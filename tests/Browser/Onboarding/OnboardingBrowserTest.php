@@ -115,3 +115,32 @@ it('persists slug edits made after Copy invite link was clicked', function (): v
     expect($user->ownedTeams)->toHaveCount(1)
         ->and($user->ownedTeams->first()->slug)->toBe('after-the-edit');
 });
+
+it('offers the invite skip only while there is an invite to skip', function (): void {
+    $user = User::factory()->create();
+
+    // With the fields empty, "Skip for now" would submit exactly what the primary
+    // button submits, so it stays hidden until an address is entered.
+    $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->assertSee('Create your workspace')
+        ->type('[id="form.name"]', 'Conditional Skip')
+        ->press('Continue')
+        ->waitForText('How did you hear about us?')
+        ->press('Continue')
+        ->waitForText('Help us customize your workspace')
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('Continue')
+        ->waitForText('Collaborate with your team')
+        ->assertSee('Get started')
+        ->assertDontSee('Skip for now')
+        ->type('input[type=email] >> nth=0', 'teammate@gmail.com')
+        // The field syncs on blur, so move focus before asserting.
+        ->click('input[type=email] >> nth=1')
+        ->waitForText('Send invites')
+        ->assertSee('Skip for now');
+});

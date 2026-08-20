@@ -16,6 +16,7 @@
     $stepCount = collect($steps)
         ->filter(static fn (\Filament\Schemas\Components\Wizard\Step $step): bool => $step->isVisible())
         ->count();
+
 @endphp
 {{-- Custom wizard view for onboarding. Removes the previous/cancel action
      divs from the footer that Filament's default view hardcodes.
@@ -167,12 +168,30 @@
          how much of onboarding is left. --}}
     @if ($isHeaderHidden && $stepCount > 1)
         <div x-cloak class="mb-6">
-            <p
-                class="text-xs font-medium text-gray-500 dark:text-gray-400"
-                x-text="@js(__('filament/pages/teams.create_team.step_indicator'))
-                    .replace(':current', getStepIndex(step) + 1)
-                    .replace(':total', @js($stepCount))"
-            ></p>
+            {{-- Back lives up here rather than under the primary button, so the footer
+                 keeps one clear call to action per step. --}}
+            <div class="flex items-center justify-between gap-x-4">
+                <button
+                    x-show="! isFirstStep()"
+                    type="button"
+                    x-on:click="goToPreviousStep()"
+                    class="flex items-center gap-x-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                >
+                    {{ \Filament\Support\generate_icon_html(
+                        \Filament\Support\Icons\Heroicon::OutlinedArrowLeft,
+                        attributes: new \Illuminate\View\ComponentAttributeBag(['class' => 'h-3.5 w-3.5']),
+                    ) }}
+
+                    {{ __('filament/pages/teams.create_team.actions.back') }}
+                </button>
+
+                <p
+                    class="ms-auto text-xs font-medium text-gray-500 dark:text-gray-400"
+                    x-text="@js(__('filament/pages/teams.create_team.step_indicator'))
+                        .replace(':current', getStepIndex(step) + 1)
+                        .replace(':total', @js($stepCount))"
+                ></p>
+            </div>
 
             <div
                 class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10"
@@ -208,18 +227,22 @@
             {{ $getSubmitAction() }}
         </div>
 
-        <div x-cloak class="mt-3 flex items-center justify-center gap-x-6">
+        {{-- Reads Livewire state rather than a server-rendered literal: Alpine compiles
+             an x-show expression once, so a baked-in value would never update as the
+             invite fields are filled in. --}}
+        <div
+            x-cloak
+            class="mt-3 text-center"
+            x-data="{
+                hasPendingInvite() {
+                    return Object.values($wire.get('data.invites') || {}).some(
+                        (invite) => ((invite || {}).email || '').trim() !== ''
+                    )
+                },
+            }"
+        >
             <button
-                x-show="! isFirstStep()"
-                type="button"
-                x-on:click="goToPreviousStep()"
-                class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-            >
-                {{ __('filament/pages/teams.create_team.actions.back') }}
-            </button>
-
-            <button
-                x-show="! isFirstStep() && step !== @js($requiredStepKey)"
+                x-show="! isFirstStep() && step !== @js($requiredStepKey) && (! isLastStep() || hasPendingInvite())"
                 type="button"
                 x-on:click="isLastStep() ? $wire.skipInvites() : goToNextStep()"
                 class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"

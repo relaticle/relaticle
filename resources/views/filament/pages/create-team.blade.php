@@ -14,8 +14,16 @@
 
                 @php($cancelUrl = $this->getCancelUrl())
 
+                {{-- Leaving the wizard belongs to the first step. From step two onward
+                     "Back" is the way out, and a third stacked link only competes with it. --}}
                 @if (filled($cancelUrl))
-                    <div class="mt-3 text-center">
+                    <div
+                        x-data="{ wizardStep: 0 }"
+                        x-on:onboarding-step-changed.window="wizardStep = $event.detail.index"
+                        x-show="wizardStep === 0"
+                        x-cloak
+                        class="mt-3 text-center"
+                    >
                         <a
                             href="{{ $cancelUrl }}"
                             wire:navigate
