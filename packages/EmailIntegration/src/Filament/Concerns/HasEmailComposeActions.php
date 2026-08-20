@@ -499,8 +499,8 @@ trait HasEmailComposeActions
                         .'</span>'
                         .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
                         .'</div>'
-                        .'<div x-show="open" x-collapse class="mt-2 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white">'
-                        .'<iframe srcdoc="'.e($safeQuotedHtml).'" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="block w-full border-0" style="height:20rem"></iframe>'
+                        .'<div x-show="open" x-collapse class="mt-2 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">'
+                        .'<iframe srcdoc="'.e($safeQuotedHtml).'" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="block w-full border-0 [color-scheme:light] dark:[color-scheme:dark]" style="height:20rem"></iframe>'
                         .'</div>'
                         .'</div>'
                     );

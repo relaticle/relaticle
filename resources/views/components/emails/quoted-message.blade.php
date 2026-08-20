@@ -81,7 +81,7 @@
                 sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                 referrerpolicy="no-referrer"
                 scrolling="no"
-                class="block w-full border-0"
+                class="block w-full border-0 [color-scheme:light] dark:[color-scheme:dark]"
                 style="height: 12rem"
             ></iframe>
         </div>

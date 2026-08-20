@@ -116,6 +116,18 @@ it('does not truncate email bodies larger than the sanitizer default input cap',
         ->assertMountedActionModalSeeHtml('END-MARKER-9F3A');
 });
 
+it('wraps sanitized email html in a scriptless dark-mode preview document', function (): void {
+    $html = EmailHtmlSanitizer::sanitize('<p style="color:#111111;background:#ffffff">Body</p>');
+
+    expect($html)
+        ->toContain('<meta name="color-scheme" content="light dark">')
+        ->toContain('@media (prefers-color-scheme: dark)')
+        ->toContain('background: #17181a')
+        ->toContain('background-color: transparent !important')
+        ->toContain('<p style="color:#111111;background:#ffffff">Body</p>')
+        ->not->toContain('<script');
+});
+
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
@@ -123,6 +135,7 @@ it('renders the email view iframe without a same-origin sandbox', function (): v
         ->assertMountedActionModalSeeHtml('<iframe')
         ->assertMountedActionModalSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox"')
         ->assertMountedActionModalSeeHtml('referrerpolicy="no-referrer"')
+        ->assertMountedActionModalSeeHtml('[color-scheme:light] dark:[color-scheme:dark]')
         ->assertMountedActionModalDontSeeHtml('allow-same-origin');
 });
 
@@ -144,6 +157,7 @@ it('sandboxes the threaded iframe without same-origin access', function (): void
 
     expect($html)
         ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->toContain('[color-scheme:light] dark:[color-scheme:dark]')
         ->not->toContain('allow-scripts')
         ->not->toContain('allow-same-origin');
 });

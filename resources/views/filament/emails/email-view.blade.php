@@ -174,7 +174,7 @@
                         srcdoc="{{ $safeHtml }}"
                         sandbox="allow-popups allow-popups-to-escape-sandbox"
                         referrerpolicy="no-referrer"
-                        class="w-full rounded-lg border-0"
+                        class="w-full rounded-lg border-0 [color-scheme:light] dark:[color-scheme:dark]"
                         style="min-height: 100vh"
                     ></iframe>
                 @elseif ($record->body?->body_text)

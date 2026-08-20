@@ -172,7 +172,7 @@
                                 srcdoc="{{ $safeHtml }}"
                                 sandbox="allow-popups allow-popups-to-escape-sandbox"
                                 referrerpolicy="no-referrer"
-                                class="w-full rounded-lg border-0"
+                                class="w-full rounded-lg border-0 [color-scheme:light] dark:[color-scheme:dark]"
                                 style="min-height: 200px; height: 60vh"
                             ></iframe>
                         @elseif ($email->body?->body_text)
