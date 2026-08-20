@@ -85,6 +85,8 @@ return [
     ],
 
     'validation' => [
+        'email_already_invited' => 'This user has already been invited to the workspace.',
+        'email_already_member' => 'This user already belongs to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
