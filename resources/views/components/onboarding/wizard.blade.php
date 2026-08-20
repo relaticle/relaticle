@@ -37,6 +37,9 @@
     x-on:go-to-wizard-step.window="$event.detail.key === @js($key) && goToStep($event.detail.step)"
     wire:ignore.self
     x-effect="window.dispatchEvent(new CustomEvent('onboarding-step-changed', { detail: { index: getStepIndex(step) } }))"
+    {{-- x-effect only re-runs when the step changes, so a listener that mounts mid-wizard
+         never hears one. This lets it ask. --}}
+    x-on:onboarding-step-request.window="window.dispatchEvent(new CustomEvent('onboarding-step-changed', { detail: { index: getStepIndex(step) } }))"
     {{
         $attributes
             ->merge([

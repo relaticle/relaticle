@@ -144,3 +144,39 @@ it('offers the invite skip only while there is an invite to skip', function (): 
         ->waitForText('Send invites')
         ->assertSee('Skip for now');
 });
+
+it('keeps the leave-wizard link off the invite step for a first-run user', function (): void {
+    $user = User::factory()->create();
+
+    // A user who owns nothing has no cancel link on first paint, so the block that
+    // tracks the wizard step only mounts once "Copy invite link" creates a workspace.
+    // It still has to know the wizard is on the last step, or the footer ends up with
+    // two competing calls to action.
+    $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->assertSee('Create your workspace')
+        ->assertDontSee('Go to workspace')
+        ->type('[id="form.name"]', 'Late Mounted Cancel')
+        ->press('Continue')
+        ->waitForText('How did you hear about us?')
+        ->press('Continue')
+        ->waitForText('Help us customize your workspace')
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('Continue')
+        ->waitForText('Collaborate with your team')
+        ->press('Copy invite link')
+        ->waitForText('Invite link copied')
+        ->assertDontSee('Go to workspace')
+        // Back on step one it is the way out again, so it has to reappear.
+        ->press('Back')
+        ->waitForText('Help us customize your workspace')
+        ->press('Back')
+        ->waitForText('How did you hear about us?')
+        ->press('Back')
+        ->waitForText('Create your workspace')
+        ->assertSee('Go to workspace');
+});
