@@ -55,6 +55,11 @@ abstract class BaseReadShowTool implements Tool
         CustomFieldType::TEXTAREA->value,
     ];
 
+    /**
+     * Characters kept per free-text value. Shared by the included-record strip
+     * and the record card, so the same field never reads shorter in the payload
+     * the model sees than in the card the user reads.
+     */
     private const int FREE_TEXT_LIMIT = 500;
 
     /**
@@ -197,6 +202,7 @@ abstract class BaseReadShowTool implements Tool
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
             $model,
             resolve(DisplayFieldSelector::class)->cardFields($user->currentTeam, $this->entityType()),
+            self::FREE_TEXT_LIMIT,
         );
 
         return [

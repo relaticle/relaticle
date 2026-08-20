@@ -14,6 +14,7 @@ use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\DisplayBlocks;
@@ -24,6 +25,7 @@ use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\ChatDocument;
 
+mutates(CustomFieldsDisplayFormatter::class);
 mutates(DisplayFieldSelector::class);
 mutates(DisplayBlocks::class);
 mutates(ListCompaniesTool::class);
@@ -92,6 +94,23 @@ function blockFieldLabels(array $block): array
     $fields = $block['fields'] ?? [];
 
     return array_map(static fn (array $field): string => (string) $field['label'], $fields);
+}
+
+/**
+ * @param  array<string, mixed>  $block
+ */
+function blockFieldValue(array $block, string $label): ?string
+{
+    /** @var list<array{label: string, value: string, type: string}> $fields */
+    $fields = $block['fields'] ?? [];
+
+    foreach ($fields as $field) {
+        if ($field['label'] === $label) {
+            return $field['value'];
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -246,6 +265,74 @@ it('returns a record_card block for a single record', function (): void {
         ->and($block['fields'][0])->toHaveKeys(['label', 'value', 'type']);
 });
 
+// --- block values are capped: the envelope is persisted forever ---
+
+it('caps a long free-text value harder in a table cell than on a card', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'company', 'briefing', 'Briefing');
+
+    $long = str_repeat("Quarterly review notes.\n", 900).'SENTINEL_TAIL';
+
+    $company = app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['briefing' => $long],
+    ]);
+
+    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
+    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
+
+    $cell = $table['rows'][0]['cells']['briefing'];
+    $cardValue = blockFieldValue($card, 'Briefing');
+
+    expect(mb_strlen($long))->toBeGreaterThan(20000)
+        ->and($cell)->not->toContain('SENTINEL_TAIL')
+        ->and($cell)->not->toContain("\n")
+        ->and(mb_strlen($cell))->toBeLessThanOrEqual(123)
+        ->and($cardValue)->not->toBeNull()
+        ->and($cardValue)->not->toContain('SENTINEL_TAIL')
+        ->and($cardValue)->not->toContain("\n")
+        ->and(mb_strlen((string) $cardValue))->toBeLessThanOrEqual(503)
+        ->and(mb_strlen((string) $cardValue))->toBeGreaterThan(123);
+});
+
+// --- a custom field may be coded like the core column ---
+
+it('keeps the core column single when a custom field shares its code', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'company', 'name', 'Legal Name');
+
+    app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['name' => 'Acme Holdings GmbH'],
+    ]);
+
+    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
+
+    expect(array_count_values(blockColumnKeys($table))['name'])->toBe(1)
+        ->and($table['rows'][0]['cells']['name'])->toBe('Acme');
+});
+
+it('keeps the core column single when a same-coded custom field is promoted', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'company', 'name', 'Legal Name', ['visible_in_list' => false]);
+
+    app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['name' => 'Acme Holdings GmbH'],
+    ]);
+
+    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request(['sort' => '-name'])));
+
+    expect(array_count_values(blockColumnKeys($table))['name'])->toBe(1)
+        ->and($table['rows'][0]['cells']['name'])->toBe('Acme');
+});
+
 // --- (c) blocks are re-derived from persisted tool_results on reload ---
 
 it('derives display_blocks from persisted tool_results on reload', function (): void {
@@ -295,7 +382,43 @@ it('hides a list-toggleable field from the table but keeps it on the card', func
         ->and(blockFieldLabels($card))->toContain('HQ');
 });
 
-it('drops a field from the surface its team hid it from', function (): void {
+it('hides a list-hidden field from the table while the card still shows it', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'company', 'hq', 'HQ', ['visible_in_list' => false, 'visible_in_view' => true]);
+
+    $company = app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['hq' => 'Berlin'],
+    ]);
+
+    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
+    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
+
+    expect(blockColumnKeys($table))->not->toContain('hq')
+        ->and(blockFieldLabels($card))->toContain('HQ');
+});
+
+it('hides a view-hidden field from the card while the table still shows it', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    seedDisplayField($user, 'company', 'hq', 'HQ', ['visible_in_list' => true, 'visible_in_view' => false]);
+
+    $company = app(CreateCompany::class)->execute($user, [
+        'name' => 'Acme',
+        'custom_fields' => ['hq' => 'Berlin'],
+    ]);
+
+    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
+    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
+
+    expect(blockColumnKeys($table))->toContain('hq')
+        ->and(blockFieldLabels($card))->not->toContain('HQ');
+});
+
+it('drops a field its team hid from both surfaces', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
