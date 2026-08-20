@@ -9,12 +9,12 @@
 
 <div>
     @if ($proposal)
-        <div class="rounded-2xl border border-gray-200/80 bg-white p-4 shadow-lg shadow-gray-900/[0.04] dark:border-white/10 dark:bg-gray-900 dark:shadow-black/20">
+        <div class="rounded-2xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-4 shadow-sm">
             {{-- Header: operation icon tile + human summary + batch pager --}}
             <div class="flex items-start gap-3">
                 <div
                     @class([
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
                         'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400' => $operation === 'create',
                         'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400' => $operation === 'update',
                         'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $operation === 'delete',
@@ -22,11 +22,11 @@
                     aria-hidden="true"
                 >
                     @if ($operation === 'update')
-                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
                     @elseif ($operation === 'delete')
-                        <x-heroicon-o-trash class="h-4 w-4" />
+                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
                     @else
-                        <x-heroicon-o-plus class="h-4 w-4" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     @endif
                 </div>
 
@@ -69,7 +69,7 @@
             @endif
 
             {{-- Field rows: fixed label column so values align, diffs render old → new --}}
-            <div class="mt-3 space-y-1.5 ps-11">
+            <div class="mt-3 space-y-2.5 ps-10">
                 @foreach ($recordFields as $row)
                     @php
                         $code = $row['code'] ?? null;
@@ -128,13 +128,13 @@
                                             @endforeach
                                         @else
                                             @foreach ($row['values'] as $badge)
-                                                <span class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">{{ $badge }}</span>
+                                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">{{ $badge }}</span>
                                             @endforeach
                                         @endif
                                     @elseif (($row['type'] ?? null) === 'boolean')
                                         <span
                                             @class([
-                                                'inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium',
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium',
                                                 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400' => ($row['new'] ?? $row['value'] ?? null) === 'Yes',
                                                 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400' => ($row['new'] ?? $row['value'] ?? null) !== 'Yes',
                                             ])
@@ -198,7 +198,7 @@
                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="createCurrent" aria-hidden="true" />
                     <x-heroicon-o-check class="h-3.5 w-3.5" wire:loading.remove wire:target="createCurrent" aria-hidden="true" />
                     <span>{{ $createLabel }}</span>
-                    <kbd class="hidden rounded bg-white/20 px-1 font-sans text-[10px] sm:inline">&#8984;&#9166;</kbd>
+                    <kbd class="hidden rounded bg-white/20 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline">&#8984;&#9166;</kbd>
                 </button>
             </div>
         </div>

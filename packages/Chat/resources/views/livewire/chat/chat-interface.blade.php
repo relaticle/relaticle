@@ -16,23 +16,6 @@
 >
     @include('chat::livewire.chat.partials._transcript')
 
-    {{-- Jump-to-latest pill: new content arrived while reading older messages --}}
-    <template x-if="hasUnseenBelow">
-        <div class="pointer-events-none absolute inset-x-0 bottom-28 z-30 flex justify-center">
-            <button
-                type="button"
-                x-on:click="jumpToLatest()"
-                class="pointer-events-auto flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                x-transition:enter="transition ease-out duration-150"
-                x-transition:enter-start="opacity-0 translate-y-1"
-                x-transition:enter-end="opacity-100 translate-y-0"
-            >
-                <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
-                New messages
-            </button>
-        </div>
-    </template>
-
     @include('chat::livewire.chat.partials._composer')
 
     {{-- Full-page chat only: the switcher never opens on the side panel's own
