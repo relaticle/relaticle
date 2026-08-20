@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Take the assistant from "works" to best-in-class: Telegram-feel transcript, record chips and display-block cards instead of markdown, broader tool coverage, voice input, team display templates.
+**Goal:** Take the assistant from "works" to best-in-class: Telegram-feel transcript, record chips and display-block cards instead of markdown, broader tool coverage, voice input.
 
 **Architecture:** One Livewire component + Alpine keyed x-for stays (Livewire 4 islands cannot loop). Phase 1 restructures the front-end once into Blade partials + ES modules and seeds a block-renderer registry; every later phase plugs into that registry or the tool-result envelope instead of re-opening the transcript.
 
@@ -39,7 +39,9 @@
 | 7 | 17-18 | Phase 3: activity tool + in-conversation search |
 | 8 | 19 | Phase 3: escort audit (+ gated comments/email tools) |
 | 9 | 20 | Phase 4: voice input |
-| 10 | 21 | Phase 5: team display templates |
+
+PR 10 (Task 21, team display templates) is REMOVED. Display field selection is
+derived inside PR 6; see the Task 21 ruling.
 
 Sequential merges; each PR leaves main green.
 
@@ -639,11 +641,24 @@ In `copyMessage`: `text.replaceAll('](/r/', '](' + window.location.origin + '/r/
 
 - [ ] **Step 1: Failing tests**
 
-Three: (a) `ListCompaniesTool` result JSON contains a `records_table` block whose rows carry `/r/` urls and formatted cells; (b) `GetCompanyTool` result contains a `record_card` block; (c) after a turn persists, `ListConversationMessages` returns the assistant message with `display_blocks` non-empty. For (c) insert a fake `tool_results` row shaped like the real column content (copy the shape from an existing pending-action test: find with `grep -rl "tool_results" tests/Feature/Chat`).
+Five: (a) `ListCompaniesTool` result JSON contains a `records_table` block whose rows carry `/r/` urls and formatted cells; (b) `GetCompanyTool` result contains a `record_card` block; (c) after a turn persists, `ListConversationMessages` returns the assistant message with `display_blocks` non-empty. For (c) insert a fake `tool_results` row shaped like the real column content (copy the shape from an existing pending-action test: find with `grep -rl "tool_results" tests/Feature/Chat`).
+
+Plus two for the derived selection: (d) a custom field with `list_toggleable_hidden` true is ABSENT from the `records_table` columns but PRESENT in the `record_card` (it is still `visible_in_view`), and flipping `visible_in_list` to false removes it from both; (e) filtering `ListOpportunitiesTool` on a hidden field puts that field's column FIRST in the block, proving query-aware promotion overrides the team's list setting. Both (d) and (e) assert against a second team's fields too: selection is per-tenant and must never leak.
 
 - [ ] **Step 2: Implement tool side**
 
-In the list base, after assembling rows for the model payload, derive the block: columns from the same field set the tool already formats (name + up to 4 salient fields: reuse whatever the tool returns per row today), rows capped at 10 with `total`. In the show base: `record_card` with the same field rows `CustomFieldsDisplayFormatter` produces for proposals (label/value/type), capped at 8 fields. Keep `display_block.display` small: formatted strings only, no raw HTML, no full custom-field dumps.
+Field selection is DERIVED from the team's existing custom-field visibility settings, never from a first-N-fields heuristic and never from a chat-only config table (see the Task 21 ruling below). Add `packages/Chat/src/Services/Tools/DisplayFieldSelector.php`, a `final readonly` sibling of `CustomFieldsSchemaDescriber`, with two methods:
+
+- `listFields(Team $team, string $entityType): list<CustomField>`: mirrors what the Filament TABLE shows: `App\Models\CustomField::query()->where('tenant_id', $team->getKey())->where('entity_type', $entityType)->active()->visibleInList()`, then drop rows whose `settings->list_toggleable_hidden` is true, `orderBy('sort_order')`.
+- `cardFields(Team $team, string $entityType): list<CustomField>`: mirrors what the Filament VIEW page shows: same query with `visibleInView()` instead, `orderBy('sort_order')`, no toggleable filter.
+
+Query through `App\Models\CustomField` (the arch rules forbid the package model directly); the `active()`/`visibleInList()`/`visibleInView()` scopes come from the package's `CustomFieldQueryBuilder`. Take `Team` explicitly and never rely on ambient tenant scoping: these tools run inside a queued Horizon job with no Filament tenant bound.
+
+In the list base: columns are the entity's core name/title column plus `listFields()`, rows capped at 10 with `total`. In the show base: `record_card` rows are the core fields plus `cardFields()`, formatted by `CustomFieldsDisplayFormatter` (label/value/type), capped at 8 fields.
+
+Query-aware promotion (this is what makes selection smart rather than merely derived): any field code the tool call itself filtered or sorted on is moved to the front of the derived list, and is INCLUDED even when the team hid it from the list. Ask for "opportunities closing this month over $50k" and close_date/amount lead the table regardless of settings. Implement as one reorder step over the selector's output inside the block builder, using the filter/sort codes the tool already parses; it holds no state and gets no service of its own. Cap still applies after promotion.
+
+Keep `display_block.display` small: formatted strings only, no raw HTML, no full custom-field dumps.
 
 - [ ] **Step 3: Implement derivation + reconcile**
 
@@ -787,34 +802,38 @@ Real browser with a real mic is manual: verify endpoint + insertion with a fixtu
 
 ---
 
-### Task 21: Team display templates (Jav's request)
+### Task 21: REMOVED. Display field selection is derived, not configured
 
-**Files:**
-- Create: migration `chat_display_templates` in the root `database/migrations/` (chat tables live there, not in the package; confirm with `ls database/migrations | grep -i chat`, e.g. the `superseded_at` migration). Columns: `team_id` FK, `entity_type` string, `field_codes` jsonb, unique(team_id, entity_type), timestamps; `up()` only
-- Create: `packages/Chat/src/Models/DisplayTemplate.php`, `packages/Chat/src/Services/DisplayFieldSelector.php`, `app/Actions/Chat/SaveDisplayTemplate.php`
-- Modify: the read tool bases (Task 15's block builders consult the selector), chip hover left for later
-- Create: settings UI section on the team settings page (find the page: `grep -rn "CustomFields" app/Filament/Pages/Team` and follow that pattern)
-- Test: `tests/Feature/Chat/DisplayTemplateTest.php`
+**Ruling (2026-08-20, user-approved):** Task 21 shipped no code. The
+`chat_display_templates` migration, `DisplayTemplate` model,
+`SaveDisplayTemplate` action, the team settings UI, `DisplayTemplateTest`,
+and PR 10 are all deleted from this plan. Task 15 absorbs the selection logic.
 
-**Interfaces:**
-- Produces: `DisplayFieldSelector::fieldsFor(Team $team, string $entityType): list<string>` (ordered field codes; defaults per entity when no row: name/title, status or stage, owner, amount where applicable); `SaveDisplayTemplate::execute(User $user, string $entityType, array $fieldCodes): DisplayTemplate` (authorizes team ownership, validates codes against core + active custom fields).
+The task's premise was that "nobody can change" which fields represent an
+entity in chat. That is false. Every custom field already stores, per tenant,
+`visible_in_list`, `list_toggleable_hidden`, `visible_in_view`, and
+`sort_order`, editable in the Custom Fields admin UI. A sampled tenant's
+`visible_in_list` set for `opportunity` is literally `{amount, close_date,
+stage}`, the exact fields Jav's scenario asks for, already configured.
 
-- [ ] **Step 1: Failing tests**
+So a chat-only template table would be a SECOND place to store the same fact,
+which the project's core rules forbid ("never store the same fact in two
+places; pick one source of truth"). Deriving from the existing settings is
+strictly better than configuring separately: chat matches what the CRM list
+and view pages show, by construction, with no new surface to keep in sync.
 
-(a) selector returns defaults with no row; (b) after `SaveDisplayTemplate`, `GetCompanyTool`'s `record_card` block shows exactly the configured fields in order; (c) non-owner cannot save (403); (d) unknown field code rejected (validation).
+Accepted trade: chat display is coupled to list/view visibility. A team that
+wants a field in chat but NOT in its table cannot express that. If that
+demand ever appears, revisit with a per-field "show in chat" toggle on the
+existing custom-field form, extending the one config surface, never adding a
+second one.
 
-- [ ] **Step 2: Implement**
-
-Selector merges core field labels (the per-entity map `ProposalDisplayBuilder` already carries) with active custom-field codes (`CustomFieldsSchemaDescriber` knows them). Block builders replace their "first N fields" heuristic with the selector's list. Settings UI: repeatable sortable select of available fields per entity type, saved through the action.
-
-- [ ] **Step 3: Verify + screenshots + commit + PR 10**
-
-`git commit -m "feat(chat): team-configurable record display templates"`
+Hover cards remain deferred (spec marks them optional).
 
 ---
 
 ## Self-review notes
 
-- Spec coverage: Phase 0 (Task 1), 1a (2-4), 1b (5-10), 1c (11), 1d (10 step 3), 2 chips (12-14), 2 blocks (15-16), 3 (17-19, comments/email explicitly gated: not on main at plan time), 4 (20), 5 templates (21). Retrieval pin is spec-only by design; issue #495 tracks the build. Hover cards deferred (spec marks them optional, Phase 5 "later").
+- Spec coverage: Phase 0 (Task 1), 1a (2-4), 1b (5-10), 1c (11), 1d (10 step 3), 2 chips (12-14), 2 blocks (15-16), 3 (17-19, comments/email explicitly gated: not on main at plan time), 4 (20). Phase 5's template half is REMOVED (see Task 21) and its intent is served inside Task 15 by deriving from custom-field visibility settings. Retrieval pin is spec-only by design; issue #495 tracks the build. Hover cards deferred (spec marks them optional, Phase 5 "later").
 - The `HORIZON_CHAT_MAX` raise is an ops decision: flag in PR 3's description, not a code task.
 - Type consistency: `referenceUrl()` (Task 13) is what Task 14's sweep and Task 15's rows consume; `display_blocks` key name is shared by Tasks 15 and 16; registry API (`registerBlock`/`blockTemplate`) shared by Tasks 4 and 16.
