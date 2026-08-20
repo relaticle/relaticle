@@ -37,7 +37,8 @@ final class ManageTasks extends ManageRecords
                 Action::make('import')
                     ->label(__('filament/resources/task.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportTasks::getUrl()),
+                    ->url(ImportTasks::getUrl())
+                    ->visible(ImportTasks::canAccess(...)),
                 ExportAction::make()->exporter(TaskExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
