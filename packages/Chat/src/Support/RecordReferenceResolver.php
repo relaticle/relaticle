@@ -24,6 +24,16 @@ use Throwable;
 final readonly class RecordReferenceResolver
 {
     /**
+     * Entity types the render-time chip sweep will style as chips. These get
+     * the short `/r/{type}/{id}` redirect URL; every other type
+     * (e.g. custom_field, which has no per-record route) keeps the
+     * absolute panel URL from `urlFor()`.
+     *
+     * @var list<string>
+     */
+    private const array CHIP_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
+
+    /**
      * @param  array<int|string, mixed>  $ids
      * @return list<array{id: string, type: string, url: string, label: string|null}>
      */
@@ -63,6 +73,20 @@ final readonly class RecordReferenceResolver
             'url' => $url,
             'label' => $this->resolveLabel($entityType, $recordId),
         ];
+    }
+
+    /**
+     * The URL a chat tool payload cites for a record. Chip-able types get the
+     * short `/r/{type}/{id}` redirect (rendered as a styled chip later);
+     * everything else falls back to the absolute panel URL.
+     */
+    public function referenceUrl(string $entityType, string $recordId): ?string
+    {
+        if (in_array($entityType, self::CHIP_TYPES, true)) {
+            return "/r/{$entityType}/{$recordId}";
+        }
+
+        return $this->urlFor($entityType, $recordId);
     }
 
     /**

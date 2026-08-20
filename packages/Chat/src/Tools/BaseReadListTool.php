@@ -132,7 +132,8 @@ abstract class BaseReadListTool implements Tool
         }
 
         $citationType = $this->citationType();
-        $items = array_map(function (mixed $item) use ($citationType): mixed {
+        $resolver = resolve(RecordReferenceResolver::class);
+        $items = array_map(function (mixed $item) use ($citationType, $resolver): mixed {
             if (! is_array($item)) {
                 return $item;
             }
@@ -141,11 +142,11 @@ abstract class BaseReadListTool implements Tool
                 ? (string) $item['id']
                 : null;
 
-            $ref = $id !== null
-                ? resolve(RecordReferenceResolver::class)->resolve($citationType, $id)
-                : null;
+            $item['url'] = null;
 
-            $item['url'] = $ref['url'] ?? null;
+            if ($id !== null && $resolver->resolve($citationType, $id) !== null) {
+                $item['url'] = $resolver->referenceUrl($citationType, $id);
+            }
 
             return $item;
         }, $items);

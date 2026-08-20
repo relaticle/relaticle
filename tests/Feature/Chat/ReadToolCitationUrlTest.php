@@ -47,19 +47,18 @@ beforeEach(function (): void {
 
 // --- GetCompanyTool ---
 
-it('GetCompanyTool output contains a non-null url with /companies/', function (): void {
+it('GetCompanyTool output url is the /r/company/{id} reference url', function (): void {
     $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
 
     $payload = json_decode(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])), true);
 
     expect($payload)->toHaveKey('url')
-        ->and($payload['url'])->toBeString()
-        ->and($payload['url'])->toContain('/companies/');
+        ->and($payload['url'])->toBe("/r/company/{$company->getKey()}");
 });
 
 // --- ListCompaniesTool ---
 
-it('ListCompaniesTool output items each have a url containing /companies/', function (): void {
+it('ListCompaniesTool output items each have a /r/company/{id} reference url', function (): void {
     Company::factory()->count(2)->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
@@ -68,25 +67,24 @@ it('ListCompaniesTool output items each have a url containing /companies/', func
 
     foreach ($payload as $item) {
         expect($item)->toHaveKey('url')
-            ->and($item['url'])->toBeString()
-            ->and($item['url'])->toContain('/companies/');
+            ->and($item['url'])->toBe("/r/company/{$item['id']}");
     }
 });
 
 // --- GetPersonTool ---
 
-it('GetPersonTool output contains a url with /people/', function (): void {
+it('GetPersonTool output url is the /r/people/{id} reference url', function (): void {
     $person = People::factory()->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(GetPersonTool::class)->handle(new Request(['id' => (string) $person->getKey()])), true);
 
     expect($payload)->toHaveKey('url')
-        ->and($payload['url'])->toContain('/people/');
+        ->and($payload['url'])->toBe("/r/people/{$person->getKey()}");
 });
 
 // --- ListPeopleTool ---
 
-it('ListPeopleTool output items each have a url with /people/', function (): void {
+it('ListPeopleTool output items each have a /r/people/{id} reference url', function (): void {
     People::factory()->count(2)->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(ListPeopleTool::class)->handle(new Request([])), true);
@@ -95,24 +93,24 @@ it('ListPeopleTool output items each have a url with /people/', function (): voi
 
     foreach ($payload as $item) {
         expect($item)->toHaveKey('url')
-            ->and($item['url'])->toContain('/people/');
+            ->and($item['url'])->toBe("/r/people/{$item['id']}");
     }
 });
 
 // --- GetOpportunityTool ---
 
-it('GetOpportunityTool output contains a url with /opportunities/', function (): void {
+it('GetOpportunityTool output url is the /r/opportunity/{id} reference url', function (): void {
     $opportunity = Opportunity::factory()->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(GetOpportunityTool::class)->handle(new Request(['id' => (string) $opportunity->getKey()])), true);
 
     expect($payload)->toHaveKey('url')
-        ->and($payload['url'])->toContain('/opportunities/');
+        ->and($payload['url'])->toBe("/r/opportunity/{$opportunity->getKey()}");
 });
 
 // --- ListOpportunitiesTool ---
 
-it('ListOpportunitiesTool output items each have a url with /opportunities/', function (): void {
+it('ListOpportunitiesTool output items each have a /r/opportunity/{id} reference url', function (): void {
     Opportunity::factory()->count(2)->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(ListOpportunitiesTool::class)->handle(new Request([])), true);
@@ -121,25 +119,24 @@ it('ListOpportunitiesTool output items each have a url with /opportunities/', fu
 
     foreach ($payload as $item) {
         expect($item)->toHaveKey('url')
-            ->and($item['url'])->toContain('/opportunities/');
+            ->and($item['url'])->toBe("/r/opportunity/{$item['id']}");
     }
 });
 
 // --- GetTaskTool ---
 
-it('GetTaskTool output contains a url (task index)', function (): void {
+it('GetTaskTool output url is the /r/task/{id} reference url', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(GetTaskTool::class)->handle(new Request(['id' => (string) $task->getKey()])), true);
 
     expect($payload)->toHaveKey('url')
-        ->and($payload['url'])->toBeString()
-        ->and($payload['url'])->toContain('/tasks');
+        ->and($payload['url'])->toBe("/r/task/{$task->getKey()}");
 });
 
 // --- ListTasksTool ---
 
-it('ListTasksTool output items each have a url (task index)', function (): void {
+it('ListTasksTool output items each have a /r/task/{id} reference url', function (): void {
     Task::factory()->count(2)->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(ListTasksTool::class)->handle(new Request([])), true);
@@ -148,26 +145,24 @@ it('ListTasksTool output items each have a url (task index)', function (): void 
 
     foreach ($payload as $item) {
         expect($item)->toHaveKey('url')
-            ->and($item['url'])->toBeString()
-            ->and($item['url'])->toContain('/tasks');
+            ->and($item['url'])->toBe("/r/task/{$item['id']}");
     }
 });
 
 // --- GetNoteTool ---
 
-it('GetNoteTool output contains a url (note index)', function (): void {
+it('GetNoteTool output url is the /r/note/{id} reference url', function (): void {
     $note = Note::factory()->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(GetNoteTool::class)->handle(new Request(['id' => (string) $note->getKey()])), true);
 
     expect($payload)->toHaveKey('url')
-        ->and($payload['url'])->toBeString()
-        ->and($payload['url'])->toContain('/notes');
+        ->and($payload['url'])->toBe("/r/note/{$note->getKey()}");
 });
 
 // --- ListNotesTool ---
 
-it('ListNotesTool output items each have a url (note index)', function (): void {
+it('ListNotesTool output items each have a /r/note/{id} reference url', function (): void {
     Note::factory()->count(2)->for($this->user->currentTeam)->create();
 
     $payload = json_decode(app(ListNotesTool::class)->handle(new Request([])), true);
@@ -176,7 +171,6 @@ it('ListNotesTool output items each have a url (note index)', function (): void 
 
     foreach ($payload as $item) {
         expect($item)->toHaveKey('url')
-            ->and($item['url'])->toBeString()
-            ->and($item['url'])->toContain('/notes');
+            ->and($item['url'])->toBe("/r/note/{$item['id']}");
     }
 });
