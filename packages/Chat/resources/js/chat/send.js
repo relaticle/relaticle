@@ -169,6 +169,14 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
 
     async regenerateMessage(index) {
         if (this.isStreaming) return;
+        // The composer is throttled team-wide right now: sendMessage() below
+        // would bail on its own `if (this.rateLimit) return` guard without
+        // pushing anything back, so splicing first would just delete the
+        // turn with nothing to replace it (issue #499). Bailing here instead
+        // leaves the still-failed bubble and its auto-resend countdown
+        // untouched, the same no-op behavior the isStreaming guard above
+        // already gives every other caller of this button mid-send.
+        if (this.rateLimit) return;
 
         let userIndex = -1;
         for (let i = index - 1; i >= 0; i--) {
@@ -636,6 +644,11 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     async retryTurn(msg) {
         if (this.isStreaming) return;
         if (msg._retrying) return;
+        // Same guard as regenerateMessage() and for the same reason (issue
+        // #499): sendMessage() below is a no-op while rate-limited, so
+        // splicing this turn out first would just delete it with nothing to
+        // replace it. Bail and leave the retryable bubble in place.
+        if (this.rateLimit) return;
 
         // Failed user turn: the server never stored the message — re-send the
         // preceding user message from local state (same flow as edit-resend).
