@@ -11,6 +11,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -92,9 +93,10 @@ final readonly class CustomFieldsDisplayFormatter
      * a proposal card and a record card never disagree about a value.
      *
      * @param  list<CustomField>  $fields  already scoped to the record's tenant, with options loaded
+     * @param  int  $valueLimit  characters kept per value, after whitespace is squeezed onto one line
      * @return list<array{label: string, code: string, value: string, type: string}>
      */
-    public function formatStored(Model $model, array $fields): array
+    public function formatStored(Model $model, array $fields, int $valueLimit): array
     {
         if ($fields === [] || ! $model->relationLoaded('customFieldValues')) {
             return [];
@@ -115,19 +117,39 @@ final readonly class CustomFieldsDisplayFormatter
 
             $rendered = $this->renderValue($field, $stored->{CustomFieldValue::getValueColumn($field->type)});
 
-            if ($rendered === null || $rendered === '') {
+            if ($rendered === null) {
+                continue;
+            }
+
+            $value = $this->condense($rendered, $valueLimit);
+
+            if ($value === '') {
                 continue;
             }
 
             $rows[] = [
                 'label' => $field->name,
                 'code' => $field->code,
-                'value' => $rendered,
+                'value' => $value,
                 'type' => $this->displayType($field, CustomFieldsType::getFieldType($field->type)?->dataType),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * A display block is a summary that the tool result carries forever, so a
+     * stored value is squeezed onto one line and capped. A rich-editor field
+     * holds kilobytes of prose; uncapped, one row of presentation copy would
+     * dwarf the whole model-facing payload it sits next to.
+     *
+     * format() deliberately does not condense: a proposal diff has to show
+     * exactly what is about to be written.
+     */
+    private function condense(string $value, int $limit): string
+    {
+        return Str::limit(trim((string) preg_replace('/\s+/', ' ', $value)), $limit);
     }
 
     private function renderValue(CustomField $field, mixed $value): ?string

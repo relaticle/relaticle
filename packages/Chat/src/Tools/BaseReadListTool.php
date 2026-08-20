@@ -46,6 +46,12 @@ abstract class BaseReadListTool implements Tool
      */
     private const int BLOCK_COLUMN_LIMIT = 6;
 
+    /**
+     * Characters kept per table cell. Tighter than the record card's cap: a cell
+     * is one line of a ten-row table, not a record summary.
+     */
+    private const int CELL_VALUE_LIMIT = 120;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -207,21 +213,27 @@ abstract class BaseReadListTool implements Tool
 
         $team = $user->currentTeam;
         $entityType = $this->entityType();
+        $coreKey = $this->searchFilterName();
 
-        $promoted = $this->promotedFields($team, $entityType, $this->promotedCodes($request));
+        // Nothing stops a team from coding a custom field `name` or `title`.
+        // Left in, it would emit the core column twice and its cell would
+        // overwrite the record's own name, which is the cell the row links from.
+        $promoted = array_values(array_filter(
+            $this->promotedFields($team, $entityType, $this->promotedCodes($request)),
+            static fn (CustomField $field): bool => $field->code !== $coreKey,
+        ));
         $promotedCodes = array_map(static fn (CustomField $field): string => $field->code, $promoted);
 
         $derived = array_values(array_filter(
             resolve(DisplayFieldSelector::class)->listFields($team, $entityType),
-            static fn (CustomField $field): bool => ! in_array($field->code, $promotedCodes, true),
+            static fn (CustomField $field): bool => $field->code !== $coreKey
+                && ! in_array($field->code, $promotedCodes, true),
         ));
 
         // The core column always survives the cap, so the promoted half is
         // trimmed first and the derived half fills whatever is left.
         $promoted = array_slice($promoted, 0, self::BLOCK_COLUMN_LIMIT - 1);
         $derived = array_slice($derived, 0, self::BLOCK_COLUMN_LIMIT - 1 - count($promoted));
-
-        $coreKey = $this->searchFilterName();
 
         return [
             'block' => 'records_table',
@@ -267,7 +279,7 @@ abstract class BaseReadListTool implements Tool
             $coreValue = $record->getAttribute($coreKey);
             $cells = [$coreKey => is_scalar($coreValue) ? (string) $coreValue : ''];
 
-            foreach ($formatter->formatStored($record, $fields) as $row) {
+            foreach ($formatter->formatStored($record, $fields, self::CELL_VALUE_LIMIT) as $row) {
                 $cells[$row['code']] = $row['value'];
             }
 
