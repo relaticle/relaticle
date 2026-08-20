@@ -427,6 +427,28 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
         'updated_at' => now(),
     ]);
 
+    // A real persisted row for the turn regenerateMessage() targets. Without
+    // one, supersedeServerTurns()'s anchor lookup finds nothing to match and
+    // a `superseded_at is still null` assertion below would pass whether or
+    // not the guard exists, giving it no teeth.
+    $targetMessageId = (string) Str::uuid7();
+    DB::table('agent_conversation_messages')->insert([
+        'id' => $targetMessageId,
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'test',
+        'role' => 'user',
+        'content' => 'first attempt',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
     $page = $this->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->type('[id="form.password"]', 'password')
@@ -436,6 +458,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
 
     $resolveInterface = ChatBrowser::resolveInterface();
     $conversationIdJson = json_encode($conversationId);
+    $targetMessageIdJson = json_encode($targetMessageId);
 
     // Fabricates the exact state issue #499 describes: a countdown from a
     // PRIOR failed send is already ticking (this.rateLimit is set) when the
@@ -452,7 +475,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
             data.conversationId = {$conversationIdJson};
 
             data.messages = [
-                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ id: {$targetMessageIdJson}, role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
                 data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
                 data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
             ];
@@ -481,6 +504,18 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
     expect($result['contents'])->toBe(['first attempt', 'first reply', 'second attempt']);
     expect($result['rateLimitStillActive'])->toBeTrue();
     expect($result['rateLimitSecondsLeft'])->toBe(30);
+
+    // The server-truth assertion: the local array looking untouched is not
+    // enough on its own, since reload reads from the DB. Before the fix,
+    // regenerateMessage() called supersedeServerTurns() (stamping this row's
+    // superseded_at) BEFORE ever reaching the rate-limit no-op in
+    // sendMessage(), so the local splice-restoring fix above still left a
+    // server-side supersede in place unless the guard runs first.
+    $supersededAt = DB::table('agent_conversation_messages')
+        ->where('id', $targetMessageId)
+        ->value('superseded_at');
+
+    expect($supersededAt)->toBeNull();
 });
 
 it('leaves the transcript untouched when retryTurn is triggered while an earlier send is still rate-limited (issue #499 sibling)', function (): void {
@@ -552,6 +587,136 @@ it('leaves the transcript untouched when retryTurn is triggered while an earlier
     expect($result['roles'])->toBe(['user', 'assistant', 'user']);
     expect($result['contents'])->toBe(['first attempt', '', 'second attempt']);
     expect($result['rateLimitStillActive'])->toBeTrue();
+
+    // Server-truth companion to the local-array assertions above. Unlike
+    // regenerateMessage(), retryTurn() never calls supersedeServerTurns() at
+    // all (the retried turn was never persisted server-side to begin with),
+    // so the guard's server-side contract here is that nothing gets written:
+    // no row for this conversation exists regardless of the local splice.
+    expect(DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->count())->toBe(0);
+});
+
+it('does not permanently supersede the edited turn when saveEdit is triggered while an earlier send is still rate-limited (issue #499 sibling: saveEdit)', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // A real persisted row for the turn being edited. saveEdit() supersedes
+    // this row server-side BEFORE splicing local state (unlike retryTurn(),
+    // and unlike regenerateMessage() post-#499-fix), so without a matching
+    // real row the supersede anchor lookup finds nothing and the
+    // `superseded_at is still null` assertion below would pass either way.
+    $editedMessageId = (string) Str::uuid7();
+    DB::table('agent_conversation_messages')->insert([
+        'id' => $editedMessageId,
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'test',
+        'role' => 'user',
+        'content' => 'first attempt',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+    $editedMessageIdJson = json_encode($editedMessageId);
+
+    // Fabricates the exact state the bug report describes: a countdown from a
+    // PRIOR failed send is already ticking (this.rateLimit is set) when the
+    // user edits and saves an EARLIER user message. saveEdit() supersedes the
+    // server-side row FIRST, then splices this.messages, then calls
+    // sendMessage() to resend, which silently no-ops on `if (this.rateLimit)
+    // return`. Pre-fix that permanently deletes the edited turn (and
+    // everything after it) both locally and server-side, with nothing sent
+    // to replace it, and reload does not recover it.
+    // Widened timeout, same reason as chatTriggerRateLimitedFailure above: unlike
+    // the regenerate/retryTurn siblings (which never reach the network pre-fix
+    // either), an UNFIXED saveEdit() makes a real supersede round trip before
+    // returning, and a Pest-level retry re-invoking this whole script mid-flight
+    // would fire that real POST twice against the same row.
+    $result = Playwright::usingTimeout(60_000, fn (): mixed => $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            window.Echo = null;
+            data.conversationId = {$conversationIdJson};
+
+            data.messages = [
+                data.ensureClientKey({ id: {$editedMessageIdJson}, role: 'user', content: 'first attempt', editing: true, editText: 'edited while rate limited', sendState: 'sent', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+            ];
+
+            const failedMsg = data.messages[data.messages.length - 1];
+            data.rateLimit = { secondsLeft: 30, timerId: null, userMsg: failedMsg };
+
+            // Captured BEFORE the call: pre-fix, saveEdit() splices this.messages
+            // to empty, so data.messages[0] would be undefined afterward and
+            // reading .editing off it would throw. This reference survives the
+            // splice either way (splice removes it from the array, not from
+            // existence), so it is the safe way to read the target's own state
+            // regardless of which behavior actually ran.
+            const targetMsg = data.messages[0];
+
+            await data.saveEdit(targetMsg, 0);
+
+            return {
+                totalCount: data.messages.length,
+                roles: data.messages.map((m) => m.role),
+                contents: data.messages.map((m) => m.content),
+                stillEditing: targetMsg.editing,
+                rateLimitStillActive: data.rateLimit !== null,
+            };
+        })();
+    JS));
+
+    // Before the fix: saveEdit() has no rate-limit guard at all, so it runs
+    // the full supersede-then-splice-then-resend sequence unconditionally.
+    // totalCount would drop to 0 (splice(index) with index 0 removes
+    // everything) and the server-side supersede would have already committed.
+    expect($result['totalCount'])->toBe(3);
+    expect($result['roles'])->toBe(['user', 'assistant', 'user']);
+    expect($result['contents'])->toBe(['first attempt', 'first reply', 'second attempt']);
+    expect($result['stillEditing'])->toBeTrue();
+    expect($result['rateLimitStillActive'])->toBeTrue();
+
+    // The server-truth assertion, and the one that actually matters: reload
+    // reads from the DB, not the local array, and a superseded row is never
+    // recovered by reload. This is what makes the bug permanent data loss
+    // rather than a cosmetic glitch.
+    $supersededAt = DB::table('agent_conversation_messages')
+        ->where('id', $editedMessageId)
+        ->value('superseded_at');
+
+    expect($supersededAt)->toBeNull();
 });
 
 it('does not soft-lock the composer when subscribeToConversation throws on a non-first message', function (): void {
@@ -625,4 +790,84 @@ it('does not soft-lock the composer when subscribeToConversation throws on a non
     expect($result['isStreaming'])->toBeFalse();
     expect($result['userCount'])->toBe(1);
     expect($result['domResendButtons'])->toBe(1);
+});
+
+it('disables Regenerate/Edit and hides Retry while rate-limited, so the affordances are not dead clicks', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+
+    // Fabricates a transcript that exercises all three affordances at once: a
+    // regenerate-eligible reply, an editable earlier user turn, and a
+    // retryable failed turn, then arms the client-side rate-limit countdown
+    // exactly as the other tests in this file do. isStreaming stays false
+    // throughout: while streaming already hides all three via x-show
+    // (:disabled="isStreaming" only ever guards an unreachable click), the
+    // gap this closes is the rate-limited-but-not-streaming state, where
+    // these previously rendered fully enabled and did nothing on click.
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            window.Echo = null;
+            data.conversationId = {$conversationIdJson};
+
+            data.messages = [
+                data.ensureClientKey({ role: 'user', content: 'editable message', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'a reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+            ];
+
+            const failedMsg = data.messages[2];
+            data.rateLimit = { secondsLeft: 30, timerId: null, userMsg: failedMsg };
+            return true;
+        })();
+    JS);
+
+    $result = $page->script(<<<'JS'
+        (() => {
+            const editButton = document.querySelector('[data-edit-button]');
+            const regenerateButton = document.querySelector('[data-regenerate-button]');
+            const retryButton = document.querySelector('[data-retry-button]');
+
+            return {
+                editDisabled: editButton?.disabled ?? null,
+                editTitle: editButton?.getAttribute('title') ?? null,
+                regenerateDisabled: regenerateButton?.disabled ?? null,
+                regenerateTitle: regenerateButton?.getAttribute('title') ?? null,
+                retryHidden: retryButton ? (retryButton.offsetParent === null) : null,
+            };
+        })();
+    JS);
+
+    expect($result['editDisabled'])->toBeTrue();
+    expect($result['editTitle'])->toContain('sending too fast');
+    expect($result['regenerateDisabled'])->toBeTrue();
+    expect($result['regenerateTitle'])->toContain('sending too fast');
+    // Retry is x-show gated, not :disabled: pre-fix it stayed visible and
+    // clickable throughout the rate-limited window.
+    expect($result['retryHidden'])->toBeTrue();
 });

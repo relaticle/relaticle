@@ -773,6 +773,13 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
 
     async saveEdit(msg, index) {
         if (this.isStreaming) return;
+        // Same guard as regenerateMessage() and retryTurn() (issue #499): sendMessage()
+        // below is a no-op while rate-limited, so running the supersede-then-splice
+        // sequence first would permanently delete this turn server-side (superseded_at
+        // stamped, never undone) with nothing sent to replace it. Bail before the
+        // supersede call, not just before the splice: unlike a local-only splice, the
+        // server-side supersede is not recoverable by a later reload.
+        if (this.rateLimit) return;
 
         const newText = (msg.editText || '').trim();
         if (!newText || newText.length > 5000) return;

@@ -174,8 +174,10 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // pushing anything back, so splicing first would just delete the
         // turn with nothing to replace it (issue #499). Bailing here instead
         // leaves the still-failed bubble and its auto-resend countdown
-        // untouched, the same no-op behavior the isStreaming guard above
-        // already gives every other caller of this button mid-send.
+        // untouched. This is the guard that actually prevents the data loss;
+        // the Regenerate button's own `:disabled` (_transcript.blade.php) is
+        // UX only, unlike isStreaming, which hides the button via x-show and
+        // makes it unreachable by click in the first place.
         if (this.rateLimit) return;
 
         let userIndex = -1;
@@ -723,7 +725,13 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         if (queued.model && this.modelOptions.some((o) => o.value === queued.model)) {
             this.selectedModel = queued.model;
         }
+        // Guarded INSIDE the callback, not before scheduling it: handleStreamEnd's own
+        // `destroyed` check (stream.js) runs BEFORE this method is called, guarding the
+        // await gap it just came out of, but this $nextTick opens a SEPARATE, later gap
+        // of its own: a wire:navigate teardown can still land between this tick being
+        // scheduled and it firing, same hazard and same fix shape as handleStreamFailed.
         this.$nextTick(() => {
+            if (this.destroyed) return;
             this.localEditor()?.setDocument?.(this.plainDocument(queued.document));
             this.sendMessage();
         });
