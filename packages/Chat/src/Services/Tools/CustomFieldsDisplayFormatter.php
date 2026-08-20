@@ -177,8 +177,10 @@ final readonly class CustomFieldsDisplayFormatter
     }
 
     /**
-     * `json_value` is cast to a Collection, which every is_array() branch below
-     * would miss and stringify into raw JSON. Unwrap it once, at the edge.
+     * `json_value` is cast to a Collection, which every is_array() branch in
+     * this class would miss and stringify into raw JSON. Every read of a stored
+     * column goes through here: formatStored() for the record card, and
+     * lookupCurrentValue() for the old side of a proposal diff.
      */
     private function plainValue(mixed $value): mixed
     {
@@ -274,6 +276,12 @@ final readonly class CustomFieldsDisplayFormatter
     /**
      * Read the current value of a custom field on a model via the
      * directly-loaded customFieldValues relation.
+     *
+     * Unwrapped through plainValue() for the same reason formatStored() is: a
+     * Collection reaching renderValue() stringifies to its own JSON, which
+     * would print `["01K4...","01K5..."]` on the OLD side of a multi-value diff
+     * while the NEW side, fed a plain array from the payload, prints the option
+     * names. Both sides of one card have to agree.
      */
     private function lookupCurrentValue(CustomField $field, Model $model): mixed
     {
@@ -291,6 +299,6 @@ final readonly class CustomFieldsDisplayFormatter
 
         $column = CustomFieldValue::getValueColumn($field->type);
 
-        return $row->{$column};
+        return $this->plainValue($row->{$column});
     }
 }
