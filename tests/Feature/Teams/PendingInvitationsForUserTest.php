@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Events\TeamMemberAdded;
+use Laravel\Jetstream\Jetstream;
 
 mutates(PendingInvitationsForUser::class, AcceptTeamInvitation::class, DeclineTeamInvitation::class);
 
@@ -31,6 +32,45 @@ test('an independently registered invitee sees their pending invitation', functi
     $this->actingAs($invitee);
 
     livewire(PendingInvitationsForUser::class)->assertSee($team->name);
+});
+
+test('the card names who invited them and what access they get', function (): void {
+    $owner = User::factory()->withTeam()->create(['name' => 'Dana Okafor']);
+    $team = $owner->currentTeam;
+    $team->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'viewer',
+        'inviter_id' => $owner->id,
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    livewire(PendingInvitationsForUser::class)
+        ->assertSee(__('teams.pending_for_user.detail_with_inviter', [
+            'inviter' => 'Dana Okafor',
+            'role' => Jetstream::findRole('viewer')?->name,
+        ]));
+});
+
+test('the card still renders when the inviter account is gone', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $team->teamInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'editor',
+        'inviter_id' => null,
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    livewire(PendingInvitationsForUser::class)
+        ->assertSee(__('teams.pending_for_user.detail', [
+            'role' => Jetstream::findRole('editor')?->name,
+        ]));
 });
 
 test('a teamless invitee sees the card on the tenant-registration page', function (): void {

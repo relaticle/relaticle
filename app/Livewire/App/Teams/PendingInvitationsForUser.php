@@ -32,7 +32,7 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
     public function invitations(): Collection
     {
         return TeamInvitation::query()
-            ->with('team')
+            ->with(['team', 'inviter'])
             ->whereRaw('lower(email) = ?', [Str::lower($this->authUser()->email)])
             ->where('expires_at', '>', now())
             ->get();
