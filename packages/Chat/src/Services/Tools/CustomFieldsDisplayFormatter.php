@@ -93,8 +93,8 @@ final readonly class CustomFieldsDisplayFormatter
      * a proposal card and a record card never disagree about a value.
      *
      * @param  list<CustomField>  $fields  already scoped to the record's tenant, with options loaded
-     * @param  int  $valueLimit  characters kept per value, after whitespace is squeezed onto one line
-     * @return list<array{label: string, code: string, value: string, type: string}>
+     * @param  int  $valueLimit  characters kept per free-text value, after whitespace is squeezed onto one line
+     * @return list<array{label: string, code: string, value: string, type: string, values?: list<string>}>
      */
     public function formatStored(Model $model, array $fields, int $valueLimit): array
     {
@@ -115,41 +115,91 @@ final readonly class CustomFieldsDisplayFormatter
                 continue;
             }
 
-            $rendered = $this->renderValue($field, $stored->{CustomFieldValue::getValueColumn($field->type)});
+            $raw = $this->plainValue($stored->{CustomFieldValue::getValueColumn($field->type)});
+            $rendered = $this->renderValue($field, $raw);
 
             if ($rendered === null) {
                 continue;
             }
 
-            $value = $this->condense($rendered, $valueLimit);
+            $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+            $type = $this->displayType($field, $dataType);
+            $value = $this->condense($rendered, $type === 'text' ? $valueLimit : null);
 
             if ($value === '') {
                 continue;
             }
 
-            $rows[] = [
+            $row = [
                 'label' => $field->name,
                 'code' => $field->code,
                 'value' => $value,
-                'type' => $this->displayType($field, CustomFieldsType::getFieldType($field->type)?->dataType),
+                'type' => $type,
             ];
+
+            $values = $this->storedValues($field, $raw, $dataType);
+
+            if ($values !== null) {
+                $row['values'] = $values;
+            }
+
+            $rows[] = $row;
         }
 
         return $rows;
     }
 
     /**
-     * A display block is a summary that the tool result carries forever, so a
-     * stored value is squeezed onto one line and capped. A rich-editor field
-     * holds kilobytes of prose; uncapped, one row of presentation copy would
-     * dwarf the whole model-facing payload it sits next to.
+     * The chip/link list behind a typed value, mirroring what format() attaches
+     * to a proposal row so a record card and a proposal card render the same
+     * field the same way. Null means the type has no list and the joined
+     * `value` string is the whole story.
      *
-     * format() deliberately does not condense: a proposal diff has to show
-     * exactly what is about to be written.
+     * @return list<string>|null
      */
-    private function condense(string $value, int $limit): string
+    private function storedValues(CustomField $field, mixed $value, ?FieldDataType $dataType): ?array
     {
-        return Str::limit(trim((string) preg_replace('/\s+/', ' ', $value)), $limit);
+        if ($field->type === CustomFieldType::LINK->value) {
+            return is_array($value) ? $this->optionNames($field, $value) : null;
+        }
+
+        if ($dataType === FieldDataType::MULTI_CHOICE) {
+            return is_array($value) ? $this->optionNames($field, $value) : null;
+        }
+
+        if ($dataType === FieldDataType::SINGLE_CHOICE) {
+            $name = $this->renderSingleChoice($field, $value);
+
+            return $name === null || $name === '' ? null : [$name];
+        }
+
+        return null;
+    }
+
+    /**
+     * `json_value` is cast to a Collection, which every is_array() branch below
+     * would miss and stringify into raw JSON. Unwrap it once, at the edge.
+     */
+    private function plainValue(mixed $value): mixed
+    {
+        return $value instanceof Collection ? $value->all() : $value;
+    }
+
+    /**
+     * A display block is a summary that the tool result carries forever, so a
+     * stored value is always squeezed onto one line. The length cap is applied
+     * to free text ONLY: that is the unbounded type (a rich-editor field holds
+     * kilobytes of prose), while a capped URL is a broken href and a capped
+     * option list is a chip cut in half.
+     *
+     * format() deliberately does neither: a proposal diff has to show exactly
+     * what is about to be written.
+     */
+    private function condense(string $value, ?int $limit): string
+    {
+        $oneLine = trim((string) preg_replace('/\s+/', ' ', $value));
+
+        return $limit === null ? $oneLine : Str::limit($oneLine, $limit);
     }
 
     private function renderValue(CustomField $field, mixed $value): ?string

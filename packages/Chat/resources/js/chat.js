@@ -27,6 +27,13 @@ const flattenChipLabel = (label) => label
     .replace(/<br\s*\/?>/g, '\n')
     .replace(/[\r\n]+/g, ' ')
 
+// The chip icon on its own, for the block templates: a `records_table` cell and
+// a `record_card` heading are chips too, but they are built by Alpine from
+// escaped data (`x-text`), never by interpolating a label into an HTML string
+// the way the markdown sweep below has to. Only the path data crosses over.
+const recordChipIcon = (type) =>
+    (Object.hasOwn(RECORD_CHIP_ICONS, type) ? RECORD_CHIP_ICONS[type] : null)
+
 const recordChipHtml = (type, href, label) =>
     `<a class="chat-chip" data-record-type="${type}" href="${href}">`
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">'
@@ -95,7 +102,7 @@ if (!registerChatEditor()) {
 // server data). These module factories are exposed here so that inline
 // script can compose them without a bundler import.
 //
-// registerBlock/blockTemplate are plain functions, not module factories:
-// exposed alongside so the transcript partial (also inline, unbundled) can
-// call window.ChatModules.blockTemplate() directly.
-window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate, modelPickerModule };
+// registerBlock/blockTemplate/recordChipIcon are plain functions, not module
+// factories: exposed alongside so the transcript partials (also inline,
+// unbundled) can call window.ChatModules.blockTemplate() directly.
+window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate, recordChipIcon, modelPickerModule };

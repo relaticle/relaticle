@@ -211,11 +211,22 @@ abstract class BaseReadShowTool implements Tool
             'type' => $this->citationType(),
             'url' => $url,
             'fields' => array_map(
-                static fn (array $row): array => [
-                    'label' => $row['label'],
-                    'value' => $row['value'],
-                    'type' => $row['type'],
-                ],
+                static function (array $row): array {
+                    $field = [
+                        'label' => $row['label'],
+                        'value' => $row['value'],
+                        'type' => $row['type'],
+                    ];
+
+                    // Choice and link fields carry their members as a list so the
+                    // card paints real chips and real hrefs rather than splitting
+                    // the joined string back apart in the browser.
+                    if (isset($row['values'])) {
+                        $field['values'] = $row['values'];
+                    }
+
+                    return $field;
+                },
                 array_slice($rows, 0, self::CARD_FIELD_LIMIT),
             ),
         ];

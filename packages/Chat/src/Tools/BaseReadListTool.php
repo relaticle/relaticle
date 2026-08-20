@@ -239,6 +239,10 @@ abstract class BaseReadListTool implements Tool
             'block' => 'records_table',
             'title' => Str::plural(Str::headline($this->citationType())),
             'type' => $this->citationType(),
+            // Named, not positional: query-aware promotion moves a filtered or
+            // sorted field to the FRONT, so the first column is routinely not
+            // the record's own name. This is the column the row links from.
+            'core' => $coreKey,
             'columns' => [
                 ...$this->fieldColumns($promoted),
                 ['key' => $coreKey, 'label' => Str::headline($coreKey)],
