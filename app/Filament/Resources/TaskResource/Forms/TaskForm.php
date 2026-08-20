@@ -29,6 +29,7 @@ final class TaskForm
                 ->label(__('filament/resources/task.fields.companies.label'))
                 ->multiple()
                 ->relationship('companies', 'name')
+                ->searchable()
                 ->columnSpanFull();
         }
 
@@ -37,6 +38,7 @@ final class TaskForm
                 ->label(__('filament/resources/task.fields.people.label'))
                 ->multiple()
                 ->relationship('people', 'name')
+                ->searchable()
                 ->nullable();
         }
 
