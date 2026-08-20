@@ -37,10 +37,12 @@ use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\GitHubService;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\BrandColors;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
@@ -130,6 +132,12 @@ final class AppServiceProvider extends ServiceProvider
                 MakeFilamentUserCommand::class,
             ]);
         }
+
+        // Panels register their own palette on boot and override this, so it only
+        // takes effect where no panel is active: the invitation, join, and
+        // scheduled-deletion interstitials, which would otherwise render
+        // Filament's default amber instead of the brand color.
+        FilamentColor::register(['primary' => BrandColors::primary()]);
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
