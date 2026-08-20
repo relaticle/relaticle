@@ -44,7 +44,15 @@ export const streamModule = () => ({
         };
         this.ensureClientKey(stub);
         this.messages.push(stub);
-        return stub;
+        // Re-read from the reactive array rather than returning the pre-push
+        // object literal directly: Alpine (like Vue3 reactivity) only tracks
+        // dependents through property access on the wrapped proxy handed back
+        // from an array read. Callers such as targetBubbleFor()'s resume
+        // fallback hand this return value straight to handleTextDelta, which
+        // mutates `.content` on it — mutating the raw object bypasses the
+        // proxy's set trap, so an already-mounted x-text effect never
+        // re-renders. Same fix as send.js's optimistic user bubble.
+        return this.messages[this.messages.length - 1];
     },
 
     lastAssistantBubble() {
