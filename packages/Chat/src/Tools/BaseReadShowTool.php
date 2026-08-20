@@ -13,6 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
+use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\CustomFields\Models\CustomFieldValue;
@@ -55,6 +57,12 @@ abstract class BaseReadShowTool implements Tool
 
     private const int FREE_TEXT_LIMIT = 500;
 
+    /**
+     * Fields carried by the `record_card` display block. The model still reads
+     * the full `attributes`/`included` payload; the card is a summary.
+     */
+    private const int CARD_FIELD_LIMIT = 8;
+
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
 
@@ -66,6 +74,14 @@ abstract class BaseReadShowTool implements Tool
     abstract protected function citationType(): string;
 
     abstract public function description(): string;
+
+    /**
+     * The custom-fields entity alias, which is also the citation/morph alias.
+     */
+    protected function entityType(): string
+    {
+        return $this->citationType();
+    }
 
     /** @return array<int, string> */
     protected function eagerLoad(): array
@@ -160,11 +176,60 @@ abstract class BaseReadShowTool implements Tool
                     $this->extraPayload($model),
                     ['url' => $url],
                     $this->buildIncluded($model, $requestedIncludes, $user),
+                    ['display_block' => $this->buildDisplayBlock($user, $model, $url)],
                 ),
                 $user,
             ),
             JSON_PRETTY_PRINT,
         );
+    }
+
+    /**
+     * The presentation envelope the chat UI renders as a record card. Mirrors
+     * what the Filament VIEW page shows for this tenant, so chat and the CRM
+     * never disagree about which fields represent a record. Presentation only:
+     * SupersededAwareConversationStore strips it from the replayed history.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildDisplayBlock(User $user, Model $model, ?string $url): array
+    {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
+            $model,
+            resolve(DisplayFieldSelector::class)->cardFields($user->currentTeam, $this->entityType()),
+        );
+
+        return [
+            'block' => 'record_card',
+            'title' => $this->cardTitle($model),
+            'type' => $this->citationType(),
+            'url' => $url,
+            'fields' => array_map(
+                static fn (array $row): array => [
+                    'label' => $row['label'],
+                    'value' => $row['value'],
+                    'type' => $row['type'],
+                ],
+                array_slice($rows, 0, self::CARD_FIELD_LIMIT),
+            ),
+        ];
+    }
+
+    /**
+     * The card heading. Every CRM entity labels itself with `name` or `title`;
+     * the entity label is the last resort for a record with neither set.
+     */
+    private function cardTitle(Model $model): string
+    {
+        foreach (['name', 'title'] as $attribute) {
+            $value = $model->getAttribute($attribute);
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return $this->entityLabel();
     }
 
     /**

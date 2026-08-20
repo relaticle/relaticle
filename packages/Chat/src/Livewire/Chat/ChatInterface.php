@@ -12,6 +12,7 @@ use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\TitleSanitizer;
 
 final class ChatInterface extends BaseLivewireComponent
@@ -133,7 +134,11 @@ final class ChatInterface extends BaseLivewireComponent
      * otherwise leave the approve/reject CTA missing until a full reload — is
      * self-healed by the client merging any cards it never received.
      *
-     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>}|null
+     * Read-tool display blocks ride along for the same reason: they are never
+     * broadcast live (Reverb's 10 KB cap), so stream_end is the first moment the
+     * client can render them.
+     *
+     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
     public function latestAssistantMessage(): ?array
     {
@@ -153,7 +158,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->whereNull('m.superseded_at')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
-            ->first(['m.id', 'm.content']);
+            ->first(['m.id', 'm.content', 'm.tool_results']);
 
         if ($row === null) {
             return null;
@@ -163,6 +168,9 @@ final class ChatInterface extends BaseLivewireComponent
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards(),
+            'display_blocks' => DisplayBlocks::collect(
+                $row->tool_results === null ? null : (string) $row->tool_results,
+            ),
         ];
     }
 

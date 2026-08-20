@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -76,6 +77,54 @@ final readonly class CustomFieldsDisplayFormatter
             }
 
             $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Display rows for the values a record already has stored, one per given
+     * field, in the order the fields are given. Fields the record holds no
+     * value for are skipped: a display block is a summary, not a form.
+     *
+     * The sibling of format(): that one renders a *proposed* payload, this one
+     * renders a *persisted* record, and both share the same value rendering so
+     * a proposal card and a record card never disagree about a value.
+     *
+     * @param  list<CustomField>  $fields  already scoped to the record's tenant, with options loaded
+     * @return list<array{label: string, code: string, value: string, type: string}>
+     */
+    public function formatStored(Model $model, array $fields): array
+    {
+        if ($fields === [] || ! $model->relationLoaded('customFieldValues')) {
+            return [];
+        }
+
+        /** @var Collection<int, CustomFieldValue> $storedValues */
+        $storedValues = $model->getRelation('customFieldValues');
+        $byFieldId = $storedValues->keyBy('custom_field_id');
+
+        $rows = [];
+
+        foreach ($fields as $field) {
+            $stored = $byFieldId->get($field->getKey());
+
+            if (! $stored instanceof CustomFieldValue) {
+                continue;
+            }
+
+            $rendered = $this->renderValue($field, $stored->{CustomFieldValue::getValueColumn($field->type)});
+
+            if ($rendered === null || $rendered === '') {
+                continue;
+            }
+
+            $rows[] = [
+                'label' => $field->name,
+                'code' => $field->code,
+                'value' => $rendered,
+                'type' => $this->displayType($field, CustomFieldsType::getFieldType($field->type)?->dataType),
+            ];
         }
 
         return $rows;
