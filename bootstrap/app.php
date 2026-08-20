@@ -151,17 +151,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 return Filament::getRegistrationUrl();
             }
 
-            $invitation = match (true) {
-                $request->routeIs('team-invitations.accept') => TeamInvitation::query()
-                    ->whereKey($request->route('invitation'))
-                    ->first(),
-                $request->routeIs('team-invitations.token.accept') => TeamInvitation::findByRawToken(
-                    (string) $request->route('token')
-                ),
-                default => null,
-            };
+            $invitation = $request->routeIs('team-invitations.token.accept')
+                ? TeamInvitation::findByRawToken((string) $request->route('token'))
+                : null;
 
-            if ($invitation === null) {
+            if (! $invitation instanceof TeamInvitation) {
                 return route('login');
             }
 
