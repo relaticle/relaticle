@@ -63,6 +63,22 @@ test('GET on a valid token renders the join confirmation page', function (): voi
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
 
+test('the join page does not leak its token through the Referer header', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-referrer',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertHeader('Referrer-Policy', 'no-referrer');
+});
+
 test('POST on a valid token attaches the user and redirects', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [

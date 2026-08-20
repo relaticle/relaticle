@@ -78,7 +78,7 @@ Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verifie
         ->name('team-invitations.token.join');
 });
 
-Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', AuthenticateSession::class])
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])
     ->group(function (): void {
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
