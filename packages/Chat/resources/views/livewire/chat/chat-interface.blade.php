@@ -356,6 +356,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     destroy() {
+        // First line, unconditionally: guards a stream-end/stream-failed
+        // continuation already mid-await when this instance is torn down (see
+        // the `destroyed` comment in stream.js). Set before any teardown step
+        // below that could throw, so the guard is armed even if one does.
+        this.destroyed = true;
         this.stashConversationCache();
         this.uninstallConversationSwitchWatch();
         this.teardownDaySeparatorObserver();

@@ -7,6 +7,14 @@
 export const streamModule = () => ({
     channel: null,
     streamTimeoutId: null,
+    // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
+    // (window.Echo.leave) stops NEW events from being delivered but cannot cancel a
+    // handler already mid-execution. handleStreamEnd/handleStreamFailed both reach
+    // localEditor() after an await, and localEditor() resolves by context name, not
+    // by instance, so a continuation surviving a wire:navigate switch would otherwise
+    // write into the NEW live instance mounted under the same context. Checked after
+    // every await in those handlers before touching the editor or persisted state.
+    destroyed: false,
     // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
     // long with no stream event, reconcile the turn from the DB. It MUST exceed the
     // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
@@ -361,6 +369,12 @@ export const streamModule = () => ({
             }
         }
         await this.reconcileLatestAssistant(assistantMsg);
+        // This instance was torn down (wire:navigate to another conversation)
+        // while the await above was pending. unsubscribe() already stopped new
+        // events, but this continuation was already in flight, so bail before
+        // touching localEditor() (flushQueuedSend) or stealing focus, either of
+        // which would resolve the NEW live instance under the same context.
+        if (this.destroyed) return;
         if (assistantMsg?.role === 'assistant') {
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
@@ -422,7 +436,14 @@ export const streamModule = () => ({
         const queued = this.queuedSend;
         this.queuedSend = null;
         if (queued) {
-            this.$nextTick(() => this.localEditor()?.setDocument?.(this.plainDocument(queued.document)));
+            // Guarded INSIDE the callback, not before scheduling it: destroy()
+            // can still run during the tick this is deferred to (same
+            // torn-down-instance hazard as handleStreamEnd, but this handler has
+            // no internal await of its own, so the $nextTick is the only gap).
+            this.$nextTick(() => {
+                if (this.destroyed) return;
+                this.localEditor()?.setDocument?.(this.plainDocument(queued.document));
+            });
         }
         this.clearStreamTimeout();
         this.restoreInputFocus();
