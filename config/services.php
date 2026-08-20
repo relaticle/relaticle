@@ -57,11 +57,6 @@ return [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
 
-    'turnstile' => [
-        'key' => env('TURNSTILE_SITE_KEY'),
-        'secret' => env('TURNSTILE_SECRET_KEY'),
-    ],
-
     'stripe' => [
         'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
         'prices' => [
