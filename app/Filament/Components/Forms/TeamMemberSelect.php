@@ -10,7 +10,12 @@ use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * The single way a workspace member is picked anywhere in the app panel.
+ * The single way a workspace member is picked via a Filament relationship select.
+ *
+ * Not every member picker in the app panel: the chat proposal card
+ * (Relaticle\Chat\Livewire\Chat\ProposalCard) builds an options-array select from
+ * TeamMembersContext and deliberately does not use this component, because the pin
+ * lives in the relationship() override and there is no relationship there.
  *
  * Pins the acting user to the top of the list, then falls back to alphabetical.
  * Filament only applies its own alphabetical order when the query carries none
