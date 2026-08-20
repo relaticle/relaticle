@@ -77,9 +77,6 @@ return RectorConfig::configure()
             __DIR__.'/app/Models/ActivityLog/Activity.php',
             __DIR__.'/app/Models/Passport/*',
             __DIR__.'/packages/ImportWizard/src/Models/*',
-            // Read-only projection with no backing table (fromSub union query);
-            // never instantiated via a factory.
-            __DIR__.'/app/Models/TeamPerson.php',
         ],
     ])
     ->withSets([
