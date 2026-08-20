@@ -391,7 +391,7 @@ final class CreateTeam extends RegisterTenant
 
     /**
      * Mirrors the fallback in Team::getSlugOptions(). Names that transliterate to
-     * nothing — CJK, Hebrew, Thai, emoji — otherwise leave the handle blank, and the
+     * nothing (CJK, Hebrew, Thai, emoji) otherwise leave the handle blank, and the
      * user is blocked by a bare "required" error on a field they never touched.
      */
     private function generateHandleFrom(?string $name): string
@@ -469,7 +469,7 @@ final class CreateTeam extends RegisterTenant
      * Whether the invite step currently holds an address worth sending, which decides
      * between the "Send invites" and "Get started" submit labels.
      */
-    public function hasPendingInvites(): bool
+    private function hasPendingInvites(): bool
     {
         $invites = $this->data['invites'] ?? [];
 

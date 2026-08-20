@@ -998,17 +998,17 @@ it('labels the submit button for what it will actually do', function (): void {
     $component = livewire(CreateTeam::class)
         ->fillForm(['name' => 'Label Check', 'onboarding_use_case' => OnboardingUseCase::Other->value]);
 
-    expect($component->instance()->hasPendingInvites())->toBeFalse();
-
-    $component->assertSee(__('filament/pages/teams.create_team.actions.get_started'));
+    $component
+        ->assertSee(__('filament/pages/teams.create_team.actions.get_started'))
+        ->assertDontSee(__('filament/pages/teams.create_team.actions.send_invites'));
 
     $component->fillForm([
         'invites' => [['email' => 'someone@gmail.com', 'role' => 'editor']],
     ]);
 
-    expect($component->instance()->hasPendingInvites())->toBeTrue();
-
-    $component->assertSee(__('filament/pages/teams.create_team.actions.send_invites'));
+    $component
+        ->assertSee(__('filament/pages/teams.create_team.actions.send_invites'))
+        ->assertDontSee(__('filament/pages/teams.create_team.actions.get_started'));
 });
 
 it('explains the workspace limit instead of returning a bare 404', function (): void {
