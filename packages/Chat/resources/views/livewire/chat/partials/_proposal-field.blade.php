@@ -14,14 +14,14 @@
         <template x-if="field.type === 'badges' && Array.isArray(field.values) && field.values.length > 0">
             <span class="flex flex-wrap gap-1">
                 <template x-for="(badge, badgeIdx) in field.values" :key="badgeIdx">
-                    <span class="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300" x-text="badge"></span>
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300" x-text="badge"></span>
                 </template>
             </span>
         </template>
 
         <template x-if="field.type === 'boolean'">
             <span
-                class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium"
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
                 :class="(field.new ?? field.value) === 'Yes'
                     ? 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400'
                     : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'"

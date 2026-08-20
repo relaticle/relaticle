@@ -113,7 +113,7 @@
                 {{-- User message --}}
                 <template x-if="msg.role === 'user'">
                     <div class="flex justify-end" data-user-bubble :data-grouped="decorations(index).grouped" :data-send-state="msg.sendState ?? 'sent'">
-                        <div class="flex max-w-[80%] flex-col items-end gap-1">
+                        <div class="flex max-w-[85%] flex-col items-end gap-1">
                             <template x-if="!msg.editing">
                                 <div
                                     :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
@@ -238,7 +238,7 @@
                         <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
                                 :title="msg.created_at ? 'Completed ' + new Date(msg.created_at).toLocaleString() : ''"
-                                class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-p:my-2 prose-headings:mb-2 prose-headings:mt-3 prose-headings:text-gray-900 dark:prose-headings:text-white prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-1 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-1 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[0.85em] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
+                                class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
                             >
                                 <template x-if="msg.rendered && msg.prerendered">
                                     <div x-html="msg.content"></div>
@@ -464,6 +464,28 @@
                     </div>
                 </div>
             </div>
+        </template>
+    </div>
+
+    {{-- Jump-to-latest pill: sticky to the bottom of THIS scrollable transcript
+         viewport, mirroring the sticky date pill above it (same zero-height-wrapper
+         trick). Anchoring here rather than to the page means it can never land on
+         top of the docked proposal card: the composer/dock sit entirely outside
+         this scrolling box, whatever height they take, so there is nothing in this
+         container for the pill to overlap. --}}
+    <div class="sticky bottom-2 z-20 flex h-0 justify-center">
+        <template x-if="hasUnseenBelow">
+            <button
+                type="button"
+                x-on:click="jumpToLatest()"
+                class="flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
+                x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
+                x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
+            >
+                <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ __('New messages') }}
+            </button>
         </template>
     </div>
 </div>
