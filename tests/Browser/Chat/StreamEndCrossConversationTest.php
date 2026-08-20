@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Tests\Helpers\ChatBrowser;
@@ -195,4 +196,109 @@ it('still flushes a queued send into the editor when the instance was not torn d
     }
 
     expect($userMessageCount)->toBe(1);
+});
+
+/**
+ * Issue #509, the narrower gap left after the first fix above: handleStreamEnd()'s
+ * own `destroyed` check (stream.js:377) guards the await gap it sits behind, but
+ * flushQueuedSend() (send.js) opens a SEPARATE, later gap of its own via its
+ * internal $nextTick. A wire:navigate teardown landing between that tick being
+ * scheduled and it firing survives the earlier check entirely, since the check
+ * already passed before flushQueuedSend() was ever called.
+ *
+ * flushQueuedSend() is called directly here rather than threaded through
+ * handleStreamEnd(): that isolates the specific gap under test from the
+ * already-covered await gap above. Alpine's nextTick is queueMicrotask ->
+ * setTimeout, so the callback fires one macrotask after a script() call returns;
+ * setting `destroyed` in a SECOND, later script() call would race that macrotask
+ * over two real CDP round trips and could land after the tick already fired,
+ * giving a test with no teeth in either direction. Scheduling the tick and
+ * setting `destroyed` in the SAME synchronous script instead removes that race:
+ * the tick's callback cannot interleave with either statement, so `destroyed` is
+ * deterministically true by the time it runs, reproducing the exact ordering a
+ * real teardown landing in that gap would produce.
+ */
+it('does not touch the editor or send when destroy lands between flushQueuedSend scheduling its tick and the tick firing', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    chatInterfaceInsertConversation($conversationId, $user, $team->getKey(), 'conv flush race');
+
+    $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
+    $resolveInterface = ChatBrowser::resolveInterface();
+    $conversationIdJson = json_encode($conversationId);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->click($editor)->type($editor, 'OWN_TYPED_CONTENT');
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            window.Echo = null;
+            data.conversationId = {$conversationIdJson};
+            data.queuedSend = {
+                document: {
+                    type: 'doc',
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'MARKER_QUEUED_SEND' }] }],
+                },
+                model: null,
+            };
+            data.flushQueuedSend();
+            data.destroyed = true;
+            return true;
+        })();
+    JS);
+
+    // Pre-fix: once the tick fires, setDocument() overwrites this with the
+    // queued marker text. Poll instead of a single fixed sleep so the check
+    // catches the overwrite whenever it lands within the window, not just at
+    // one sampled instant.
+    $editorTextAfterRace = null;
+    for ($i = 0; $i < 20; $i++) {
+        $editorTextAfterRace = $page->script(<<<'JS'
+            (() => {
+                const el = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]');
+                return el ? el.textContent : null;
+            })();
+        JS);
+        if ($editorTextAfterRace !== 'OWN_TYPED_CONTENT') {
+            break;
+        }
+        usleep(100_000);
+    }
+
+    expect($editorTextAfterRace)->toBe('OWN_TYPED_CONTENT');
+
+    // Stronger than the composer-text check alone: pre-fix, the callback does not
+    // stop at setDocument(); it goes on to call sendMessage() with `this` still
+    // bound to the torn-down instance's own conversationId, silently pushing the
+    // queued marker into this.messages and POSTing it server-side.
+    $sentMarkerCount = null;
+    for ($i = 0; $i < 20; $i++) {
+        $sentMarkerCount = $page->script(<<<JS
+            (() => {
+                {$resolveInterface}
+                return data.messages.filter((m) => m.content === 'MARKER_QUEUED_SEND').length;
+            })();
+        JS);
+        if ($sentMarkerCount > 0) {
+            break;
+        }
+        usleep(100_000);
+    }
+
+    expect($sentMarkerCount)->toBe(0);
+
+    expect(DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->count())->toBe(0);
 });

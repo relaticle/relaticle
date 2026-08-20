@@ -204,7 +204,7 @@
                                             <button
                                                 type="button"
                                                 x-on:click="saveEdit(msg, index)"
-                                                :disabled="!(msg.editText || '').trim() || (msg.editText || '').length > 5000 || isStreaming"
+                                                :disabled="!(msg.editText || '').trim() || (msg.editText || '').length > 5000 || isStreaming || rateLimit !== null"
                                                 class="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:bg-white/60 disabled:text-primary-400"
                                             >
                                                 Save &amp; resend
@@ -218,10 +218,11 @@
                                 <div class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                     <button
                                         type="button"
-                                        x-on:click="canEdit(index) && startEdit(msg, index)"
-                                        :disabled="!canEdit(index)"
-                                        :title="canEdit(index) ? 'Edit message' : 'Cannot edit — pending approval'"
-                                        :aria-label="canEdit(index) ? 'Edit message' : 'Cannot edit — pending approval'"
+                                        data-edit-button
+                                        x-on:click="(canEdit(index) && rateLimit === null) && startEdit(msg, index)"
+                                        :disabled="!canEdit(index) || rateLimit !== null"
+                                        :title="rateLimit !== null ? 'Cannot edit: sending too fast' : (canEdit(index) ? 'Edit message' : 'Cannot edit: pending approval')"
+                                        :aria-label="rateLimit !== null ? 'Cannot edit: sending too fast' : (canEdit(index) ? 'Edit message' : 'Cannot edit: pending approval')"
                                         class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                                     >
                                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
@@ -268,7 +269,8 @@
                                 <span class="flex-1 text-xs text-amber-800 dark:text-amber-200" x-text="msg.streamError"></span>
                                 <button
                                     type="button"
-                                    x-show="msg.retryable && !isStreaming"
+                                    data-retry-button
+                                    x-show="msg.retryable && !isStreaming && !rateLimit"
                                     x-on:click="retryTurn(msg)"
                                     class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
                                 >
@@ -308,11 +310,12 @@
                                 </button>
                                 <button
                                     type="button"
+                                    data-regenerate-button
                                     x-show="!isStreaming"
                                     x-on:click="regenerateMessage(index)"
-                                    :disabled="!canRegenerate(index)"
-                                    :aria-label="canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate — pending approval'"
-                                    :title="canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate — pending approval'"
+                                    :disabled="!canRegenerate(index) || rateLimit !== null"
+                                    :aria-label="rateLimit !== null ? 'Cannot regenerate: sending too fast' : (canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate: pending approval')"
+                                    :title="rateLimit !== null ? 'Cannot regenerate: sending too fast' : (canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate: pending approval')"
                                     class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-400"
                                 >
                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />

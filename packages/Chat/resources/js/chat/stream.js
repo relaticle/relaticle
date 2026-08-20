@@ -9,11 +9,13 @@ export const streamModule = () => ({
     streamTimeoutId: null,
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
     // (window.Echo.leave) stops NEW events from being delivered but cannot cancel a
-    // handler already mid-execution. handleStreamEnd/handleStreamFailed both reach
-    // localEditor() after an await, and localEditor() resolves by context name, not
-    // by instance, so a continuation surviving a wire:navigate switch would otherwise
-    // write into the NEW live instance mounted under the same context. Checked after
-    // every await in those handlers before touching the editor or persisted state.
+    // handler already mid-execution. handleStreamEnd/handleStreamFailed/the watchdog
+    // in this file, and flushQueuedSend() in send.js, all reach localEditor() after
+    // an await or a deferred $nextTick, and localEditor() resolves by context name,
+    // not by instance, so a continuation surviving a wire:navigate switch would
+    // otherwise write into the NEW live instance mounted under the same context.
+    // Checked after every await, and as the first line of every deferred callback
+    // scheduled after one, before touching the editor or persisted state.
     destroyed: false,
     // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
     // long with no stream event, reconcile the turn from the DB. It MUST exceed the
@@ -238,6 +240,11 @@ export const streamModule = () => ({
             // truncated bubble with a missing approve/reject CTA until reload.
             const assistantMsg = this.lastAssistantBubble();
             await this.reconcileLatestAssistant(assistantMsg);
+            // Same torn-down-instance hazard as handleStreamEnd (see the `destroyed`
+            // comment above): this continuation reaches restoreInputFocus() below,
+            // which would steal focus into whatever NEW instance is now live under
+            // this same context if a wire:navigate landed during the await above.
+            if (this.destroyed) return;
             if (assistantMsg?.role === 'assistant') {
                 if (!assistantMsg.content) {
                     assistantMsg.streamError = 'The assistant took too long to respond.';
