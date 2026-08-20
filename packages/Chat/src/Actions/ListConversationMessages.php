@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use stdClass;
@@ -20,7 +21,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -105,6 +106,9 @@ final readonly class ListConversationMessages
             'pending_actions' => $this->extractPendingActions(
                 $msg->tool_results === null ? null : (string) $msg->tool_results,
                 $records,
+            ),
+            'display_blocks' => DisplayBlocks::collect(
+                $msg->tool_results === null ? null : (string) $msg->tool_results,
             ),
             'feedback' => isset($feedbackByMessage[$msg->id]) ? [
                 'rating' => (string) $feedbackByMessage[$msg->id]->rating,

@@ -61,7 +61,7 @@ it('GetCompanyTool output url is the /r/company/{id} reference url', function ()
 it('ListCompaniesTool output items each have a /r/company/{id} reference url', function (): void {
     Company::factory()->count(2)->for($this->user->currentTeam)->create();
 
-    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true)['data'];
 
     expect($payload)->toBeArray()->not->toBeEmpty();
 
@@ -87,7 +87,7 @@ it('GetPersonTool output url is the /r/people/{id} reference url', function (): 
 it('ListPeopleTool output items each have a /r/people/{id} reference url', function (): void {
     People::factory()->count(2)->for($this->user->currentTeam)->create();
 
-    $payload = json_decode(app(ListPeopleTool::class)->handle(new Request([])), true);
+    $payload = json_decode(app(ListPeopleTool::class)->handle(new Request([])), true)['data'];
 
     expect($payload)->toBeArray()->not->toBeEmpty();
 
@@ -113,7 +113,7 @@ it('GetOpportunityTool output url is the /r/opportunity/{id} reference url', fun
 it('ListOpportunitiesTool output items each have a /r/opportunity/{id} reference url', function (): void {
     Opportunity::factory()->count(2)->for($this->user->currentTeam)->create();
 
-    $payload = json_decode(app(ListOpportunitiesTool::class)->handle(new Request([])), true);
+    $payload = json_decode(app(ListOpportunitiesTool::class)->handle(new Request([])), true)['data'];
 
     expect($payload)->toBeArray()->not->toBeEmpty();
 
@@ -139,7 +139,7 @@ it('GetTaskTool output url is the /r/task/{id} reference url', function (): void
 it('ListTasksTool output items each have a /r/task/{id} reference url', function (): void {
     Task::factory()->count(2)->for($this->user->currentTeam)->create();
 
-    $payload = json_decode(app(ListTasksTool::class)->handle(new Request([])), true);
+    $payload = json_decode(app(ListTasksTool::class)->handle(new Request([])), true)['data'];
 
     expect($payload)->toBeArray()->not->toBeEmpty();
 
@@ -165,7 +165,7 @@ it('GetNoteTool output url is the /r/note/{id} reference url', function (): void
 it('ListNotesTool output items each have a /r/note/{id} reference url', function (): void {
     Note::factory()->count(2)->for($this->user->currentTeam)->create();
 
-    $payload = json_decode(app(ListNotesTool::class)->handle(new Request([])), true);
+    $payload = json_decode(app(ListNotesTool::class)->handle(new Request([])), true)['data'];
 
     expect($payload)->toBeArray()->not->toBeEmpty();
 
