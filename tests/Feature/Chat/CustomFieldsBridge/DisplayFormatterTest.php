@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -69,6 +70,37 @@ it('includes the old value for updates with a current value on the model', funct
         'label' => 'Description',
         'old' => 'Old text',
         'new' => 'New text',
+    ]);
+});
+
+/**
+ * The old side of a multi-value diff. `json_value` is cast to a Collection, so
+ * every is_array() branch in the formatter misses it and the raw Collection
+ * stringifies to its own JSON: without the unwrap, this row reads
+ * `["old.example.com"]` before the arrow and `new.example.com` after it, in the
+ * same proposal card. The stored path already unwraps; this pins the proposed
+ * path so the two cannot diverge again.
+ */
+it('renders the old value of a multi-value field as its members, not raw json', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $company = Company::factory()->for($team)->create(['name' => 'Acme']);
+
+    $domains = CustomField::query()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    $company->saveCustomFieldValue($domains, ['old.example.com']);
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'company', cleanFields: ['domains' => ['new.example.com']], oldModel: $company->fresh());
+
+    expect($rows[0])->toMatchArray([
+        'label' => 'Domains',
+        'old' => 'old.example.com',
+        'new' => 'new.example.com',
     ]);
 });
 

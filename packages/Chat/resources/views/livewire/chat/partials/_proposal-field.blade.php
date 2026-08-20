@@ -29,14 +29,20 @@
             ></span>
         </template>
 
+        {{-- `truncate` only bites when the box is allowed to shrink. Every anchor
+             here is a flex item, whose default `min-width: auto` is its own
+             untruncated text width, so a UTM-length URL bursts the card sideways
+             on a phone (measured: a 155-char href rendered 1162px wide inside a
+             316px card). min-w-0 on the anchors, and on the multi-value row that
+             holds them, lets the ellipsis do its job instead. --}}
         <template x-if="field.type === 'link' && Array.isArray(field.values) && field.values.length > 0">
-            <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                 <template x-for="(url, urlIdx) in field.values" :key="urlIdx">
                     <a
                         :href="(String(url).startsWith('http') ? '' : 'https://') + url"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="truncate text-primary-600 hover:underline dark:text-primary-400"
+                        class="min-w-0 truncate text-primary-600 hover:underline dark:text-primary-400"
                         x-text="url"
                     ></a>
                 </template>
@@ -48,7 +54,7 @@
                 :href="(String(field.new ?? field.value).startsWith('http') ? '' : 'https://') + (field.new ?? field.value)"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="truncate text-primary-600 hover:underline dark:text-primary-400"
+                class="min-w-0 truncate text-primary-600 hover:underline dark:text-primary-400"
                 x-text="field.new ?? field.value"
             ></a>
         </template>
