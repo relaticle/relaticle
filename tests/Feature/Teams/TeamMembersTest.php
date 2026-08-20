@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\UpdateInviteLinkSettings;
+use App\Actions\Jetstream\UpdateTeamMemberRole;
 use App\Enums\TeamRole;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Models\User;
@@ -10,6 +12,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 mutates(TeamMembers::class);
 
@@ -229,6 +232,23 @@ test('an admin cannot set the invite link default role to admin', function (): v
         ->assertHasActionErrors();
 
     expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
+test('the invite link default role must be a role the app actually registers', function (): void {
+    expect(fn () => resolve(UpdateInviteLinkSettings::class)->update($this->owner, $this->team, 'superuser'))
+        ->toThrow(ValidationException::class);
+
+    expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
+test('a member role must be a role the app actually registers', function (): void {
+    $editor = User::factory()->create();
+    $this->team->users()->attach($editor, ['role' => TeamRole::Editor->value]);
+
+    expect(fn () => resolve(UpdateTeamMemberRole::class)->update($this->owner, $this->team, (string) $editor->getKey(), 'superuser'))
+        ->toThrow(ValidationException::class);
+
+    expect($editor->fresh()->teamRole($this->team->fresh())?->key)->toBe(TeamRole::Editor->value);
 });
 
 test('rotating the invite link changes the token', function (): void {
