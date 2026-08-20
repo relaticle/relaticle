@@ -173,6 +173,16 @@ return [
     'invite_link' => [
         'url' => 'Anyone with this link can join',
         'default_role' => 'Role for people who join with this link',
+        'join' => [
+            'heading' => 'Join :workspace',
+            'body' => 'You have been invited to join the :workspace workspace. Confirm to accept the invitation.',
+            'action' => 'Join workspace',
+        ],
+        'expired' => [
+            'heading' => 'Invite Link Expired',
+            'body' => 'This invite link has expired. Please ask the workspace owner to share a new link.',
+            'action' => 'Go to my workspace',
+        ],
     ],
 
     'mail' => [
@@ -189,6 +199,8 @@ return [
 
     'pending_for_user' => [
         'heading' => 'You have been invited to join :team',
+        'detail_with_inviter' => ':inviter invited you with :role access.',
+        'detail' => 'You will join with :role access.',
         'accept' => 'Join workspace',
         'decline' => 'Decline',
         'declined' => 'Invitation declined.',
@@ -197,6 +209,7 @@ return [
     'accept' => [
         'joined' => 'You have joined the :team workspace.',
         'already_member' => 'You are already a member of :team.',
+        'no_longer_valid' => 'That invitation is no longer valid. It may have been revoked or it may have expired.',
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
         'team_deleting' => 'This workspace is scheduled for deletion and is not accepting new members.',
         'ready' => [

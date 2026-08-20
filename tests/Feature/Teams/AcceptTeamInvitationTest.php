@@ -9,6 +9,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(TeamInvitation::class, AcceptTeamInvitation::class);
 
@@ -349,6 +350,54 @@ test('two concurrent accepts attach exactly one membership', function (): void {
     $this->actingAs($invitee)->post(route('team-invitations.token.join', ['token' => $raw]));
 
     expect($this->team->users()->where('users.id', $invitee->id)->count())->toBe(1);
+});
+
+test('an invitation revoked in flight refuses instead of reporting a join that did not happen', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    TeamInvitation::query()->whereKey($invitation->id)->delete();
+
+    expect(fn () => resolve(AcceptTeamInvitation::class)->execute($invitee, $invitation))
+        ->toThrow(HttpException::class);
+
+    expect($this->team->users()->where('users.id', $invitee->id)->exists())->toBeFalse()
+        ->and($invitee->fresh()->current_team_id)->not->toBe($this->team->id);
+});
+
+test('a revoked invitation shows the expired state rather than a false success banner', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    TeamInvitation::query()->whereKey($invitation->id)->delete();
+
+    $this->actingAs($invitee)
+        ->post(route('team-invitations.token.join', ['token' => $raw]))
+        ->assertOk()
+        ->assertSee(__('teams.accept.expired.heading'));
+
+    expect($this->team->users()->where('users.id', $invitee->id)->exists())->toBeFalse();
+});
+
+test('an expired-in-flight invitation refuses even though the caller saw it as valid', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    TeamInvitation::query()->whereKey($invitation->id)->update(['expires_at' => now()->subDay()]);
+
+    expect(fn () => resolve(AcceptTeamInvitation::class)->execute($invitee, $invitation))
+        ->toThrow(HttpException::class);
+
+    expect($this->team->users()->where('users.id', $invitee->id)->exists())->toBeFalse();
 });
 
 test('the legacy signed-URL routes are gone', function (): void {
