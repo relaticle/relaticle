@@ -168,6 +168,15 @@
                         {{ __('Get in touch') }}
                     </x-marketing.button>
                 </div>
+
+                {{-- The two claims this page leans on hardest, self-hosting and the AI
+                     layer, each have a page of their own. Linked here rather than inside
+                     the copy above, which is all translated strings. --}}
+                <p class="mt-6 text-xs text-gray-500 dark:text-gray-400">
+                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('See self-hosting options') }}</a>
+                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
+                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Meet :name, the built-in AI assistant', ['name' => config('chat.assistant_name')]) }}</a>
+                </p>
             </div>
 
         </div>

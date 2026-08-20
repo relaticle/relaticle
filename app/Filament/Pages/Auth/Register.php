@@ -7,12 +7,10 @@ namespace App\Filament\Pages\Auth;
 use App\Concerns\DetectsTeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
-use App\Rules\TurnstileChallenge;
 use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\RegistrationResponse;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
@@ -20,17 +18,30 @@ use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Blade;
+use Spatie\Honeypot\Http\Livewire\Concerns\HoneypotData;
+use Spatie\Honeypot\Http\Livewire\Concerns\UsesSpamProtection;
 
 final class Register extends BaseRegister
 {
     use DetectsTeamInvitation;
+    use UsesSpamProtection;
+
+    public HoneypotData $extraFields;
+
+    public function mount(): void
+    {
+        $this->extraFields = new HoneypotData;
+
+        parent::mount();
+    }
 
     public function content(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Html::make(fn (): string => $this->getInvitationContentHtml()),
+                Html::make(fn (): string => Blade::render('<x-honeypot livewire-model="extraFields" />')),
                 RenderHook::make(PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE),
                 $this->getFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_REGISTER_FORM_AFTER),
@@ -52,37 +63,11 @@ final class Register extends BaseRegister
             ->unique($this->getUserModel());
     }
 
-    protected function getTurnstileFormComponent(): ViewField
-    {
-        return ViewField::make('cf_turnstile_response')
-            ->hiddenLabel()
-            ->view('filament.forms.components.turnstile')
-            ->dehydrated(false)
-            ->required()
-            ->validationMessages(['required' => __('auth.turnstile.required')])
-            ->rules([new TurnstileChallenge])
-            ->visible(TurnstileChallenge::isConfigured(...));
-    }
-
-    public function form(Schema $schema): Schema
-    {
-        $schema = parent::form($schema);
-
-        return $schema->components([
-            ...$schema->getComponents(withHidden: true),
-            $this->getTurnstileFormComponent(),
-        ]);
-    }
-
     public function register(): ?RegistrationResponse
     {
-        try {
-            return parent::register();
-        } catch (ValidationException $exception) {
-            $this->resetTurnstileChallenge();
+        $this->protectAgainstSpam();
 
-            throw $exception;
-        }
+        return parent::register();
     }
 
     public function getRegisterFormAction(): Action
@@ -110,27 +95,5 @@ final class Register extends BaseRegister
         session()->put('fathom.track_signup', true);
 
         return $user;
-    }
-
-    /**
-     * Cloudflare turnstile tokens are single-use, and Laravel validates every
-     * field on every submit — so the token is already spent by the time any
-     * other field (duplicate email, password mismatch, disposable domain)
-     * reports its error. Blanking the state fires the widget's Livewire
-     * watcher, which resets the challenge and issues a fresh token; without it
-     * the next submit replays the spent one and fails with
-     * "timeout-or-duplicate" beside a widget showing a green tick.
-     */
-    private function resetTurnstileChallenge(): void
-    {
-        if (! is_array($this->data)) {
-            return;
-        }
-
-        if (! array_key_exists('cf_turnstile_response', $this->data)) {
-            return;
-        }
-
-        $this->data['cf_turnstile_response'] = null;
     }
 }

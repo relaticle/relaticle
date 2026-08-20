@@ -61,6 +61,7 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
+        <env name="HONEYPOT_ENABLED" value="false"/>
         <env name="RELATICLE_FEATURE_BLOG" value="true"/>
         <env name="BROADCAST_CONNECTION" value="log"/>
         <env name="PUSHER_APP_KEY" value="test-key"/>
