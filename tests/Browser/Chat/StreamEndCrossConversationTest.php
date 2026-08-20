@@ -23,7 +23,7 @@ mutates(ChatInterface::class);
  * awaits reconcileLatestAssistant()'s `$wire` round trip before reaching
  * flushQueuedSend(), which touches the editor via a further deferred
  * $nextTick. Note: handleStreamFailed() (also named in the issue) has no
- * internal await of its own — the delayed step it eventually reaches is the
+ * internal await of its own. The delayed step it eventually reaches is the
  * SAME deferred $nextTick pattern, not a $wire round trip; the fix guards
  * that $nextTick directly rather than relying on an await gap that does not
  * exist for that specific handler.
@@ -68,7 +68,7 @@ it('does not write a queued document from conversation A into conversation B\'s 
 
     // Replace reconcileLatestAssistant() with a promise this test controls
     // the resolution of, deterministically opening the exact await window
-    // handleStreamEnd() spends mid-continuation — a fixed sleep() would race
+    // handleStreamEnd() spends mid-continuation, since a fixed sleep() would race
     // the real navigation below and could produce a false pass. Stash the
     // release function on `window`: it is the one piece of state that
     // survives the wire:navigate switch this test performs next.
@@ -122,7 +122,7 @@ it('does not write a queued document from conversation A into conversation B\'s 
     expect($bComposerText)->toBe('B_OWN_TYPED_CONTENT');
 
     // Stronger than the composer-text check alone: pre-fix, flushQueuedSend()
-    // does not stop at setDocument() — it goes on to call sendMessage() with
+    // does not stop at setDocument(); it goes on to call sendMessage() with
     // `this` still bound to A's dead instance (whose conversationId is still
     // A's), silently POSTing the queued text into conversation A behind the
     // user's back while they are looking at B. Confirmed live before this

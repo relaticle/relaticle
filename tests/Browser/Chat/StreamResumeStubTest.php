@@ -26,7 +26,7 @@ mutates(ChatInterface::class);
  * regardless of whether the write went through the proxy. The failure only
  * becomes PERMANENT once an effect has already mounted (reading through the
  * proxy once) and a LATER mutation reuses the same stale raw reference
- * instead of re-reading the array — exactly what the second assertion below
+ * instead of re-reading the array, exactly what the second assertion below
  * reproduces, and exactly the shape mintAssistantStub()'s return value
  * invites any caller to fall into (the same class already fixed once in
  * send.js's optimistic user bubble).
@@ -120,7 +120,7 @@ it('paints a later mutation on the reference targetBubbleFor()\'s resume fallbac
 
     // A brand new array item's first-ever paint reads fresh state regardless
     // of the bug (Alpine defers the render to a microtask, by which point
-    // the synchronous mutation above has already landed) — expected to pass
+    // the synchronous mutation above has already landed), expected to pass
     // both pre- and post-fix, establishing the mounted effect this test
     // actually probes with the next mutation.
     $firstPaint = streamResumeStubPollBubbleText($page, 'first chunk');
