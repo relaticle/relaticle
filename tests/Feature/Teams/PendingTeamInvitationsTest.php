@@ -42,14 +42,14 @@ test('a pending invitation is listed', function (): void {
 
 test('the card renders nothing when there are no pending invitations', function (): void {
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertDontSee(__('teams.table.pending_heading'));
+        ->assertDontSee(__('teams.sections.pending_team_invitations.title'));
 });
 
 test('the card appears once an invitation exists', function (): void {
     pendingInvitation($this->team);
 
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertSee(__('teams.table.pending_heading'));
+        ->assertSee(__('teams.sections.pending_team_invitations.title'));
 });
 
 test('an invitation row shows its expiry', function (): void {
