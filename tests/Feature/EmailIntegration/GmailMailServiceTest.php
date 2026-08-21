@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
+use Google\Service\Gmail\MessagePart;
+use Google\Service\Gmail\MessagePartBody;
+use Google\Service\Gmail\MessagePartHeader;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
 
@@ -114,4 +117,64 @@ it('strips quotes and newlines from attachment filenames to prevent header injec
 
     expect($raw)->toContain('filename="evilBcc: attacker@example.com"')
         ->and($raw)->not->toContain("\r\nBcc: attacker@example.com");
+});
+
+it('marks gmail cid image parts as inline instead of downloadable attachments', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $imagePart = new MessagePart;
+    $imagePart->setFilename('logo.png');
+    $imagePart->setMimeType('image/png');
+    $imagePart->setHeaders([
+        new MessagePartHeader(['name' => 'Content-ID', 'value' => '<logo@example.test>']),
+        new MessagePartHeader(['name' => 'Content-Disposition', 'value' => 'inline; filename="logo.png"']),
+    ]);
+    $imagePart->setBody(new MessagePartBody([
+        'attachmentId' => 'image-attachment-id',
+        'size' => 1234,
+    ]));
+
+    $htmlPart = new MessagePart;
+    $htmlPart->setMimeType('text/html');
+    $htmlPart->setBody(new MessagePartBody([
+        'data' => rtrim(strtr(base64_encode('<p><img src="cid:logo@example.test"></p>'), '+/', '-_'), '='),
+        'size' => 43,
+    ]));
+
+    $payload = new MessagePart;
+    $payload->setMimeType('multipart/related');
+    $payload->setHeaders([
+        new MessagePartHeader(['name' => 'Message-ID', 'value' => '<msg@example.test>']),
+        new MessagePartHeader(['name' => 'Subject', 'value' => 'Inline image']),
+        new MessagePartHeader(['name' => 'From', 'value' => 'Sender <sender@example.test>']),
+        new MessagePartHeader(['name' => 'To', 'value' => 'Owner <owner@example.test>']),
+    ]);
+    $payload->setParts([$htmlPart, $imagePart]);
+
+    $message = new Message([
+        'id' => 'gmail-msg-inline',
+        'threadId' => 'gmail-thread-inline',
+        'internalDate' => (string) (now()->timestamp * 1000),
+        'labelIds' => ['INBOX'],
+        'snippet' => 'Inline image',
+    ]);
+    $message->setPayload($payload);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('get')
+        ->once()
+        ->with('me', 'gmail-msg-inline', ['format' => 'full'])
+        ->andReturn($message);
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_messages = $messages;
+
+    $data = (new GmailService($account, $gmail))->fetchMessage('gmail-msg-inline');
+
+    expect($data->hasAttachments)->toBeFalse()
+        ->and($data->attachments)->toHaveCount(1)
+        ->and($data->attachments[0]['filename'])->toBe('logo.png')
+        ->and($data->attachments[0]['content_id'])->toBe('logo@example.test')
+        ->and($data->attachments[0]['attachment_id'])->toBe('image-attachment-id')
+        ->and($data->attachments[0]['is_inline'])->toBeTrue();
 });

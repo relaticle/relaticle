@@ -107,6 +107,7 @@ final readonly class GmailService implements MailServiceInterface
         $payload = $message->getPayload();
 
         $labelIds = $message->getLabelIds() ?? [];
+        $attachments = $this->extractAttachments($payload);
 
         return new FetchedEmailData(
             providerMessageId: $message->getId(),
@@ -118,12 +119,12 @@ final readonly class GmailService implements MailServiceInterface
             sentAt: now()->setTimestamp((int) ($message->getInternalDate() / 1000)),
             direction: in_array('SENT', $labelIds) ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $this->resolveFolder($labelIds),
-            hasAttachments: $this->hasAttachments($payload),
+            hasAttachments: collect($attachments)->contains(fn (array $attachment): bool => ! ($attachment['is_inline'] ?? false)),
             isRead: ! in_array('UNREAD', $labelIds),
             bodyText: $this->extractBody($payload, 'text/plain'),
             bodyHtml: $this->extractBody($payload, 'text/html'),
             participants: $this->extractParticipants($headers),
-            attachments: $this->extractAttachments($payload),
+            attachments: $attachments,
             providerCategory: $this->resolveProviderCategory($labelIds),
         );
     }
@@ -366,17 +367,6 @@ final readonly class GmailService implements MailServiceInterface
         };
     }
 
-    private function hasAttachments(MessagePart $payload): bool
-    {
-        // Large attachments (>25 KB) have an attachmentId set on the body;
-        // small ones (<25 KB) carry inline data but still expose a filename.
-        return collect($payload->getParts())->contains(
-            fn (MessagePart $part): bool => filled($part->getBody()->getAttachmentId()) ||
-                filled($part->getFilename()) ||
-                ($part->getParts() !== [] && $this->hasAttachments($part))
-        );
-    }
-
     /**
      * Download an attachment binary from the Gmail API.
      * Returns the raw decoded bytes.
@@ -393,7 +383,7 @@ final readonly class GmailService implements MailServiceInterface
      * Covers both file attachments (Content-Disposition: attachment) and
      * inline images (Content-Disposition: inline with Content-ID).
      *
-     * @return array<int, array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null}>
+     * @return array<int, array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline: bool}>
      */
     private function extractAttachments(MessagePart $payload): array
     {
@@ -411,7 +401,13 @@ final readonly class GmailService implements MailServiceInterface
                 $contentId = trim($contentId, '<>');
             }
 
-            if (filled($filename) || str_starts_with(strtolower($disposition), 'attachment')) {
+            $mimeType = (string) $part->getMimeType();
+            $isInline = $contentId !== null && (
+                str_starts_with(strtolower($disposition), 'inline') ||
+                str_starts_with($mimeType, 'image/')
+            );
+
+            if (filled($filename) || str_starts_with(strtolower($disposition), 'attachment') || $isInline) {
                 $body = $part->getBody();
                 // getAttachmentId() returns empty string when not present (large attachments have it set)
                 $gmailAttachmentId = $body->getAttachmentId();
@@ -419,12 +415,13 @@ final readonly class GmailService implements MailServiceInterface
 
                 $attachments[] = [
                     'filename' => filled($filename) ? $filename : null,
-                    'mime_type' => $part->getMimeType(),
+                    'mime_type' => $mimeType,
                     'size' => $body->getSize(),
                     'content_id' => $contentId,
                     'attachment_id' => $attachmentId,
                     // For small attachments (<25 KB) the binary is inlined; large ones have an attachment_id
                     'inline_data' => $attachmentId === null ? ($body->getData() ?: null) : null,
+                    'is_inline' => $isInline,
                 ];
             }
 

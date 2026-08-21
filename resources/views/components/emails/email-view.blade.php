@@ -37,7 +37,9 @@
     // Hoisted so the reader knows up front whether there is a frame to wait for: a
     // text-only body or a privacy gate has nothing to load and must not sit behind
     // a spinner.
-    $safeHtml = $canViewBody ? EmailHtmlSanitizer::sanitize($record->body?->body_html) : null;
+    $inlineAttachments = $record->attachments->where('is_inline', true);
+    $downloadAttachments = $record->attachments->where('is_inline', false);
+    $safeHtml = $canViewBody ? EmailHtmlSanitizer::sanitize($record->body?->body_html, $inlineAttachments) : null;
 @endphp
 
 {{-- `ready` lives here so the message frame can flip it while the loading state sits
@@ -230,11 +232,11 @@
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
 
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
-    @if ($canViewBody && $record->has_attachments && $record->attachments->isNotEmpty())
+    @if ($canViewBody && $downloadAttachments->isNotEmpty())
         <div class="flex max-h-28 shrink-0 flex-wrap items-center gap-2 overflow-y-auto border-b border-gray-100 dark:border-gray-800 px-4 py-2.5 sm:px-6">
             <x-heroicon-o-paper-clip class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
 
-            @foreach ($record->attachments as $attachment)
+            @foreach ($downloadAttachments as $attachment)
                 @php
                     $downloadUrl = filled($attachment->provider_attachment_id)
                         ? route('email-attachments.download', $attachment->getKey())

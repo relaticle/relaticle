@@ -13,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 mutates(Email::class, EmailHtmlSanitizer::class);
@@ -161,6 +162,20 @@ it('wraps sanitized email html in a scriptless dark-mode preview document', func
         ->toContain('background-color: transparent !important')
         ->toContain('<p style="color:#111111;background:#ffffff">Body</p>')
         ->not->toContain('<script');
+});
+
+it('rewrites cid image references to authorized inline attachment urls', function (): void {
+    $email = makeEmailWithBody('<p><img src="cid:logo@example.test"></p>');
+    $attachment = EmailAttachment::factory()->inline()->create([
+        'email_id' => $email->getKey(),
+        'content_id' => 'logo@example.test',
+    ]);
+
+    $html = EmailHtmlSanitizer::sanitize($email->body?->body_html, collect([$attachment]));
+
+    expect($html)
+        ->toContain(route('email-attachments.inline', ['attachment' => $attachment->getKey()]))
+        ->not->toContain('cid:logo@example.test');
 });
 
 it('renders the email view iframe without a same-origin sandbox', function (): void {

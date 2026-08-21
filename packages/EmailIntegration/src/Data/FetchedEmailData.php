@@ -13,7 +13,7 @@ final readonly class FetchedEmailData
 {
     /**
      * @param  array<int, array{email_address: string, name: string|null, role: string}>  $participants
-     * @param  array<int, array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null}>  $attachments
+     * @param  array<int, array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}>  $attachments
      */
     public function __construct(
         public string $providerMessageId,

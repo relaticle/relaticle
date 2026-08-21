@@ -6,6 +6,8 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Team;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -74,8 +76,9 @@ final readonly class StoreEmailAction
                     'mime_type' => $attachment['mime_type'],
                     'size' => $attachment['size'],
                     'content_id' => $attachment['content_id'],
+                    'is_inline' => $attachment['is_inline'] ?? false,
                     'provider_attachment_id' => $attachment['attachment_id'],
-                    'storage_path' => null,
+                    'storage_path' => $this->storeInlineData($email, $attachment),
                 ]);
             }
 
@@ -115,5 +118,31 @@ final readonly class StoreEmailAction
 
             return $email;
         });
+    }
+
+    /**
+     * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     */
+    private function storeInlineData(Email $email, array $attachment): ?string
+    {
+        if (($attachment['is_inline'] ?? false) === false) {
+            return null;
+        }
+
+        if (blank($attachment['inline_data'])) {
+            return null;
+        }
+
+        $binary = base64_decode(strtr((string) $attachment['inline_data'], '-_', '+/'), true);
+
+        if ($binary === false) {
+            return null;
+        }
+
+        $path = "email-inline-attachments/{$email->getKey()}/".Str::ulid();
+
+        Storage::disk(EmailAttachment::DISK)->put($path, $binary);
+
+        return $path;
     }
 }

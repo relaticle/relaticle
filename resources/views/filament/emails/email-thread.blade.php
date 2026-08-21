@@ -39,8 +39,10 @@
             $canViewBody    = $authUser->can('viewBody', $email);
             $isOutbound     = $email->direction === EmailDirection::OUTBOUND;
 
+            $inlineAttachments = $email->attachments->where('is_inline', true);
+            $downloadAttachments = $email->attachments->where('is_inline', false);
             $safeHtml = $canViewBody && $email->body?->body_html
-                ? EmailHtmlSanitizer::sanitize($email->body->body_html)
+                ? EmailHtmlSanitizer::sanitize($email->body->body_html, $inlineAttachments)
                 : null;
         @endphp
 
@@ -105,7 +107,7 @@
                             {{ $email->direction->getLabel() }}
                         </span>
 
-                        @if ($email->has_attachments)
+                        @if ($downloadAttachments->isNotEmpty())
                             <x-heroicon-o-paper-clip class="h-3.5 w-3.5 text-gray-400" />
                         @endif
                     </div>
@@ -183,13 +185,13 @@
                 </div>
 
                 {{-- Attachments --}}
-                @if ($email->has_attachments && $email->attachments->isNotEmpty())
+                @if ($downloadAttachments->isNotEmpty())
                     <div class="border-t border-gray-100 dark:border-gray-800 px-6 py-4">
                         <p class="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
-                            Attachments <span class="font-normal normal-case tracking-normal">({{ $email->attachments->count() }})</span>
+                            Attachments <span class="font-normal normal-case tracking-normal">({{ $downloadAttachments->count() }})</span>
                         </p>
                         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            @foreach ($email->attachments as $attachment)
+                            @foreach ($downloadAttachments as $attachment)
                                 @php
                                     $downloadUrl = filled($attachment->provider_attachment_id)
                                         ? route('email-attachments.download', $attachment->getKey())

@@ -19,7 +19,7 @@
         ->implode('');
 
     $safeHtml = $authUser->can('viewBody', $record)
-        ? EmailHtmlSanitizer::sanitize($record->body?->body_html)
+        ? EmailHtmlSanitizer::sanitize($record->body?->body_html, $record->attachments->where('is_inline', true))
         : null;
 @endphp
 

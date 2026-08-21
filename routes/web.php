@@ -65,6 +65,10 @@ Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
     ->middleware(['auth', 'verified', AuthenticateSession::class])
     ->name('email-attachments.download');
 
+Route::get('/email-attachments/{attachment}/inline', [EmailAttachmentController::class, 'inline'])
+    ->middleware(['auth', 'verified', AuthenticateSession::class])
+    ->name('email-attachments.inline');
+
 Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
     ->group(function (): void {
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])

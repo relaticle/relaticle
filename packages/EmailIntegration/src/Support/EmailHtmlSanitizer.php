@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Support;
 
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
@@ -24,12 +25,16 @@ final readonly class EmailHtmlSanitizer
      * `javascript:` URLs, and unsafe elements that a regex filter cannot
      * reliably catch, while preserving the presentational attributes/elements
      * that real-world email layouts depend on.
+     *
+     * @param  iterable<int, EmailAttachment>  $inlineAttachments
      */
-    public static function sanitize(?string $html): ?string
+    public static function sanitize(?string $html, iterable $inlineAttachments = []): ?string
     {
         if ($html === null || trim($html) === '') {
             return null;
         }
+
+        $html = self::replaceCidImages($html, $inlineAttachments);
 
         // Presentational attributes/elements emails rely on for layout.
         // CSS values are not deep-sanitized, but the body is rendered in an
@@ -64,6 +69,36 @@ final readonly class EmailHtmlSanitizer
         }
 
         return self::wrapPreviewDocument($clean);
+    }
+
+    /**
+     * @param  iterable<int, EmailAttachment>  $inlineAttachments
+     */
+    private static function replaceCidImages(string $html, iterable $inlineAttachments): string
+    {
+        $urlsByContentId = [];
+
+        foreach ($inlineAttachments as $attachment) {
+            if (! $attachment->is_inline) {
+                continue;
+            }
+
+            if (blank($attachment->content_id)) {
+                continue;
+            }
+
+            $urlsByContentId[mb_strtolower(trim((string) $attachment->content_id, '<>'))] = route('email-attachments.inline', $attachment->getKey());
+        }
+
+        if ($urlsByContentId === []) {
+            return $html;
+        }
+
+        return preg_replace_callback('/cid:([^"\'\s>)]+)/i', function (array $matches) use ($urlsByContentId): string {
+            $contentId = mb_strtolower(trim(rawurldecode($matches[1]), '<>'));
+
+            return $urlsByContentId[$contentId] ?? $matches[0];
+        }, $html) ?? $html;
     }
 
     private static function wrapPreviewDocument(string $html): string
