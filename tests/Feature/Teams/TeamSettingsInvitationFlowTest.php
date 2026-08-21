@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\Members;
+use App\Livewire\App\Teams\InviteTeamMembers;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Livewire\App\Teams\UpdateTeamName;
@@ -67,11 +68,12 @@ test('the pending invitations card is listed above the members table', function 
 test('admin invites by email and the invitation appears in the pending list', function () {
     Mail::fake();
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'invitee@example.com',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->sole();
 
@@ -87,11 +89,12 @@ test('admin invites by email and the invitation appears in the pending list', fu
 test('inviting keeps the admin on the members tab and announces the new invitation', function () {
     Mail::fake();
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'invitee@example.com',
             'role' => 'editor',
         ])
+        ->call('invitePeople')
         ->assertNoRedirect()
         ->assertDispatched('teamInvitationSent');
 
@@ -106,11 +109,12 @@ test('the pending card picks up an invitation announced by the members table', f
 
     $pendingCard->assertDontSee(__('teams.sections.pending_team_invitations.title'));
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'invitee@example.com',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $pendingCard->call('refreshInvitations')
         ->assertSee('invitee@example.com');
