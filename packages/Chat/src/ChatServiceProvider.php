@@ -16,9 +16,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Events\AgentFailed;
+use Laravel\Ai\Events\StepFailed;
+use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
 use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
@@ -31,6 +35,7 @@ use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
+use Relaticle\Chat\Support\AgentRunTelemetry;
 
 final class ChatServiceProvider extends ServiceProvider
 {
@@ -57,6 +62,19 @@ final class ChatServiceProvider extends ServiceProvider
         $this->registerMigrations();
         $this->registerRenderHooks();
         $this->registerInsightsCacheInvalidation();
+        $this->registerRunTelemetry();
+    }
+
+    /**
+     * Correlate a failed turn to the step or tool that killed it, which the
+     * job-level failure hook cannot see.
+     */
+    private function registerRunTelemetry(): void
+    {
+        Event::listen(
+            [AgentFailed::class, StepFailed::class, ToolFailed::class],
+            AgentRunTelemetry::class,
+        );
     }
 
     private function registerCommands(): void

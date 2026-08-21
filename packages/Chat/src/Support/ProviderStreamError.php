@@ -20,7 +20,7 @@ final readonly class ProviderStreamError
 
     public static function toException(Error $event): Throwable
     {
-        if (in_array($event->type, self::RETRYABLE_TYPES, true)) {
+        if (self::isRetryable($event)) {
             return new ProviderOverloadedException(
                 "Provider stream error [{$event->type}]: {$event->message}",
             );
@@ -29,5 +29,17 @@ final readonly class ProviderStreamError
         return new RuntimeException(
             "Provider stream error [{$event->type}]: {$event->message}",
         );
+    }
+
+    /**
+     * Whether a provider-reported stream error is worth another attempt.
+     *
+     * Also answers for laravel/ai's own StreamErrorException, which carries the
+     * provider's Error event on ->error (null when the stream simply ended
+     * without completing the step — not retryable on its own).
+     */
+    public static function isRetryable(?Error $event): bool
+    {
+        return $event instanceof Error && in_array($event->type, self::RETRYABLE_TYPES, true);
     }
 }

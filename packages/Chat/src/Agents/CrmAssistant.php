@@ -55,11 +55,11 @@ use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
 
-// Gemini is excluded until laravel/ai's Gemini driver hoists `tool_config`
-// to the request top-level. Currently, providerOptions() values are merged
-// into generationConfig, so Gemini's function_calling_config mode cannot be
-// set via this mechanism — leaving the sequential-write guard unenforceable.
-#[Provider(['anthropic', 'openai'])]
+// Only a fallback: every chat turn passes an explicit provider resolved by
+// AiModelResolver, and laravel/ai reads this attribute only when the prompt's
+// provider argument is null. A provider LIST here would therefore never fail
+// over — to get failover, stream() has to receive the array.
+#[Provider(Lab::Anthropic)]
 #[MaxSteps(15)]
 #[Temperature(0.3)]
 #[Timeout(120)]
@@ -481,6 +481,10 @@ PROMPT;
             Lab::OpenAI->value => [
                 'parallel_tool_calls' => false,
             ],
+            // Gemini is absent on purpose: its driver merges providerOptions() into
+            // generationConfig rather than hoisting them to the request top level,
+            // so function_calling_config mode cannot be set this way and the
+            // sequential-write guard would be unenforceable.
             default => [],
         };
     }

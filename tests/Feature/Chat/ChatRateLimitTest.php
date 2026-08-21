@@ -9,7 +9,10 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Exceptions\StreamErrorException;
+use Laravel\Ai\Streaming\Events\Error;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 
@@ -113,4 +116,47 @@ it('broadcasts the rate-limit message for a raw 429 RequestException failure', f
     $job->failed(httpClientException(429));
 
     Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $e): bool => str_contains($e->message, 'rate-limited'));
+});
+
+function streamErrorException(?string $type): StreamErrorException
+{
+    return new StreamErrorException(
+        $type === null ? null : new Error('evt-1', $type, 'provider says no', false, time()),
+    );
+}
+
+it('releases the turn for a dropped provider connection and a retryable stream error', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $job = new ProcessChatMessage(
+        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNGGGGGGGGGGGGGGGGGGGGG',
+    );
+
+    expect($job->isTransient(ProviderConnectionException::forProvider('anthropic')))->toBeTrue()
+        ->and($job->isTransient(streamErrorException('overloaded_error')))->toBeTrue()
+        ->and($job->isTransient(streamErrorException('rate_limit_error')))->toBeTrue()
+        ->and($job->isTransient(httpClientException(429)))->toBeTrue()
+        ->and($job->isTransient(streamErrorException('invalid_request_error')))->toBeFalse()
+        ->and($job->isTransient(streamErrorException(null)))->toBeFalse()
+        ->and($job->isTransient(httpClientException(400)))->toBeFalse()
+        ->and($job->isTransient(new RuntimeException('boom')))->toBeFalse()
+        ->and($job->isTransient(null))->toBeFalse();
+});
+
+it('does not tell the user they were rate-limited when the provider connection dropped', function (): void {
+    Event::fake([ChatStreamFailed::class]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    seedRateLimitConversation('c-1', $user);
+    $job = new ProcessChatMessage(
+        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNHHHHHHHHHHHHHHHHHHHHH',
+    );
+
+    $job->failed(ProviderConnectionException::forProvider('anthropic'));
+
+    Event::assertDispatched(
+        ChatStreamFailed::class,
+        fn (ChatStreamFailed $e): bool => ! str_contains($e->message, 'rate-limited'),
+    );
 });
