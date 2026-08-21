@@ -19,8 +19,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Exceptions\StreamErrorException;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
@@ -227,6 +229,9 @@ final class ProcessChatMessage implements ShouldQueue
             }
 
             $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService): void {
+                // promptTokens is the UNCACHED remainder only, so it understates the
+                // real prompt on a cached turn. Record the cache legs next to it;
+                // credits are still priced on model + tool calls, not tokens.
                 ChatTelemetry::breadcrumb('stream.completed', [
                     'input_tokens' => $streamedResponse->usage->promptTokens,
                     'output_tokens' => $streamedResponse->usage->completionTokens,
@@ -257,12 +262,13 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->broadcastFollowUps($streamedResponse);
             });
         } catch (Throwable $e) {
-            // Rate-limit / overloaded errors are transient -> release with backoff.
+            // Rate-limit, overloaded, dropped-connection and provider stream errors are
+            // transient -> release with backoff.
             // release() does not count against MaxExceptions(1); attempts() increments
             // each retry. Bounded by this cap AND the job's retryUntil() (now+3min).
             // Anything else rethrows and fails fast, exactly as before.
-            if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
-                ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
+            if ($this->isTransient($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
+                ChatTelemetry::breadcrumb('stream.transient_retry', ['attempt' => $this->attempts(), 'exception' => $e::class]);
                 // Honor the provider's Retry-After when present; jitter spreads
                 // the re-dispatch so concurrent 429ed jobs don't stampede back.
                 $delay = $this->retryDelaySeconds($this->attempts(), $e) + random_int(0, 3);
@@ -292,6 +298,27 @@ final class ProcessChatMessage implements ShouldQueue
             : 0;
 
         return max($base, min($retryAfter, 60));
+    }
+
+    /**
+     * Every provider failure worth releasing the job for rather than failing the turn.
+     *
+     * Wider than isRateLimited(), which stays scoped to real throttling because it
+     * also picks the user-facing failure copy. A dropped connection and a provider
+     * error reported inside the stream body are equally transient, but telling the
+     * user they were rate-limited would be a lie.
+     */
+    public function isTransient(?Throwable $e): bool
+    {
+        if ($e instanceof ProviderConnectionException) {
+            return true;
+        }
+
+        if ($e instanceof StreamErrorException) {
+            return ProviderStreamError::isRetryable($e->error);
+        }
+
+        return $this->isRateLimited($e);
     }
 
     /**
