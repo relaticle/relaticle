@@ -277,6 +277,7 @@
                  Never add `allow-scripts` here without removing `allow-same-origin`. --}}
             <div
                 x-data="{
+                    ready: false,
                     fit() {
                         const doc = $refs.body?.contentDocument
 
@@ -302,9 +303,13 @@
                         setTimeout(() => { this.ready = true }, 5000)
                     },
                 }"
-                class="shrink-0 bg-gray-50 dark:bg-gray-950"
+                x-bind:class="ready ? 'shrink-0' : 'flex min-h-0 flex-1 flex-col'"
+                class="bg-gray-50 dark:bg-gray-950"
             >
-                <div class="relative w-full overflow-hidden border-y border-gray-100 bg-white dark:border-gray-800 dark:bg-neutral-950">
+                <div
+                    x-bind:class="ready ? '' : 'min-h-0 flex-1'"
+                    class="relative w-full overflow-hidden border-y border-gray-100 bg-white dark:border-gray-800 dark:bg-neutral-950"
+                >
                     <div
                         x-show="! ready"
                         x-cloak
