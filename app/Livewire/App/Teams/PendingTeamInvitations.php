@@ -64,11 +64,6 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
         return $table
             ->query(fn (): Builder => $this->team->teamInvitations()->getQuery()->latest())
             ->paginated(false)
-            ->heading(__('teams.table.pending_heading'))
-            ->description(fn (): string => trans_choice(
-                'teams.table.pending_count',
-                $this->team->teamInvitations()->count(),
-            ))
             // Split rather than discrete columns, matching the members list: a
             // header row over two fields reads as table chrome around a list.
             ->columns([

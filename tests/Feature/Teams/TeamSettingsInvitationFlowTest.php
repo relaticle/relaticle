@@ -104,7 +104,7 @@ test('the pending card picks up an invitation announced by the members table', f
 
     $pendingCard = livewire(PendingTeamInvitations::class, ['team' => $this->team]);
 
-    $pendingCard->assertDontSee(__('teams.table.pending_heading'));
+    $pendingCard->assertDontSee(__('teams.sections.pending_team_invitations.title'));
 
     livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('invitePeople')->table(), [

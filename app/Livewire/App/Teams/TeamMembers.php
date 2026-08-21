@@ -72,8 +72,6 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             ->query($this->membersQuery(...))
             ->paginated(false)
             ->defaultSort('name')
-            ->heading(__('teams.table.members_heading'))
-            ->description(fn (): string => trans_choice('teams.table.members_count', $this->memberCount()))
             ->headerActions([
                 $this->invitePeopleAction(),
                 $this->manageInviteLinkAction(),
@@ -145,11 +143,6 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                         ->whereColumn('team_user.user_id', 'users.id')
                         ->where('team_user.team_id', $this->team->id));
             });
-    }
-
-    private function memberCount(): int
-    {
-        return $this->membersQuery()->toBase()->count();
     }
 
     private function isOwner(User $record): bool

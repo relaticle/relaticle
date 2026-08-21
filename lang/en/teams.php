@@ -26,6 +26,14 @@ return [
             'title' => 'Workspace Name',
             'description' => 'The workspace\'s name and owner information.',
         ],
+        'team_members' => [
+            'title' => 'Members',
+            'description' => 'All of the people that are part of this workspace.',
+        ],
+        'pending_team_invitations' => [
+            'title' => 'Pending Invitations',
+            'description' => 'These people have been invited to your workspace and have been sent an invitation email. They may join the workspace by accepting the email invitation.',
+        ],
         'delete_team' => [
             'title' => 'Delete Workspace',
             'description' => 'Schedule this workspace for deletion.',
@@ -135,10 +143,6 @@ return [
 
     'table' => [
         'expires_in' => 'Expires in :time',
-        'members_heading' => 'Members',
-        'members_count' => '{1} 1 person has access|[2,*] :count people have access',
-        'pending_heading' => 'Pending invitations',
-        'pending_count' => '{1} 1 person has been invited and has not joined yet|[2,*] :count people have been invited and have not joined yet',
         'expired' => 'Expired',
     ],
 
