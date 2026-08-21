@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -46,6 +47,16 @@ final readonly class ChatController
      * name — the titler declines it and the next message gets a turn.
      */
     private const int TITLE_ATTEMPT_TURNS = 3;
+
+    /**
+     * Cap on in-conversation search hits. Deliberately small: the overlay is a
+     * jump-to affordance, not a results page.
+     */
+    private const int SEARCH_MATCH_LIMIT = 20;
+
+    private const int SNIPPET_LEAD = 40;
+
+    private const int SNIPPET_LENGTH = 160;
 
     public function __construct(
         private CreditService $creditService,
@@ -435,6 +446,86 @@ final readonly class ChatController
             ->update(['superseded_at' => now(), 'updated_at' => now()]);
 
         return response()->json(['superseded' => $superseded]);
+    }
+
+    /**
+     * Search within one conversation.
+     *
+     * Scoped exactly like ListConversationMessages (same participant, same
+     * team, same superseded and approval-echo exclusions) so every id returned
+     * here is one the transcript's pager can actually reach. A hit the pager
+     * could never render would send the client's load-until-found loop all the
+     * way to the top of the history and then report nothing.
+     *
+     * `q` is a user-supplied pattern, so it goes through LikePattern::escape
+     * before the ILIKE: a literal `%` or `_` typed into the search box must
+     * match that character, not act as a wildcard.
+     */
+    public function searchMessages(Request $request, string $conversationId): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if(
+            $conversation === null
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->current_team_id),
+            404,
+        );
+
+        $escaped = LikePattern::escape($validated['q']);
+
+        $matches = DB::table('agent_conversation_messages as m')
+            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
+            ->where('m.conversation_id', $conversationId)
+            ->where('m.participant_type', $user->getMorphClass())
+            ->where('m.participant_id', $user->getKey())
+            ->where('c.team_id', $user->current_team_id)
+            ->whereNull('m.superseded_at')
+            ->whereNot(function (QueryBuilder $inner): void {
+                $inner->where('m.role', 'user')->where('m.content', 'like', '[approval]%');
+            })
+            ->where('m.content', 'ilike', "%{$escaped}%")
+            ->orderByDesc('m.id')
+            ->limit(self::SEARCH_MATCH_LIMIT)
+            ->get(['m.id', 'm.content']);
+
+        return response()->json([
+            'matches' => $matches
+                ->map(fn (object $row): array => [
+                    'message_id' => (string) $row->id,
+                    'snippet' => $this->snippet((string) $row->content, $validated['q']),
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * A one-line excerpt centred on the match, for the result row in the search
+     * overlay. Whitespace is collapsed so a multi-paragraph assistant answer
+     * still renders as a single readable line.
+     */
+    private function snippet(string $content, string $needle): string
+    {
+        $text = trim((string) preg_replace('/\s+/u', ' ', $content));
+        $needle = trim((string) preg_replace('/\s+/u', ' ', $needle));
+
+        $position = $needle === '' ? false : mb_stripos($text, $needle);
+        $start = $position === false ? 0 : max(0, $position - self::SNIPPET_LEAD);
+
+        $excerpt = mb_substr($text, $start, self::SNIPPET_LENGTH);
+
+        return ($start > 0 ? '…' : '')
+            .$excerpt
+            .($start + mb_strlen($excerpt) < mb_strlen($text) ? '…' : '');
     }
 
     public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse

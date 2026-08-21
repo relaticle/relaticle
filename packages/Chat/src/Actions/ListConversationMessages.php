@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,15 @@ final readonly class ListConversationMessages
             ->where('m.participant_type', $user->getMorphClass())
             ->where('m.participant_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
-            ->whereNull('m.superseded_at');
+            ->whereNull('m.superseded_at')
+            // Approval echoes are internal turn bookkeeping and are never
+            // rendered. Excluded in SQL rather than after the fetch so the
+            // limit counts visible rows only: dropping one afterwards returned
+            // a short page, and the caller reads a short page as "no more
+            // history", which stranded every older message behind it.
+            ->whereNot(function (Builder $inner): void {
+                $inner->where('m.role', 'user')->where('m.content', 'like', '[approval]%');
+            });
 
         if ($beforeMessageId !== null) {
             $query->where('m.id', '<', $beforeMessageId);
@@ -42,8 +51,6 @@ final readonly class ListConversationMessages
             ->limit($limit)
             ->get(['m.id', 'm.role', 'm.content', 'm.document', 'm.tool_results', 'm.created_at'])
             ->reverse()
-            ->reject(fn (object $msg): bool => (string) $msg->role === 'user'
-                && str_starts_with((string) ($msg->content ?? ''), '[approval]'))
             ->values();
 
         $mentionsByMessage = DB::table('agent_conversation_message_mentions')

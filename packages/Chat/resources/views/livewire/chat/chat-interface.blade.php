@@ -25,6 +25,7 @@
          that hosts the side panel, i.e. nearly every app page. --}}
     @if (($context ?? 'conversation') === 'conversation')
         @include('chat::livewire.chat.partials._switcher')
+        @include('chat::livewire.chat.partials._message-search')
     @endif
 </div>
 
@@ -33,6 +34,10 @@
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
     ...window.ChatModules.transcriptModule({
         messagesUrl: @js(url('/chat/messages')),
+        {{-- Templated on the conversation id for the same reason the switcher's
+             own URL is: the id is minted client-side for a brand-new chat, so
+             it is not knowable when this attribute renders. --}}
+        messageSearchUrlTemplate: @js(route('chat.conversations.search', ['conversationId' => '__CONVERSATION_ID__'])),
         todayLabel: @js(__('Today')),
         yesterdayLabel: @js(__('Yesterday')),
         feedbackDeleteConfirmText: @js(__('Remove this feedback? Your category and comment will be deleted.')),
@@ -391,6 +396,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.uninstallConversationSwitchWatch();
         this.teardownDaySeparatorObserver();
         this.teardownLoadEarlierObserver();
+        this.teardownMessageSearch();
         this.clearStreamTimeout();
         this.stopCopyTicker();
         this.clearRateLimit();

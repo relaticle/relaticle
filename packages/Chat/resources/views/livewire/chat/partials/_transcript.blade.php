@@ -91,13 +91,23 @@
              prepends (load earlier) and pops (continuation revert) must not
              re-bind DOM nodes across different logical messages. --}}
         <template x-for="(msg, index) in messages" :key="msg.clientKey || ('i-' + index)">
+            {{-- The negative inline margin cancels the padding, so the search
+                 highlight below gets breathing room around the bubble without
+                 the row shifting when it comes and goes. --}}
             <div
-                class="group/message"
+                class="group/message -mx-3 rounded-xl px-3 motion-safe:transition-colors"
+                {{-- Jump target for the in-conversation search overlay (see
+                     revealMessage() in transcript.js). Absent on an optimistic
+                     bubble, which has no server id to search by yet. --}}
+                :data-message-id="msg.id || null"
                 {{-- Tightens the gap AFTER this message when the NEXT one groups
                      with it (space-y-6 on the parent sets each item's own
                      trailing margin, so the message being pulled closer to its
                      successor is the one whose margin must shrink). --}}
-                :class="(index + 1 < messages.length && decorations(index + 1).grouped) ? 'mb-1' : ''"
+                :class="[
+                    (index + 1 < messages.length && decorations(index + 1).grouped) ? 'mb-1' : '',
+                    (msg.id && msg.id === highlightedMessageId) ? 'bg-primary-50 dark:bg-primary-500/10' : '',
+                ]"
             >
                 {{-- Day separator: rendered above this message when its calendar
                      day differs from the previous message's. --}}
