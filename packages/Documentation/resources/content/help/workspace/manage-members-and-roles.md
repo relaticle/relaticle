@@ -8,8 +8,9 @@ related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete
 
 Membership is managed on **Workspace Settings** — click your workspace name
 at the top of the sidebar to reach it, then click the **Members** tab.
-Invitations, roles, and removals all live there: **Pending Invitations**
-lists people who have not joined yet, and **Members** lists everyone who has.
+Invitations, roles, and removals all live there, in three sections: **Invite
+people** to send invites, **Pending invitations** for people who have not
+joined yet, and **Members** for everyone who has.
 
 ## The three roles
 
@@ -32,18 +33,19 @@ be removed.
 
 ## Invitations
 
-Click **Invite people** to send up to 10 invites at once — paste the email
-addresses separated by a comma, a space, or a new line, then pick the role
-they all join with. Until an invitation is accepted it sits in **Pending
-Invitations** with the role and how long it has left, where you can:
+The **Invite people** section sends up to 10 invites at once — paste the
+email addresses separated by a comma, a space, or a new line, then pick the
+role they all join with. Until an invitation is accepted it sits in
+**Pending invitations** with the role and how long it has left, where you
+can:
 
 - **Resend** the email.
 - **Revoke** the invitation.
 
-![The Pending Invitations list showing an invited email with its role, expiry, and Resend and Revoke actions](/help-assets/workspace/manage-members-and-roles-1.png)
+![The Pending invitations list showing an invited email with its role, expiry, and Resend and Revoke actions](/help-assets/workspace/manage-members-and-roles-1.png)
 
 There's also a workspace **join link**, managed from **Invite link** next to
-**Invite people**: copy it to share directly, generate a new one if it
+**Send invitations**: copy it to share directly, generate a new one if it
 leaks, and set the role people get when they join with it — Editor by
 default. The link stays valid for 7 days.
 

@@ -12,22 +12,21 @@ workspace, edit records, or just view them.
 
 1. Click your workspace name at the top of the sidebar, then click
    **Workspace Settings**.
-2. Click the **Members** tab.
-3. Click **Invite people**.
-4. Type the addresses into **Send invite to**, separated by a comma, a
+2. Click the **Members** tab. **Invite people** is the first section.
+3. Type the addresses into **Send invite to**, separated by a comma, a
    space, or a new line — up to 10 in one go.
-5. Choose an **Invite as** role — **Administrator**, **Editor**, or
+4. Choose an **Invite as** role — **Administrator**, **Editor**, or
    **Viewer**. Everyone in this batch joins with that role.
-6. Click **Send invitations**.
+5. Click **Send invitations**.
 
-![The Invite team members modal with several addresses in Send invite to and a role chosen in Invite as](/help-assets/getting-started/invite-your-team-1.png)
+![The Invite people section with several addresses in Send invite to and a role chosen in Invite as](/help-assets/getting-started/invite-your-team-1.png)
 
-Each person receives an invitation email and appears in the workspace's
-**Pending Invitations** list until they accept. From there you can
-**Resend** or **Revoke** the invite.
+Each person receives an invitation email and appears in **Pending
+invitations** until they accept. From there you can **Resend** or
+**Revoke** the invite.
 
 ## If you invited the wrong address, then revoke it
 
-Find the invitation in **Pending Invitations** and click **Revoke**. It can
+Find the invitation in **Pending invitations** and click **Revoke**. It can
 no longer be used to join your workspace, and you can send a new one with
 the correct address.

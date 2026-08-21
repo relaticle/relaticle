@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
+use App\Livewire\App\Teams\InviteTeamMembers;
 use App\Livewire\App\Teams\PendingTeamInvitations;
-use App\Livewire\App\Teams\TeamMembers;
 use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -25,11 +25,12 @@ beforeEach(function () {
 });
 
 test('team members can be invited to team', function () {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'test@example.com',
             'role' => 'admin',
-        ]);
+        ])
+        ->call('invitePeople');
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
 
@@ -43,22 +44,24 @@ test('team members can be invited to team', function () {
 test('invitation expires_at is set based on config', function () {
     config(['jetstream.invitation_expiry_days' => 14]);
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'test@example.com',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->first();
     expect((int) round($invitation->expires_at->diffInDays(now(), absolute: true)))->toBe(14);
 });
 
 test('team member invitations can be revoked', function () {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'test@example.com',
             'role' => 'admin',
-        ]);
+        ])
+        ->call('invitePeople');
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(1);
 
@@ -71,11 +74,12 @@ test('team member invitations can be revoked', function () {
 });
 
 test('team members cannot be invited with a disposable email address', function () {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'burner@mailinator.com',
             'role' => 'admin',
         ])
+        ->call('invitePeople')
         ->assertNotified(__('teams.notifications.some_invites_failed.title'));
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
@@ -87,11 +91,12 @@ test('admin cannot invite a new member as admin', function (): void {
 
     $this->actingAs($admin);
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'newadmin@example.com',
             'role' => 'admin',
         ])
+        ->call('invitePeople')
         ->assertHasActionErrors();
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
@@ -156,11 +161,12 @@ test('viewer cannot manage members', function (): void {
 });
 
 test('inviting records the inviter and mints a token', function (): void {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'new@example.test',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->first();
 
@@ -169,11 +175,12 @@ test('inviting records the inviter and mints a token', function (): void {
 });
 
 test('inviting lowercases a mixed-case email', function (): void {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'Mixed-Case@Example.Test',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->first();
 
@@ -181,17 +188,19 @@ test('inviting lowercases a mixed-case email', function (): void {
 });
 
 test('inviting a case-variant of an already-invited email is rejected as a duplicate', function (): void {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'bob@example.test',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'Bob@Example.Test',
             'role' => 'editor',
         ])
+        ->call('invitePeople')
         ->assertNotified(
             Notification::make()
                 ->title(__('teams.notifications.some_invites_failed.title'))
@@ -206,11 +215,12 @@ test('inviting someone who already belongs to the workspace names the workspace,
     $member = User::factory()->create(['email' => 'member@example.test']);
     $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'member@example.test',
             'role' => 'editor',
         ])
+        ->call('invitePeople')
         ->assertNotified(
             Notification::make()
                 ->title(__('teams.notifications.some_invites_failed.title'))
@@ -224,11 +234,12 @@ test('inviting someone who already belongs to the workspace names the workspace,
 test('invitation email names the inviter and the role', function (): void {
     $this->user->update(['name' => 'Ana Reyes']);
 
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'new@example.test',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail): bool {
         return $mail->hasTo('new@example.test')
@@ -238,11 +249,12 @@ test('invitation email names the inviter and the role', function (): void {
 });
 
 test('invitation email accept URL resolves to the token route and carries the raw token, not the hash', function (): void {
-    livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('invitePeople')->table(), [
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->fillForm([
             'emails' => 'new@example.test',
             'role' => 'editor',
-        ]);
+        ])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->sole();
 

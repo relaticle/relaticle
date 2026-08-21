@@ -26,13 +26,17 @@ return [
             'title' => 'Workspace Name',
             'description' => 'The workspace\'s name and owner information.',
         ],
+        'add_team_member' => [
+            'title' => 'Invite people',
+            'description' => 'Invite people to collaborate in this workspace.',
+        ],
         'team_members' => [
             'title' => 'Members',
-            'description' => 'All of the people that are part of this workspace.',
+            'description' => 'Everyone with access to this workspace.',
         ],
         'pending_team_invitations' => [
-            'title' => 'Pending Invitations',
-            'description' => 'These people have been invited to your workspace and have been sent an invitation email. They may join the workspace by accepting the email invitation.',
+            'title' => 'Pending invitations',
+            'description' => 'Invited, but not joined yet.',
         ],
         'delete_team' => [
             'title' => 'Delete Workspace',
@@ -44,7 +48,6 @@ return [
 
     'actions' => [
         'save' => 'Save',
-        'invite_people' => 'Invite people',
         'send_invitations' => 'Send invitations',
         'invite_link' => 'Invite link',
         'rotate_invite_link' => 'Generate a new link',
@@ -102,9 +105,6 @@ return [
     ],
 
     'modals' => [
-        'invite_people' => [
-            'heading' => 'Invite team members',
-        ],
         'leave_team' => [
             'notice' => 'Are you sure you would like to leave this workspace?',
         ],
