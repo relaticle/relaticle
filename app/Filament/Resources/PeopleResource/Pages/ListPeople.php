@@ -33,7 +33,8 @@ final class ListPeople extends ListRecords
                 Action::make('import')
                     ->label(__('filament/resources/person.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportPeople::getUrl()),
+                    ->url(ImportPeople::getUrl())
+                    ->visible(ImportPeople::canAccess(...)),
                 ExportAction::make()->exporter(PeopleExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')

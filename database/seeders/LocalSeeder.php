@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\TeamRole;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -53,7 +54,7 @@ final class LocalSeeder extends Seeder
             ->after(function (User $user) use ($teamId): void {
                 // Assign the user to the personal team.
                 $user->teams()->attach($teamId, [
-                    'role' => 'member',
+                    'role' => TeamRole::Editor->value,
                 ]);
             });
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\TeamMemberRemovedNotification;
@@ -23,6 +24,8 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
         $this->authorize($user, $team, $teamMember);
 
         $this->ensureUserDoesNotOwnTeam($teamMember, $team);
+
+        $this->ensureAdminIsNotRemovingAnotherAdmin($user, $team, $teamMember);
 
         $team->removeUser($teamMember);
 
@@ -52,5 +55,29 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
                 'team' => [__('You may not leave a workspace that you created.')],
             ])->errorBag('removeTeamMember');
         }
+    }
+
+    /**
+     * Only the owner may remove another Admin. An Admin removing themselves
+     * (leaving the workspace) is unaffected — the self-exception in
+     * authorize() already allows that regardless of role.
+     */
+    private function ensureAdminIsNotRemovingAnotherAdmin(User $user, Team $team, User $teamMember): void
+    {
+        if ($user->id === $teamMember->id) {
+            return;
+        }
+
+        if ($teamMember->teamRole($team)?->key !== TeamRole::Admin->value) {
+            return;
+        }
+
+        if (Gate::forUser($user)->check('promoteToAdmin', $team)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'team' => [__('teams.notifications.permission_denied.cannot_promote_to_admin')],
+        ])->errorBag('removeTeamMember');
     }
 }

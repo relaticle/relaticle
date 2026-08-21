@@ -4,25 +4,34 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Teams;
 
-use App\Actions\Jetstream\RemoveTeamMember as RemoveTeamMemberAction;
+use App\Actions\Jetstream\RemoveTeamMember;
+use App\Actions\Jetstream\UpdateTeamMemberRole;
+use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
-use App\Models\Membership;
 use App\Models\Team;
+use App\Models\User;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
-use Filament\Schemas\Components\Grid;
-use Filament\Support\Enums\Alignment;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use Laravel\Jetstream\Events\TeamMemberUpdated;
 use Laravel\Jetstream\Jetstream;
 
+/**
+ * The workspace's people directory. Inviting lives in InviteTeamMembers and
+ * pending invitations in PendingTeamInvitations — three sections down the page,
+ * so the roster stays a roster and the actionable sets are not buried inside
+ * it. Merging them into one paginated table hid pending invites behind
+ * pagination, which is why Twenty and Slack keep them apart too.
+ */
 final class TeamMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
@@ -36,144 +45,228 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
     public function table(Table $table): Table
     {
-        $model = Membership::class;
-
-        $teamForeignKeyColumn = 'team_id';
-
         return $table
-            ->query(fn (): Builder => $model::with('user')->whereHas('user')->where($teamForeignKeyColumn, $this->team->id))
+            ->query($this->membersQuery(...))
+            ->paginated(false)
+            ->defaultSort('name')
+            // Split rather than discrete columns: this is a short roster, and a
+            // header row over two fields reads as table chrome around a list.
             ->columns([
                 Tables\Columns\Layout\Split::make([
                     Tables\Columns\ImageColumn::make('profile_photo_url')
-                        ->disk(config('jetstream.profile_photo_disk'))
-                        ->defaultImageUrl(fn (Membership $record): string => Filament::getUserAvatarUrl($record->user))
                         ->circular()
-                        ->imageSize(25)
+                        ->imageSize(32)
+                        ->defaultImageUrl(fn (User $record): string => Filament::getUserAvatarUrl($record))
                         ->grow(false),
-                    Tables\Columns\TextColumn::make('user.email'),
+                    Tables\Columns\TextColumn::make('name')
+                        ->description(fn (User $record): string => $record->email),
+                    // Every other row wears its role on the updateTeamRole button,
+                    // which the owner never gets — this keeps their row labelled
+                    // without opening a role-change surface on it.
+                    Tables\Columns\TextColumn::make('owner_label')
+                        ->badge()
+                        ->color('primary')
+                        ->grow(false)
+                        // Empty string, not null: Filament renders no badge for a
+                        // blank state, so non-owner rows stay clean.
+                        ->state(fn (User $record): string => $this->isOwner($record)
+                            ? __('teams.roles.owner.label')
+                            : ''),
                 ]),
             ])
-            ->paginated(false)
             ->recordActions([
-                Action::make('updateTeamRole')
-                    ->visible(fn (Membership $record): bool => Gate::check('updateTeamMember', $this->team))
-                    ->label(fn (Membership $record): string => $record->roleName)
-                    ->modalWidth('lg')
-                    ->modalHeading(__('teams.actions.update_team_role'))
-                    ->modalSubmitActionLabel(__('teams.actions.save'))
-                    ->modalCancelAction(false)
-                    ->modalFooterActionsAlignment(Alignment::End)
-                    ->schema([
-                        Grid::make()
-                            ->columns(1)
-                            ->schema(function (): array {
-                                $roles = collect(Jetstream::$roles);
-
-                                return [
-                                    Radio::make('role')
-                                        ->hiddenLabel()
-                                        ->required()
-                                        ->in($roles->pluck('key'))
-                                        ->options($roles->pluck('name', 'key'))
-                                        ->descriptions($roles->pluck('description', 'key'))
-                                        ->default(fn (Membership $record): string => $record->role),
-                                ];
-                            }),
-                    ])
-                    ->action(function (Membership $record, array $data): void {
-                        $this->updateTeamRole($this->team, $record, $data);
-                    }),
-                Action::make('removeTeamMember')
-                    ->visible(
-                        fn (Membership $record): bool => (string) $this->authUser()->id !== (string) $record->user_id && Gate::check(
-                            'removeTeamMember',
-                            $this->team
-                        )
-                    )
-                    ->label(__('teams.actions.remove_team_member'))
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Membership $record): void {
-                        $this->removeTeamMember($this->team, $record);
-                    }),
-                Action::make('leaveTeam')
-                    ->visible(fn (Membership $record): bool => (string) $this->authUser()->id === (string) $record->user_id)
-                    ->icon('heroicon-o-arrow-right-start-on-rectangle')
-                    ->color('danger')
-                    ->label(__('teams.actions.leave_team'))
-                    ->modalDescription(__('teams.modals.leave_team.notice'))
-                    ->requiresConfirmation()
-                    ->action(function (Membership $record): void {
-                        $this->leaveTeam($this->team);
-                    }),
+                $this->updateTeamRoleAction(),
+                $this->removeTeamMemberAction(),
+                $this->leaveTeamAction(),
             ]);
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * Owner and members in one list, without the raw-SQL union the merged table
+     * needed: Jetstream tracks ownership on `teams.user_id` rather than the
+     * `team_user` pivot, so the owner is pulled in by a second `where` leg and
+     * carries a null `team_role`.
+     *
+     * Selecting through `users` also drops orphaned pivot rows structurally —
+     * production is missing the `team_user` foreign keys, so a deleted account
+     * can leave a row whose user is gone, and `Filament::getUserAvatarUrl()` is
+     * typed non-nullable and 500s on it.
+     *
+     * @return Builder<User>
      */
-    public function updateTeamRole(Team $team, Membership $teamMember, array $data): void
+    private function membersQuery(): Builder
     {
-        if (! Gate::check('updateTeamMember', $team)) {
-            $this->sendNotification(
-                __('teams.notifications.permission_denied.cannot_update_team_member'),
-                type: 'danger'
-            );
+        $pivot = fn (string $column): QueryBuilder => DB::table('team_user')
+            ->select($column)
+            ->whereColumn('team_user.user_id', 'users.id')
+            ->where('team_user.team_id', $this->team->id)
+            ->limit(1);
 
-            return;
-        }
-
-        $team->users()->updateExistingPivot($teamMember->user_id, ['role' => $data['role']]);
-
-        event(new TeamMemberUpdated($team->fresh(), $teamMember));
-
-        $this->sendNotification();
-
-        $team->fresh();
+        return User::query()
+            ->select('users.*')
+            ->addSelect([
+                'team_role' => $pivot('role'),
+                'joined_at' => $pivot('created_at'),
+            ])
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereKey($this->team->user_id)
+                    ->orWhereExists(fn (QueryBuilder $exists): QueryBuilder => $exists
+                        ->from('team_user')
+                        ->whereColumn('team_user.user_id', 'users.id')
+                        ->where('team_user.team_id', $this->team->id));
+            });
     }
 
-    public function removeTeamMember(Team $team, Membership $teamMember): void
+    private function isOwner(User $record): bool
     {
-        try {
-            resolve(RemoveTeamMemberAction::class)->remove($this->authUser(), $team, $teamMember->user);
-
-            $this->sendNotification(__('teams.notifications.team_member_removed.success'));
-
-            $team->fresh();
-        } catch (AuthorizationException) {
-            $this->sendNotification(
-                __('teams.notifications.permission_denied.cannot_remove_team_member'),
-                type: 'danger'
-            );
-        } catch (ValidationException $e) {
-            $this->sendNotification(
-                $e->validator->errors()->first(),
-                type: 'danger'
-            );
-        }
+        return $record->getKey() === $this->team->user_id;
     }
 
-    public function leaveTeam(Team $team): void
+    /**
+     * `team_role` is a per-query select, not a column on `users`, so it is read
+     * through the attribute bag rather than declared on the model. It is null on
+     * the owner row, which has no `team_user` pivot to select from.
+     */
+    private function roleKey(User $record): ?string
     {
-        $teamMember = $this->authUser();
+        $role = $record->getAttribute('team_role');
 
-        try {
-            resolve(RemoveTeamMemberAction::class)->remove($teamMember, $team, $teamMember);
+        return is_string($role) ? $role : null;
+    }
 
-            $this->sendNotification(__('teams.notifications.leave_team.success'));
+    /**
+     * Falls back to the raw role string for a legacy or unregistered role key
+     * rather than throwing — Jetstream::findRole()'s untyped PHPDoc return
+     * makes PHPStan misjudge a plain `?->` chain as never-null here.
+     */
+    private function roleLabel(string $role): string
+    {
+        $registeredRole = Jetstream::findRole($role);
 
-            $this->redirect(Filament::getHomeUrl());
-        } catch (AuthorizationException) {
-            $this->sendNotification(
-                title: __('teams.notifications.permission_denied.cannot_leave_team'),
-                type: 'danger'
-            );
-        } catch (ValidationException $e) {
-            $this->sendNotification(
-                $e->validator->errors()->first(),
-                type: 'danger'
-            );
+        if ($registeredRole === null) {
+            return $role;
         }
+
+        return $registeredRole->name;
+    }
+
+    private function updateTeamRoleAction(): Action
+    {
+        return Action::make('updateTeamRole')
+            // The button reads as the member's current role, so the row shows the
+            // role without a column for it and the click target is the thing you
+            // would change. This is how the page worked before the rewrite.
+            ->label(fn (User $record): string => $this->roleLabel($this->roleKey($record) ?? ''))
+            ->badge()
+            ->color('gray')
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
+                && Gate::check('updateTeamMember', $this->team))
+            ->modalHeading(__('teams.actions.update_team_role'))
+            ->modalWidth('lg')
+            ->schema([
+                Radio::make('role')
+                    ->hiddenLabel()
+                    ->required()
+                    ->options(fn (): array => $this->assignableRoles())
+                    ->in(fn (): array => array_keys($this->assignableRoles()))
+                    ->descriptions(fn (): array => collect(Jetstream::$roles)
+                        ->only(array_keys($this->assignableRoles()))
+                        ->pluck('description', 'key')
+                        ->all())
+                    ->default(fn (User $record): string => $this->roleKey($record) ?? '')
+                    ->rules([
+                        fn (User $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+                            $touchesAdminStatus = $value === TeamRole::Admin->value
+                                || $this->roleKey($record) === TeamRole::Admin->value;
+
+                            if ($touchesAdminStatus && ! Gate::check('promoteToAdmin', $this->team)) {
+                                $fail(__('teams.validation.only_owner_promotes_admins'));
+                            }
+                        },
+                    ]),
+            ])
+            ->action(function (User $record, array $data): void {
+                try {
+                    resolve(UpdateTeamMemberRole::class)->update(
+                        $this->authUser(),
+                        $this->team,
+                        (string) $record->getKey(),
+                        $data['role'],
+                    );
+
+                    $this->sendNotification(__('teams.notifications.role_updated.success'));
+                } catch (AuthorizationException) {
+                    $this->sendNotification(
+                        __('teams.notifications.permission_denied.cannot_promote_to_admin'),
+                        type: 'danger'
+                    );
+                }
+
+                $this->resetTable();
+            });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function assignableRoles(): array
+    {
+        $roles = collect(Jetstream::$roles)->pluck('name', 'key');
+
+        if (! Gate::check('promoteToAdmin', $this->team)) {
+            $roles = $roles->except(TeamRole::Admin->value);
+        }
+
+        return $roles->all();
+    }
+
+    private function removeTeamMemberAction(): Action
+    {
+        return Action::make('removeTeamMember')
+            ->label(__('teams.actions.remove_team_member'))
+            ->color('danger')
+            ->requiresConfirmation()
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
+                && $record->getKey() !== $this->authUser()->getKey()
+                && Gate::check('removeTeamMember', $this->team))
+            ->action(function (User $record): void {
+                try {
+                    resolve(RemoveTeamMember::class)->remove($this->authUser(), $this->team, $record);
+                    $this->sendNotification(__('teams.notifications.team_member_removed.success'));
+                } catch (AuthorizationException) {
+                    $this->sendNotification(__('teams.notifications.permission_denied.cannot_remove_team_member'), type: 'danger');
+                } catch (ValidationException $exception) {
+                    $this->sendNotification($exception->validator->errors()->first(), type: 'danger');
+                }
+
+                $this->resetTable();
+            });
+    }
+
+    private function leaveTeamAction(): Action
+    {
+        return Action::make('leaveTeam')
+            ->label(__('teams.actions.leave_team'))
+            ->icon('heroicon-o-arrow-right-start-on-rectangle')
+            ->color('danger')
+            ->modalDescription(__('teams.modals.leave_team.notice'))
+            ->requiresConfirmation()
+            // Hidden on the owner row: RemoveTeamMember always rejects the owner,
+            // so showing it could only ever produce an error (defect A8).
+            ->visible(fn (User $record): bool => ! $this->isOwner($record)
+                && $record->getKey() === $this->authUser()->getKey())
+            ->action(function (): void {
+                $user = $this->authUser();
+
+                try {
+                    resolve(RemoveTeamMember::class)->remove($user, $this->team, $user);
+                    $this->sendNotification(__('teams.notifications.leave_team.success'));
+                    $this->redirect(Filament::getHomeUrl());
+                } catch (ValidationException $exception) {
+                    $this->sendNotification($exception->validator->errors()->first(), type: 'danger');
+                }
+            });
     }
 
     public function render(): View

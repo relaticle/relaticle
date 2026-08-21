@@ -9,17 +9,34 @@ use App\Actions\Jetstream\RevokeTeamInvitation;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL;
+use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\On;
 
+/**
+ * The outstanding-invitation worklist: short, unpaginated, and hidden entirely
+ * when empty, so every pending invitation is always one glance away. Twenty
+ * (`SettingsWorkspaceMembersInviteTab`) and Slack both render it this way; the
+ * merged, paginated people table this replaced could bury a pending invitation
+ * on page three.
+ *
+ * There is deliberately no per-invitation "copy link" action. The raw token is
+ * only ever held in memory at mint time — `TeamInvitation::issueToken()` stores
+ * a SHA-256 hash — so a copy action could only work by re-minting, which would
+ * silently invalidate the link already sitting in the invitee's inbox. Twenty
+ * excludes the token from its listing query for the same reason, and Slack and
+ * Notion offer no per-invitation link either. Sharing a link out-of-band is
+ * what the workspace-wide invite link (TeamMembers::manageInviteLinkAction) is
+ * for; re-delivering this specific one is what Resend is for.
+ */
 final class PendingTeamInvitations extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
@@ -32,102 +49,123 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
     }
 
     #[On('teamInvitationSent')]
-    public function refreshInvitationList(): void
+    public function refreshInvitations(): void
     {
-        // Filament table auto-refreshes on Livewire re-render
+        $this->resetTable();
+    }
+
+    public function hasPendingInvitations(): bool
+    {
+        return $this->team->teamInvitations()->exists();
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn () => $this->team->teamInvitations()->latest())
+            ->query(fn (): Builder => $this->team->teamInvitations()->getQuery()->latest())
+            ->paginated(false)
+            // Split rather than discrete columns, matching the members list: a
+            // header row over two fields reads as table chrome around a list.
             ->columns([
                 Tables\Columns\Layout\Split::make([
-                    Tables\Columns\TextColumn::make('email'),
+                    Tables\Columns\TextColumn::make('email')
+                        ->icon('heroicon-m-envelope')
+                        ->iconColor('gray')
+                        ->wrap(),
+                    Tables\Columns\TextColumn::make('role')
+                        ->badge()
+                        ->color('gray')
+                        ->grow(false)
+                        ->formatStateUsing(fn (string $state): string => $this->roleLabel($state)),
                     Tables\Columns\TextColumn::make('expires_at')
-                        ->label(__('Expires'))
-                        ->state(function (TeamInvitation $record): string {
-                            if ($record->isExpired()) {
-                                return __('Expired');
-                            }
-
-                            /** @var Carbon $expiresAt */
-                            $expiresAt = $record->expires_at;
-
-                            return $expiresAt->diffForHumans();
+                        ->badge()
+                        ->grow(false)
+                        ->color(fn (TeamInvitation $record): string => $record->isExpired() ? 'danger' : 'warning')
+                        ->formatStateUsing(fn (?Carbon $state): string => match (true) {
+                            ! $state instanceof Carbon => __('teams.table.expired'),
+                            $state->isPast() => __('teams.table.expired'),
+                            default => __('teams.table.expires_in', ['time' => $state->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE)]),
                         }),
                 ]),
             ])
-            ->paginated(false)
             ->recordActions([
-                Action::make('copyInviteLink')
-                    ->label(__('teams.actions.copy_invite_link'))
-                    ->color('gray')
-                    ->visible(fn () => Gate::check('updateTeamMember', $this->team))
-                    ->action(fn (Model $record) => $this->copyInviteLink($record)),
-                Action::make('resendTeamInvitation')
-                    ->label(__('teams.actions.resend_team_invitation'))
-                    ->color('primary')
-                    ->requiresConfirmation()
-                    ->visible(fn () => Gate::check('updateTeamMember', $this->team))
-                    ->action($this->resendTeamInvitation(...)),
-                Action::make('revokeTeamInvitation')
-                    ->label(__('teams.actions.revoke_team_invitation'))
-                    ->color('danger')
-                    ->visible(fn () => Gate::check('removeTeamMember', $this->team))
-                    ->requiresConfirmation()
-                    ->action(fn (Model $record) => $this->revokeTeamInvitation($record)),
+                $this->resendTeamInvitationAction(),
+                $this->revokeTeamInvitationAction(),
             ]);
     }
 
-    public function copyInviteLink(Model $invitation): void
+    /**
+     * Falls back to the raw role string for a legacy or unregistered role key
+     * rather than throwing — Jetstream::findRole()'s untyped PHPDoc return
+     * makes PHPStan misjudge a plain `?->` chain as never-null here.
+     */
+    private function roleLabel(string $role): string
     {
-        /** @var TeamInvitation $invitation */
-        Gate::authorize('updateTeamMember', $this->team);
+        $registeredRole = Jetstream::findRole($role);
 
-        abort_unless($invitation->team_id === $this->team->id, 403);
-
-        $url = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-
-        $this->js('navigator.clipboard.writeText('.json_encode($url, JSON_THROW_ON_ERROR).')');
-
-        $this->sendNotification(__('teams.notifications.invite_link_copied.success'));
-    }
-
-    public function resendTeamInvitation(Model $invitation): void
-    {
-        /** @var TeamInvitation $invitation */
-        Gate::authorize('updateTeamMember', $this->team);
-
-        abort_unless($invitation->team_id === $this->team->id, 403);
-
-        $key = "resend-invitation:{$invitation->getKey()}";
-
-        if (RateLimiter::tooManyAttempts($key, 1)) {
-            $seconds = RateLimiter::availableIn($key);
-
-            $this->sendNotification(__('Please wait :seconds seconds before resending.', ['seconds' => $seconds]));
-
-            return;
+        if ($registeredRole === null) {
+            return $role;
         }
 
-        RateLimiter::hit($key, 60);
-
-        resolve(ResendTeamInvitation::class)->resend($invitation);
-
-        $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
+        return $registeredRole->name;
     }
 
-    public function revokeTeamInvitation(Model $invitation): void
+    private function resendTeamInvitationAction(): Action
     {
-        /** @var TeamInvitation $invitation */
-        Gate::authorize('removeTeamMember', $this->team);
+        return Action::make('resendTeamInvitation')
+            ->label(__('teams.actions.resend_team_invitation'))
+            ->requiresConfirmation()
+            ->visible(fn (): bool => Gate::check('updateTeamMember', $this->team))
+            ->action(function (TeamInvitation $record): void {
+                $this->authorizeInvitation($record, 'updateTeamMember');
+
+                $key = "resend-invitation:{$record->getKey()}";
+
+                if (RateLimiter::tooManyAttempts($key, 1)) {
+                    $this->sendNotification(__('teams.notifications.resend_throttled', [
+                        'seconds' => RateLimiter::availableIn($key),
+                    ]), type: 'warning');
+
+                    return;
+                }
+
+                RateLimiter::hit($key, 60);
+
+                resolve(ResendTeamInvitation::class)->resend($record);
+
+                $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
+                $this->resetTable();
+            });
+    }
+
+    private function revokeTeamInvitationAction(): Action
+    {
+        return Action::make('revokeTeamInvitation')
+            ->label(__('teams.actions.revoke_team_invitation'))
+            ->color('danger')
+            ->requiresConfirmation()
+            ->visible(fn (): bool => Gate::check('removeTeamMember', $this->team))
+            ->action(function (TeamInvitation $record): void {
+                $this->authorizeInvitation($record, 'removeTeamMember');
+
+                resolve(RevokeTeamInvitation::class)->revoke($record);
+
+                $this->sendNotification(__('teams.notifications.team_invitation_revoked.success'));
+                $this->resetTable();
+            });
+    }
+
+    /**
+     * The table query is already team-scoped, so a foreign key cannot resolve to
+     * a record here. This re-asserts the boundary anyway: the record key arrives
+     * from the client, and PendingTeamInvitationsCrossTenantTest pins a 403
+     * rather than a silent no-op as the contract for a foreign invitation.
+     */
+    private function authorizeInvitation(TeamInvitation $invitation, string $ability): void
+    {
+        Gate::authorize($ability, $this->team);
 
         abort_unless($invitation->team_id === $this->team->id, 403);
-
-        resolve(RevokeTeamInvitation::class)->revoke($invitation);
-
-        $this->sendNotification(__('teams.notifications.team_invitation_revoked.success'));
     }
 
     public function render(): View

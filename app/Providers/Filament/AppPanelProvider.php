@@ -30,6 +30,7 @@ use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\BrandColors;
 use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -235,20 +236,7 @@ final class AppPanelProvider extends PanelProvider
                 position: DatabaseNotificationsPosition::Sidebar,
             )
             ->colors([
-                'primary' => [
-                    50 => 'oklch(0.969 0.016 293.756)',
-                    100 => 'oklch(0.943 0.028 294.588)',
-                    200 => 'oklch(0.894 0.055 293.283)',
-                    300 => 'oklch(0.811 0.101 293.571)',
-                    400 => 'oklch(0.709 0.159 293.541)',
-                    500 => 'oklch(0.606 0.219 292.717)',
-                    600 => 'oklch(0.541 0.247 293.009)',
-                    700 => 'oklch(0.491 0.241 292.581)',
-                    800 => 'oklch(0.432 0.211 292.759)',
-                    900 => 'oklch(0.380 0.178 293.745)',
-                    950 => 'oklch(0.283 0.135 291.089)',
-                    'DEFAULT' => 'oklch(0.541 0.247 293.009)',
-                ],
+                'primary' => BrandColors::primary(),
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->userMenuItems([
@@ -356,6 +344,21 @@ final class AppPanelProvider extends PanelProvider
 
                     return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
+            )
+            ->renderHook(
+                // CreateTeam (the /new tenant-registration page every current_team_id=null
+                // user lands on) renders a custom $view that never includes the standard
+                // page component, so PAGE_START above never fires there. It keeps the
+                // default $layout though, which fires SIMPLE_LAYOUT_START unconditionally
+                // -- scoping to CreateTeam::class keeps this off the unauthenticated
+                // login/register pages that also use that layout.
+                PanelsRenderHook::SIMPLE_LAYOUT_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
+                scopes: CreateTeam::class,
             );
 
         if (Features::hasApiFeatures()) {

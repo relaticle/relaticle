@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
+use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -118,8 +121,22 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: SetApiTeamContext::class,
         );
 
+        // Textual order in a route's middleware array does not decide execution
+        // order: SortedMiddleware resorts by this priority list, and — critically
+        // — an unmapped middleware sitting between two mapped ones (e.g. between
+        // the 'web' group's SubstituteBindings and 'auth') gets dragged along
+        // when the higher-priority one jumps forward. Only registering our own
+        // class here keeps ThrottleBeforeAuthentication running before auth,
+        // without moving the framework's own ThrottleRequests (used by 'throttle'
+        // elsewhere, e.g. routes/api.php, routes/ai.php) relative to auth.
+        $middleware->prependToPriorityList(
+            before: AuthenticatesRequests::class,
+            prepend: ThrottleBeforeAuthentication::class,
+        );
+
         $middleware->alias([
             'signed' => ValidateSignature::class,
+            'no-referrer' => NoReferrer::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -127,18 +144,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request): string {
-            if ($request->routeIs('team-invitations.accept')) {
-                $invitation = TeamInvitation::query()
-                    ->whereKey($request->route('invitation'))
-                    ->first();
-
-                if ($invitation && User::query()->where('email', $invitation->email)->exists()) {
-                    return Filament::getLoginUrl();
-                }
-
-                return Filament::getRegistrationUrl();
-            }
-
             // A shared join link carries no email, so we cannot tell whether the
             // visitor has an account. Most people opening one do not, and the
             // register page links back to sign-in for the rest.
@@ -146,7 +151,17 @@ return Application::configure(basePath: dirname(__DIR__))
                 return Filament::getRegistrationUrl();
             }
 
-            return route('login');
+            $invitation = $request->routeIs('team-invitations.token.accept')
+                ? TeamInvitation::findByRawToken((string) $request->route('token'))
+                : null;
+
+            if (! $invitation instanceof TeamInvitation) {
+                return route('login');
+            }
+
+            return User::query()->where('email', $invitation->email)->exists()
+                ? Filament::getLoginUrl()
+                : Filament::getRegistrationUrl();
         });
     })
     ->withExceptions(function (Exceptions $exceptions): void {

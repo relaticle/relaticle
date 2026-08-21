@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\TeamRole;
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
+use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use Closure;
@@ -12,14 +15,13 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
-use Laravel\Jetstream\TeamInvitation as TeamInvitationModel;
 
 final readonly class InviteTeamMember implements InvitesTeamMembers
 {
@@ -28,22 +30,29 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
      */
     public function invite(User $user, Team $team, string $email, ?string $role = null): void
     {
+        $email = Str::lower($email);
+
         Gate::forUser($user)->authorize('addTeamMember', $team);
+
+        if ($role === TeamRole::Admin->value) {
+            Gate::forUser($user)->authorize('promoteToAdmin', $team);
+        }
 
         $this->validate($team, $email, $role);
 
         event(new InvitingTeamMember($team, $email, $role));
 
-        $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
-
-        $invitation = $team->teamInvitations()->create([
+        $invitation = $team->teamInvitations()->make([
             'email' => $email,
             'role' => $role,
-            'expires_at' => now()->addDays($expiryDays),
+            'inviter_id' => $user->id,
         ]);
 
         /** @var TeamInvitationModel $invitation */
-        Mail::to($email)->send(new TeamInvitation($invitation));
+        $rawToken = $invitation->issueToken();
+        $invitation->save();
+
+        Mail::to($invitation->email)->send(new TeamInvitationMail($invitation, $rawToken));
     }
 
     /**
@@ -55,7 +64,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
             'email' => $email,
             'role' => $role,
         ], $this->rules($team), [
-            'email.unique' => __('This user has already been invited to the team.'),
+            'email.unique' => __('teams.validation.email_already_invited'),
         ])->after(
             $this->ensureUserIsNotAlreadyOnTeam($team, $email)
         )->validateWithBag('addTeamMember');
@@ -88,7 +97,7 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
             $validator->errors()->addIf(
                 $team->hasUserWithEmail($email),
                 'email',
-                __('This user already belongs to the team.')
+                __('teams.validation.email_already_member')
             );
         };
     }

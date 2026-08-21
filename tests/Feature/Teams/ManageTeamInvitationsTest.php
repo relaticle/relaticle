@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Console\Commands\CleanupExpiredInvitationsCommand;
 use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Support\Facades\Mail;
 
 mutates(TeamInvitation::class);
 
@@ -40,32 +42,18 @@ test('invitation expiring exactly now is expired', function () {
     expect($invitation->isExpired())->toBeTrue();
 });
 
-// --- Copy invite link ---
-
-test('team owner can copy invite link', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
-
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $user->currentTeam->id,
-    ]);
-
-    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
-        ->callAction(TestAction::make('copyInviteLink')->table($invitation))
-        ->assertNotified();
-});
-
 // --- Pending invitations table ---
 
 test('pending invitations table shows invitations', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
-    $invitation = TeamInvitation::factory()->create([
+    TeamInvitation::factory()->create([
         'team_id' => $user->currentTeam->id,
         'email' => 'pending@example.com',
     ]);
 
     livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
-        ->assertCanSeeTableRecords([$invitation]);
+        ->assertSee('pending@example.com');
 });
 
 // --- Cleanup command ---
@@ -118,7 +106,7 @@ test('team owner can revoke a pending invitation', function () {
     ]);
 
     livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
-        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation))
+        ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_revoked.success'));
 
     expect(TeamInvitation::query()->whereKey($invitation->getKey())->exists())->toBeFalse();
@@ -136,5 +124,59 @@ test('old cancel action name is gone', function () {
     ]);
 
     livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
-        ->assertActionDoesNotExist(TestAction::make('cancelTeamInvitation')->table($invitation));
+        ->assertActionDoesNotExist(TestAction::make('cancelTeamInvitation')->table($invitation->id));
+});
+
+// --- Resend invitation ---
+
+test('resending re-issues the token and extends expiry', function (): void {
+    Mail::fake();
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
+
+    $invitation = $team->teamInvitations()->create([
+        'email' => 'legacy@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDay(),
+    ]);
+
+    expect($invitation->token)->toBeNull();
+
+    livewire(PendingTeamInvitations::class, ['team' => $team])
+        ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id));
+
+    $invitation->refresh();
+
+    expect($invitation->token)->not->toBeNull()
+        ->and($invitation->expires_at->isAfter(now()->addDays(6)))->toBeTrue();
+});
+
+test('resending delivers the new invitation mailable with a working raw token', function (): void {
+    Mail::fake();
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
+    $team = $user->currentTeam;
+
+    $invitation = $team->teamInvitations()->create([
+        'email' => 'legacy@example.test',
+        'role' => 'editor',
+        'expires_at' => now()->addDay(),
+    ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $team])
+        ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id));
+
+    $invitation->refresh();
+
+    Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail) use ($invitation): bool {
+        $resolved = TeamInvitation::findByRawToken($mail->rawToken);
+        $expectedUrl = route('team-invitations.token.accept', ['token' => $mail->rawToken]);
+
+        return $mail->hasTo('legacy@example.test')
+            && $mail->rawToken !== $invitation->token
+            && $resolved instanceof TeamInvitation
+            && $resolved->is($invitation)
+            && str_contains($mail->render(), $expectedUrl);
+    });
 });

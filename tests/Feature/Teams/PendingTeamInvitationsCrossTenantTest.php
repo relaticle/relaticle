@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
+use Illuminate\Support\Facades\Mail;
 
 mutates(PendingTeamInvitations::class);
 
-it('prevents admin of team A from revoking an invitation belonging to team B', function (): void {
+it('prevents an admin of team A from revoking an invitation belonging to team B', function (): void {
     $attacker = User::factory()->withPersonalTeam()->create();
     $attackerTeam = $attacker->personalTeam();
 
@@ -17,19 +19,25 @@ it('prevents admin of team A from revoking an invitation belonging to team B', f
     $victimInvitation = $victimTeam->teamInvitations()->create([
         'email' => 'bystander@example.com',
         'role' => 'editor',
+        'expires_at' => now()->addDays(5),
     ]);
 
     $this->actingAs($attacker);
 
-    livewire(PendingTeamInvitations::class, ['team' => $attackerTeam])
-        ->call('revokeTeamInvitation', $victimInvitation)
-        ->assertForbidden();
+    $component = livewire(PendingTeamInvitations::class, ['team' => $attackerTeam]);
 
-    expect($victimTeam->teamInvitations()->whereKey($victimInvitation->id)->exists())
-        ->toBeTrue();
+    $component->assertDontSee('bystander@example.com');
+
+    rescue(fn () => $component->callAction(
+        TestAction::make('revokeTeamInvitation')->table($victimInvitation->id)
+    ));
+
+    expect($victimTeam->teamInvitations()->whereKey($victimInvitation->id)->exists())->toBeTrue();
 });
 
-it('prevents admin of team A from resending an invitation belonging to team B', function (): void {
+it('prevents an admin of team A from resending an invitation belonging to team B', function (): void {
+    Mail::fake();
+
     $attacker = User::factory()->withPersonalTeam()->create();
     $attackerTeam = $attacker->personalTeam();
 
@@ -37,28 +45,14 @@ it('prevents admin of team A from resending an invitation belonging to team B', 
     $victimInvitation = $victimOwner->personalTeam()->teamInvitations()->create([
         'email' => 'bystander@example.com',
         'role' => 'editor',
+        'expires_at' => now()->addDays(5),
     ]);
 
     $this->actingAs($attacker);
 
-    livewire(PendingTeamInvitations::class, ['team' => $attackerTeam])
-        ->call('resendTeamInvitation', $victimInvitation)
-        ->assertForbidden();
-});
+    rescue(fn () => livewire(PendingTeamInvitations::class, ['team' => $attackerTeam])
+        ->callAction(TestAction::make('resendTeamInvitation')->table($victimInvitation->id)));
 
-it('prevents admin of team A from copying an invite link for team B', function (): void {
-    $attacker = User::factory()->withPersonalTeam()->create();
-    $attackerTeam = $attacker->personalTeam();
-
-    $victimOwner = User::factory()->withPersonalTeam()->create();
-    $victimInvitation = $victimOwner->personalTeam()->teamInvitations()->create([
-        'email' => 'bystander@example.com',
-        'role' => 'editor',
-    ]);
-
-    $this->actingAs($attacker);
-
-    livewire(PendingTeamInvitations::class, ['team' => $attackerTeam])
-        ->call('copyInviteLink', $victimInvitation)
-        ->assertForbidden();
+    Mail::assertNothingSent();
+    Mail::assertNothingQueued();
 });

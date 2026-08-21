@@ -100,9 +100,6 @@ parameters:
             path: app/Filament/Resources/TaskResource/Pages/TasksBoard.php
         -
             identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Http/Controllers/AcceptTeamInvitationController.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
             path: app/Http/Controllers/Auth/CallbackController.php
         -
             identifier: app.architecture.eloquentWriteOutsideAction

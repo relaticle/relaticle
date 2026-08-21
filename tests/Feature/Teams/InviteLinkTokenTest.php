@@ -63,6 +63,22 @@ test('GET on a valid token renders the join confirmation page', function (): voi
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
 
+test('the join page does not leak its token through the Referer header', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-referrer',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertHeader('Referrer-Policy', 'no-referrer');
+});
+
 test('POST on a valid token attaches the user and redirects', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [
@@ -148,6 +164,22 @@ test('guest hitting join link is redirected to register', function (): void {
         ->assertRedirect(Filament::getRegistrationUrl());
 });
 
+test('unauthenticated attempts against the join link route are rate limited', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-throttle',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    foreach (range(1, 10) as $ignored) {
+        $this->get(route('teams.join', ['token' => $team->invite_link_token]));
+    }
+
+    $this->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertStatus(429);
+});
+
 test('user scheduled for deletion cannot view join confirmation', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [
@@ -204,4 +236,33 @@ test('joining a team scheduled for deletion is blocked', function (): void {
         ->assertStatus(410);
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
+});
+
+test('the join link grants the configured default role', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $team->update(['invite_link_default_role' => TeamRole::Viewer->value]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect();
+
+    expect($joiner->fresh()->teamRole($team->fresh())->key)
+        ->toBe(TeamRole::Viewer->value);
+});
+
+test('teams without a configured default still grant editor', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect();
+
+    expect($joiner->fresh()->teamRole($team->fresh())->key)
+        ->toBe(TeamRole::Editor->value);
 });

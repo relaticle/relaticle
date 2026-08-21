@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
@@ -321,5 +322,27 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         }
 
         return Jetstream::findRole($membershipRole)?->key === $role;
+    }
+
+    /**
+     * Whether the user's membership role on the given team is Viewer.
+     *
+     * The owner is never a viewer — ownership outranks the pivot role, and
+     * `ownedTeams` is checked first so an owner row carrying a stale pivot
+     * value cannot lock them out of their own workspace.
+     */
+    public function isViewerOnTeamId(?string $teamId): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return false;
+        }
+
+        return $this->hasTeamRoleForTeamId($teamId, TeamRole::Viewer->value);
     }
 }

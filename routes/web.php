@@ -15,6 +15,7 @@ use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
+use App\Http\Middleware\ThrottleBeforeAuthentication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
@@ -67,11 +68,17 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
-Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::class)
-    ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
-    ->name('team-invitations.accept');
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+    Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('team-invitations.token.accept');
 
-Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
+    Route::post('/invitations/{token}', [AcceptTeamInvitationController::class, 'store'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->name('team-invitations.token.join');
+});
+
+Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])
     ->group(function (): void {
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
