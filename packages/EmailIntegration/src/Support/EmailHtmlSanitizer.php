@@ -77,7 +77,13 @@ final readonly class EmailHtmlSanitizer
 <style>
 :root { color-scheme: light dark; background: #ffffff; }
 html, body { margin: 0; background: #ffffff; color: #111827; }
+body {
+    box-sizing: border-box;
+    padding: clamp(20px, 4vw, 44px);
+    overflow-wrap: anywhere;
+}
 img, video { max-width: 100%; height: auto; }
+table { max-width: 100%; }
 pre { white-space: pre-wrap; }
 @media (prefers-color-scheme: dark) {
     :root { background: #17181a; }

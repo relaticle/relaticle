@@ -2,16 +2,15 @@
 
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
-    use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
     use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser = auth()->user();
 
-    $from    = $record->participants->firstWhere('role', EmailParticipantRole::FROM);
-    $toList  = $record->participants->where('role', EmailParticipantRole::TO);
-    $ccList  = $record->participants->where('role', EmailParticipantRole::CC);
-    $aiLabel = $record->labels->firstWhere('source', 'ai');
+    $from    = $record->fromParticipant();
+    $toList  = $record->toParticipants();
+    $ccList  = $record->ccParticipants();
+    $aiLabel = $record->aiLabel();
 
     $canViewSubject = $authUser->can('viewSubject', $record);
     $canViewBody    = $authUser->can('viewBody', $record);
@@ -283,7 +282,8 @@
 
                         if (! doc?.documentElement) return
 
-                        $refs.body.style.height = doc.documentElement.scrollHeight + 'px'
+                        $refs.body.style.height = '1px'
+                        $refs.body.style.height = Math.max(doc.documentElement.scrollHeight, 160) + 'px'
                     },
                     init() {
                         this.fit()
@@ -302,29 +302,31 @@
                         setTimeout(() => { this.ready = true }, 5000)
                     },
                 }"
-                class="relative shrink-0 bg-white dark:bg-gray-950"
+                class="flex shrink-0 justify-center bg-gray-50 px-4 py-5 dark:bg-gray-950 sm:px-6"
             >
-                {{-- Centred over the frame's own area, not the whole reader --}}
-                <div
-                    x-show="! ready"
-                    x-cloak
-                    class="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-gray-950"
-                >
-                    <x-filament::loading-indicator class="h-8 w-8 text-primary-500" />
-                </div>
+                <div class="relative w-full max-w-3xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
+                    {{-- Centred over the frame's own area, not the whole reader --}}
+                    <div
+                        x-show="! ready"
+                        x-cloak
+                        class="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-neutral-900"
+                    >
+                        <x-filament::loading-indicator class="h-8 w-8 text-primary-500" />
+                    </div>
 
-                <iframe
-                    x-ref="body"
-                    x-bind:class="ready ? 'opacity-100' : 'opacity-0'"
-                    srcdoc="{{ $safeHtml }}"
-                    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                    referrerpolicy="no-referrer"
-                    scrolling="no"
-                    class="block w-full border-0 transition-opacity duration-150 [color-scheme:light] dark:[color-scheme:dark]"
-                    {{-- A placeholder tall enough to centre the spinner in; replaced by
-                         the measured content height the moment the frame loads. --}}
-                    style="height: 24rem"
-                ></iframe>
+                    <iframe
+                        x-ref="body"
+                        x-bind:class="ready ? 'opacity-100' : 'opacity-0'"
+                        srcdoc="{{ $safeHtml }}"
+                        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                        referrerpolicy="no-referrer"
+                        scrolling="no"
+                        class="block w-full border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
+                        {{-- A placeholder tall enough to centre the spinner in; replaced by
+                             the measured content height the moment the frame loads. --}}
+                        style="height: 24rem"
+                    ></iframe>
+                </div>
             </div>
         @else
             <div class="shrink-0 px-6 py-5">

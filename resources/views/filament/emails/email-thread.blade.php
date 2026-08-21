@@ -1,6 +1,5 @@
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
-    use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser    = auth()->user();
@@ -25,10 +24,10 @@
     {{-- ── Stacked emails ──────────────────────────────────────────── --}}
     @foreach ($emails as $email)
         @php
-            $from    = $email->from->first();
-            $toList  = $email->participants->where('role', EmailParticipantRole::TO->value);
-            $ccList  = $email->participants->where('role', EmailParticipantRole::CC->value);
-            $aiLabel = $email->labels->firstWhere('source', 'ai');
+            $from    = $email->fromParticipant();
+            $toList  = $email->toParticipants();
+            $ccList  = $email->ccParticipants();
+            $aiLabel = $email->aiLabel();
 
             $senderName = $from?->name ?: $from?->email_address ?: '?';
             $initials   = collect(explode(' ', trim($senderName)))
@@ -165,14 +164,14 @@
 
             {{-- ── Body ──────────────────────────────────────────────── --}}
             @if ($canViewBody)
-                <div class="bg-gray-50 dark:bg-gray-900/30 px-6 pb-5">
-                    <div class="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-7 py-5 shadow-xs">
+                <div class="bg-gray-50 px-6 pb-5 dark:bg-gray-950">
+                    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
                         @if ($safeHtml)
                             <iframe
                                 srcdoc="{{ $safeHtml }}"
                                 sandbox="allow-popups allow-popups-to-escape-sandbox"
                                 referrerpolicy="no-referrer"
-                                class="w-full rounded-lg border-0 [color-scheme:light] dark:[color-scheme:dark]"
+                                class="w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
                                 style="min-height: 200px; height: 60vh"
                             ></iframe>
                         @elseif ($email->body?->body_text)
