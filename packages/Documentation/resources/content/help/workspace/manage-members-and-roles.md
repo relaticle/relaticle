@@ -2,14 +2,14 @@
 title: Manage members and roles
 description: What Administrators, Editors, and Viewers can each do, plus invitations, join links, and removing members.
 order: 1
-updated: "2026-08-19"
+updated: "2026-08-21"
 related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete-your-workspace]
 ---
 
 Membership is managed on **Workspace Settings** — click your workspace name
 at the top of the sidebar to reach it, then click the **Members** tab.
-Invitations, roles, and removals all live there, in one **People** list of
-current members and pending invitations together.
+Invitations, roles, and removals all live there: **Pending Invitations**
+lists people who have not joined yet, and **Members** lists everyone who has.
 
 ## The three roles
 
@@ -32,17 +32,15 @@ be removed.
 
 ## Invitations
 
-Click **Invite people** to send one or more invites at once — add an email
-address and a role for each person, using **Add another** for up to 10 in
-one go. Until an invitation is accepted it sits in the **People** list with
-an **Invitation pending** status, where you can:
+Click **Invite people** to send up to 10 invites at once — paste the email
+addresses separated by a comma, a space, or a new line, then pick the role
+they all join with. Until an invitation is accepted it sits in **Pending
+Invitations** with the role and how long it has left, where you can:
 
-- **Copy Link** — grab the invitation's accept URL to hand over directly, if
-  the email didn't arrive.
 - **Resend** the email.
 - **Revoke** the invitation.
 
-![The People list showing members with their roles and a pending invitation with Copy Link, Resend, and Revoke actions](/help-assets/workspace/manage-members-and-roles-1.png)
+![The Pending Invitations list showing an invited email with its role, expiry, and Resend and Revoke actions](/help-assets/workspace/manage-members-and-roles-1.png)
 
 There's also a workspace **join link**, managed from **Invite link** next to
 **Invite people**: copy it to share directly, generate a new one if it
@@ -51,8 +49,8 @@ default. The link stays valid for 7 days.
 
 ## Changing and removing members
 
-In the **People** list, click a member's **Manage Role** to switch them
-between Administrator, Editor, and Viewer. **Remove** takes a member out of
-the workspace — their records stay, they lose access. Any member but the
-owner can **Leave** the workspace themselves; the owner has no **Leave**
-action.
+In the **Members** list, each person's current role is the button next to
+their name — click it to switch them between Administrator, Editor, and
+Viewer. **Remove** takes a member out of the workspace — their records stay,
+they lose access. Any member but the owner can **Leave** the workspace
+themselves; the owner has no **Leave** action.
