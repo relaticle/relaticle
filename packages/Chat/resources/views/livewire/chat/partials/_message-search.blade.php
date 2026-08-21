@@ -35,23 +35,24 @@
         </div>
 
         <div class="max-h-80 overflow-y-auto py-1" role="listbox" aria-label="{{ __('Matching messages') }}">
-            <template x-if="searchUnreachable">
-                <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">
-                    {{ __('That message is no longer part of this conversation.') }}
-                </p>
+            {{-- Dead end for the hit the user picked: either it is gone, or the
+                 history walk that was fetching it never came back. Either way
+                 the remaining rows below stay listed and clickable. --}}
+            <template x-if="messageSearchNotice()">
+                <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status" x-text="messageSearchNotice()"></p>
             </template>
 
-            <template x-if="!searchUnreachable && searchLoading">
+            <template x-if="!messageSearchNotice() && searchLoading">
                 <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">{{ __('Loading…') }}</p>
             </template>
 
-            <template x-if="!searchUnreachable && !searchLoading && searchError">
+            <template x-if="!messageSearchNotice() && !searchLoading && searchError">
                 <p class="px-3 py-3 text-xs text-danger-600 dark:text-danger-400" role="status">
                     {{ __('Could not search this conversation. Try again.') }}
                 </p>
             </template>
 
-            <template x-if="!searchUnreachable && !searchLoading && !searchError && searchResults.length === 0">
+            <template x-if="!messageSearchNotice() && !searchLoading && !searchError && searchResults.length === 0">
                 <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">
                     <span x-show="searchQuery.trim().length >= 2">{{ __('No matches.') }}</span>
                     <span x-show="searchQuery.trim().length < 2">{{ __('Type at least two characters to search this conversation.') }}</span>

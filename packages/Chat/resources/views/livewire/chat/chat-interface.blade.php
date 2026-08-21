@@ -38,6 +38,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
              own URL is: the id is minted client-side for a brand-new chat, so
              it is not knowable when this attribute renders. --}}
         messageSearchUrlTemplate: @js(route('chat.conversations.search', ['conversationId' => '__CONVERSATION_ID__'])),
+        messageSearchUnreachableText: @js(__('That message is no longer part of this conversation.')),
+        messageSearchStalledText: @js(__('Could not load enough history to reach that message. Try again.')),
         todayLabel: @js(__('Today')),
         yesterdayLabel: @js(__('Yesterday')),
         feedbackDeleteConfirmText: @js(__('Remove this feedback? Your category and comment will be deleted.')),

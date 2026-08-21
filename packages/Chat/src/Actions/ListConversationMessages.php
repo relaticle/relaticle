@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\TranscriptScope;
 use stdClass;
 
 final readonly class ListConversationMessages
@@ -26,21 +26,11 @@ final readonly class ListConversationMessages
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
-        $query = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.conversation_id', $conversationId)
-            ->where('m.participant_type', $user->getMorphClass())
-            ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
-            ->whereNull('m.superseded_at')
-            // Approval echoes are internal turn bookkeeping and are never
-            // rendered. Excluded in SQL rather than after the fetch so the
-            // limit counts visible rows only: dropping one afterwards returned
-            // a short page, and the caller reads a short page as "no more
-            // history", which stranded every older message behind it.
-            ->whereNot(function (Builder $inner): void {
-                $inner->where('m.role', 'user')->where('m.content', 'like', '[approval]%');
-            });
+        $query = TranscriptScope::apply(
+            DB::table('agent_conversation_messages as m'),
+            $user,
+            $conversationId,
+        );
 
         if ($beforeMessageId !== null) {
             $query->where('m.id', '<', $beforeMessageId);

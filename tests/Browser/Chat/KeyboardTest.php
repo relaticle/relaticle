@@ -225,6 +225,27 @@ it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit bel
 
     $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
     $page->assertVisible('[data-message-id="ks-002"]');
+
+    // The overlay is hidden while the walk runs, so the focused search input is
+    // display:none'd and focus falls to <body>, which is NOT inside the chat
+    // root. The root's keydown layer only sees events from its own subtree, so
+    // leaving focus there kills every chat shortcut until the user clicks back
+    // in. jumpToMessage() hands focus to the composer; without that this reads
+    // BODY and fails.
+    $focusReturnedToChat = $page->script(<<<'JS'
+        (async () => {
+            const root = document.querySelector('[data-chat-context="conversation"]');
+
+            for (let i = 0; i < 40; i++) {
+                if (root.contains(document.activeElement)) return 1;
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            return 0;
+        })();
+    JS);
+
+    expect((int) $focusReturnedToChat)->toBe(1);
 });
 
 it('closes search on Esc without loading any history', function (): void {
