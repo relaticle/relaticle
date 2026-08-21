@@ -15,8 +15,10 @@ mutates(ChatInterface::class);
  * Cmd+O / Ctrl+O opens a full-page conversation switcher (Cmd+K is taken by
  * Filament's global search app-wide, Cmd+J by the chat side-panel toggle
  * app-wide, both confirmed live before picking a third key). Esc closes it.
+ * Cmd+F / Ctrl+F opens in-conversation search; it is taken over only inside
+ * the chat subtree, so the browser's own find still works elsewhere.
  * ArrowUp in an empty composer enters edit mode on the last user message.
- * All three bindings are wired via `x-on:keydown` on the chat root element
+ * All of these bindings are wired via `x-on:keydown` on the chat root element
  * (not window/document), so a real keypress must originate from inside the
  * chat interface's own DOM subtree. These tests drive it through the real
  * composer, not by poking Alpine internals, so a regression in the actual
@@ -24,6 +26,7 @@ mutates(ChatInterface::class);
  */
 const KEYBOARD_TEST_EDITOR = '[data-chat-context="conversation"] [contenteditable="true"]';
 const KEYBOARD_TEST_SWITCHER = '[role="dialog"][aria-label="Switch conversation"]';
+const KEYBOARD_TEST_MESSAGE_SEARCH = '[role="dialog"][aria-label="Search this conversation"]';
 
 function keyboardTestInsertConversation(string $id, User $user, int|string $team, string $title): void
 {
@@ -161,6 +164,91 @@ it('does not enter edit mode when the composer has unsent text', function (): vo
     $page->keys(KEYBOARD_TEST_EDITOR, 'ArrowUp');
 
     $page->assertMissing('textarea[aria-label="Edit message"]');
+});
+
+/**
+ * Cmd+F / Ctrl+F searches inside the open conversation. The point of the
+ * feature is a hit that is NOT on screen: the transcript renders one page of
+ * 50, so picking a hit older than that has to walk the pager backwards until
+ * the message exists before it can be scrolled to. This drives the whole path
+ * through the real composer and the real overlay, so a regression anywhere
+ * from the keydown scope to the load-until-found loop fails it.
+ */
+it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit below the first page', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Deep history chat');
+
+    $rows = [];
+
+    // 110 messages puts the target two full pages below the newest 50.
+    foreach (range(1, 110) as $i) {
+        $rows[] = [
+            'id' => sprintf('ks-%03d', $i),
+            'conversation_id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => $i % 2 === 1 ? 'user' : 'assistant',
+            'content' => $i === 2 ? 'the Northwind renewal' : "filler line {$i}",
+            'document' => ChatDocument::emptyJson(),
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '{}',
+            'meta' => '{}',
+            'created_at' => now()->subMinutes(200 - $i),
+            'updated_at' => now()->subMinutes(200 - $i),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert($rows);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->assertSourceHas('filler line 110');
+
+    $page->assertMissing('[data-message-id="ks-002"]');
+
+    $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
+    $page->assertVisible(KEYBOARD_TEST_MESSAGE_SEARCH);
+
+    $page->type(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'northwind');
+    $page->assertSeeIn(KEYBOARD_TEST_MESSAGE_SEARCH, 'the Northwind renewal');
+
+    $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Enter');
+
+    $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
+    $page->assertVisible('[data-message-id="ks-002"]');
+});
+
+it('closes search on Esc without loading any history', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Escape search chat');
+    keyboardTestInsertMessage($conversationId, $user, 'user', 'the only message');
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->assertSourceHas('the only message');
+
+    $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
+    $page->assertVisible(KEYBOARD_TEST_MESSAGE_SEARCH);
+
+    $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Escape');
+
+    $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
+    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationId}");
 });
 
 /**
