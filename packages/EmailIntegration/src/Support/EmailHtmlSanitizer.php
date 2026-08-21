@@ -59,6 +59,48 @@ final readonly class EmailHtmlSanitizer
 
         $clean = new HtmlSanitizer($config)->sanitize($html);
 
-        return trim($clean) === '' ? null : $clean;
+        if (trim($clean) === '') {
+            return null;
+        }
+
+        return self::wrapPreviewDocument($clean);
+    }
+
+    private static function wrapPreviewDocument(string $html): string
+    {
+        return <<<'HTML'
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<style>
+:root { color-scheme: light dark; background: #ffffff; }
+html, body { margin: 0; background: #ffffff; color: #111827; }
+body {
+    box-sizing: border-box;
+    padding: 0;
+    overflow-wrap: anywhere;
+}
+img, video { max-width: 100%; height: auto; }
+table { max-width: 100%; }
+pre { white-space: pre-wrap; }
+@media (prefers-color-scheme: dark) {
+    :root { background: #17181a; }
+    html, body { background: #17181a !important; color: #f3f4f6 !important; }
+    body, table, tbody, thead, tfoot, tr, td, th, div, p, span, section, article, main, blockquote, li {
+        background-color: transparent !important;
+        border-color: #4b5563 !important;
+        color: #f3f4f6 !important;
+    }
+    a { color: #93c5fd !important; }
+    [bgcolor] { background-color: transparent !important; }
+}
+</style>
+</head>
+<body>
+HTML
+            .$html
+            .'</body></html>';
     }
 }

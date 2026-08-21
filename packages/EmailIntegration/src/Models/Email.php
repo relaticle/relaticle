@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -219,6 +220,32 @@ final class Email extends Model
     public function from(): HasMany
     {
         return $this->hasMany(EmailParticipant::class)->where('role', 'from');
+    }
+
+    public function fromParticipant(): ?EmailParticipant
+    {
+        return $this->participants->firstWhere('role', EmailParticipantRole::FROM);
+    }
+
+    /**
+     * @return EloquentCollection<int, EmailParticipant>
+     */
+    public function toParticipants(): EloquentCollection
+    {
+        return $this->participants->where('role', EmailParticipantRole::TO);
+    }
+
+    /**
+     * @return EloquentCollection<int, EmailParticipant>
+     */
+    public function ccParticipants(): EloquentCollection
+    {
+        return $this->participants->where('role', EmailParticipantRole::CC);
+    }
+
+    public function aiLabel(): ?EmailLabel
+    {
+        return $this->labels->firstWhere('source', 'ai');
     }
 
     /**

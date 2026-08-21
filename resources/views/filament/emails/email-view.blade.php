@@ -1,15 +1,14 @@
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
-    use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
     use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser = auth()->user();
 
-    $from    = $record->participants->firstWhere('role', EmailParticipantRole::FROM);
-    $toList  = $record->participants->where('role', EmailParticipantRole::TO);
-    $ccList  = $record->participants->where('role', EmailParticipantRole::CC);
-    $aiLabel = $record->labels->firstWhere('source', 'ai');
+    $from    = $record->fromParticipant();
+    $toList  = $record->toParticipants();
+    $ccList  = $record->ccParticipants();
+    $aiLabel = $record->aiLabel();
 
     $canViewSubject = $authUser->can('viewSubject', $record);
     $canViewBody    = $authUser->can('viewBody', $record);
@@ -164,8 +163,8 @@
 
     {{-- ── Body ────────────────────────────────────────────────────────────── --}}
     @if ($canViewBody)
-        <div class="flex flex-col items-center bg-gray-50 dark:bg-gray-900/30 px-6 py-6">
-            <div class="w-full max-w-3xl rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-8 py-6 shadow-xs">
+        <div class="flex flex-col items-center bg-gray-50 px-6 py-6 dark:bg-gray-950">
+            <div class="w-full max-w-3xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
                 @if ($record->body?->body_html)
                     @php
                         $safeHtml = EmailHtmlSanitizer::sanitize($record->body->body_html);
@@ -174,7 +173,7 @@
                         srcdoc="{{ $safeHtml }}"
                         sandbox="allow-popups allow-popups-to-escape-sandbox"
                         referrerpolicy="no-referrer"
-                        class="w-full rounded-lg border-0"
+                        class="w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
                         style="min-height: 100vh"
                     ></iframe>
                 @elseif ($record->body?->body_text)

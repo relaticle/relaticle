@@ -1,8 +1,6 @@
 @php
-    use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
-
-    $toList = $record->participants->where('role', EmailParticipantRole::TO);
-    $ccList = $record->participants->where('role', EmailParticipantRole::CC);
+    $toList = $record->toParticipants();
+    $ccList = $record->ccParticipants();
 @endphp
 
 @if ($toList->isNotEmpty() || $ccList->isNotEmpty())

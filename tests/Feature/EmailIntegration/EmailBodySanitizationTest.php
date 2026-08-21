@@ -9,12 +9,13 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
-mutates(EmailHtmlSanitizer::class);
+mutates(Email::class, EmailHtmlSanitizer::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -100,6 +101,39 @@ it('preserves inline styles and presentational attributes used by email layouts'
         ->assertMountedActionModalSeeHtml('align=&quot;center&quot;');
 });
 
+it('renders email participants and ai label through the email view helpers', function (): void {
+    $email = makeEmailWithBody('<p>body</p>');
+
+    $email->participants()->createMany([
+        [
+            'role' => EmailParticipantRole::FROM,
+            'name' => 'Alice Sender',
+            'email_address' => 'alice@example.test',
+        ],
+        [
+            'role' => EmailParticipantRole::TO,
+            'name' => 'Tara Recipient',
+            'email_address' => 'tara@example.test',
+        ],
+        [
+            'role' => EmailParticipantRole::CC,
+            'name' => 'Cal Copy',
+            'email_address' => 'cal@example.test',
+        ],
+    ]);
+
+    $email->labels()->create([
+        'source' => 'ai',
+        'label' => 'Sales',
+    ]);
+
+    mountEmailView($email->fresh(['body', 'participants', 'labels', 'attachments']))
+        ->assertMountedActionModalSeeHtml('Alice Sender')
+        ->assertMountedActionModalSeeHtml('Tara Recipient')
+        ->assertMountedActionModalSeeHtml('Cal Copy')
+        ->assertMountedActionModalSeeHtml('Sales');
+});
+
 it('does not truncate email bodies larger than the sanitizer default input cap', function (): void {
     // Symfony HtmlSanitizer truncates input at 20 KB by default; real email
     // bodies routinely exceed that, so the tail of the message must survive.
@@ -116,6 +150,19 @@ it('does not truncate email bodies larger than the sanitizer default input cap',
         ->assertMountedActionModalSeeHtml('END-MARKER-9F3A');
 });
 
+it('wraps sanitized email html in a scriptless dark-mode preview document', function (): void {
+    $html = EmailHtmlSanitizer::sanitize('<p style="color:#111111;background:#ffffff">Body</p>');
+
+    expect($html)
+        ->toContain('<meta name="color-scheme" content="light dark">')
+        ->toContain('@media (prefers-color-scheme: dark)')
+        ->toContain('background: #17181a')
+        ->toContain('padding: 0')
+        ->toContain('background-color: transparent !important')
+        ->toContain('<p style="color:#111111;background:#ffffff">Body</p>')
+        ->not->toContain('<script');
+});
+
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
@@ -123,6 +170,8 @@ it('renders the email view iframe without a same-origin sandbox', function (): v
         ->assertMountedActionModalSeeHtml('<iframe')
         ->assertMountedActionModalSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox"')
         ->assertMountedActionModalSeeHtml('referrerpolicy="no-referrer"')
+        ->assertMountedActionModalSeeHtml('dark:bg-neutral-900 dark:[color-scheme:dark]')
+        ->assertMountedActionModalSeeHtml('dark:bg-gray-950')
         ->assertMountedActionModalDontSeeHtml('allow-same-origin');
 });
 
@@ -144,6 +193,8 @@ it('sandboxes the threaded iframe without same-origin access', function (): void
 
     expect($html)
         ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->toContain('dark:bg-neutral-900 dark:[color-scheme:dark]')
+        ->toContain('dark:bg-gray-950')
         ->not->toContain('allow-scripts')
         ->not->toContain('allow-same-origin');
 });

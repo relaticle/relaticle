@@ -6,11 +6,10 @@
      carries the reply actions and the draft dock itself — rendering it inside the
      composer would nest a composer in a composer. This shows only who wrote what. --}}
 @php
-    use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
     use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser = auth()->user();
-    $from = $record->participants->firstWhere('role', EmailParticipantRole::FROM);
+    $from = $record->fromParticipant();
     $senderName = $from?->name ?: $from?->email_address ?: '?';
 
     $initials = collect(explode(' ', trim($senderName)))
@@ -59,7 +58,8 @@
 
                     if (! doc?.documentElement) return
 
-                    $refs.quoted.style.height = doc.documentElement.scrollHeight + 'px'
+                    $refs.quoted.style.height = '1px'
+                    $refs.quoted.style.height = Math.max(doc.documentElement.scrollHeight, 112) + 'px'
                 },
                 init() {
                     this.fit()
@@ -73,17 +73,19 @@
                     })
                 },
             }"
-            class="shrink-0 bg-white dark:bg-gray-950"
+            class="flex shrink-0 justify-center bg-gray-50 px-4 py-4 dark:bg-gray-950 sm:px-6"
         >
-            <iframe
-                x-ref="quoted"
-                srcdoc="{{ $safeHtml }}"
-                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                referrerpolicy="no-referrer"
-                scrolling="no"
-                class="block w-full border-0"
-                style="height: 12rem"
-            ></iframe>
+            <div class="w-full max-w-3xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
+                <iframe
+                    x-ref="quoted"
+                    srcdoc="{{ $safeHtml }}"
+                    sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                    referrerpolicy="no-referrer"
+                    scrolling="no"
+                    class="block w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
+                    style="height: 12rem"
+                ></iframe>
+            </div>
         </div>
     @else
         <p class="px-4 pb-4 text-sm italic text-gray-400 dark:text-gray-500 sm:px-6">

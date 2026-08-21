@@ -1122,8 +1122,8 @@ final class EmailInboxPage extends Page
                         .'</span>'
                         .'<div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>'
                         .'</div>'
-                        .'<div x-show="open" x-collapse class="mt-2 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white">'
-                        .'<iframe srcdoc="'.e($safeQuotedHtml).'" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="block w-full border-0" style="height:20rem"></iframe>'
+                        .'<div x-show="open" x-collapse class="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/25 dark:bg-neutral-900">'
+                        .'<iframe srcdoc="'.e($safeQuotedHtml).'" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="block w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]" style="height:20rem"></iframe>'
                         .'</div>'
                         .'</div>'
                     );
