@@ -302,14 +302,13 @@
                         setTimeout(() => { this.ready = true }, 5000)
                     },
                 }"
-                class="flex shrink-0 justify-center bg-gray-50 px-4 py-5 dark:bg-gray-950 sm:px-6"
+                class="shrink-0 bg-gray-50 dark:bg-gray-950"
             >
-                <div class="relative w-full max-w-3xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
-                    {{-- Centred over the frame's own area, not the whole reader --}}
+                <div class="relative w-full overflow-hidden border-y border-gray-100 bg-white dark:border-gray-800 dark:bg-neutral-950">
                     <div
                         x-show="! ready"
                         x-cloak
-                        class="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-neutral-900"
+                        class="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-neutral-950"
                     >
                         <x-filament::loading-indicator class="h-8 w-8 text-primary-500" />
                     </div>
@@ -321,7 +320,7 @@
                         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                         referrerpolicy="no-referrer"
                         scrolling="no"
-                        class="block w-full border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
+                        class="block w-full border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-neutral-950 dark:[color-scheme:dark]"
                         {{-- A placeholder tall enough to centre the spinner in; replaced by
                              the measured content height the moment the frame loads. --}}
                         style="height: 24rem"

@@ -79,7 +79,7 @@ final readonly class EmailHtmlSanitizer
 html, body { margin: 0; background: #ffffff; color: #111827; }
 body {
     box-sizing: border-box;
-    padding: clamp(20px, 4vw, 44px);
+    padding: 0;
     overflow-wrap: anywhere;
 }
 img, video { max-width: 100%; height: auto; }
