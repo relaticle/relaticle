@@ -15,7 +15,6 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -38,6 +37,7 @@ use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\TranscriptScope;
 
 final readonly class ChatController
 {
@@ -451,11 +451,10 @@ final readonly class ChatController
     /**
      * Search within one conversation.
      *
-     * Scoped exactly like ListConversationMessages (same participant, same
-     * team, same superseded and approval-echo exclusions) so every id returned
-     * here is one the transcript's pager can actually reach. A hit the pager
-     * could never render would send the client's load-until-found loop all the
-     * way to the top of the history and then report nothing.
+     * Scoped through TranscriptScope, the same predicate set the pager applies,
+     * so every id returned here is one the transcript can actually reach. A hit
+     * the pager could never render would send the client's load-until-found
+     * loop all the way to the top of the history and then report nothing.
      *
      * `q` is a user-supplied pattern, so it goes through LikePattern::escape
      * before the ILIKE: a literal `%` or `_` typed into the search box must
@@ -482,16 +481,11 @@ final readonly class ChatController
 
         $escaped = LikePattern::escape($validated['q']);
 
-        $matches = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.conversation_id', $conversationId)
-            ->where('m.participant_type', $user->getMorphClass())
-            ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
-            ->whereNull('m.superseded_at')
-            ->whereNot(function (QueryBuilder $inner): void {
-                $inner->where('m.role', 'user')->where('m.content', 'like', '[approval]%');
-            })
+        $matches = TranscriptScope::apply(
+            DB::table('agent_conversation_messages as m'),
+            $user,
+            $conversationId,
+        )
             ->where('m.content', 'ilike', "%{$escaped}%")
             ->orderByDesc('m.id')
             ->limit(self::SEARCH_MATCH_LIMIT)

@@ -109,8 +109,10 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null, messageSearchUnreachableText = 'That message is no longer part of this conversation.', messageSearchStalledText = 'Could not load enough history to reach that message. Try again.', todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
     messageSearchUrlTemplate,
+    messageSearchUnreachableText,
+    messageSearchStalledText,
     prependScrollAnchor: null,
     // Guards loadEarlier() against re-entry: the top-sentinel observer
     // (see initLoadEarlierObserver) re-checks on every qualifying layout
@@ -157,11 +159,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     searchError: false,
     searchResults: [],
     searchActiveIndex: 0,
-    // True while the load-until-found loop is pulling earlier pages, and true
-    // when that loop finished without ever seeing the id (the message was
-    // superseded between the search and the jump).
+    // True while the load-until-found loop is pulling earlier pages;
+    // searchUnreachable when it finished without ever seeing the id (the
+    // message was superseded between the search and the jump); searchStalled
+    // when a history load never came back at all.
     searchJumping: false,
     searchUnreachable: false,
+    searchStalled: false,
     highlightedMessageId: null,
     _searchDebounceTimer: null,
     _searchRequestToken: 0,
@@ -481,7 +485,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         // carrying either over would just leave a dead result list open.
         this.dismissMessageSearch();
         this.searchResults = [];
+        this.searchActiveIndex = 0;
         this.searchUnreachable = false;
+        this.searchStalled = false;
         this.highlightedMessageId = null;
         clearTimeout(this._highlightTimer);
 
@@ -1066,8 +1072,19 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         // the trade here: native find can only see the newest page of a paged
         // transcript, whereas this searches the whole conversation server-side.
         if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+            if (this.searchOpen) {
+                e.preventDefault();
+                this.closeMessageSearch();
+                return;
+            }
+
+            // Nothing to search yet (a brand-new chat with no conversation).
+            // Fall through WITHOUT preventDefault so the browser's own find
+            // still opens, rather than swallowing the key to do nothing.
+            if (!this.canOpenMessageSearch()) return;
+
             e.preventDefault();
-            this.searchOpen ? this.closeMessageSearch() : this.openMessageSearch();
+            this.openMessageSearch();
             return;
         }
 
@@ -1199,9 +1216,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
 
     // ---- In-conversation search (Cmd+F) -----------------------------------
 
+    // A brand-new chat has no conversation to search yet. Checked before the
+    // keydown handler calls preventDefault(), so Cmd+F falls through to the
+    // browser's own find rather than being swallowed for nothing.
+    canOpenMessageSearch() {
+        return !!this.conversationId && !!this.messageSearchUrlTemplate;
+    },
+
     openMessageSearch() {
         if (this.searchOpen) return;
-        if (!this.conversationId || !this.messageSearchUrlTemplate) return;
+        if (!this.canOpenMessageSearch()) return;
 
         this.switcherOpen = false;
         this.searchOpen = true;
@@ -1210,7 +1234,20 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         this.searchActiveIndex = 0;
         this.searchError = false;
         this.searchUnreachable = false;
-        this.$nextTick(() => this.$refs.messageSearchInput?.focus());
+        this.searchStalled = false;
+        this.focusMessageSearchInput();
+    },
+
+    // The overlay is toggled by x-show, so the input is display:none at the
+    // moment the flag flips and .focus() on it would be a no-op. $nextTick puts
+    // this after Alpine has applied the show, which is where every other focus
+    // call in this component sits. Destroyed-guarded because callers reach here
+    // after an await.
+    focusMessageSearchInput() {
+        this.$nextTick(() => {
+            if (this.destroyed) return;
+            this.$refs.messageSearchInput?.focus();
+        });
     },
 
     closeMessageSearch() {
@@ -1233,6 +1270,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     onMessageSearchInput() {
         this.searchActiveIndex = 0;
         this.searchUnreachable = false;
+        this.searchStalled = false;
         clearTimeout(this._searchDebounceTimer);
         this._searchDebounceTimer = setTimeout(() => this.runMessageSearch(), SEARCH_DEBOUNCE_MS);
     },
@@ -1271,6 +1309,17 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
                 this.searchLoading = false;
             }
         }
+    },
+
+    // The one notice that outranks the result rows, or '' when there is none.
+    // Both outcomes it covers are dead ends for the hit the user just picked,
+    // so they share a slot rather than each growing another gate on every other
+    // branch in the overlay.
+    messageSearchNotice() {
+        if (this.searchUnreachable) return this.messageSearchUnreachableText;
+        if (this.searchStalled) return this.messageSearchStalledText;
+
+        return '';
     },
 
     messageSearchMoveActive(delta) {
@@ -1312,8 +1361,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     // Terminates on any of: the message is present; the server says there is no
     // more history; a page came back without growing the array (empty or
     // failed); MAX_SEARCH_JUMP_PAGES; a load that never settles; teardown.
-    // If it ends without finding the id (the message was superseded between the
-    // search and the jump) the overlay reopens carrying searchUnreachable.
+    //
+    // Every exit that leaves the user on this page reopens the overlay and puts
+    // the caret back in its input. The overlay is hidden while the walk runs, so
+    // the focused input is display:none'd and focus falls to <body>, which is
+    // NOT inside the chat root: without re-focusing, the reopened dialog would
+    // ignore Escape, the arrows and Enter, and a later Cmd+F would be dead too
+    // (both measured before this was added).
     async jumpToMessage(messageId) {
         if (!messageId) return;
 
@@ -1325,13 +1379,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
                 // First: let any load the top sentinel already started finish,
                 // otherwise loadEarlier() below would no-op on its re-entry
                 // guard and this loop would give up on its first pass.
-                if (!(await this.settleEarlierLoad())) return;
+                if (!(await this.settleEarlierLoad())) return this.abandonJump();
                 if (this.messageIndexById(messageId) !== -1) break;
                 if (!this.hasMoreMessages) break;
 
                 const before = this.messages.length;
                 this.loadEarlier();
-                if (!(await this.settleEarlierLoad())) return;
+                if (!(await this.settleEarlierLoad())) return this.abandonJump();
                 if (this.messages.length === before) break;
             }
         } finally {
@@ -1343,14 +1397,28 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         if (this.messageIndexById(messageId) === -1) {
             // Drop the hit that led nowhere before reopening, otherwise the
             // notice sits above the very row it just said no longer exists and
-            // invites a second futile click. Any other hits stay clickable.
+            // invites a second futile click. Any other hits stay clickable, so
+            // the active row is clamped back into the shortened list rather
+            // than left pointing past its end.
             this.searchResults = this.searchResults.filter((match) => match.message_id !== messageId);
+            this.searchActiveIndex = 0;
             this.searchUnreachable = true;
             this.searchOpen = true;
+            this.focusMessageSearchInput();
             return;
         }
 
         this.revealMessage(messageId);
+        this.restoreInputFocus();
+    },
+
+    // A history load that never settled (its 10s deadline elapsed). Without
+    // this the banner just disappeared and the user was told nothing at all.
+    abandonJump() {
+        if (this.destroyed) return;
+        this.searchStalled = true;
+        this.searchOpen = true;
+        this.focusMessageSearchInput();
     },
 
     revealMessage(messageId) {
