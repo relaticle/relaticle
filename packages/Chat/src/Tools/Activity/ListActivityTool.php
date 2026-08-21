@@ -8,8 +8,10 @@ use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
@@ -28,9 +30,12 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 final readonly class ListActivityTool implements Tool
 {
     /**
-     * Entries carried by the model-facing payload. Fifty edits is already more
-     * history than a chat answer can use, and the payload is replayed on every
-     * later turn of the conversation.
+     * Activity rows fetched for the model-facing payload. Fifty edits is already
+     * more history than a chat answer can use, and the payload is replayed on
+     * every later turn of the conversation. Rows whose subject no longer exists
+     * are excluded in SQL, so a purged record never consumes this budget; the
+     * merged entries the payload carries are therefore at most this many, and
+     * usually fewer, with `total` reporting the true figure for the window.
      */
     private const int ENTRY_LIMIT = 50;
 
@@ -101,34 +106,20 @@ final readonly class ListActivityTool implements Tool
         }
 
         $days = $this->days($request);
+        $scope = $this->scopedQuery((string) $team->getKey(), $days, $recordType, $recordId);
 
-        $query = Activity::query()
-            // The agent runs in a queued job with no Filament tenant bound, and
-            // TeamScope answers a null tenant with `1 = 0` -- every row would
-            // vanish in production while passing in a panel request. The team
-            // predicate below is the real boundary, stated explicitly.
-            ->withoutGlobalScope(TeamScope::class)
-            ->where('team_id', $team->getKey())
-            ->whereIn('subject_type', RecordReferenceResolver::CHIP_TYPES)
-            ->where('created_at', '>=', now()->subDays($days))
+        $rows = $scope->clone()
             ->with(['causer', 'subject'])
             // `created_at` is second-precision, so several rows of one save tie
             // on it; the auto-increment id breaks the tie deterministically.
-            ->orderByDesc('created_at')
+            ->latest()
             ->orderByDesc('id')
-            ->limit(self::ENTRY_LIMIT);
-
-        if ($recordType !== null) {
-            $query->where('subject_type', $recordType);
-        }
-
-        if ($recordId !== null) {
-            $query->where('subject_id', $recordId);
-        }
+            ->limit(self::ENTRY_LIMIT)
+            ->get();
 
         $entries = [];
 
-        foreach ($this->groupBySave($query->get()) as $group) {
+        foreach ($this->groupBySave($rows) as $group) {
             $entry = $this->entry($user, $group);
 
             if ($entry !== null) {
@@ -139,10 +130,66 @@ final readonly class ListActivityTool implements Tool
         $payload = ['days' => $days, 'data' => $entries];
 
         if ($entries !== []) {
-            $payload['display_block'] = $this->buildDisplayBlock($entries);
+            $payload['display_block'] = $this->buildDisplayBlock($entries, $this->countEntries($scope));
         }
 
         return (string) json_encode($payload, JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Every activity row the caller may read in the window, unordered and
+     * uncapped: the fetch and the count both start from this, so the footer can
+     * never disagree with the rows about which history exists.
+     *
+     * @return Builder<Activity>
+     */
+    private function scopedQuery(string $teamId, int $days, ?string $recordType, ?string $recordId): Builder
+    {
+        $query = Activity::query()
+            // The agent runs in a queued job with no Filament tenant bound, and
+            // TeamScope answers a null tenant with `1 = 0` -- every row would
+            // vanish in production while passing in a panel request. The team
+            // predicate below is the real boundary, stated explicitly.
+            ->withoutGlobalScope(TeamScope::class)
+            ->where('team_id', $teamId)
+            ->where('created_at', '>=', now()->subDays($days))
+            // Nothing cascades activity rows, so a force-deleted record leaves
+            // history that can be neither named nor opened. Dropped HERE rather
+            // than after the fetch: filtered in PHP, a workspace whose newest
+            // rows all point at purged records would spend the whole row budget
+            // on them and answer "nothing changed" while real history waited
+            // outside the limit. The soft-delete scope is lifted so a genuine
+            // deletion keeps naming its record, matching the `subject` relation
+            // (`activitylog.include_soft_deleted_subjects`).
+            ->whereHasMorph(
+                'subject',
+                $recordType !== null ? [$recordType] : RecordReferenceResolver::CHIP_TYPES,
+                static fn (Builder $subject): Builder => $subject->withoutGlobalScope(SoftDeletingScope::class),
+            );
+
+        if ($recordId !== null) {
+            $query->where('subject_id', $recordId);
+        }
+
+        return $query;
+    }
+
+    /**
+     * How many entries the window really holds, counted the way groupBySave()
+     * groups them. `total` feeds a footer shared with every other display block,
+     * and the model reads it too, so it has to mean the same thing everywhere: a
+     * count capped at ENTRY_LIMIT renders identically to a true one and would
+     * quietly tell a user that ten of forty-three records changed last month
+     * when hundreds did.
+     *
+     * @param  Builder<Activity>  $scope
+     */
+    private function countEntries(Builder $scope): int
+    {
+        return (int) $scope->clone()
+            ->toBase()
+            ->selectRaw("count(distinct (coalesce(batch_uuid::text, 'row:' || id::text), subject_type, subject_id)) as aggregate")
+            ->value('aggregate');
     }
 
     /**
@@ -177,11 +224,10 @@ final readonly class ListActivityTool implements Tool
     }
 
     /**
-     * Null when the record itself is gone for good. Activity rows outlive a
-     * force-deleted subject (nothing cascades them), and such an entry can be
-     * neither named nor opened -- it is a blank cell in the table and a record
-     * the user cannot look at. A SOFT-deleted record still resolves (the
-     * subject relation drops the soft-delete scope), so real deletions survive.
+     * Null when the record itself is gone for good. scopedQuery() already drops
+     * those rows in SQL, so this is the belt to that braces: a subject the
+     * database says exists but the relation cannot hydrate must not reach the
+     * table as a nameless, unopenable row.
      *
      * @param  list<Activity>  $group
      * @return ActivityEntry|null
@@ -376,7 +422,7 @@ final readonly class ListActivityTool implements Tool
      * @param  list<ActivityEntry>  $entries
      * @return array<string, mixed>
      */
-    private function buildDisplayBlock(array $entries): array
+    private function buildDisplayBlock(array $entries, int $total): array
     {
         $rows = [];
 
@@ -409,7 +455,7 @@ final readonly class ListActivityTool implements Tool
                 ['key' => 'what', 'label' => 'What Changed'],
             ],
             'rows' => $rows,
-            'total' => count($entries),
+            'total' => $total,
         ];
     }
 
