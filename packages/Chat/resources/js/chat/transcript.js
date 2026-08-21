@@ -9,6 +9,19 @@ import { MENTION_CHIP_CLASS } from './mention-chip';
 
 const CONVERSATION_CACHE_LIMIT = 5;
 
+// In-conversation search (Cmd+F). The endpoint enforces min:2, so anything
+// shorter is not worth a round trip.
+const SEARCH_MIN_QUERY = 2;
+const SEARCH_DEBOUNCE_MS = 250;
+// Safety net on the load-until-found loop. The normal exits are "found" and
+// "no more history"; this only catches a server that keeps handing back full
+// pages forever. 40 pages is 2000 messages at the component's PAGE_SIZE.
+const MAX_SEARCH_JUMP_PAGES = 40;
+const LOAD_EARLIER_POLL_MS = 40;
+const LOAD_EARLIER_TIMEOUT_MS = 10000;
+const SEARCH_HIGHLIGHT_MS = 2600;
+const CONVERSATION_ID_PLACEHOLDER = '__CONVERSATION_ID__';
+
 // Consecutive same-role messages closer together than this render as one
 // visual group (no repeated timestamp/avatar chrome, tighter spacing).
 const GROUPING_GAP_MINUTES = 3;
@@ -96,7 +109,8 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null, todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
+    messageSearchUrlTemplate,
     prependScrollAnchor: null,
     // Guards loadEarlier() against re-entry: the top-sentinel observer
     // (see initLoadEarlierObserver) re-checks on every qualifying layout
@@ -130,6 +144,28 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
     switcherError: false,
     switcherItems: [],
     switcherActiveIndex: 0,
+
+    // In-conversation search overlay (Cmd+F / Ctrl+F, see onChatRootKeydown()).
+    // Same interaction model as the switcher above: type to filter, arrows to
+    // move, Enter to act, Esc to dismiss. Unlike the switcher it does not
+    // filter a preloaded list client-side, because the transcript the user is
+    // looking at is only the newest page: the hits it needs may not be in the
+    // DOM at all, which is the whole reason the server endpoint exists.
+    searchOpen: false,
+    searchQuery: '',
+    searchLoading: false,
+    searchError: false,
+    searchResults: [],
+    searchActiveIndex: 0,
+    // True while the load-until-found loop is pulling earlier pages, and true
+    // when that loop finished without ever seeing the id (the message was
+    // superseded between the search and the jump).
+    searchJumping: false,
+    searchUnreachable: false,
+    highlightedMessageId: null,
+    _searchDebounceTimer: null,
+    _searchRequestToken: 0,
+    _highlightTimer: null,
 
     // Scroll ownership (see scrollToBottom): streaming only autoscrolls while
     // the user is pinned near the bottom; otherwise the jump pill shows.
@@ -439,6 +475,15 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         this.hasMoreMessages = false;
         this.loadingEarlier = false;
         this.prependScrollAnchor = null;
+
+        // Hits and the highlight belong to the conversation being left: a
+        // message id from it will never appear in the one being painted, so
+        // carrying either over would just leave a dead result list open.
+        this.dismissMessageSearch();
+        this.searchResults = [];
+        this.searchUnreachable = false;
+        this.highlightedMessageId = null;
+        clearTimeout(this._highlightTimer);
 
         this.scrollToBottom(true);
 
@@ -1015,14 +1060,43 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
             return;
         }
 
+        // Cmd+F is taken over only while the keydown target is inside this chat
+        // instance (this listener is bound to the chat root, not window), so
+        // the browser's own find still works everywhere else on the page. Worth
+        // the trade here: native find can only see the newest page of a paged
+        // transcript, whereas this searches the whole conversation server-side.
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            this.searchOpen ? this.closeMessageSearch() : this.openMessageSearch();
+            return;
+        }
+
         if (e.key === 'Escape') {
-            if (!this.switcherOpen) return;
+            if (!this.switcherOpen && !this.searchOpen) return;
             e.preventDefault();
             // Stops the side panel's own window-level Escape handler from also
             // acting on this same keypress (it closes the panel/its dropdowns
             // when open): the two must not both react to one Esc.
             e.stopPropagation();
-            this.closeSwitcher();
+            this.switcherOpen ? this.closeSwitcher() : this.closeMessageSearch();
+            return;
+        }
+
+        if (this.searchOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.messageSearchMoveActive(1);
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.messageSearchMoveActive(-1);
+                return;
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.openActiveMessageSearchResult();
+            }
             return;
         }
 
@@ -1066,6 +1140,7 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
 
     openSwitcher() {
         if (this.switcherOpen) return;
+        this.dismissMessageSearch();
         this.switcherOpen = true;
         this.switcherQuery = '';
         this.switcherActiveIndex = 0;
@@ -1120,5 +1195,202 @@ export const transcriptModule = ({ messagesUrl, todayLabel = 'Today', yesterdayL
         } else {
             window.location.href = url;
         }
+    },
+
+    // ---- In-conversation search (Cmd+F) -----------------------------------
+
+    openMessageSearch() {
+        if (this.searchOpen) return;
+        if (!this.conversationId || !this.messageSearchUrlTemplate) return;
+
+        this.switcherOpen = false;
+        this.searchOpen = true;
+        this.searchQuery = '';
+        this.searchResults = [];
+        this.searchActiveIndex = 0;
+        this.searchError = false;
+        this.searchUnreachable = false;
+        this.$nextTick(() => this.$refs.messageSearchInput?.focus());
+    },
+
+    closeMessageSearch() {
+        if (!this.searchOpen) return;
+        this.dismissMessageSearch();
+        this.restoreInputFocus();
+    },
+
+    // Closes without touching focus, so opening the other overlay (or jumping
+    // to a hit) does not fight it for the caret.
+    dismissMessageSearch() {
+        this.searchOpen = false;
+        this.searchLoading = false;
+        clearTimeout(this._searchDebounceTimer);
+        // Invalidates any response still in flight: it must not repopulate the
+        // list of a search the user has already dismissed.
+        this._searchRequestToken++;
+    },
+
+    onMessageSearchInput() {
+        this.searchActiveIndex = 0;
+        this.searchUnreachable = false;
+        clearTimeout(this._searchDebounceTimer);
+        this._searchDebounceTimer = setTimeout(() => this.runMessageSearch(), SEARCH_DEBOUNCE_MS);
+    },
+
+    async runMessageSearch() {
+        const query = this.searchQuery.trim();
+
+        this.searchError = false;
+
+        if (query.length < SEARCH_MIN_QUERY || !this.conversationId || !this.messageSearchUrlTemplate) {
+            this.searchResults = [];
+            this.searchLoading = false;
+            return;
+        }
+
+        // Monotonic token, checked after every await: a slow response for an
+        // earlier keystroke must never overwrite a newer one's results.
+        const token = ++this._searchRequestToken;
+        this.searchLoading = true;
+
+        try {
+            const url = this.messageSearchUrlTemplate.replace(CONVERSATION_ID_PLACEHOLDER, encodeURIComponent(this.conversationId))
+                + '?q=' + encodeURIComponent(query);
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error('failed');
+            const payload = await res.json();
+            if (this.destroyed || token !== this._searchRequestToken) return;
+            this.searchResults = Array.isArray(payload?.matches) ? payload.matches : [];
+            this.searchActiveIndex = 0;
+        } catch (_) {
+            if (this.destroyed || token !== this._searchRequestToken) return;
+            this.searchResults = [];
+            this.searchError = true;
+        } finally {
+            if (!this.destroyed && token === this._searchRequestToken) {
+                this.searchLoading = false;
+            }
+        }
+    },
+
+    messageSearchMoveActive(delta) {
+        const total = this.searchResults.length;
+        if (total === 0) return;
+        this.searchActiveIndex = (this.searchActiveIndex + delta + total) % total;
+    },
+
+    openActiveMessageSearchResult() {
+        const match = this.searchResults[this.searchActiveIndex];
+        if (match) this.jumpToMessage(match.message_id);
+    },
+
+    messageIndexById(messageId) {
+        return this.messages.findIndex((m) => m.id === messageId);
+    },
+
+    // Resolves once no loadEarlier() is in flight. `loadingEarlier` is cleared
+    // by chat-interface.blade.php's chat:messages-prepended handler, and only
+    // AFTER that handler has restored the scroll position, so seeing it false
+    // here means the prepend has fully settled. Returns false when it never
+    // settles (a wedged request) or the component died mid-wait, which is the
+    // signal for the caller to give up rather than spin.
+    async settleEarlierLoad() {
+        const deadline = Date.now() + LOAD_EARLIER_TIMEOUT_MS;
+
+        while (this.loadingEarlier && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, LOAD_EARLIER_POLL_MS));
+            if (this.destroyed) return false;
+        }
+
+        return !this.loadingEarlier;
+    },
+
+    // Walks earlier pages until `messageId` is in `this.messages`, then centres
+    // and highlights it. Drives the SAME loadEarlier() path the top sentinel
+    // uses rather than a parallel fetch, so paging stays single-sourced.
+    //
+    // Terminates on any of: the message is present; the server says there is no
+    // more history; a page came back without growing the array (empty or
+    // failed); MAX_SEARCH_JUMP_PAGES; a load that never settles; teardown.
+    // If it ends without finding the id (the message was superseded between the
+    // search and the jump) the overlay reopens carrying searchUnreachable.
+    async jumpToMessage(messageId) {
+        if (!messageId) return;
+
+        this.dismissMessageSearch();
+        this.searchJumping = true;
+
+        try {
+            for (let page = 0; page < MAX_SEARCH_JUMP_PAGES; page++) {
+                // First: let any load the top sentinel already started finish,
+                // otherwise loadEarlier() below would no-op on its re-entry
+                // guard and this loop would give up on its first pass.
+                if (!(await this.settleEarlierLoad())) return;
+                if (this.messageIndexById(messageId) !== -1) break;
+                if (!this.hasMoreMessages) break;
+
+                const before = this.messages.length;
+                this.loadEarlier();
+                if (!(await this.settleEarlierLoad())) return;
+                if (this.messages.length === before) break;
+            }
+        } finally {
+            this.searchJumping = false;
+        }
+
+        if (this.destroyed) return;
+
+        if (this.messageIndexById(messageId) === -1) {
+            // Drop the hit that led nowhere before reopening, otherwise the
+            // notice sits above the very row it just said no longer exists and
+            // invites a second futile click. Any other hits stay clickable.
+            this.searchResults = this.searchResults.filter((match) => match.message_id !== messageId);
+            this.searchUnreachable = true;
+            this.searchOpen = true;
+            return;
+        }
+
+        this.revealMessage(messageId);
+    },
+
+    revealMessage(messageId) {
+        this.highlightedMessageId = messageId;
+        clearTimeout(this._highlightTimer);
+
+        // A macrotask, not $nextTick: the prepend handler restores scrollTop
+        // inside its own $nextTick, and Alpine flushes those in queue order, so
+        // a $nextTick queued here could still land before a restore and have
+        // its centring stomped. Destroyed-guarded because a wire:navigate can
+        // land in the gap.
+        setTimeout(() => {
+            if (this.destroyed) return;
+
+            const container = this.$refs.messages;
+            if (!container) return;
+
+            const id = window.CSS?.escape ? window.CSS.escape(messageId) : messageId;
+            const el = container.querySelector(`[data-message-id="${id}"]`);
+            if (!el) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const elRect = el.getBoundingClientRect();
+            const offset = (elRect.top - containerRect.top) - (containerRect.height - elRect.height) / 2;
+
+            container.scrollTo({
+                top: container.scrollTop + offset,
+                behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
+        }, 0);
+
+        this._highlightTimer = setTimeout(() => {
+            if (this.destroyed) return;
+            this.highlightedMessageId = null;
+        }, SEARCH_HIGHLIGHT_MS);
+    },
+
+    teardownMessageSearch() {
+        clearTimeout(this._searchDebounceTimer);
+        clearTimeout(this._highlightTimer);
+        this._searchRequestToken++;
     },
 });

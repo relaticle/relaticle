@@ -22,6 +22,10 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     Route::get('/chat/conversations', [ChatController::class, 'conversations'])->name('chat.conversations');
     Route::delete('/chat/conversations/{conversation}', [ChatController::class, 'destroyConversation'])->name('chat.conversations.destroy');
 
+    Route::get('/chat/conversations/{conversationId}/search', [ChatController::class, 'searchMessages'])
+        ->middleware('throttle:60,1')
+        ->name('chat.conversations.search');
+
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1')
         ->name('chat.cancel');
