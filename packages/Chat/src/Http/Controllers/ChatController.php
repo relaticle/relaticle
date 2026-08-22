@@ -498,12 +498,15 @@ final readonly class ChatController
 
     /**
      * A one-line excerpt centred on the match, for the result row in the search
-     * overlay. Whitespace is collapsed so a multi-paragraph assistant answer
-     * still renders as a single readable line.
+     * overlay. Markdown syntax is stripped and whitespace collapsed so a
+     * multi-paragraph assistant answer renders as one readable line instead of
+     * leaking **bold** markers and [label](/r/...) link syntax.
      */
     private function snippet(string $content, string $needle): string
     {
-        $text = Str::squish($content);
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $content) ?? $content;
+        $text = preg_replace('/[*_`~#]+/', '', $text) ?? $text;
+        $text = Str::squish($text);
 
         return Str::excerpt($text, Str::squish($needle), ['radius' => 60, 'omission' => '…'])
             ?? Str::limit($text, 160, '…');

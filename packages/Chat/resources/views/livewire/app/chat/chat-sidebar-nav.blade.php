@@ -6,10 +6,11 @@
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
             {{-- Bare keys must never fire while a dialog, dropdown, or the chat
-                 side panel owns the interaction. getComputedStyle (not
-                 offsetParent, which is always null for position:fixed) detects
-                 the panel's x-show display:none state. --}}
-            if (e.target?.closest?.('[role="dialog"], [role="menu"], [role="listbox"], .fi-modal')) return;
+                 side panel owns the interaction. Quoteless attribute selectors
+                 are load-bearing: this sits inside a double-quoted x-data
+                 attribute. getComputedStyle (not offsetParent, which is always
+                 null for position:fixed) detects the panel's display:none. --}}
+            if (e.target?.closest?.('[role=dialog], [role=menu], [role=listbox], .fi-modal')) return;
             const sidePanel = document.querySelector('[data-chat-side-panel]');
             if (sidePanel && getComputedStyle(sidePanel).display !== 'none') return;
             if (document.querySelector('.fi-modal-open')) return;

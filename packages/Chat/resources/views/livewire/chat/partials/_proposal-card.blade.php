@@ -7,11 +7,14 @@
           deliberately omit the header, fields, and final badge to avoid a
           confusing duplicate.
        2. status !== 'pending' (finalized / single resolved): the full read-only
-          audit card. --}}
-<div class="rounded-2xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-4 shadow-sm">
+          audit card.
+
+     Surface: the solid data-block tier (crisp hairline card, no shadow),
+     matching the docked card and the read-result blocks. --}}
+<div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
     {{-- COMPACT progress view while the batch is still docked. --}}
     <template x-if="action.status === 'pending'">
-        <div>
+        <div class="px-4 py-3">
             <div class="space-y-1.5">
                 <template x-for="(item, itemIdx) in (action.display?.items || [])" :key="itemIdx">
                     <template x-if="itemResult(action, itemIdx)">
@@ -36,30 +39,30 @@
     {{-- Full read-only audit card once the proposal is finalized. --}}
     <template x-if="action.status !== 'pending'">
         <div>
-            {{-- Header: operation icon tile + human summary + resolution pill --}}
-            <div class="flex items-start gap-3">
-                <div
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+            {{-- Header strip: operation icon + human summary + resolution pill --}}
+            <div class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+                <span
+                    class="shrink-0"
                     :class="{
-                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
-                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
-                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400': action.operation === 'delete',
+                        'text-blue-600 dark:text-blue-400': action.operation === 'create',
+                        'text-amber-600 dark:text-amber-400': action.operation === 'update',
+                        'text-red-600 dark:text-red-400': action.operation === 'delete',
                     }"
                     aria-hidden="true"
                 >
                     <template x-if="action.operation === 'update'">
-                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                     </template>
                     <template x-if="action.operation === 'delete'">
-                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        <x-heroicon-o-trash class="h-4 w-4" />
                     </template>
                     <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        <x-heroicon-o-plus class="h-4 w-4" />
                     </template>
-                </div>
+                </span>
 
-                <div class="min-w-0 flex-1 pt-1">
-                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? ((@js([
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? ((@js([
                         'create' => __('Create'),
                         'update' => __('Update'),
                         'delete' => __('Delete'),
@@ -69,7 +72,7 @@
                 {{-- Translated label map, not charAt-capitalized enum values:
                      'superseded' also reads as jargon, so it shows as Replaced. --}}
                 <span
-                    class="mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
+                    class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
                     :class="{
                         'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
                         'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
@@ -85,14 +88,14 @@
             </div>
 
             <template x-if="action.display?.duplicate_warning">
-                <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span x-text="action.display.duplicate_warning"></span>
                 </div>
             </template>
 
             <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-                <div class="mt-3 space-y-2.5 ps-10">
+                <div class="space-y-2.5 px-4 py-3">
                     <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
                         @include('chat::livewire.chat.partials._proposal-field')
                     </template>
@@ -101,9 +104,9 @@
 
             {{-- Batch items (records[] proposals): per-item summary, fields, and resolved chip. --}}
             <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-                <div class="mt-3 divide-y divide-gray-100 ps-10 dark:divide-white/5">
+                <div class="divide-y divide-gray-100 px-4 dark:divide-white/5">
                     <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
-                        <div class="py-2.5 first:pt-0 last:pb-0">
+                        <div class="py-3">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
 
@@ -134,7 +137,7 @@
                  View link above, and the outcome summary sits below the card, so a
                  batch-level link row here would just repeat the same links. --}}
             <template x-if="!(Array.isArray(action.display?.items) && action.display.items.length > 0) && action.status === 'approved' && action.record && action.record.url">
-                <div class="mt-3 ps-10 text-xs">
+                <div class="px-4 pb-3 text-xs">
                     @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'action.record'])
                 </div>
             </template>

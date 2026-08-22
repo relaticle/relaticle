@@ -9,33 +9,36 @@
 
 <div>
     @if ($proposal)
-        <div class="rounded-2xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-4 shadow-sm">
-            {{-- Header: operation icon tile + human summary + batch pager --}}
-            <div class="flex items-start gap-3">
-                <div
+        {{-- Surface: the solid data-block tier (crisp hairline card, no
+             shadow) shared with the read-result blocks; the operation icon
+             sits inline in its semantic color instead of a pastel tile. --}}
+        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
+            {{-- Header strip: operation icon + human summary + batch pager --}}
+            <div class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+                <span
                     @class([
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
-                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400' => $operation === 'create',
-                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400' => $operation === 'update',
-                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $operation === 'delete',
+                        'shrink-0',
+                        'text-blue-600 dark:text-blue-400' => $operation === 'create',
+                        'text-amber-600 dark:text-amber-400' => $operation === 'update',
+                        'text-red-600 dark:text-red-400' => $operation === 'delete',
                     ])
                     aria-hidden="true"
                 >
                     @if ($operation === 'update')
-                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                     @elseif ($operation === 'delete')
-                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        <x-heroicon-o-trash class="h-4 w-4" />
                     @else
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        <x-heroicon-o-plus class="h-4 w-4" />
                     @endif
-                </div>
+                </span>
 
-                <div class="min-w-0 flex-1 pt-1">
-                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $record['summary'] ?? $proposal->display_data['summary'] ?? $proposal->display_data['title'] ?? '' }}</p>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $record['summary'] ?? $proposal->display_data['summary'] ?? $proposal->display_data['title'] ?? '' }}</p>
                 </div>
 
                 @if ($remainingCount > 1)
-                    <div class="flex shrink-0 items-center gap-0.5 pt-0.5">
+                    <div class="flex shrink-0 items-center gap-0.5">
                         <button
                             type="button"
                             wire:click="stepPrev"
@@ -66,14 +69,14 @@
             </div>
 
             @if (! empty($proposal->display_data['duplicate_warning']))
-                <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span>{{ $proposal->display_data['duplicate_warning'] }}</span>
                 </div>
             @endif
 
             {{-- Field rows: fixed label column so values align, diffs render old → new --}}
-            <div class="mt-3 space-y-2.5 ps-10">
+            <div class="space-y-2.5 px-4 py-3">
                 @foreach ($recordFields as $row)
                     @php
                         $code = $row['code'] ?? null;
@@ -171,13 +174,13 @@
             </div>
 
             @error('resolve')
-                <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-400/10 dark:text-red-400" role="alert">
+                <p class="mx-4 mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-400/10 dark:text-red-400" role="alert">
                     {{ $message }}
                 </p>
             @enderror
 
             {{-- Footer: the decision. Separated by a hairline so it reads as one deliberate step. --}}
-            <div class="mt-4 flex items-center justify-end gap-2 border-t border-gray-100 pt-3 dark:border-white/5">
+            <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2.5 dark:border-white/5">
                 <button
                     type="button"
                     wire:click="discardCurrent"

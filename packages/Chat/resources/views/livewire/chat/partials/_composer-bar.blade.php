@@ -23,7 +23,7 @@
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
 @endphp
 
-<div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] transition focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20">
+<div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] transition focus-within:border-primary-400 dark:focus-within:border-primary-500/60">
     {{-- wire:ignore: TipTap mounts into this node imperatively; without it
          Livewire's morphdom wipes the editor on every chat-interface re-render
          (e.g. after the first message), leaving an empty, unusable composer. --}}
@@ -77,7 +77,7 @@
                         :aria-pressed="recording"
                         :aria-label="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
                         :title="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
-                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
                         :aria-busy="transcribing"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'
@@ -114,7 +114,7 @@
             <button
                 @if ($showStopButton) x-show="!isStreaming" x-cloak @endif
                 type="submit"
-                class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
+                class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
                 :disabled="{{ $sendDisabled }}"
                 aria-label="{{ __('Send message') }}"
             >
@@ -127,7 +127,7 @@
                     x-cloak
                     type="button"
                     x-on:click="cancelStream()"
-                    class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-white transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
+                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-white transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
                     aria-label="{{ __('Stop generation') }}"
                 >
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

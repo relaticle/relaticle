@@ -44,6 +44,7 @@
 :root {
     --surface-card-bg: rgb(249 250 251 / 0.8);            /* gray-50/80 */
     --surface-card-border: rgb(229 231 235 / 0.8);        /* gray-200/80 */
+    --surface-canvas-bg: rgb(249 250 251 / 0.6);          /* chat canvas wash: lifts solid blocks off the page */
     --surface-shell-bg: rgb(249 250 251 / 0.6);           /* gray-50/60 */
     --surface-shell-divider: rgb(229 231 235 / 0.6);      /* gray-200/60 */
     --surface-input-bg: rgb(249 250 251 / 0.8);           /* gray-50/80 */
@@ -52,6 +53,7 @@
 
 .dark {
     --surface-card-bg: rgb(255 255 255 / 0.02);
+    --surface-canvas-bg: transparent;                      /* dark canvas: blocks lift on gray-900 already */
     --surface-card-border: rgb(255 255 255 / 0.06);
     --surface-shell-bg: rgb(255 255 255 / 0.015);
     --surface-shell-divider: rgb(255 255 255 / 0.06);

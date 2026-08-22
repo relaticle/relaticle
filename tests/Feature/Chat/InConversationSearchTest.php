@@ -67,6 +67,29 @@ it('finds a message by substring and returns its id with a snippet', function ()
         ->and($response->json('matches.0.snippet'))->toContain('Northwind');
 });
 
+it('strips markdown syntax from snippets', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    seedSearchableConversation($user, 'conv-md');
+    seedSearchableMessage(
+        $user,
+        'conv-md',
+        'm-md',
+        "There's 1 task with the status **Done** — [Send proposal to Tim](/r/task/01abc) is ready.",
+        ['role' => 'assistant'],
+    );
+
+    actingAs($user);
+
+    $response = getJson(route('chat.conversations.search', ['conversationId' => 'conv-md', 'q' => 'proposal']))
+        ->assertOk();
+
+    expect($response->json('matches.0.snippet'))
+        ->toContain('Done')
+        ->toContain('Send proposal to Tim')
+        ->not->toContain('**')
+        ->not->toContain('](/r/');
+});
+
 it('matches assistant messages too', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     seedSearchableConversation($user, 'conv-assistant');
