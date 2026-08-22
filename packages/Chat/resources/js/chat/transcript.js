@@ -284,6 +284,52 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return (msg?.display_blocks || []).filter((block) => window.ChatModules.isKnownBlock(block?.block));
     },
 
+    // Interleaved render plan for an assistant reply: html and block segments
+    // in reading order. The model places a block mid-reply by writing
+    // {{block:N}} (1-based, tool-call order) alone on its own line, which both
+    // markdown pipelines wrap as its own <p>; the reply splits there and the
+    // real block component renders in that spot. Everything degrades to the
+    // old behaviour: no markers, an out-of-range N, or a marker the split
+    // cannot honor (inline mid-sentence) leaves the text intact minus the
+    // marker and appends the unplaced blocks below the reply in order.
+    messageSegments(msg) {
+        const blocks = this.displayBlocks(msg);
+        const html = msg.prerendered ? (msg.content || '') : window.renderMarkdown(msg.content || '');
+        const stripStray = (chunk) => chunk.replace(/\{\{block:\d+\}\}/g, '');
+
+        const segments = [];
+        const placed = new Set();
+        const re = /<p>\s*\{\{block:(\d+)\}\}\s*<\/p>/g;
+        let last = 0;
+        let match;
+
+        while ((match = re.exec(html)) !== null) {
+            const idx = Number(match[1]) - 1;
+            const before = stripStray(html.slice(last, match.index));
+            if (before.trim() !== '') segments.push({ type: 'html', html: before });
+            if (idx >= 0 && idx < blocks.length && !placed.has(idx)) {
+                placed.add(idx);
+                segments.push({ type: 'block', block: blocks[idx] });
+            }
+            last = re.lastIndex;
+        }
+
+        const rest = stripStray(html.slice(last));
+        if (rest.trim() !== '') segments.push({ type: 'html', html: rest });
+
+        blocks.forEach((block, idx) => {
+            if (!placed.has(idx)) segments.push({ type: 'block', block });
+        });
+
+        return segments;
+    },
+
+    // Streamed (pre-render) text with placement markers hidden: the raw
+    // {{block:N}} token must not flash on screen while tokens arrive.
+    streamingText(msg) {
+        return (msg?.content || '').replace(/\{\{block:\d+\}\}/g, '');
+    },
+
     blockTitle(block) {
         return blockTitles[block?.type] ?? (block?.title || '');
     },
@@ -763,7 +809,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     async copyMessage(msg) {
-        const text = this.absolutizeRecordLinks(msg?.content || '');
+        const text = this.absolutizeRecordLinks(msg?.content || '').replace(/\{\{block:\d+\}\}/g, '').trim();
         if (!text) return;
 
         try {

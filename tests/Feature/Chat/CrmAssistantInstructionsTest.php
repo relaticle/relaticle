@@ -43,7 +43,7 @@ it('scopes the block claim to the read tools that emit one', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
-        ->toContain('rendered as a table or card block under your reply')
+        ->toContain('rendered as a table or card block')
         ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
         ->toContain('ONE short lead-in sentence');
 });

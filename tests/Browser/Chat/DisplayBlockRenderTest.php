@@ -179,6 +179,43 @@ it('paints persisted read results as a real table and card, and drops an unknown
         ->and($shape['cardLinkHref'])->toBe($longUrl);
 });
 
+it('places a block at its {{block:N}} marker inside the reply and appends unplaced blocks below', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    $longUrl = 'https://example.com/?ref=inline';
+
+    displayBlockInsertAssistantMessage(
+        $conversationId,
+        $user,
+        "Lead-in before the table.\n\n{{block:1}}\n\nCommentary after the table.",
+        [displayBlockTableFixture(), displayBlockCardFixture($longUrl)],
+        60,
+    );
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Commentary after the table.');
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const bubble = document.querySelector('[data-assistant-bubble]');
+            const parts = Array.from(bubble.querySelectorAll('.prose, [data-block]'))
+                .map((el) => el.dataset.block ?? ('text:' + el.textContent.trim().slice(0, 12)));
+
+            return JSON.stringify({
+                parts,
+                leaksMarker: bubble.textContent.includes('{{block:'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    // Reading order: lead-in, the marked table exactly where the marker sat,
+    // the commentary, then the unplaced card appended below the reply.
+    expect($shape['parts'])->toBe(['text:Lead-in befo', 'records_table', 'text:Commentary a', 'record_card'])
+        ->and($shape['leaksMarker'])->toBeFalse();
+});
+
 it('attaches display blocks to the streamed bubble at stream-end reconcile', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
@@ -209,11 +246,16 @@ it('attaches display blocks to the streamed bubble at stream-end reconcile', fun
         })();
     JS);
 
+    // The real finalize path: handleStreamEnd() reconciles from the DB and
+    // marks the bubble rendered, which is what actually puts the block on
+    // screen. Blocks paint only on rendered replies (they interleave with the
+    // message's html segments), so calling reconcile alone would assert an
+    // intermediate state no user ever sees.
     $page->script(<<<JS
         (async () => {
             {$resolveInterface}
 
-            await data.reconcileLatestAssistant(data.lastAssistantBubble());
+            await data.handleStreamEnd({ invocation_id: 'inv-reconcile' });
 
             return true;
         })();

@@ -11,7 +11,7 @@
         pageContextConsumed = false;
     "
     data-chat-context="{{ $context ?? 'conversation' }}"
-    class="relative flex h-full flex-col"
+    class="relative flex h-full flex-col bg-[var(--surface-canvas-bg)]"
 >
     @include('chat::livewire.chat.partials._transcript')
 

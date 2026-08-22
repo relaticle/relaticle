@@ -69,7 +69,7 @@
          list's own spacing. --}}
     <div x-ref="topSentinel" aria-hidden="true" class="h-px"></div>
 
-    <div class="mx-auto max-w-3xl space-y-6">
+    <div class="mx-auto max-w-3xl space-y-5">
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">
                 <button
@@ -122,9 +122,12 @@
                     <div class="flex justify-end" data-user-bubble :data-grouped="decorations(index).grouped" :data-send-state="msg.sendState ?? 'sent'">
                         <div class="flex max-w-[85%] flex-col items-end gap-1">
                             <template x-if="!msg.editing">
+                                {{-- Soft brand tint, not solid primary-600: a wall of
+                                     saturated bubbles overpowered the transcript; the
+                                     tint keeps who-said-what without shouting. --}}
                                 <div
                                     :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
-                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-primary-600 px-4 py-3 text-sm text-white"
+                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15"
                                 >
                                     <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
                                 </div>
@@ -181,7 +184,7 @@
                             </template>
 
                             <template x-if="msg.editing">
-                                <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-600 p-2">
+                                <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-50 p-2 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:ring-primary-400/15">
                                     <textarea
                                         :id="'chat-edit-' + index"
                                         x-ref="editArea"
@@ -192,16 +195,16 @@
                                         rows="1"
                                         maxlength="5000"
                                         aria-label="{{ __('Edit message') }}"
-                                        class="block min-h-[28px] w-full resize-none rounded-xl border-0 bg-primary-700/40 px-3 py-2 text-sm leading-6 text-white placeholder:text-primary-100/70 focus:outline-none focus:ring-2 focus:ring-white/40"
+                                        class="block min-h-[28px] w-full resize-none rounded-xl border-0 bg-white px-3 py-2 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:bg-gray-900 dark:text-gray-100"
                                         style="max-height: 200px;"
                                     ></textarea>
                                     <div class="mt-2 flex items-center justify-between gap-2 px-1">
                                         <span
                                             class="text-[length:var(--text-micro)]"
                                             :class="{
-                                                'text-primary-100/80': (msg.editText || '').length <= 4900,
-                                                'text-amber-200': (msg.editText || '').length > 4900 && (msg.editText || '').length <= 5000,
-                                                'text-red-200': (msg.editText || '').length > 5000,
+                                                'text-gray-500 dark:text-gray-400': (msg.editText || '').length <= 4900,
+                                                'text-amber-600 dark:text-amber-400': (msg.editText || '').length > 4900 && (msg.editText || '').length <= 5000,
+                                                'text-red-600 dark:text-red-400': (msg.editText || '').length > 5000,
                                             }"
                                             x-text="(msg.editText || '').length > 4000 ? `${(msg.editText || '').length.toLocaleString()} / 5,000` : ''"
                                         ></span>
@@ -209,7 +212,7 @@
                                             <button
                                                 type="button"
                                                 x-on:click="cancelEdit(msg)"
-                                                class="rounded-lg bg-primary-700/40 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
+                                                class="rounded-lg px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:text-gray-300 dark:hover:bg-white/10"
                                             >
                                                 {{ __('Cancel') }}
                                             </button>
@@ -217,7 +220,7 @@
                                                 type="button"
                                                 x-on:click="saveEdit(msg, index)"
                                                 :disabled="!(msg.editText || '').trim() || (msg.editText || '').length > 5000 || isStreaming || rateLimit !== null"
-                                                class="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60 disabled:cursor-not-allowed disabled:bg-white/60 disabled:text-primary-400"
+                                                class="rounded-lg bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-primary-600/50"
                                             >
                                                 {{ __('Save & resend') }}
                                             </button>
@@ -265,21 +268,49 @@
                      user bubble opposite keeps who-said-what scanning. --}}
                 <template x-if="msg.role === 'assistant' && (msg.rendered || msg.content || msg.streamError || (index === messages.length - 1 && isStreaming && currentToolStatus))">
                     <div class="flex flex-col items-start" data-assistant-bubble :data-grouped="decorations(index).grouped">
-                        <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
+                        <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || displayBlocks(msg).length > 0 || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
                                 :title="msg.created_at ? @js(__('Completed :time')).replace(':time', new Date(msg.created_at).toLocaleString()) : ''"
-                                class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
+                                class="w-full min-w-0"
                             >
-                                <template x-if="msg.rendered && msg.prerendered">
-                                    <div x-html="msg.content"></div>
-                                </template>
-                                <template x-if="msg.rendered && !msg.prerendered">
-                                    <div x-html="window.renderMarkdown(msg.content)"></div>
+                                {{-- Rendered reply: text and display blocks interleaved in
+                                     reading order. messageSegments() honors {{ '{{block:N}}' }}
+                                     placement markers and appends unplaced blocks below,
+                                     which is also the no-marker default. --}}
+                                <template x-if="msg.rendered">
+                                    <div>
+                                        <template x-for="(seg, segIdx) in messageSegments(msg)" :key="segIdx">
+                                            <div class="w-full">
+                                                <template x-if="seg.type === 'html'">
+                                                    <div
+                                                        x-html="seg.html"
+                                                        class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
+                                                    ></div>
+                                                </template>
+                                                {{-- Single-element x-for: binds the loop var name
+                                                     `block`, which the included partials expect. --}}
+                                                <template x-if="seg.type === 'block' && seg.block.block === 'records_table'">
+                                                    <template x-for="block in [seg.block]" :key="segIdx + '-table'">
+                                                        <div class="my-3 w-full">
+                                                            @include('chat::livewire.chat.partials._block-records-table')
+                                                        </div>
+                                                    </template>
+                                                </template>
+                                                <template x-if="seg.type === 'block' && seg.block.block === 'record_card'">
+                                                    <template x-for="block in [seg.block]" :key="segIdx + '-card'">
+                                                        <div class="my-3 w-full">
+                                                            @include('chat::livewire.chat.partials._block-record-card')
+                                                        </div>
+                                                    </template>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
                                 </template>
                                 <template x-if="!msg.rendered">
-                                    <div>
+                                    <div class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100">
                                         <template x-if="msg.content">
-                                            <div x-text="msg.content" class="whitespace-pre-wrap"></div>
+                                            <div x-text="streamingText(msg)" class="whitespace-pre-wrap"></div>
                                         </template>
                                         <template x-if="index === messages.length - 1 && isStreaming && currentToolStatus">
                                             <div data-chat-loading-indicator class="flex items-center gap-2 text-xs" role="status" :class="{ 'mt-2': msg.content }">
@@ -305,21 +336,6 @@
                                 >
                                     {{ __('Retry') }}
                                 </button>
-                            </div>
-                        </template>
-
-                        {{-- Read-tool display blocks: the real table/card that replaces the
-                             markdown table the model used to hand-write. Dispatched through the
-                             displayBlocks() has already dropped any type this build
-                             does not know (see chat/blocks.js). --}}
-                        <template x-for="(block, blockIdx) in displayBlocks(msg)" :key="blockIdx">
-                            <div class="mt-3 w-full">
-                                <template x-if="block.block === 'records_table'">
-                                    @include('chat::livewire.chat.partials._block-records-table')
-                                </template>
-                                <template x-if="block.block === 'record_card'">
-                                    @include('chat::livewire.chat.partials._block-record-card')
-                                </template>
                             </div>
                         </template>
 
@@ -402,7 +418,7 @@
 
                         {{-- Thumbs-down detail funnel: category chips + optional comment --}}
                         <template x-if="msg.feedbackPanelOpen">
-                            <div class="mt-2 w-full max-w-[85%] rounded-xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-3">
+                            <div class="mt-2 w-full max-w-[85%] rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-gray-900">
                                 <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ __('What went wrong?') }}</p>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     <template x-for="cat in feedbackCategories" :key="cat.value">
