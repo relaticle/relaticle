@@ -472,7 +472,28 @@ it('derives display_blocks from persisted tool_results on reload', function (): 
 
     expect($assistant['display_blocks'])->toHaveCount(1)
         ->and($assistant['display_blocks'][0]['block'])->toBe('records_table')
+        ->and($assistant['display_blocks'][0]['tool_call_order'])->toBe(1)
         ->and($assistant['display_blocks'][0]['rows'][0]['url'])->toBe('/r/company/01ABC');
+});
+
+it('preserves tool-call order when an earlier tool emits no display block', function (): void {
+    $user = $this->user;
+    $toolResults = [
+        [
+            'id' => 'toolu_summary',
+            'name' => 'GetCrmSummaryTool',
+            'arguments' => [],
+            'result' => json_encode(['data' => []]),
+        ],
+        ...blockToolResults('toolu_block_2'),
+    ];
+
+    $conversationId = seedBlockConversation($user, $toolResults);
+    $messages = resolve(ListConversationMessages::class)->execute($user, $conversationId);
+    $assistant = collect($messages)->firstWhere('role', 'assistant');
+
+    expect($assistant['display_blocks'])->toHaveCount(1)
+        ->and($assistant['display_blocks'][0]['tool_call_order'])->toBe(2);
 });
 
 it('returns display_blocks on the latest assistant message for stream-end reconcile', function (): void {

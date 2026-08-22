@@ -30,9 +30,8 @@ mutates(ListConversationMessages::class);
  */
 function displayBlockInsertAssistantMessage(string $conversationId, User $user, string $content, array $blocks, int $secondsAgo): void
 {
-    // A null entry stands in for a tool call that emits no display_block
-    // (GetCrmSummaryTool): it still occupies a slot in the tool-call order
-    // the {{block:N}} markers are numbered by.
+    // A null entry represents a tool call without a display block. It still
+    // occupies a marker position.
     $toolResults = array_map(static fn (?array $block, int $index): array => [
         'id' => 'toolu_block_'.$index,
         'name' => $block === null ? 'GetCrmSummaryTool' : 'ListCompaniesTool',
@@ -259,10 +258,8 @@ it('resolves markers by tool-call order when a blockless tool was called first',
     $team = $user->ownedTeams()->first();
     $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
 
-    // Tool call #1 (a summary) emits no block, so marker numbering (tool-call
-    // order, per the agent prompt) and block-array indices diverge: {{block:2}}
-    // is the FIRST block. Resolving markers by array index placed every block
-    // one slot off and dropped the last one (observed live).
+    // The first tool emits no block. Therefore, marker 2 maps to the first
+    // display block instead of array index 2.
     displayBlockInsertAssistantMessage(
         $conversationId,
         $user,

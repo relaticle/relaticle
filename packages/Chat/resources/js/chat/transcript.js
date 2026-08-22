@@ -297,16 +297,12 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const html = msg.prerendered ? (msg.content || '') : window.renderMarkdown(msg.content || '');
         const stripStray = (chunk) => chunk.replace(/\{\{block:\d+\}\}/g, '');
 
-        // Marker N is the 1-based TOOL-CALL order (the prompt's definition),
-        // which server payloads carry as `n` on each block: a blockless tool
-        // called earlier in the turn (GetCrmSummaryTool) shifts the numbering
-        // away from this array's own indices, so resolving by index misplaced
-        // every later block. Payloads without `n` (older cached conversations)
-        // fall back to the index interpretation they were written under.
-        const blockIndexForMarker = (n) => {
-            const byOrder = blocks.findIndex((b) => b?.n === n);
+        // Marker N follows tool-call order. A blockless earlier tool can make
+        // that order differ from the display-block array index.
+        const blockIndexForMarker = (markerOrder) => {
+            const byOrder = blocks.findIndex((block) => block?.tool_call_order === markerOrder);
             if (byOrder !== -1) return byOrder;
-            return blocks.some((b) => b?.n !== undefined) ? -1 : n - 1;
+            return blocks.some((block) => block?.tool_call_order !== undefined) ? -1 : markerOrder - 1;
         };
 
         const segments = [];
