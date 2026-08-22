@@ -138,11 +138,20 @@ final class ChatInterface extends BaseLivewireComponent
      * broadcast live (Reverb's 10 KB cap), so stream_end is the first moment the
      * client can render them.
      *
+     * The client passes its own id for the same reason conversationTitle() takes
+     * one: on the FIRST turn of a new chat the conversation is created by the
+     * client's fetch, so $conversationId is still null here and reconcile would
+     * hand back nothing — leaving the turn's tables missing until a reload. The
+     * query below is scoped to the authed participant and team, so an id from
+     * the client cannot reach another user's conversation.
+     *
      * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
-    public function latestAssistantMessage(): ?array
+    public function latestAssistantMessage(?string $conversationId = null): ?array
     {
-        if ($this->conversationId === null) {
+        $conversationId ??= $this->conversationId;
+
+        if ($conversationId === null) {
             return null;
         }
 
@@ -150,7 +159,7 @@ final class ChatInterface extends BaseLivewireComponent
 
         $row = DB::table('agent_conversation_messages as m')
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.conversation_id', $this->conversationId)
+            ->where('m.conversation_id', $conversationId)
             ->where('m.participant_type', $user->getMorphClass())
             ->where('m.participant_id', $user->getKey())
             ->where('c.team_id', $user->current_team_id)
@@ -167,7 +176,7 @@ final class ChatInterface extends BaseLivewireComponent
         return [
             'id' => (string) $row->id,
             'content' => (string) $row->content,
-            'pending_actions' => $this->pendingActionCards(),
+            'pending_actions' => $this->pendingActionCards($conversationId),
             'display_blocks' => DisplayBlocks::collect(
                 $row->tool_results === null ? null : (string) $row->tool_results,
             ),
@@ -182,10 +191,10 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * @return list<array<string, mixed>>
      */
-    private function pendingActionCards(): array
+    private function pendingActionCards(string $conversationId): array
     {
         $actions = PendingAction::query()
-            ->where('conversation_id', $this->conversationId)
+            ->where('conversation_id', $conversationId)
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
             ->oldest()
