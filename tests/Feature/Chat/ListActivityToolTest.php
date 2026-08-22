@@ -14,6 +14,11 @@ use Relaticle\Chat\Tools\Activity\ListActivityTool;
 
 mutates(ListActivityTool::class);
 
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($this->user);
+});
+
 /*
  * Every test here runs WITHOUT a Filament tenant, on purpose: the agent runs
  * inside a queued job that binds the auth user and nothing else, so a tool
@@ -57,8 +62,7 @@ function activityBatches(string $event): array
 }
 
 it('reports a name change with its old and new value', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $company = app(CreateCompany::class)->execute($user, ['name' => 'Old Co']);
 
@@ -139,8 +143,7 @@ it('rejects a record id belonging to another team', function (): void {
 });
 
 it('reads a custom field change from the label the writer stored', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     app(CreateCustomField::class)->execute($user, [
         'entity_type' => 'company',
@@ -171,8 +174,7 @@ it('reads a custom field change from the label the writer stored', function (): 
 });
 
 it('collapses one save\'s native and custom-field rows into a single entry', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     app(CreateCustomField::class)->execute($user, [
         'entity_type' => 'company',
@@ -209,8 +211,7 @@ it('collapses one save\'s native and custom-field rows into a single entry', fun
 });
 
 it('keeps two records touched by one job as separate entries', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $first = app(CreateCompany::class)->execute($user, ['name' => 'First Co']);
     $second = app(CreateCompany::class)->execute($user, ['name' => 'Second Co']);
@@ -237,8 +238,7 @@ it('keeps two records touched by one job as separate entries', function (): void
 });
 
 it('reports a deletion, naming the record it soft-deleted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $company = app(CreateCompany::class)->execute($user, ['name' => 'Gone Co']);
 
@@ -254,8 +254,7 @@ it('reports a deletion, naming the record it soft-deleted', function (): void {
 });
 
 it('drops activity whose record was force-deleted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $kept = app(CreateCompany::class)->execute($user, ['name' => 'Kept Co']);
     $purged = app(CreateCompany::class)->execute($user, ['name' => 'Purged Co']);
@@ -273,8 +272,7 @@ it('drops activity whose record was force-deleted', function (): void {
 });
 
 it('keeps real history when every recent row points at a purged record', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $kept = app(CreateCompany::class)->execute($user, ['name' => 'Kept Co']);
 
@@ -295,8 +293,7 @@ it('keeps real history when every recent row points at a purged record', functio
 });
 
 it('reports the true entry count when the window holds more than one fetch', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     // One request stamps all of these with a single batch_uuid, so they group by
     // subject: 51 records, 51 entries, one more than a fetch can carry.
@@ -315,8 +312,7 @@ it('reports the true entry count when the window holds more than one fetch', fun
 });
 
 it('ignores activity older than the requested window', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $this->travelTo(now()->subDays(20));
     app(CreateCompany::class)->execute($user, ['name' => 'Ancient Co']);
@@ -327,8 +323,7 @@ it('ignores activity older than the requested window', function (): void {
 });
 
 it('renders no table when nothing changed in the window', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $payload = activityPayload();
 

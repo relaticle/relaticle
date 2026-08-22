@@ -59,6 +59,22 @@ function makeBatchProposal(string $convId, User $user, array $records): PendingA
     ]);
 }
 
+function makeSingleProposal(string $convId, User $user, string $title): PendingAction
+{
+    return PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $convId,
+        'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => $title],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
 it('refuses a whole-batch approval — a batch resolves only per item', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [
         ['title' => 'Batch A'], ['title' => 'Batch B'], ['title' => 'Batch C'],
@@ -178,18 +194,7 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
 });
 
 it('dispatches no continuation on a single approve and persists the record', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Single Approve'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Single Approve');
 
     $resolved = resolve(PendingActionService::class)->approve($action, $this->user);
 
@@ -199,18 +204,7 @@ it('dispatches no continuation on a single approve and persists the record', fun
 });
 
 it('dispatches no continuation on a single reject and creates nothing', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Single Reject'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Single Reject');
 
     $resolved = resolve(PendingActionService::class)->reject($action);
 
@@ -219,18 +213,7 @@ it('dispatches no continuation on a single reject and creates nothing', function
 });
 
 it('rejecting an already-resolved action throws', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Reject Once'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Reject Once');
     $service = resolve(PendingActionService::class);
 
     $service->reject($action);
@@ -288,18 +271,7 @@ it('approving an already-resolved action throws', function (): void {
  */
 it('broadcasts pending_action.resolved on a single approve', function (): void {
     Event::fake([PendingActionResolved::class]);
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Broadcast Approve'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Broadcast Approve');
 
     resolve(PendingActionService::class)->approve($action, $this->user);
 
@@ -314,18 +286,7 @@ it('broadcasts pending_action.resolved on a single approve', function (): void {
 
 it('broadcasts pending_action.resolved on a single reject', function (): void {
     Event::fake([PendingActionResolved::class]);
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => CreateTask::class,
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Broadcast Reject'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Broadcast Reject');
 
     resolve(PendingActionService::class)->reject($action);
 

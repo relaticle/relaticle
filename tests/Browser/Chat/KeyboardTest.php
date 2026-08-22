@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
 mutates(ChatInterface::class);
@@ -28,17 +29,31 @@ const KEYBOARD_TEST_EDITOR = '[data-chat-context="conversation"] [contenteditabl
 const KEYBOARD_TEST_SWITCHER = '[role="dialog"][aria-label="Switch conversation"]';
 const KEYBOARD_TEST_MESSAGE_SEARCH = '[role="dialog"][aria-label="Search this conversation"]';
 
-function keyboardTestInsertConversation(string $id, User $user, int|string $team, string $title): void
+function keyboardTestSeedFiller(string $conversationId, User $user, string $prefix, int $total, string $needle): void
 {
-    DB::table('agent_conversations')->insert([
-        'id' => $id,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team,
-        'title' => $title,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $rows = [];
+
+    foreach (range(1, $total) as $i) {
+        $rows[] = [
+            'id' => sprintf('%s-%04d', $prefix, $i),
+            'conversation_id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => $i % 2 === 1 ? 'user' : 'assistant',
+            'content' => $i === 2 ? $needle : "filler line {$i}",
+            'document' => ChatDocument::emptyJson(),
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '{}',
+            'meta' => '{}',
+            'created_at' => now()->subMinutes($total - $i + 1),
+            'updated_at' => now()->subMinutes($total - $i + 1),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert($rows);
 }
 
 function keyboardTestInsertMessage(string $conversationId, User $user, string $role, string $content): void
@@ -67,17 +82,12 @@ it('opens the switcher on Cmd/Ctrl+O, filters as you type, and Enter navigates t
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationA, $user, $team->getKey(), 'Alpha planning thread');
-    keyboardTestInsertConversation($conversationB, $user, $team->getKey(), 'Bravo onboarding notes');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Alpha planning thread', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Bravo onboarding notes', $conversationB);
     keyboardTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
     keyboardTestInsertMessage($conversationB, $user, 'user', 'Bravo seed message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+o');
@@ -103,15 +113,10 @@ it('closes the switcher on Esc without navigating', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationA, $user, $team->getKey(), 'Alpha planning thread');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Alpha planning thread', $conversationA);
     keyboardTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+o');
@@ -127,16 +132,11 @@ it('enters edit mode on the last user message when ArrowUp is pressed in an empt
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Arrow up chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Arrow up chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'my original message');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'an assistant reply');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('my original message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'ArrowUp');
@@ -149,15 +149,10 @@ it('does not enter edit mode when the composer has unsent text', function (): vo
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Arrow up guarded chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Arrow up guarded chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'my original message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('my original message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->type(KEYBOARD_TEST_EDITOR, 'a draft in progress');
@@ -178,42 +173,15 @@ it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit bel
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Deep history chat');
-
-    $rows = [];
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Deep history chat', $conversationId);
 
     // 110 messages puts the target two full pages below the newest 50.
-    foreach (range(1, 110) as $i) {
-        $rows[] = [
-            'id' => sprintf('ks-%03d', $i),
-            'conversation_id' => $conversationId,
-            'participant_type' => 'user',
-            'participant_id' => $user->getKey(),
-            'agent' => CrmAssistant::class,
-            'role' => $i % 2 === 1 ? 'user' : 'assistant',
-            'content' => $i === 2 ? 'the Northwind renewal' : "filler line {$i}",
-            'document' => ChatDocument::emptyJson(),
-            'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
-            'usage' => '{}',
-            'meta' => '{}',
-            'created_at' => now()->subMinutes(200 - $i),
-            'updated_at' => now()->subMinutes(200 - $i),
-        ];
-    }
+    keyboardTestSeedFiller($conversationId, $user, 'ks', 110, 'the Northwind renewal');
 
-    DB::table('agent_conversation_messages')->insert($rows);
-
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('filler line 110');
 
-    $page->assertMissing('[data-message-id="ks-002"]');
+    $page->assertMissing('[data-message-id="ks-0002"]');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
     $page->assertVisible(KEYBOARD_TEST_MESSAGE_SEARCH);
@@ -224,7 +192,7 @@ it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit bel
     $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Enter');
 
     $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
-    $page->assertVisible('[data-message-id="ks-002"]');
+    $page->assertVisible('[data-message-id="ks-0002"]');
 
     // The overlay is hidden while the walk runs, so the focused search input is
     // display:none'd and focus falls to <body>, which is NOT inside the chat
@@ -261,39 +229,12 @@ it('cancels an in-flight search jump on Esc and stops the walk', function (): vo
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Very deep history chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Very deep history chat', $conversationId);
 
     $total = 300;
-    $rows = [];
+    keyboardTestSeedFiller($conversationId, $user, 'kc', $total, 'the zylophonic migration record');
 
-    foreach (range(1, $total) as $i) {
-        $rows[] = [
-            'id' => sprintf('kc-%04d', $i),
-            'conversation_id' => $conversationId,
-            'participant_type' => 'user',
-            'participant_id' => $user->getKey(),
-            'agent' => CrmAssistant::class,
-            'role' => $i % 2 === 1 ? 'user' : 'assistant',
-            'content' => $i === 2 ? 'the zylophonic migration record' : "filler line {$i}",
-            'document' => ChatDocument::emptyJson(),
-            'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
-            'usage' => '{}',
-            'meta' => '{}',
-            'created_at' => now()->subMinutes($total - $i + 1),
-            'updated_at' => now()->subMinutes($total - $i + 1),
-        ];
-    }
-
-    DB::table('agent_conversation_messages')->insert($rows);
-
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas("filler line {$total}");
 
     $page->assertMissing('[data-message-id="kc-0002"]');
@@ -357,39 +298,12 @@ it('reaches Escape from the real post-Enter focus, not just a targeted keypress'
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Untargeted escape chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Untargeted escape chat', $conversationId);
 
     $total = 300;
-    $rows = [];
+    keyboardTestSeedFiller($conversationId, $user, 'ke', $total, 'the flibbertigibbet quarterly digest');
 
-    foreach (range(1, $total) as $i) {
-        $rows[] = [
-            'id' => sprintf('ke-%04d', $i),
-            'conversation_id' => $conversationId,
-            'participant_type' => 'user',
-            'participant_id' => $user->getKey(),
-            'agent' => CrmAssistant::class,
-            'role' => $i % 2 === 1 ? 'user' : 'assistant',
-            'content' => $i === 2 ? 'the flibbertigibbet quarterly digest' : "filler line {$i}",
-            'document' => ChatDocument::emptyJson(),
-            'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
-            'usage' => '{}',
-            'meta' => '{}',
-            'created_at' => now()->subMinutes($total - $i + 1),
-            'updated_at' => now()->subMinutes($total - $i + 1),
-        ];
-    }
-
-    DB::table('agent_conversation_messages')->insert($rows);
-
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas("filler line {$total}");
 
     $page->assertMissing('[data-message-id="ke-0002"]');
@@ -454,15 +368,10 @@ it('closes search on Esc without loading any history', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Escape search chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Escape search chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'the only message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('the only message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
@@ -483,16 +392,11 @@ it('confirms before deleting a thumbs-down rating that has a saved category, and
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Feedback chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Feedback chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'a question');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'an unhelpful answer');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('an unhelpful answer');
 
     $page->click('button[aria-label="Bad response"]');
@@ -515,16 +419,11 @@ it('does not ask for confirmation when toggling off a thumbs-up rating', functio
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Thumbs up chat');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Thumbs up chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'a question');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'a helpful answer');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('a helpful answer');
 
     // Records every window.confirm() call instead of throwing on any call: Pest

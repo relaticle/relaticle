@@ -21,19 +21,6 @@ mutates(ChatInterface::class);
  * grouped (`data-grouped` on the later bubble); a calendar-day change between
  * two adjacent messages renders exactly one `data-day-separator` marker.
  */
-function transcriptShapeInsertConversation(string $id, User $user, int|string $team): void
-{
-    DB::table('agent_conversations')->insert([
-        'id' => $id,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team,
-        'title' => 'transcript shape',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-}
-
 function transcriptShapeInsertMessage(string $conversationId, User $user, string $content, Carbon $at): void
 {
     DB::table('agent_conversation_messages')->insert([
@@ -55,34 +42,11 @@ function transcriptShapeInsertMessage(string $conversationId, User $user, string
     ]);
 }
 
-/**
- * The initial HTML source carries the message payload inline (`@js($messages)`
- * inside the `x-data="chatInterface(...)"` attribute), so `assertSourceHas`
- * proves the server sent the data, not that Alpine's `x-for` has painted it
- * yet. Poll the live DOM for the expected bubble count before reading shape,
- * rather than trusting a single read right after navigation.
- */
-function transcriptShapeWaitForBubbles(AwaitableWebpage $page, int $expected): int
-{
-    $count = 0;
-    for ($i = 0; $i < 50; $i++) {
-        $count = $page->script(<<<'JS'
-            (() => document.querySelectorAll('[data-user-bubble]').length)();
-        JS);
-        if ($count === $expected) {
-            return $count;
-        }
-        usleep(100_000);
-    }
-
-    return $count;
-}
-
 it('groups messages under a 3-minute gap and renders exactly one day separator across a day change', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    transcriptShapeInsertConversation($conversationId, $user, $team->getKey());
+    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Carbon::parse('2026-08-19 10:00:00', 'UTC');
 
@@ -94,15 +58,10 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
     transcriptShapeInsertMessage($conversationId, $user, 'Second today message', $baseline->copy()->addMinute());
     transcriptShapeInsertMessage($conversationId, $user, 'Third today message', $baseline->copy()->addMinutes(5));
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Third today message');
 
-    expect(transcriptShapeWaitForBubbles($page, 4))->toBe(4);
+    $page->assertCount('[data-user-bubble]', 4);
 
     $shape = $page->script(<<<'JS'
         (() => {
@@ -211,24 +170,19 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    transcriptShapeInsertConversation($conversationId, $user, $team->getKey());
+    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
     // Only the most recent 50 render initially, and the top-sentinel observer
     // must NOT have fired yet: on a normal-height viewport, 50 short bubbles
     // fill it well past the fold, so scrollToBottom(true) on mount leaves the
     // sentinel far off-screen above the scroll position.
-    expect(transcriptShapeWaitForBubbles($page, 50))->toBe(50);
+    $page->assertCount('[data-user-bubble]', 50);
 
     $topBeforeScroll = transcriptShapeTopBubbleText($page);
     expect($topBeforeScroll)->toBe('Seeded message 0071');
@@ -239,7 +193,7 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     // would need.
     transcriptShapeScrollToTop($page);
 
-    expect(transcriptShapeWaitForBubbles($page, 100))->toBe(100);
+    $page->assertCount('[data-user-bubble]', 100);
 
     // The message that was at the top before the prepend must still be
     // visible after the scroll-height-delta restoration runs, not merely
@@ -252,14 +206,32 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     // No runaway loop: settling for half a second must not silently keep
     // pulling further pages just because the observer stayed attached.
     usleep(500_000);
-    expect(transcriptShapeWaitForBubbles($page, 100))->toBe(100);
+    $page->assertCount('[data-user-bubble]', 100);
 
     // Recovery: the guard must re-arm after a successful load, not just once.
     // A second genuine scroll-to-top pulls the final 20 messages, and
     // hasMoreMessages must flip false (button disappears) once true history
     // end is reached.
     transcriptShapeScrollToTop($page);
-    expect(transcriptShapeWaitForBubbles($page, 120))->toBe(120);
+
+    // Deliberately a usleep poll, NOT assertCount: the auto-retrying
+    // assertion hammers the CDP bridge in a tight loop, and (verified
+    // empirically, 4/4 runs) the in-process server then never finishes
+    // serving THIS second back-to-back load-earlier request — the count
+    // stays 100 for the whole 30s retry budget. The quiet usleep windows
+    // leave the shared event loop free to serve the XHR; the same poll is
+    // why this test passed before the assertCount migration.
+    $count = 0;
+    for ($i = 0; $i < 50; $i++) {
+        $count = $page->script(<<<'JS'
+            (() => document.querySelectorAll('[data-user-bubble]').length)();
+        JS);
+        if ($count === 120) {
+            break;
+        }
+        usleep(100_000);
+    }
+    expect($count)->toBe(120);
 
     $buttonStillPresent = $page->script(<<<'JS'
         (() => Array.from(document.querySelectorAll('button')).some((b) => b.textContent.includes('Load earlier messages')))();
@@ -271,20 +243,15 @@ it('guards against a duplicate load when triggered again while one is already in
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    transcriptShapeInsertConversation($conversationId, $user, $team->getKey());
+    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
-    expect(transcriptShapeWaitForBubbles($page, 50))->toBe(50);
+    $page->assertCount('[data-user-bubble]', 50);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
@@ -302,7 +269,7 @@ it('guards against a duplicate load when triggered again while one is already in
     JS);
     expect($flagRightAfterDoubleCall)->toBeTrue();
 
-    expect(transcriptShapeWaitForBubbles($page, 100))->toBe(100);
+    $page->assertCount('[data-user-bubble]', 100);
 
     $flagAfterSettle = $page->script(<<<JS
         (() => {
@@ -327,20 +294,15 @@ it('clears the in-flight guard on a failed request, so history loading is not pe
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    transcriptShapeInsertConversation($conversationId, $user, $team->getKey());
+    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
-    expect(transcriptShapeWaitForBubbles($page, 50))->toBe(50);
+    $page->assertCount('[data-user-bubble]', 50);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
@@ -382,32 +344,28 @@ it('clears the in-flight guard on a failed request, so history loading is not pe
     expect($settledAfterFailure)->toBeFalse();
 
     // Still exactly 50: the failed attempt must not have prepended anything.
-    expect(transcriptShapeWaitForBubbles($page, 50))->toBe(50);
+    $page->assertCount('[data-user-bubble]', 50);
 
     // Re-arm proof: restore the real transport, then a genuine scroll-to-top
     // still successfully loads the next real page. If the guard had wedged
     // true, this would time out at 50 forever.
     $page->script('(() => { window.fetch = window.__originalFetch; return true; })();');
     transcriptShapeScrollToTop($page);
-    expect(transcriptShapeWaitForBubbles($page, 100))->toBe(100);
+    $page->assertCount('[data-user-bubble]', 100);
 });
 
 it('auto-loads on mount when a short first page leaves the sentinel visible without any scroll', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    transcriptShapeInsertConversation($conversationId, $user, $team->getKey());
+    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
     // One more than PAGE_SIZE (50): the initial fetch returns the newest 50
     // and reports hasMoreMessages = true, leaving exactly one message behind.
     transcriptShapeInsertSequencedMessages($conversationId, $user, 51, $baseline);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->resize(1400, 9000)
         ->navigate("/app/{$team->slug}/chats/{$conversationId}")
         ->assertSourceHas('Seeded message 0051');
@@ -416,30 +374,11 @@ it('auto-loads on mount when a short first page leaves the sentinel visible with
     // short single-line bubbles do not fill the container, so the sentinel is
     // visible the instant the observer attaches and must fire without the
     // user ever moving the scrollbar.
-    expect(transcriptShapeWaitForBubbles($page, 51))->toBe(51);
+    $page->assertCount('[data-user-bubble]', 51);
     expect(transcriptShapeTopBubbleText($page))->toBe('Seeded message 0001');
 });
 
 /** Polls the transcript for the expected number of painted record chips. */
-function transcriptShapeWaitForChips(AwaitableWebpage $page, int $expected): int
-{
-    $count = 0;
-
-    for ($i = 0; $i < 50; $i++) {
-        $count = $page->script(<<<'JS'
-            (() => document.querySelectorAll('.chat-chip').length)();
-        JS);
-
-        if ($count === $expected) {
-            return $count;
-        }
-
-        usleep(100_000);
-    }
-
-    return $count;
-}
-
 /**
  * A `/r/{type}/{id}` citation inside an assistant reply paints as a chip on
  * BOTH render pipelines, and the two agree.
@@ -465,11 +404,7 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
     $serverHtmlJson = json_encode($serverHtml, JSON_THROW_ON_ERROR);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
@@ -479,7 +414,7 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
         (() => {
             {$resolveInterface}
 
-            const base = { role: 'assistant', rendered: true, editing: false, editText: '', copiedAt: 0, follow_ups: [] };
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '', follow_ups: [] };
 
             data.messages.push({ ...base, content: {$markdownJson}, prerendered: false });
             data.messages.push({ ...base, content: {$serverHtmlJson}, prerendered: true });
@@ -488,7 +423,7 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
         })();
     JS);
 
-    expect(transcriptShapeWaitForChips($page, 2))->toBe(2);
+    $page->assertCount('.chat-chip', 2);
 
     $chips = json_decode((string) $page->script(<<<'JS'
         (() => {
@@ -526,11 +461,7 @@ it('copies a cited record as an absolute url from both message shapes', function
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
     $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
@@ -546,7 +477,7 @@ it('copies a cited record as an absolute url from both message shapes', function
                 value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } },
             });
 
-            const base = { role: 'assistant', rendered: true, editing: false, editText: '', copiedAt: 0, follow_ups: [] };
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '', follow_ups: [] };
             const streamed = { ...base, content: {$markdownJson}, prerendered: false };
             const reloaded = { ...base, content: {$serverHtmlJson}, prerendered: true };
 
@@ -614,11 +545,7 @@ it('emits chip markup identical to the server for every citable type, and chips 
 
     $casesJson = json_encode($cases, JSON_THROW_ON_ERROR);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
