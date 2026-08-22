@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Features\OnboardSeed;
+use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\WithCachedConfig;
 use Illuminate\Foundation\Testing\WithCachedRoutes;
@@ -13,11 +14,29 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Laravel\Pennant\Feature;
+use Spatie\Activitylog\Actions\LogActivityAction;
 
 abstract class TestCase extends BaseTestCase
 {
     use WithCachedConfig;
     use WithCachedRoutes;
+
+    /**
+     * LogActivityAction keeps its beforeLogging callbacks in a STATIC array that
+     * outlives the application. AppServiceProvider appends one per boot, so from
+     * the second test in a process the first-registered closure still wins, and
+     * it resolves RequestActivityBatch from a container that was flushed at the
+     * previous teardown: every activity row gets its own batch_uuid and a single
+     * save stops looking like a single save. Clearing here, BEFORE the fresh app
+     * boots, leaves exactly this application's closure registered. Clearing in
+     * setUp() would be too late and would strip that closure too.
+     */
+    public function createApplication(): Application
+    {
+        LogActivityAction::clearBeforeLoggingCallbacks();
+
+        return parent::createApplication();
+    }
 
     protected function setUp(): void
     {

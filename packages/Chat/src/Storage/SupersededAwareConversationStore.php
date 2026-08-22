@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Storage;
 
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
+use Laravel\Ai\Messages\Message;
+use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Storage\DatabaseConversationStore;
 use Relaticle\Chat\Support\AssistantText;
+use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\FirstChatUsageTagger;
 
 /**
@@ -21,6 +25,34 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
+    /**
+     * Drop presentation-only display blocks from the history replayed to the model.
+     *
+     * Read tools persist a `display_block` envelope next to their model-facing
+     * payload so the UI can render a real table on reload. Tool results are
+     * replayed on every later turn, so leaving the block in would re-bill 1-2 KB
+     * per read call for the rest of the conversation, against a prompt prefix we
+     * fought to shrink. The persisted row keeps it; only the replay drops it.
+     *
+     * This post-processes the parent's output rather than rebuilding it, so the
+     * ownership note below still holds.
+     *
+     * @return Collection<int, Message>
+     */
+    public function getLatestConversationMessages(string $conversationId, int $limit): Collection
+    {
+        return parent::getLatestConversationMessages($conversationId, $limit)
+            ->each(function (Message $message): void {
+                if (! $message instanceof ToolResultMessage) {
+                    return;
+                }
+
+                foreach ($message->toolResults as $toolResult) {
+                    $toolResult->result = DisplayBlocks::strip($toolResult->result);
+                }
+            });
+    }
+
     /**
      * Scope every message query the store makes to the non-superseded rows.
      *

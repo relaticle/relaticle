@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\Table\TableExtension;
 use League\CommonMark\MarkdownConverter;
 
@@ -22,6 +23,10 @@ final readonly class MarkdownRenderer
 
         $environment->addExtension(new CommonMarkCoreExtension);
         $environment->addExtension(new TableExtension);
+
+        // Above the core LinkRenderer (priority 0): a `/r/` citation becomes a
+        // record chip, everything else falls through to it untouched.
+        $environment->addRenderer(Link::class, new RecordChipRenderer, 10);
 
         $this->converter = new MarkdownConverter($environment);
     }

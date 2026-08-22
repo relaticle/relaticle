@@ -32,7 +32,7 @@ it('static instructions forbid enumerating proposal data in prose', function ():
 
     expect($instructions)
         ->toContain('NEVER repeat the proposed records or their field values in prose')
-        ->toContain('Use tables ONLY for read/search results')
+        ->toContain('Never write a markdown table of records')
         ->toContain('No celebratory emoji')
         ->toContain('never re-list field values or render a table of data the user just approved');
 });

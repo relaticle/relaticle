@@ -6,19 +6,13 @@ import HardBreak from '@tiptap/extension-hard-break';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
 import { createMentionSuggestion } from './chat-mention-suggestion';
+import { MENTION_CHIP_CLASS } from './chat/mention-chip';
 
 // Editors live outside Alpine's reactive proxy. Wrapping a TipTap editor in a
 // Proxy breaks ProseMirror's identity checks ("Applying a mismatched
 // transaction") because internal doc/state references are compared by identity
 // when transactions are applied.
 const editorByEl = new WeakMap();
-
-function deepClone(value) {
-    if (typeof structuredClone === 'function') {
-        return structuredClone(value);
-    }
-    return JSON.parse(JSON.stringify(value));
-}
 
 function hasContent(doc) {
     if (! doc || ! Array.isArray(doc.content) || doc.content.length === 0) return false;
@@ -32,7 +26,7 @@ function hasContent(doc) {
     return true;
 }
 
-export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, autofocus } = {}) {
+export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofocus } = {}) {
     return {
         editorEl: null,
         // Reactive mirror of the editor's plain text. Alpine bindings depending
@@ -63,7 +57,7 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
                     return ['span', {
                         'data-mention-id': node.attrs.id,
                         'data-mention-type': node.attrs.type,
-                        'class': 'inline-flex items-center rounded-md bg-primary-100 px-1.5 py-0.5 text-xs text-primary-800 dark:bg-primary-900/30 dark:text-primary-200',
+                        'class': MENTION_CHIP_CLASS,
                         ...HTMLAttributes,
                     }, '@' + (node.attrs.label ?? '')];
                 },
@@ -85,9 +79,7 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
                 // ProseMirror requires `block+` content; pass an empty paragraph rather
                 // than an empty content array so the Placeholder extension has a node to
                 // attach to and the editor reports a non-zero selection range.
-                content: hasContent(initialDocument)
-                    ? deepClone(initialDocument)
-                    : { type: 'doc', content: [{ type: 'paragraph' }] },
+                content: { type: 'doc', content: [{ type: 'paragraph' }] },
                 editorProps: {
                     attributes: {
                         class: 'prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
@@ -108,6 +100,15 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
                             }
                             event.preventDefault();
                             onSubmit?.();
+                            return true;
+                        }
+                        // ArrowUp-to-edit: only when the doc is empty (a single empty
+                        // paragraph has nothing meaningful for the browser's default
+                        // ArrowUp to do anyway, so intercepting unconditionally here
+                        // is safe (a non-empty composer keeps normal cursor movement).
+                        if (event.key === 'ArrowUp' && editor.isEmpty) {
+                            event.preventDefault();
+                            onArrowUp?.();
                             return true;
                         }
                         return false;
@@ -156,11 +157,23 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, a
             this.text = text;
         },
 
+        // Drops text at the caret and leaves the caret after it, so a dictated
+        // sentence lands wherever the user was typing and they keep editing.
+        // The content is passed as an explicit text node rather than a string:
+        // TipTap parses a string as HTML, and a transcription is arbitrary user
+        // speech that may contain angle brackets.
+        insertText(text) {
+            const editor = editorByEl.get(this.editorEl);
+            if (! editor || ! text) return;
+            editor.chain().focus().insertContent({ type: 'text', text }).run();
+            this.text = editor.getText();
+        },
+
         setDocument(doc) {
             const editor = editorByEl.get(this.editorEl);
             if (! editor) return;
             const content = hasContent(doc)
-                ? deepClone(doc)
+                ? structuredClone(doc)
                 : { type: 'doc', content: [{ type: 'paragraph' }] };
             editor.commands.setContent(content);
             this.text = editor.getText();

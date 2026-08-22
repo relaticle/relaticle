@@ -8,8 +8,13 @@ use App\Filament\Pages\NotificationPreferences;
 use App\Providers\Filament\AppPanelProvider;
 use App\Providers\MacroServiceProvider;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Bootstrap\LoadConfiguration;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\CachedState;
+use Illuminate\Support\Facades\Route;
+use Relaticle\Chat\ChatServiceProvider;
 
-mutates(MacroServiceProvider::class, AppPanelProvider::class);
+mutates(MacroServiceProvider::class, AppPanelProvider::class, ChatServiceProvider::class);
 
 describe('app panel configuration - path mode (default)', function () {
     it('registers panel with path prefix and no domain constraint', function () {
@@ -154,5 +159,53 @@ describe('getPublicUrl macro', function () {
         ]);
 
         expect(url()->getPublicUrl('about'))->toBe('https://example.com/about');
+    });
+});
+
+/**
+ * Chat cites every record as a `/r/{type}/{id}` chip. Production subdomain-routes
+ * the app panel (APP_PANEL_DOMAIN), which strips the "/app" prefix off the tenant
+ * routes and leaves `{tenant:slug}/{resource}/{record}` matching `/r/people/{id}`
+ * as tenant "r" plus the People resource. Panel routes carry the domain and
+ * Laravel matches every domain route ahead of every domainless one, so the chip
+ * resolved locally and 404'd in production until ChatServiceProvider started
+ * registering its routes on the panel domain during the register phase.
+ */
+$recordPermalinkTypes = ['company', 'people', 'opportunity', 'task', 'note', 'custom_field'];
+
+describe('chat record permalinks - path mode (default)', function () use ($recordPermalinkTypes) {
+    it('routes each permalink to the chat redirect', function (string $type) {
+        $this->get("/r/{$type}/01ABC");
+
+        expect(Route::currentRouteName())->toBe('chat.record-redirect');
+    })->with($recordPermalinkTypes);
+});
+
+describe('chat record permalinks - domain mode', function () use ($recordPermalinkTypes) {
+    beforeEach(function () {
+        putenv('APP_PANEL_DOMAIN=app.example.com');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+    });
+
+    afterEach(function () {
+        putenv('APP_PANEL_DOMAIN');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('routes each permalink to the chat redirect, not to a panel resource', function (string $type) {
+        $this->get("http://app.example.com/r/{$type}/01ABC");
+
+        expect(Route::currentRouteName())->toBe('chat.record-redirect');
+    })->with($recordPermalinkTypes);
+
+    it('leaves panel resource URLs to the panel', function () {
+        $this->get('http://app.example.com/acme/people/01ABC');
+
+        expect(Route::currentRouteName())->toBe('filament.app.resources.people.view');
     });
 });

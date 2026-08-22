@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+use Relaticle\Chat\Agents\CrmAssistant;
+
+mutates(CrmAssistant::class);
+
+/**
+ * The system prompt is a shipped artifact: read results now render as a
+ * display block under the reply, so any surviving instruction to hand-write a
+ * table of the same rows puts a duplicate table back on screen. Both the Rules
+ * entry and the Formatting bullet are pinned, because either one alone is
+ * enough to bring it back.
+ */
+it('no longer instructs the model to hand-write a table of read results', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->not->toContain('present results in a compact table format')
+        ->not->toContain('Use tables ONLY for read/search results');
+});
+
+/**
+ * Without a Capabilities line naming it, the change-history tool is a schema
+ * the model never reaches for: it answers "what changed last week" out of the
+ * list tools, which carry no history at all.
+ */
+it('tells the model it can read a record\'s change history', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('ListActivityTool');
+});
+
+/**
+ * Only the list tools, the show tools and ListActivityTool emit a display_block.
+ * SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool return plain JSON,
+ * so an unscoped "your read results are rendered as a block" plus Rule 3's ban on
+ * tables, bullet lists and per-record prose leaves the model no way to show a
+ * search hit at all: the user gets "I found 3 matches" over an empty screen.
+ */
+it('scopes the block claim to the read tools that emit one', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('rendered as a table or card block under your reply')
+        ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
+        ->toContain('ONE short lead-in sentence');
+});
+
+/**
+ * Blocks are appended after the whole reply, so with two read tools in one turn
+ * a model-written "**Companies**" header can never sit next to its table: both
+ * headers strand at the bottom of the bubble and both tables land under them.
+ * The only header that can be adjacent is the block's own title, so the prompt
+ * has to forbid the model's.
+ */
+it('forbids per-result headings that would strand above the blocks', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('never write a heading or label naming a result set')
+        ->toContain('Never write a heading or bold label naming a set of results');
+});
+
+/**
+ * DestinationResolver gained an export_* destination per entity, but the model
+ * only reaches for a destination the prompt routes to. Without both of these,
+ * "how do I export my companies?" falls through to the product-question rule
+ * and answers with documentation steps and no link into the workspace, which
+ * the prompt itself calls a downgrade.
+ */
+it('routes export requests to the export destinations', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
+        ->toContain('(custom field definitions, bulk imports, exports, team members)');
+});

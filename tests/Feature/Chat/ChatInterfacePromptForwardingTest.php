@@ -38,11 +38,11 @@ it('hides the starter prompt chips in the side panel', function (): void {
         'context' => 'side-panel',
         'contextPrompts' => [['label' => 'Summarize Acme', 'prompt' => 'Summarize Acme']],
     ])
-        ->assertSee('Ask about your CRM data.')
-        ->assertDontSee('or try one of these');
+        ->assertSee('Ask about this record, or anything else in your CRM.')
+        ->assertDontSee('Try one of these');
 });
 
 it('keeps the starter prompt chips on the full-page chat', function (): void {
     Livewire::test(ChatInterface::class)
-        ->assertSee('or try one of these');
+        ->assertSee('Try one of these');
 });

@@ -7,11 +7,14 @@ namespace Relaticle\Chat\Livewire\Chat;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\TranscriptScope;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -69,27 +72,30 @@ final class ChatInterface extends BaseLivewireComponent
         $this->initialModel = $initialModel ?? $modelQuery;
 
         if ($this->conversationId !== null) {
-            $this->messages = $this->fetchMessages();
+            $this->messages = resolve(ListConversationMessages::class)->execute(
+                $this->authUser(),
+                $this->conversationId,
+            );
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
         }
     }
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, created_at: ?string, pending_actions: array<int, mixed>}>
+     * Renderless: the client already applies the delta from the dispatched
+     * chat:messages-prepended event (prepending `messages`, restoring scroll
+     * by anchoring to the pre-prepend scrollHeight). A normal render here
+     * would re-serialize the now-larger $this->messages back into the root
+     * element's `x-data="chatInterface(..., @js($messages), ...)"` attribute
+     * and morph it in, which (confirmed empirically) does not merely patch
+     * that attribute string but tears down and remounts the whole Alpine
+     * component (destroy() then a fresh init()), discarding the very
+     * prependScrollAnchor/loadingEarlier state this method's own client-side
+     * counterpart depends on, and unconditionally re-running init()'s own
+     * scrollToBottom(true), silently overwriting the scroll-restore with a
+     * jump to the bottom on every call.
      */
-    public function fetchMessages(): array
-    {
-        if ($this->conversationId === null) {
-            return [];
-        }
-
-        return resolve(ListConversationMessages::class)->execute(
-            $this->authUser(),
-            $this->conversationId,
-        );
-    }
-
+    #[Renderless]
     public function loadEarlierMessages(): void
     {
         if ($this->conversationId === null || $this->oldestMessageId === null) {
@@ -117,27 +123,34 @@ final class ChatInterface extends BaseLivewireComponent
      * otherwise leave the approve/reject CTA missing until a full reload — is
      * self-healed by the client merging any cards it never received.
      *
-     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>}|null
+     * Read-tool display blocks ride along for the same reason: they are never
+     * broadcast live (Reverb's 10 KB cap), so stream_end is the first moment the
+     * client can render them.
+     *
+     * The client passes its own id for the same reason conversationTitle() takes
+     * one: on the FIRST turn of a new chat the conversation is created by the
+     * client's fetch, so $conversationId is still null here and reconcile would
+     * hand back nothing — leaving the turn's tables missing until a reload. The
+     * query below is scoped to the authed participant and team, so an id from
+     * the client cannot reach another user's conversation.
+     *
+     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
-    public function latestAssistantMessage(): ?array
+    public function latestAssistantMessage(?string $conversationId = null): ?array
     {
-        if ($this->conversationId === null) {
+        $conversationId ??= $this->conversationId;
+
+        if ($conversationId === null) {
             return null;
         }
 
         $user = $this->authUser();
 
-        $row = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.conversation_id', $this->conversationId)
-            ->where('m.participant_type', $user->getMorphClass())
-            ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
+        $row = TranscriptScope::apply(DB::table('agent_conversation_messages as m'), $user, $conversationId)
             ->where('m.role', 'assistant')
-            ->whereNull('m.superseded_at')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
-            ->first(['m.id', 'm.content']);
+            ->first(['m.id', 'm.content', 'm.tool_results']);
 
         if ($row === null) {
             return null;
@@ -146,7 +159,10 @@ final class ChatInterface extends BaseLivewireComponent
         return [
             'id' => (string) $row->id,
             'content' => (string) $row->content,
-            'pending_actions' => $this->pendingActionCards(),
+            'pending_actions' => $this->pendingActionCards($conversationId),
+            'display_blocks' => DisplayBlocks::collect(
+                $row->tool_results === null ? null : (string) $row->tool_results,
+            ),
         ];
     }
 
@@ -158,10 +174,10 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * @return list<array<string, mixed>>
      */
-    private function pendingActionCards(): array
+    private function pendingActionCards(string $conversationId): array
     {
         $actions = PendingAction::query()
-            ->where('conversation_id', $this->conversationId)
+            ->where('conversation_id', $conversationId)
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
             ->oldest()

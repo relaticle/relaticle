@@ -60,3 +60,14 @@ it('returns earlier messages with beforeMessageId cursor', function (): void {
     expect($result[0]['content'])->toContain('msg 1');
     expect($result[24]['content'])->toContain('msg 25');
 });
+
+it('still fills a whole page when an approval marker sits inside the window', function (): void {
+    DB::table('agent_conversation_messages')
+        ->where('id', 'm-050')
+        ->update(['role' => 'user', 'content' => '[approval] approved']);
+
+    $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page');
+
+    expect($result)->toHaveCount(50)
+        ->and(array_column($result, 'id'))->not->toContain('m-050');
+});

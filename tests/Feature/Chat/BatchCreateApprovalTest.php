@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CreateTask;
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
@@ -10,13 +11,17 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
 uses(LazilyRefreshDatabase::class);
+
+mutates(PendingActionService::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -44,11 +49,27 @@ function makeBatchProposal(string $convId, User $user, array $records): PendingA
         'team_id' => $user->currentTeam->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
         'action_data' => ['_batch' => true, 'records' => $records],
         'display_data' => ['title' => 'Create Tasks', 'summary' => 'Create '.count($records).' tasks', 'items' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+function makeSingleProposal(string $convId, User $user, string $title): PendingAction
+{
+    return PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $convId,
+        'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => $title],
+        'display_data' => [],
         'status' => PendingActionStatus::Pending,
         'expires_at' => now()->addMinutes(15),
     ]);
@@ -138,7 +159,7 @@ it('throws when calling approveItem on a non-batch proposal', function (): void 
         'team_id' => $this->user->currentTeam->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
         'action_data' => ['title' => 'Flat'],
@@ -173,18 +194,7 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
 });
 
 it('dispatches no continuation on a single approve and persists the record', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Single Approve'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Single Approve');
 
     $resolved = resolve(PendingActionService::class)->approve($action, $this->user);
 
@@ -194,18 +204,7 @@ it('dispatches no continuation on a single approve and persists the record', fun
 });
 
 it('dispatches no continuation on a single reject and creates nothing', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Single Reject'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Single Reject');
 
     $resolved = resolve(PendingActionService::class)->reject($action);
 
@@ -214,18 +213,7 @@ it('dispatches no continuation on a single reject and creates nothing', function
 });
 
 it('rejecting an already-resolved action throws', function (): void {
-    $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
-        'user_id' => $this->user->getKey(),
-        'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
-        'operation' => PendingActionOperation::Create,
-        'entity_type' => 'task',
-        'action_data' => ['title' => 'Reject Once'],
-        'display_data' => [],
-        'status' => PendingActionStatus::Pending,
-        'expires_at' => now()->addMinutes(15),
-    ]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Reject Once');
     $service = resolve(PendingActionService::class);
 
     $service->reject($action);
@@ -238,7 +226,7 @@ it('approving an expired action throws and creates nothing', function (): void {
         'team_id' => $this->user->currentTeam->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
         'action_data' => ['title' => 'Expired'],
@@ -258,7 +246,7 @@ it('approving an already-resolved action throws', function (): void {
         'team_id' => $this->user->currentTeam->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
-        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'task',
         'action_data' => ['title' => 'Done'],
@@ -270,4 +258,137 @@ it('approving an already-resolved action throws', function (): void {
 
     expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
         ->toThrow(RuntimeException::class, 'This action has already been resolved');
+});
+
+/**
+ * F1: every resolution path (single approve/reject, and per-item approveItem/
+ * rejectItem for a batch) broadcasts `pending_action.resolved` on the
+ * conversation's private channel, so a second open tab reconciles a proposal
+ * resolved elsewhere instead of showing stale Approve/Reject buttons on an
+ * action that has already been decided. approve()/reject() are NOT the only
+ * two resolution paths: a batch resolves per item through approveItem()/
+ * rejectItem(), each in its own transaction, so those two must broadcast too.
+ */
+it('broadcasts pending_action.resolved on a single approve', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Broadcast Approve');
+
+    resolve(PendingActionService::class)->approve($action, $this->user);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
+        && $event->pendingActionId === $action->getKey()
+        && $event->status === 'approved'
+        && $event->index === null
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('broadcasts pending_action.resolved on a single reject', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeSingleProposal($this->convId, $this->user, 'Broadcast Reject');
+
+    resolve(PendingActionService::class)->reject($action);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
+        && $event->pendingActionId === $action->getKey()
+        && $event->status === 'rejected'
+        && $event->index === null
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('broadcasts pending_action.resolved with the item index on a batch approveItem, unfinalized', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
+
+    resolve(PendingActionService::class)->approveItem($action, $this->user, 0);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
+        && $event->pendingActionId === $action->getKey()
+        && $event->status === 'approved'
+        && $event->index === 0
+        && $event->finalized === false
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('broadcasts pending_action.resolved as finalized on the batch\'s last item', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
+    $service = resolve(PendingActionService::class);
+
+    $service->approveItem($action, $this->user, 0);
+    $service->approveItem($action, $this->user, 1);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
+        && $event->pendingActionId === $action->getKey()
+        && $event->status === 'approved'
+        && $event->index === 1
+        && $event->finalized
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('broadcasts pending_action.resolved with status rejected on a batch rejectItem', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
+
+    resolve(PendingActionService::class)->rejectItem($action, 0);
+
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
+        && $event->pendingActionId === $action->getKey()
+        && $event->status === 'rejected'
+        && $event->index === 0
+        && $event->finalized === false
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+});
+
+it('reports the item\'s real stored status when approveItem is called again on an already-rejected item', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
+    $service = resolve(PendingActionService::class);
+
+    $service->rejectItem($action, 0);
+    $service->approveItem($action, $this->user, 0);
+
+    // The idempotent no-op path must report the item's REAL status ('rejected',
+    // set by the first call) rather than assuming 'approved' just because
+    // approveItem() is the method that was called the second time. Both
+    // dispatched events share pendingActionId/index/status = 0/'rejected';
+    // assertDispatched alone would pass on the FIRST event no matter what the
+    // second (the no-op path under test) reports, so assertNotDispatched is
+    // the assertion that actually discriminates.
+    Event::assertDispatchedTimes(PendingActionResolved::class, 2);
+    Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->pendingActionId === $action->getKey()
+        && $event->index === 0
+        && $event->status === 'rejected'
+        && $event->broadcastOn()[0]->name === "private-chat.conversation.{$this->convId}"
+        && $event->broadcastAs() === 'pending_action.resolved');
+    Event::assertNotDispatched(fn (PendingActionResolved $event): bool => $event->pendingActionId === $action->getKey()
+        && $event->index === 0
+        && $event->status === 'approved');
+    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+});
+
+it('does not broadcast when the pending action has no conversation_id', function (): void {
+    Event::fake([PendingActionResolved::class]);
+    $action = PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['title' => 'No Conversation'],
+        'display_data' => [],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    resolve(PendingActionService::class)->approve($action, $this->user);
+
+    Event::assertNotDispatched(PendingActionResolved::class);
 });

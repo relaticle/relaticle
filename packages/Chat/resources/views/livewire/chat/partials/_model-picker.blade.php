@@ -38,7 +38,6 @@
                 role="option"
                 :aria-selected="selectedModel === opt.value"
                 :aria-disabled="! allowedModels.includes(opt.value)"
-                :disabled="false"
                 x-on:click="selectModel(opt.value); menuOpen = false"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
                 :class="{
@@ -55,9 +54,9 @@
                 <span class="flex-1 truncate" x-text="opt.label"></span>
                 <span
                     x-show="! allowedModels.includes(opt.value)"
-                    class="ml-auto inline-flex shrink-0 items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                    class="ml-auto inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                 >
-                    Pro
+                    {{ __('Pro') }}
                 </span>
                 <x-heroicon-s-check-circle
                     x-show="selectedModel === opt.value && allowedModels.includes(opt.value)"

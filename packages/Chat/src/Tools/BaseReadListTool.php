@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Models\CustomField;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
+use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
@@ -25,6 +32,26 @@ abstract class BaseReadListTool implements Tool
     use NormalizesToolInput;
     use ReportsValidationFailures;
 
+    /**
+     * Rows carried by the `records_table` display block. The model still sees
+     * the full page under `data`; the block is what the user reads, and a chat
+     * bubble that scrolls past ten rows stops being a summary.
+     */
+    private const int BLOCK_ROW_LIMIT = 10;
+
+    /**
+     * Columns carried by the block: the entity's core name/title column plus up
+     * to five custom-field columns, wide enough for the fields a team marks
+     * visible and narrow enough for a chat bubble.
+     */
+    private const int BLOCK_COLUMN_LIMIT = 6;
+
+    /**
+     * Characters kept per table cell. Tighter than the record card's cap: a cell
+     * is one line of a ten-row table, not a record summary.
+     */
+    private const int CELL_VALUE_LIMIT = 120;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -36,14 +63,6 @@ abstract class BaseReadListTool implements Tool
     abstract protected function citationType(): string;
 
     abstract public function description(): string;
-
-    /**
-     * The custom-fields entity alias, which is also the citation/morph alias.
-     */
-    protected function entityType(): string
-    {
-        return $this->citationType();
-    }
 
     /** @return array<string, mixed> */
     protected function additionalSchema(JsonSchema $schema): array
@@ -71,7 +90,7 @@ abstract class BaseReadListTool implements Tool
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
-        $entityType = $this->entityType();
+        $entityType = $this->citationType();
 
         $customFieldsDescription = 'Filter by custom field values.';
         $sortable = $this->nativeSorts();
@@ -121,6 +140,13 @@ abstract class BaseReadListTool implements Tool
             return (string) json_encode(['error' => $e->getMessage()]);
         }
 
+        // Captured before the resource collection is built: wrapping a paginator
+        // in a resource collection replaces its items with resource instances,
+        // and the display block reads stored custom-field values off the models.
+        $block = $results instanceof LengthAwarePaginator
+            ? $this->buildDisplayBlock($user, $results, $request)
+            : null;
+
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
         $collection = $resourceClass::collection($results);
@@ -132,7 +158,8 @@ abstract class BaseReadListTool implements Tool
         }
 
         $citationType = $this->citationType();
-        $items = array_map(function (mixed $item) use ($citationType): mixed {
+        $resolver = resolve(RecordReferenceResolver::class);
+        $items = array_map(function (mixed $item) use ($citationType, $resolver): mixed {
             if (! is_array($item)) {
                 return $item;
             }
@@ -141,16 +168,184 @@ abstract class BaseReadListTool implements Tool
                 ? (string) $item['id']
                 : null;
 
-            $ref = $id !== null
-                ? resolve(RecordReferenceResolver::class)->resolve($citationType, $id)
-                : null;
+            $item['url'] = null;
 
-            $item['url'] = $ref['url'] ?? null;
+            if ($id !== null && $resolver->resolve($citationType, $id) !== null) {
+                $item['url'] = $resolver->referenceUrl($citationType, $id);
+            }
 
             return $item;
         }, $items);
 
-        return (string) json_encode($this->localiseDatetimes($items, $user), JSON_PRETTY_PRINT);
+        $payload = ['data' => $items];
+
+        if ($block !== null) {
+            $payload['display_block'] = $block;
+        }
+
+        return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * The presentation envelope the chat UI renders as a real table. Kept
+     * alongside the model-facing `data` rows rather than replacing them, and
+     * stripped from the replayed history (see SupersededAwareConversationStore)
+     * because the model reasons over `data`, never over this.
+     *
+     * @param  LengthAwarePaginator<int, Model>  $results
+     * @return array<string, mixed>|null
+     */
+    private function buildDisplayBlock(User $user, LengthAwarePaginator $results, Request $request): ?array
+    {
+        $records = array_slice(array_values($results->items()), 0, self::BLOCK_ROW_LIMIT);
+
+        if ($records === []) {
+            return null;
+        }
+
+        $team = $user->currentTeam;
+        $entityType = $this->citationType();
+        $coreKey = $this->searchFilterName();
+
+        // Nothing stops a team from coding a custom field `name` or `title`.
+        // Left in, it would emit the core column twice and its cell would
+        // overwrite the record's own name, which is the cell the row links from.
+        $promoted = array_values(array_filter(
+            $this->promotedFields($team, $entityType, $this->promotedCodes($request)),
+            static fn (CustomField $field): bool => $field->code !== $coreKey,
+        ));
+        $promotedCodes = array_map(static fn (CustomField $field): string => $field->code, $promoted);
+
+        $derived = array_values(array_filter(
+            resolve(DisplayFieldSelector::class)->listFields($team, $entityType),
+            static fn (CustomField $field): bool => $field->code !== $coreKey
+                && ! in_array($field->code, $promotedCodes, true),
+        ));
+
+        // The core column always survives the cap, so the promoted half is
+        // trimmed first and the derived half fills whatever is left.
+        $promoted = array_slice($promoted, 0, self::BLOCK_COLUMN_LIMIT - 1);
+        $derived = array_slice($derived, 0, self::BLOCK_COLUMN_LIMIT - 1 - count($promoted));
+
+        return [
+            'block' => 'records_table',
+            'title' => Str::plural(Str::headline($this->citationType())),
+            'type' => $this->citationType(),
+            // Named, not positional: query-aware promotion moves a filtered or
+            // sorted field to the FRONT, so the first column is routinely not
+            // the record's own name. This is the column the row links from.
+            'core' => $coreKey,
+            'columns' => [
+                ...$this->fieldColumns($promoted),
+                ['key' => $coreKey, 'label' => Str::headline($coreKey)],
+                ...$this->fieldColumns($derived),
+            ],
+            'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey),
+            'total' => $results->total(),
+        ];
+    }
+
+    /**
+     * @param  list<CustomField>  $fields
+     * @return list<array{key: string, label: string}>
+     */
+    private function fieldColumns(array $fields): array
+    {
+        return array_map(
+            static fn (CustomField $field): array => ['key' => $field->code, 'label' => $field->name],
+            $fields,
+        );
+    }
+
+    /**
+     * @param  list<Model>  $records
+     * @param  list<CustomField>  $fields
+     * @return list<array{id: string, url: string, cells: array<string, string>}>
+     */
+    private function blockRows(array $records, array $fields, string $coreKey): array
+    {
+        $resolver = resolve(RecordReferenceResolver::class);
+        $formatter = resolve(CustomFieldsDisplayFormatter::class);
+        $citationType = $this->citationType();
+
+        $rows = [];
+
+        foreach ($records as $record) {
+            $id = (string) $record->getKey();
+            $coreValue = $record->getAttribute($coreKey);
+            $cells = [$coreKey => is_scalar($coreValue) ? (string) $coreValue : ''];
+
+            foreach ($formatter->formatStored($record, $fields, self::CELL_VALUE_LIMIT) as $row) {
+                $cells[$row['code']] = $row['value'];
+            }
+
+            $rows[] = [
+                'id' => $id,
+                'url' => $resolver->referenceUrl($citationType, $id),
+                'cells' => $cells,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Field codes this call filtered or sorted on, in the order the tool parsed
+     * them. Relevance follows the question: ask for deals closing this month
+     * over $50k and close_date/amount lead the table, whatever the team marked
+     * visible. Native sorts and codes from another tenant drop out in
+     * promotedFields(), which only resolves this team's own fields.
+     *
+     * @return list<string>
+     */
+    private function promotedCodes(Request $request): array
+    {
+        $customFields = $request['custom_fields'] ?? null;
+
+        $codes = is_array($customFields) ? array_map(strval(...), array_keys($customFields)) : [];
+
+        $sort = $request['sort'] ?? null;
+
+        if (is_string($sort) && $sort !== '') {
+            $codes[] = ltrim($sort, '-');
+        }
+
+        return array_values(array_unique($codes));
+    }
+
+    /**
+     * Promoted fields are resolved without any visibility filter: a field the
+     * team hid from its table is exactly the field the user just asked about.
+     *
+     * @param  list<string>  $codes
+     * @return list<CustomField>
+     */
+    private function promotedFields(Team $team, string $entityType, array $codes): array
+    {
+        if ($codes === []) {
+            return [];
+        }
+
+        $fields = CustomField::query()
+            ->where('tenant_id', $team->getKey())
+            ->where('entity_type', $entityType)
+            ->active()
+            ->whereIn('code', $codes)
+            ->with('options')
+            ->get()
+            ->keyBy('code');
+
+        $ordered = [];
+
+        foreach ($codes as $code) {
+            $field = $fields->get($code);
+
+            if ($field instanceof CustomField) {
+                $ordered[] = $field;
+            }
+        }
+
+        return $ordered;
     }
 
     /**
@@ -170,7 +365,7 @@ abstract class BaseReadListTool implements Tool
         ));
 
         $customFields = resolve(CustomFieldsFilterTranslator::class)
-            ->translate($user, $this->entityType(), $request['custom_fields'] ?? null);
+            ->translate($user, $this->citationType(), $request['custom_fields'] ?? null);
 
         if ($customFields !== []) {
             $nativeFilters['custom_fields'] = $customFields;

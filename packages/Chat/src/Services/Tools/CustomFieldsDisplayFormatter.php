@@ -9,7 +9,9 @@ use App\Models\CustomField;
 use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -79,6 +81,127 @@ final readonly class CustomFieldsDisplayFormatter
         }
 
         return $rows;
+    }
+
+    /**
+     * Display rows for the values a record already has stored, one per given
+     * field, in the order the fields are given. Fields the record holds no
+     * value for are skipped: a display block is a summary, not a form.
+     *
+     * The sibling of format(): that one renders a *proposed* payload, this one
+     * renders a *persisted* record, and both share the same value rendering so
+     * a proposal card and a record card never disagree about a value.
+     *
+     * @param  list<CustomField>  $fields  already scoped to the record's tenant, with options loaded
+     * @param  int  $valueLimit  characters kept per free-text value, after whitespace is squeezed onto one line
+     * @return list<array{label: string, code: string, value: string, type: string, values?: list<string>}>
+     */
+    public function formatStored(Model $model, array $fields, int $valueLimit): array
+    {
+        if ($fields === [] || ! $model->relationLoaded('customFieldValues')) {
+            return [];
+        }
+
+        /** @var Collection<int, CustomFieldValue> $storedValues */
+        $storedValues = $model->getRelation('customFieldValues');
+        $byFieldId = $storedValues->keyBy('custom_field_id');
+
+        $rows = [];
+
+        foreach ($fields as $field) {
+            $stored = $byFieldId->get($field->getKey());
+
+            if (! $stored instanceof CustomFieldValue) {
+                continue;
+            }
+
+            $raw = $this->plainValue($stored->{CustomFieldValue::getValueColumn($field->type)});
+            $rendered = $this->renderValue($field, $raw);
+
+            if ($rendered === null) {
+                continue;
+            }
+
+            $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+            $type = $this->displayType($field, $dataType);
+            $value = $this->condense($rendered, $type === 'text' ? $valueLimit : null);
+
+            if ($value === '') {
+                continue;
+            }
+
+            $row = [
+                'label' => $field->name,
+                'code' => $field->code,
+                'value' => $value,
+                'type' => $type,
+            ];
+
+            $values = $this->storedValues($field, $raw, $dataType);
+
+            if ($values !== null) {
+                $row['values'] = $values;
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * The chip/link list behind a typed value, mirroring what format() attaches
+     * to a proposal row so a record card and a proposal card render the same
+     * field the same way. Null means the type has no list and the joined
+     * `value` string is the whole story.
+     *
+     * @return list<string>|null
+     */
+    private function storedValues(CustomField $field, mixed $value, ?FieldDataType $dataType): ?array
+    {
+        if ($field->type === CustomFieldType::LINK->value) {
+            return is_array($value) ? $this->optionNames($field, $value) : null;
+        }
+
+        if ($dataType === FieldDataType::MULTI_CHOICE) {
+            return is_array($value) ? $this->optionNames($field, $value) : null;
+        }
+
+        if ($dataType === FieldDataType::SINGLE_CHOICE) {
+            $name = $this->renderSingleChoice($field, $value);
+
+            return $name === null || $name === '' ? null : [$name];
+        }
+
+        return null;
+    }
+
+    /**
+     * `json_value` is cast to a Collection, which every is_array() branch in
+     * this class would miss and stringify into raw JSON. Every read of a stored
+     * column goes through here: formatStored() for the record card, and
+     * lookupCurrentValue() for the old side of a proposal diff.
+     */
+    private function plainValue(mixed $value): mixed
+    {
+        return $value instanceof Collection ? $value->all() : $value;
+    }
+
+    /**
+     * A display block is a summary that the tool result carries forever, so a
+     * stored value is always squeezed onto one line. The length cap is applied
+     * to free text ONLY: that is the unbounded type (a rich-editor field holds
+     * kilobytes of prose), while a capped URL is a broken href and a capped
+     * option list is a chip cut in half.
+     *
+     * format() deliberately does neither: a proposal diff has to show exactly
+     * what is about to be written.
+     */
+    private function condense(string $value, ?int $limit): string
+    {
+        $oneLine = Str::squish($value);
+
+        return $limit === null ? $oneLine : Str::limit($oneLine, $limit);
     }
 
     private function renderValue(CustomField $field, mixed $value): ?string
@@ -153,6 +276,12 @@ final readonly class CustomFieldsDisplayFormatter
     /**
      * Read the current value of a custom field on a model via the
      * directly-loaded customFieldValues relation.
+     *
+     * Unwrapped through plainValue() for the same reason formatStored() is: a
+     * Collection reaching renderValue() stringifies to its own JSON, which
+     * would print `["01K4...","01K5..."]` on the OLD side of a multi-value diff
+     * while the NEW side, fed a plain array from the payload, prints the option
+     * names. Both sides of one card have to agree.
      */
     private function lookupCurrentValue(CustomField $field, Model $model): mixed
     {
@@ -170,6 +299,6 @@ final readonly class CustomFieldsDisplayFormatter
 
         $column = CustomFieldValue::getValueColumn($field->type);
 
-        return $row->{$column};
+        return $this->plainValue($row->{$column});
     }
 }

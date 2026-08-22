@@ -8,7 +8,7 @@
           confusing duplicate.
        2. status !== 'pending' (finalized / single resolved): the full read-only
           audit card. --}}
-<div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+<div class="rounded-2xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-4 shadow-sm">
     {{-- COMPACT progress view while the batch is still docked. --}}
     <template x-if="action.status === 'pending'">
         <div>
@@ -17,21 +17,9 @@
                     <template x-if="itemResult(action, itemIdx)">
                         <div class="flex items-center gap-2 text-xs">
                             <span class="text-gray-600 dark:text-gray-300" x-text="item.summary"></span>
-                            <template x-if="itemResult(action, itemIdx).status === 'approved'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                                    <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
-                                </span>
-                            </template>
-                            <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                    Skipped
-                                </span>
-                            </template>
+                            @include('chat::livewire.chat.partials._proposal-item-chips')
                             <template x-if="itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
-                                <a :href="itemResult(action, itemIdx).record.url" wire:navigate class="inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                    <span x-text="itemResult(action, itemIdx).record.label ? 'View ' + itemResult(action, itemIdx).record.label : 'View'"></span>
-                                    <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                </a>
+                                @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'itemResult(action, itemIdx).record'])
                             </template>
                         </div>
                     </template>
@@ -49,7 +37,7 @@
             {{-- Header: operation icon tile + human summary + resolution pill --}}
             <div class="flex items-start gap-3">
                 <div
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
                     :class="{
                         'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
                         'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
@@ -58,13 +46,13 @@
                     aria-hidden="true"
                 >
                     <template x-if="action.operation === 'update'">
-                        <x-heroicon-o-pencil-square class="h-4 w-4" />
+                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
                     </template>
                     <template x-if="action.operation === 'delete'">
-                        <x-heroicon-o-trash class="h-4 w-4" />
+                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
                     </template>
                     <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
-                        <x-heroicon-o-plus class="h-4 w-4" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     </template>
                 </div>
 
@@ -73,7 +61,7 @@
                 </div>
 
                 <span
-                    class="mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                    class="mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
                     :class="{
                         'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
                         'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
@@ -91,7 +79,7 @@
             </template>
 
             <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-                <div class="mt-3 space-y-1.5 ps-11">
+                <div class="mt-3 space-y-2.5 ps-10">
                     <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
                         @include('chat::livewire.chat.partials._proposal-field')
                     </template>
@@ -100,7 +88,7 @@
 
             {{-- Batch items (records[] proposals): per-item summary, fields, and resolved chip. --}}
             <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-                <div class="mt-3 divide-y divide-gray-100 ps-11 dark:divide-white/5">
+                <div class="mt-3 divide-y divide-gray-100 ps-10 dark:divide-white/5">
                     <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
                         <div class="py-2.5 first:pt-0 last:pb-0">
                             <div class="flex items-center justify-between gap-2">
@@ -109,20 +97,11 @@
                                 {{-- Per-item resolved chip (Created / Skipped). --}}
                                 <template x-if="itemResult(action, itemIdx)">
                                     <span class="flex shrink-0 items-center gap-2 text-xs">
-                                        <template x-if="itemResult(action, itemIdx).status === 'approved'">
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                                                <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
-                                            </span>
-                                        </template>
-                                        <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                                Skipped
-                                            </span>
-                                        </template>
+                                        @include('chat::livewire.chat.partials._proposal-item-chips')
                                     </span>
                                 </template>
                             </div>
-                            <div class="mt-1.5 space-y-1">
+                            <div class="mt-1.5 space-y-1.5">
                                 <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
                                     @include('chat::livewire.chat.partials._proposal-field')
                                 </template>
@@ -130,10 +109,7 @@
 
                             <template x-if="itemResult(action, itemIdx) && itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
                                 <div class="mt-1.5 text-xs">
-                                    <a :href="itemResult(action, itemIdx).record.url" wire:navigate class="inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                        <span x-text="itemResult(action, itemIdx).record.label ? 'View ' + itemResult(action, itemIdx).record.label : 'View'"></span>
-                                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                    </a>
+                                    @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'itemResult(action, itemIdx).record'])
                                 </div>
                             </template>
                         </div>
@@ -145,15 +121,8 @@
                  View link above, and the outcome summary sits below the card, so a
                  batch-level link row here would just repeat the same links. --}}
             <template x-if="!(Array.isArray(action.display?.items) && action.display.items.length > 0) && action.status === 'approved' && action.record && action.record.url">
-                <div class="mt-3 ps-11">
-                    <a
-                        :href="action.record.url"
-                        wire:navigate
-                        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                    >
-                        <span x-text="action.record.label ? 'View ' + action.record.label : 'View'"></span>
-                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                    </a>
+                <div class="mt-3 ps-10 text-xs">
+                    @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'action.record'])
                 </div>
             </template>
         </div>

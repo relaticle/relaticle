@@ -236,7 +236,7 @@
             <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <div class="flex min-w-0 items-center gap-2">
                     <x-heroicon-o-chat-bubble-left-right class="h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
-                    <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">Chat</h3>
+                    <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ config('chat.assistant_name') }}</h3>
                 </div>
 
                 <div class="flex shrink-0 items-center gap-0.5">
@@ -298,8 +298,8 @@
 
                                 <template x-if="!historyLoading && !historyError && filteredHistory.length === 0">
                                     <p class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" role="status">
-                                        <span x-show="historySearch.trim()">No matches.</span>
-                                        <span x-show="!historySearch.trim()">No chats yet.</span>
+                                        <span x-show="historySearch.trim()">{{ __('No matches.') }}</span>
+                                        <span x-show="!historySearch.trim()">{{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}</span>
                                     </p>
                                 </template>
 

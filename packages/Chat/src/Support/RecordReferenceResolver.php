@@ -24,14 +24,28 @@ use Throwable;
 final readonly class RecordReferenceResolver
 {
     /**
+     * Entity types the render-time chip sweep will style as chips, and the
+     * only types `referenceUrl()` is ever asked for. Every other type
+     * (e.g. custom_field, which has no per-record route) is reached through
+     * `urlFor()`'s absolute panel URL instead.
+     *
+     * Public because it is the list both render pipelines are held to: every
+     * type here needs an icon in `RecordChipRenderer` and in the matching JS
+     * map, and ChipRenderingTest asserts exactly that.
+     *
+     * @var list<string>
+     */
+    public const array CHIP_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
+
+    /**
      * @param  array<int|string, mixed>  $ids
      * @return list<array{id: string, type: string, url: string, label: string|null}>
      */
-    public function resolveMany(string $entityType, array $ids, int $cap = 10): array
+    public function resolveMany(string $entityType, array $ids): array
     {
         $refs = [];
 
-        foreach (array_slice($ids, 0, $cap) as $id) {
+        foreach (array_slice($ids, 0, 10) as $id) {
             if (! is_string($id) && ! is_int($id)) {
                 continue;
             }
@@ -65,7 +79,24 @@ final readonly class RecordReferenceResolver
         ];
     }
 
-    public function urlFor(string $entityType, string $recordId): ?string
+    /**
+     * The URL a chat tool payload cites for a record: the short
+     * `/r/{type}/{id}` redirect, rendered as a styled chip later. Every caller
+     * is constrained to CHIP_TYPES.
+     */
+    public function referenceUrl(string $entityType, string $recordId): string
+    {
+        return "/r/{$entityType}/{$recordId}";
+    }
+
+    /**
+     * @param  Team|null  $team  The tenant to build the panel URL against. Defaults to the
+     *                           authenticated user's current team. Pass the record's own team
+     *                           explicitly when the caller already resolved a specific record
+     *                           (e.g. the `/r/{type}/{id}` redirect) so a citation for a record
+     *                           in a non-current team still lands on that team's panel.
+     */
+    public function urlFor(string $entityType, string $recordId, ?Team $team = null): ?string
     {
         $authUser = auth()->user();
 
@@ -73,7 +104,7 @@ final readonly class RecordReferenceResolver
             return null;
         }
 
-        $team = $authUser->currentTeam;
+        $team ??= $authUser->currentTeam;
 
         if ($team === null) {
             return null;
