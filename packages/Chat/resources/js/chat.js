@@ -32,7 +32,7 @@ const flattenChipLabel = (label) => label
 // escaped data (`x-text`), never by interpolating a label into an HTML string
 // the way the markdown sweep below has to. Only the path data crosses over.
 const recordChipIcon = (type) =>
-    (Object.hasOwn(RECORD_CHIP_ICONS, type) ? RECORD_CHIP_ICONS[type] : null)
+    (Object.hasOwn(RECORD_CHIP_ICONS, type) ? RECORD_CHIP_ICONS[type] : '')
 
 const recordChipHtml = (type, href, label) =>
     `<a class="chat-chip" data-record-type="${type}" href="${href}">`

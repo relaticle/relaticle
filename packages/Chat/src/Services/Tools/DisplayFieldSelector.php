@@ -6,7 +6,6 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\CustomField;
 use App\Models\Team;
-use Illuminate\Database\Eloquent\Collection;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\QueryBuilders\CustomFieldQueryBuilder;
 
@@ -35,8 +34,11 @@ final readonly class DisplayFieldSelector
      */
     public function listFields(Team $team, string $entityType): array
     {
+        /** @var list<CustomField> $fields */
+        $fields = $this->baseQuery($team, $entityType)->visibleInList()->get()->all();
+
         return array_values(array_filter(
-            $this->narrow($this->baseQuery($team, $entityType)->visibleInList()->get()),
+            $fields,
             static fn (CustomField $field): bool => $field->settings->list_toggleable_hidden !== true,
         ));
     }
@@ -49,7 +51,10 @@ final readonly class DisplayFieldSelector
      */
     public function cardFields(Team $team, string $entityType): array
     {
-        return $this->narrow($this->baseQuery($team, $entityType)->visibleInView()->get());
+        /** @var list<CustomField> $fields */
+        $fields = $this->baseQuery($team, $entityType)->visibleInView()->get()->all();
+
+        return $fields;
     }
 
     /**
@@ -71,21 +76,5 @@ final readonly class DisplayFieldSelector
             // many rows at once: lazy loading here trips strict mode.
             ->with('options')
             ->orderBy('sort_order');
-    }
-
-    /**
-     * AppServiceProvider swaps the package's model for App\Models\CustomField,
-     * so this narrows rather than filters: the package declares its own generics
-     * against its base class and cannot see the swap.
-     *
-     * @param  Collection<int, BaseCustomField>  $fields
-     * @return list<CustomField>
-     */
-    private function narrow(Collection $fields): array
-    {
-        return array_values(array_filter(
-            $fields->all(),
-            static fn (BaseCustomField $field): bool => $field instanceof CustomField,
-        ));
     }
 }

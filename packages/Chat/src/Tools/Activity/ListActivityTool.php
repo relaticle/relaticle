@@ -25,7 +25,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * "What changed on this deal last week", answered from the activity log.
  *
  * @phpstan-type ChangeRow array{field: string, old: string|null, new: string|null}
- * @phpstan-type ActivityEntry array{at: string, by: string, event: string, record: array{type: string, id: string, name: string, url: string|null}, changes: list<ChangeRow>}
+ * @phpstan-type ActivityEntry array{at: string, by: string, event: string, record: array{type: string, id: string, name: string, url: string}, changes: list<ChangeRow>}
  */
 final readonly class ListActivityTool implements Tool
 {
@@ -492,9 +492,7 @@ final readonly class ListActivityTool implements Tool
 
     private function occurredAt(User $user, Activity $activity): Carbon
     {
-        $timezone = $user->timezone ?? (string) config('app.timezone');
-
-        return Date::parse($activity->created_at)->setTimezone($timezone);
+        return Date::parse($activity->created_at)->setTimezone($user->effectiveTimezone());
     }
 
     private function causerName(Activity $activity): string

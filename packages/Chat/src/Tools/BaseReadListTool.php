@@ -268,7 +268,7 @@ abstract class BaseReadListTool implements Tool
     /**
      * @param  list<Model>  $records
      * @param  list<CustomField>  $fields
-     * @return list<array{id: string, url: string|null, cells: array<string, string>}>
+     * @return list<array{id: string, url: string, cells: array<string, string>}>
      */
     private function blockRows(array $records, array $fields, string $coreKey): array
     {

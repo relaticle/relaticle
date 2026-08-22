@@ -54,10 +54,6 @@ final readonly class ChatController
      */
     private const int SEARCH_MATCH_LIMIT = 20;
 
-    private const int SNIPPET_LEAD = 40;
-
-    private const int SNIPPET_LENGTH = 160;
-
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
@@ -509,17 +505,10 @@ final readonly class ChatController
      */
     private function snippet(string $content, string $needle): string
     {
-        $text = trim((string) preg_replace('/\s+/u', ' ', $content));
-        $needle = trim((string) preg_replace('/\s+/u', ' ', $needle));
+        $text = Str::squish($content);
 
-        $position = $needle === '' ? false : mb_stripos($text, $needle);
-        $start = $position === false ? 0 : max(0, $position - self::SNIPPET_LEAD);
-
-        $excerpt = mb_substr($text, $start, self::SNIPPET_LENGTH);
-
-        return ($start > 0 ? '…' : '')
-            .$excerpt
-            .($start + mb_strlen($excerpt) < mb_strlen($text) ? '…' : '');
+        return Str::excerpt($text, Str::squish($needle), ['radius' => 60, 'omission' => '…'])
+            ?? Str::limit($text, 160, '…');
     }
 
     public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse

@@ -36,7 +36,7 @@
                                          Livewire page, and the chip family is plain navigation. --}}
                                     <a class="chat-chip" :data-record-type="blockRowType(block, row)" :href="row.url">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" :d="blockChipIcon(blockRowType(block, row))"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(blockRowType(block, row))"></path>
                                         </svg>
                                         <span class="chat-chip-label" x-text="blockCell(row, column)"></span>
                                     </a>

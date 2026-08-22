@@ -24,10 +24,10 @@ use Throwable;
 final readonly class RecordReferenceResolver
 {
     /**
-     * Entity types the render-time chip sweep will style as chips. These get
-     * the short `/r/{type}/{id}` redirect URL; every other type
-     * (e.g. custom_field, which has no per-record route) keeps the
-     * absolute panel URL from `urlFor()`.
+     * Entity types the render-time chip sweep will style as chips, and the
+     * only types `referenceUrl()` is ever asked for. Every other type
+     * (e.g. custom_field, which has no per-record route) is reached through
+     * `urlFor()`'s absolute panel URL instead.
      *
      * Public because it is the list both render pipelines are held to: every
      * type here needs an icon in `RecordChipRenderer` and in the matching JS
@@ -80,17 +80,13 @@ final readonly class RecordReferenceResolver
     }
 
     /**
-     * The URL a chat tool payload cites for a record. Chip-able types get the
-     * short `/r/{type}/{id}` redirect (rendered as a styled chip later);
-     * everything else falls back to the absolute panel URL.
+     * The URL a chat tool payload cites for a record: the short
+     * `/r/{type}/{id}` redirect, rendered as a styled chip later. Every caller
+     * is constrained to CHIP_TYPES.
      */
-    public function referenceUrl(string $entityType, string $recordId): ?string
+    public function referenceUrl(string $entityType, string $recordId): string
     {
-        if (in_array($entityType, self::CHIP_TYPES, true)) {
-            return "/r/{$entityType}/{$recordId}";
-        }
-
-        return $this->urlFor($entityType, $recordId);
+        return "/r/{$entityType}/{$recordId}";
     }
 
     /**
