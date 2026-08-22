@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
+use Relaticle\Chat\Http\Controllers\TranscribeController;
 
 Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(function (): void {
     Route::get('/r/{type}/{id}', RecordRedirectController::class)
@@ -37,6 +38,10 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     Route::post('/chat/conversations/{conversationId}/messages/supersede', [ChatController::class, 'supersedeMessages'])
         ->middleware('throttle:30,1')
         ->name('chat.messages.supersede');
+
+    Route::post('/chat/transcribe', TranscribeController::class)
+        ->middleware('throttle:10,1')
+        ->name('chat.transcribe');
 
     Route::post('/chat/messages/{messageId}/feedback', [MessageFeedbackController::class, 'store'])
         ->middleware('throttle:60,1')

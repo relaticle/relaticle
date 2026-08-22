@@ -104,6 +104,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Voice Input
+    |--------------------------------------------------------------------------
+    |
+    | Push-to-talk dictation in the composer. A recording is transcribed by the
+    | provider named in `ai.default_for_transcription` and the text is inserted
+    | at the cursor for the user to review. It is never sent on their behalf.
+    | The mic button additionally requires that provider to have a key, so an
+    | install without one shows no button at all (ModelRegistry::voiceInputAvailable()).
+    */
+
+    'voice_enabled' => (bool) env('CHAT_VOICE_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Custom Field Schema Caps
     |--------------------------------------------------------------------------
     |
