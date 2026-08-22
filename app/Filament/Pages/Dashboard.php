@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -113,6 +114,35 @@ final class Dashboard extends Page
         return $team
             ? resolve(MyTasksService::class)->forUser($user, $team)
             : new Collection;
+    }
+
+    #[Computed]
+    public function canCompleteTasks(): bool
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+        $team = $user->currentTeam;
+
+        return $team !== null && resolve(MyTasksService::class)->hasDoneOption($team);
+    }
+
+    public function completeTask(string $taskId): void
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+
+        // Scoped to the current tenant: the status custom field resolves against
+        // it, so a task from another of the user's teams would get a foreign
+        // field id written onto it. A row that no longer resolves (completed in
+        // another tab, deleted meanwhile) is not an error: the desired end state
+        // is already true, so just refresh instead of throwing a 404 over Home.
+        $task = Task::query()->where('team_id', Filament::getTenant()?->getKey())->find($taskId);
+
+        if ($task instanceof Task) {
+            resolve(CompleteTask::class)->execute($user, $task);
+        }
+
+        unset($this->myTasks);
     }
 
     public function getTasksIndexUrl(): string

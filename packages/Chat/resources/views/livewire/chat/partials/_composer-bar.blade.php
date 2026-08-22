@@ -23,7 +23,10 @@
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
 @endphp
 
-<div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] transition focus-within:border-primary-400 dark:focus-within:border-primary-500/60">
+<div
+    data-chat-composer
+    class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-[var(--surface-input-bg)] dark:focus-within:border-primary-500/60"
+>
     {{-- wire:ignore: TipTap mounts into this node imperatively; without it
          Livewire's morphdom wipes the editor on every chat-interface re-render
          (e.g. after the first message), leaving an empty, unusable composer. --}}
