@@ -332,7 +332,10 @@ export const streamModule = () => ({
         const assistantMsg = target ?? this.lastAssistantBubble();
         if (assistantMsg?.role !== 'assistant') return;
         try {
-            const authoritative = await this.$wire.latestAssistantMessage();
+            // Pass our own id: on the first turn of a new chat the conversation
+            // was created by send.js's fetch, so the server component's
+            // $conversationId is still null and it would hand back nothing.
+            const authoritative = await this.$wire.latestAssistantMessage(this.conversationId);
             if (!authoritative) return;
             // Capture the persisted id even when the text already matches —
             // feedback (thumbs) and supersede anchoring need it.
