@@ -30,11 +30,14 @@ mutates(ListConversationMessages::class);
  */
 function displayBlockInsertAssistantMessage(string $conversationId, User $user, string $content, array $blocks, int $secondsAgo): void
 {
-    $toolResults = array_map(static fn (array $block, int $index): array => [
+    // A null entry stands in for a tool call that emits no display_block
+    // (GetCrmSummaryTool): it still occupies a slot in the tool-call order
+    // the {{block:N}} markers are numbered by.
+    $toolResults = array_map(static fn (?array $block, int $index): array => [
         'id' => 'toolu_block_'.$index,
-        'name' => 'ListCompaniesTool',
+        'name' => $block === null ? 'GetCrmSummaryTool' : 'ListCompaniesTool',
         'arguments' => [],
-        'result' => json_encode(['data' => [], 'display_block' => $block]),
+        'result' => json_encode($block === null ? ['data' => []] : ['data' => [], 'display_block' => $block]),
     ], $blocks, array_keys($blocks));
 
     foreach (['user' => $content.' request', 'assistant' => $content] as $role => $text) {
@@ -248,6 +251,43 @@ it('honors markers separated by single newlines, the shape the model actually wr
     JS), true, 512, JSON_THROW_ON_ERROR);
 
     expect($shape['parts'])->toBe(['text:Here is ever', 'records_table', 'record_card', 'text:Enjoy!'])
+        ->and($shape['leaksMarker'])->toBeFalse();
+});
+
+it('resolves markers by tool-call order when a blockless tool was called first', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    // Tool call #1 (a summary) emits no block, so marker numbering (tool-call
+    // order, per the agent prompt) and block-array indices diverge: {{block:2}}
+    // is the FIRST block. Resolving markers by array index placed every block
+    // one slot off and dropped the last one (observed live).
+    displayBlockInsertAssistantMessage(
+        $conversationId,
+        $user,
+        "Overview first.\n\n{{block:2}}\n\n{{block:3}}\n\nDone.",
+        [null, displayBlockTableFixture(), displayBlockCardFixture('https://example.com/?ref=order')],
+        60,
+    );
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Overview first.');
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const bubble = document.querySelector('[data-assistant-bubble]');
+            const parts = Array.from(bubble.querySelectorAll('.prose, [data-block]'))
+                .map((el) => el.dataset.block ?? ('text:' + el.textContent.trim().slice(0, 12)));
+
+            return JSON.stringify({
+                parts,
+                leaksMarker: bubble.textContent.includes('{{block:'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($shape['parts'])->toBe(['text:Overview fir', 'records_table', 'record_card', 'text:Done.'])
         ->and($shape['leaksMarker'])->toBeFalse();
 });
 

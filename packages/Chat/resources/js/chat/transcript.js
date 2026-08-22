@@ -297,6 +297,18 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const html = msg.prerendered ? (msg.content || '') : window.renderMarkdown(msg.content || '');
         const stripStray = (chunk) => chunk.replace(/\{\{block:\d+\}\}/g, '');
 
+        // Marker N is the 1-based TOOL-CALL order (the prompt's definition),
+        // which server payloads carry as `n` on each block: a blockless tool
+        // called earlier in the turn (GetCrmSummaryTool) shifts the numbering
+        // away from this array's own indices, so resolving by index misplaced
+        // every later block. Payloads without `n` (older cached conversations)
+        // fall back to the index interpretation they were written under.
+        const blockIndexForMarker = (n) => {
+            const byOrder = blocks.findIndex((b) => b?.n === n);
+            if (byOrder !== -1) return byOrder;
+            return blocks.some((b) => b?.n !== undefined) ? -1 : n - 1;
+        };
+
         const segments = [];
         const placed = new Set();
         const re = /<p>\s*\{\{block:(\d+)\}\}\s*<\/p>/g;
@@ -304,7 +316,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         let match;
 
         while ((match = re.exec(html)) !== null) {
-            const idx = Number(match[1]) - 1;
+            const idx = blockIndexForMarker(Number(match[1]));
             const before = stripStray(html.slice(last, match.index));
             if (before.trim() !== '') segments.push({ type: 'html', html: before });
             if (idx >= 0 && idx < blocks.length && !placed.has(idx)) {

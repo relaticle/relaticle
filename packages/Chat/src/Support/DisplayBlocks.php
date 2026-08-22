@@ -36,7 +36,7 @@ final readonly class DisplayBlocks
 
         $blocks = [];
 
-        foreach ($parsed as $toolResult) {
+        foreach (array_values($parsed) as $callIndex => $toolResult) {
             if (! is_array($toolResult) || ! isset($toolResult['result'])) {
                 continue;
             }
@@ -44,7 +44,14 @@ final readonly class DisplayBlocks
             $inner = json_decode((string) $toolResult['result'], true);
 
             if (is_array($inner) && is_array($inner[self::KEY] ?? null)) {
-                $blocks[] = $inner[self::KEY];
+                // `n` is the 1-based TOOL-CALL order, the numbering the agent
+                // prompt defines for {{block:N}} placement markers. It differs
+                // from this list's own index whenever a blockless tool (e.g.
+                // GetCrmSummaryTool) was called earlier in the same turn, so
+                // resolving markers by list index misplaces every later block
+                // (observed live: markers 2-6 after a summary call, all off by
+                // one and the last dropped). messageSegments() resolves by `n`.
+                $blocks[] = [...$inner[self::KEY], 'n' => $callIndex + 1];
             }
         }
 
