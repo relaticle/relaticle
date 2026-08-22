@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Scribe\OpenApi\ErrorResponsesGenerator;
 use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
 use Knuckles\Scribe\Config\AuthIn;
 use Knuckles\Scribe\Config\Defaults;
@@ -27,7 +28,13 @@ return [
     'intro_text' => <<<'INTRO'
     Welcome to the Relaticle API documentation. This API follows the [JSON:API](https://jsonapi.org/) specification.
 
-    All endpoints require authentication via Bearer token. Generate an access token from **Settings > Access Tokens** in the Relaticle app.
+    All endpoints require authentication via Bearer token. Generate an access token from **Settings > Access Tokens** in the Relaticle app. Tokens carry scoped abilities (`read`, `create`, `update`, `delete`) that map to the HTTP method of each request.
+
+    The API is versioned in the URL path (`/v1/`). Breaking changes ship under a new path version; the previous version keeps working for at least six months after the new one is announced.
+
+    Limits are 600 requests per minute per workspace, and per token 300 reads and 60 writes per minute. Every authenticated response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. When a limit is exceeded the API returns `429` with a `Retry-After` header giving the seconds to wait.
+
+    Errors use a consistent JSON envelope: `{"message": "..."}`, and validation failures (`422`) add an `errors` object keyed by field name.
     INTRO
     ,
     // The base URL displayed in the docs.
@@ -171,7 +178,9 @@ return [
 
         // Additional generators to use when generating the OpenAPI spec.
         // Should extend `Knuckles\Scribe\Writing\OpenApiSpecGenerators\OpenApiGenerator`.
-        'generators' => [],
+        'generators' => [
+            ErrorResponsesGenerator::class,
+        ],
     ],
 
     'groups' => [
