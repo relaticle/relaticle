@@ -547,7 +547,7 @@ final readonly class PendingActionService
         ], $actions->all()));
     }
 
-    private function resolveActionLabel(PendingAction $action): ?string
+    public function resolveActionLabel(PendingAction $action): ?string
     {
         $display = $action->display_data;
         $data = $action->action_data;
@@ -742,7 +742,7 @@ final readonly class PendingActionService
         $incomingLower = array_keys($titleMap);
 
         foreach ($recent as $existing) {
-            $existingLower = $this->proposedTitles($existing->action_data);
+            $existingLower = array_keys($this->proposedTitleMap($existing->action_data));
             $overlap = array_intersect($incomingLower, $existingLower);
             if ($overlap !== []) {
                 $matchedLower = array_first($overlap);
@@ -784,17 +784,5 @@ final readonly class PendingActionService
         }
 
         return $map;
-    }
-
-    /**
-     * Returns lowercased titles for all records in the given action data.
-     * Used when checking existing proposals against incoming ones.
-     *
-     * @param  array<string, mixed>  $actionData
-     * @return list<string>
-     */
-    private function proposedTitles(array $actionData): array
-    {
-        return array_keys($this->proposedTitleMap($actionData));
     }
 }

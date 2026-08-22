@@ -41,11 +41,11 @@ final readonly class RecordReferenceResolver
      * @param  array<int|string, mixed>  $ids
      * @return list<array{id: string, type: string, url: string, label: string|null}>
      */
-    public function resolveMany(string $entityType, array $ids, int $cap = 10): array
+    public function resolveMany(string $entityType, array $ids): array
     {
         $refs = [];
 
-        foreach (array_slice($ids, 0, $cap) as $id) {
+        foreach (array_slice($ids, 0, 10) as $id) {
             if (! is_string($id) && ! is_int($id)) {
                 continue;
             }

@@ -487,28 +487,13 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function summarizeSuperseded(array $superseded): array
     {
-        return array_map(static function (PendingAction $action): array {
-            $data = $action->action_data;
-            $display = $action->display_data;
+        $pendingActions = resolve(PendingActionService::class);
 
-            $label = null;
-            foreach (['name', 'title'] as $field) {
-                if (isset($display[$field]) && is_string($display[$field]) && $display[$field] !== '') {
-                    $label = $display[$field];
-                    break;
-                }
-                if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
-                    $label = $data[$field];
-                    break;
-                }
-            }
-
-            return [
-                'operation' => $action->operation->value,
-                'entity_type' => $action->entity_type,
-                'label' => $label,
-            ];
-        }, $superseded);
+        return array_map(static fn (PendingAction $action): array => [
+            'operation' => $action->operation->value,
+            'entity_type' => $action->entity_type,
+            'label' => $pendingActions->resolveActionLabel($action),
+        ], $superseded);
     }
 
     /**
@@ -583,18 +568,25 @@ final class ProcessChatMessage implements ShouldQueue
         return $ledger;
     }
 
+    private function latestMessageId(string $role): ?string
+    {
+        $id = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $this->conversationId)
+            ->where('role', $role)
+            ->latest()
+            ->orderByDesc('id')
+            ->value('id');
+
+        return is_string($id) ? $id : null;
+    }
+
     private function persistMentions(): void
     {
         if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
 
-        $userMessageId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'user')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $userMessageId = $this->latestMessageId('user');
 
         if ($userMessageId === null) {
             return;
@@ -637,12 +629,7 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function persistUserDocument(): void
     {
-        $latestId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'user')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $latestId = $this->latestMessageId('user');
 
         if ($latestId === null) {
             return;
@@ -674,12 +661,7 @@ final class ProcessChatMessage implements ShouldQueue
 
         $document = $this->getParser()->buildFromText($assistantContent, [], $this->team);
 
-        $latestId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'assistant')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $latestId = $this->latestMessageId('assistant');
 
         if ($latestId === null) {
             return;

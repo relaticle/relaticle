@@ -12,7 +12,6 @@ use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TranscriptScope;
-use stdClass;
 
 final readonly class ListConversationMessages
 {
@@ -54,7 +53,21 @@ final readonly class ListConversationMessages
             ->get(['message_id', 'rating', 'category'])
             ->keyBy('message_id');
 
-        $pendingIds = $this->collectPendingActionIds($messages);
+        $envelopesByMessage = [];
+        $pendingIds = [];
+
+        foreach ($messages as $msg) {
+            $envelopes = $this->pendingActionEnvelopes($msg->tool_results === null ? null : (string) $msg->tool_results);
+            $envelopesByMessage[(string) $msg->id] = $envelopes;
+
+            foreach ($envelopes as $inner) {
+                if (isset($inner['pending_action_id'])) {
+                    $pendingIds[] = (string) $inner['pending_action_id'];
+                }
+            }
+        }
+
+        $pendingIds = array_values(array_unique($pendingIds));
 
         /** @var array<string, array{status: string, entity_type: ?string, result_data: ?array<string, mixed>}> $records */
         $records = $pendingIds === []
@@ -100,10 +113,7 @@ final readonly class ListConversationMessages
             // gaps, day separators, and the bubble tooltips, which were
             // already reading the wrong time before this fix).
             'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
-            'pending_actions' => $this->extractPendingActions(
-                $msg->tool_results === null ? null : (string) $msg->tool_results,
-                $records,
-            ),
+            'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
             'display_blocks' => DisplayBlocks::collect(
                 $msg->tool_results === null ? null : (string) $msg->tool_results,
             ),
@@ -135,44 +145,12 @@ final readonly class ListConversationMessages
     }
 
     /**
-     * @param  Collection<int, stdClass>  $messages
-     * @return list<string>
+     * The decoded `pending_action` envelopes inside a message's tool_results,
+     * parsed once and shared by the id collection and the card extraction.
+     *
+     * @return list<array<string, mixed>>
      */
-    private function collectPendingActionIds(Collection $messages): array
-    {
-        $ids = [];
-
-        foreach ($messages as $msg) {
-            $rawToolResults = $msg->tool_results ?? null;
-            $parsed = json_decode((string) ($rawToolResults ?? 'null'), true);
-
-            if (! is_array($parsed)) {
-                continue;
-            }
-
-            foreach ($parsed as $toolResult) {
-                if (! is_array($toolResult)) {
-                    continue;
-                }
-                if (! isset($toolResult['result'])) {
-                    continue;
-                }
-                $inner = json_decode((string) $toolResult['result'], true);
-
-                if (is_array($inner) && ($inner['type'] ?? null) === 'pending_action' && isset($inner['pending_action_id'])) {
-                    $ids[] = (string) $inner['pending_action_id'];
-                }
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * @param  array<string, array{status: string, entity_type: ?string, result_data: ?array<string, mixed>}>  $records
-     * @return array<int, mixed>
-     */
-    private function extractPendingActions(?string $toolResults, array $records): array
+    private function pendingActionEnvelopes(?string $toolResults): array
     {
         if ($toolResults === null) {
             return [];
@@ -184,23 +162,33 @@ final readonly class ListConversationMessages
             return [];
         }
 
-        $actions = [];
+        $envelopes = [];
 
         foreach ($parsed as $toolResult) {
-            if (! is_array($toolResult)) {
-                continue;
-            }
-            if (! isset($toolResult['result'])) {
-                continue;
-            }
-            $inner = json_decode((string) $toolResult['result'], true);
-            if (! is_array($inner)) {
-                continue;
-            }
-            if (($inner['type'] ?? null) !== 'pending_action') {
+            if (! is_array($toolResult) || ! isset($toolResult['result'])) {
                 continue;
             }
 
+            $inner = json_decode((string) $toolResult['result'], true);
+
+            if (is_array($inner) && ($inner['type'] ?? null) === 'pending_action') {
+                $envelopes[] = $inner;
+            }
+        }
+
+        return $envelopes;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $envelopes
+     * @param  array<string, array{status: string, entity_type: ?string, result_data: ?array<string, mixed>}>  $records
+     * @return array<int, mixed>
+     */
+    private function extractPendingActions(array $envelopes, array $records): array
+    {
+        $actions = [];
+
+        foreach ($envelopes as $inner) {
             $pendingId = (string) ($inner['pending_action_id'] ?? '');
             $info = $records[$pendingId] ?? null;
             $inner['status'] = $info['status'] ?? 'expired';
