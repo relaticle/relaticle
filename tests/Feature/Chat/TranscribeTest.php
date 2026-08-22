@@ -104,3 +104,25 @@ it('throttles after 10 requests a minute', function (): void {
 
     $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
 });
+
+/**
+ * The per-minute limiter alone leaves a hosted workspace free to dictate all day
+ * against a provider it pays for and reserves no credit against, so the daily one
+ * is the real spend ceiling. It is pinned here because a limiter nothing pins is
+ * a limiter that gets dropped: waiting out each minute has to stop working too,
+ * not just hammering one.
+ */
+it('throttles after 60 requests a day even when they are spread across minutes', function (): void {
+    Transcription::fake(['ok']);
+    Cache::flush();
+
+    for ($minute = 0; $minute < 6; $minute++) {
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertOk();
+        }
+
+        $this->travel(1)->minutes();
+    }
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
+});

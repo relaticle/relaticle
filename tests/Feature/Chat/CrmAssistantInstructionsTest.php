@@ -32,11 +32,19 @@ it('tells the model it can read a record\'s change history', function (): void {
     expect($instructions)->toContain('ListActivityTool');
 });
 
-it('tells the model its read results are rendered as a block under the reply', function (): void {
+/**
+ * Only the list tools, the show tools and ListActivityTool emit a display_block.
+ * SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool return plain JSON,
+ * so an unscoped "your read results are rendered as a block" plus Rule 3's ban on
+ * tables, bullet lists and per-record prose leaves the model no way to show a
+ * search hit at all: the user gets "I found 3 matches" over an empty screen.
+ */
+it('scopes the block claim to the read tools that emit one', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
         ->toContain('rendered as a table or card block under your reply')
+        ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
         ->toContain('ONE short lead-in sentence');
 });
 

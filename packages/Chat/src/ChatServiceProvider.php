@@ -45,6 +45,8 @@ final class ChatServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModelRegistry::class);
 
+        $this->registerRoutes();
+
         // Replace laravel/ai's store so superseded (regenerated/edited-away)
         // turns disappear from the agent's history, not just the UI.
         $this->app->singleton(ConversationStore::class, fn (): SupersededAwareConversationStore => new SupersededAwareConversationStore(
@@ -55,7 +57,6 @@ final class ChatServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerCommands();
-        $this->registerRoutes();
         $this->registerChannels();
         $this->registerViews();
         $this->registerLivewireComponents();
@@ -87,12 +88,36 @@ final class ChatServiceProvider extends ServiceProvider
         ]);
     }
 
+    /**
+     * Registered from register(), not boot(), and pinned to the app panel's own
+     * domain when there is one. Both halves are load-bearing in production,
+     * where the panel is subdomain-routed (APP_PANEL_DOMAIN) and its tenant
+     * routes lose the "/app" prefix: `{tenant:slug}/{resource}/{record}` then
+     * reads `/r/people/{id}` as tenant "r" plus the People resource, and every
+     * chip in a transcript 404s.
+     *
+     * - RouteCollection::get() returns every domain route ahead of every
+     *   domainless one, so an unqualified chat route loses to the panel no
+     *   matter which provider registered first.
+     * - Filament registers panel routes from its own vendor provider's boot(),
+     *   which runs before every app provider's boot(), so a chat route added
+     *   during boot is always the later of the two.
+     *
+     * Both "r" and "chat" are reserved team slugs, so no legitimate tenant URL
+     * can live under either prefix and winning the match here is correct.
+     * tests/Feature/Routing/AppPanelRoutingTest.php pins both routing modes.
+     */
     private function registerRoutes(): void
     {
-        Route::middleware('web')
-            ->group(function (): void {
-                $this->loadRoutesFrom(__DIR__.'/../routes/chat.php');
-            });
+        $route = Route::middleware('web');
+
+        if (is_string($domain = config('app.app_panel_domain')) && $domain !== '') {
+            $route->domain($domain);
+        }
+
+        $route->group(function (): void {
+            $this->loadRoutesFrom(__DIR__.'/../routes/chat.php');
+        });
     }
 
     private function registerChannels(): void
