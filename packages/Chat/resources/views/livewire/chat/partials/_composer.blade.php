@@ -36,7 +36,7 @@
             <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary-50 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-primary-700 ring-1 ring-inset ring-primary-600/20 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/30">
                 <span class="shrink-0" x-html="pageContextIcon()"></span>
 
-                <span class="truncate" x-text="pageContextLabel"></span>
+                <span class="truncate" :title="pageContextLabel" x-text="pageContextLabel"></span>
 
                 <button
                     type="button"

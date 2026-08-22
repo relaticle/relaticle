@@ -189,32 +189,36 @@
                 const startX = e.clientX;
                 const startWidth = this.width;
 
-                const onMouseMove = (moveEvent) => {
+                {{-- Pointer events + capture: works for touch/pen too, and the
+                     drag can never strand over an iframe or outside the window. --}}
+                try { e.target.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
+
+                const onPointerMove = (moveEvent) => {
                     const delta = startX - moveEvent.clientX;
                     this.width = Math.max(this.minWidth, Math.min(this.maxWidth, startWidth + delta));
                 };
 
-                const onMouseUp = () => {
+                const onPointerUp = () => {
                     this.resizing = false;
                     try { localStorage.setItem('chat-panel-width', this.width.toString()); } catch (_) { /* ignore */ }
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
+                    document.removeEventListener('pointermove', onPointerMove);
+                    document.removeEventListener('pointerup', onPointerUp);
                 };
 
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('pointermove', onPointerMove);
+                document.addEventListener('pointerup', onPointerUp);
             }
         }"
         x-show="open"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="translate-x-full"
-        x-transition:enter-end="translate-x-0"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="translate-x-0"
-        x-transition:leave-end="translate-x-full"
+        x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200"
+        x-transition:enter-start="motion-safe:translate-x-full"
+        x-transition:enter-end="motion-safe:translate-x-0"
+        x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-150"
+        x-transition:leave-start="motion-safe:translate-x-0"
+        x-transition:leave-end="motion-safe:translate-x-full"
         x-cloak
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
         aria-label="{{ __('Chat side panel') }}"
         tabindex="-1"
         class="fixed inset-y-0 right-0 z-50 flex max-w-full"
@@ -224,9 +228,11 @@
         {{-- Resize Handle: a grabbable strip that stays invisible, so the panel's
              own 1px border is the only line the eye sees. --}}
         <div
-            @mousedown="startResize($event)"
-            class="w-1 cursor-col-resize bg-transparent transition-colors hover:bg-primary-400/60"
+            @pointerdown="startResize($event)"
+            x-show="viewportWidth >= 640"
+            class="w-1 cursor-col-resize bg-transparent transition-colors hover:bg-primary-400/60 dark:hover:bg-primary-500/60"
             :class="{ 'bg-primary-500/80': resizing }"
+            aria-hidden="true"
         ></div>
 
         {{-- Panel Content --}}
@@ -256,9 +262,9 @@
                         <div
                             x-show="historyOpen"
                             x-cloak
-                            x-transition:enter="transition ease-out duration-100"
-                            x-transition:enter-start="opacity-0 scale-95"
-                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-100"
+                            x-transition:enter-start="motion-safe:opacity-0 motion-safe:scale-95"
+                            x-transition:enter-end="motion-safe:opacity-100 motion-safe:scale-100"
                             role="dialog"
                             aria-label="{{ __('Chat history') }}"
                             class="absolute end-0 z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
@@ -306,8 +312,9 @@
                                     <button
                                         type="button"
                                         @click="selectConversation(item.id)"
-                                        class="flex w-full items-center gap-2 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                        class="flex w-full items-center gap-2 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                                         :class="{ 'bg-gray-50 font-medium dark:bg-white/5': item.id === currentConversationId }"
+                                        :aria-current="item.id === currentConversationId ? 'true' : null"
                                     >
                                         <x-heroicon-o-chat-bubble-left class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                         <span class="truncate" x-text="item.title || @js(__('Untitled chat'))" :title="item.title || @js(__('Untitled chat'))"></span>
@@ -334,9 +341,9 @@
                         <div
                             x-show="menuOpen"
                             x-cloak
-                            x-transition:enter="transition ease-out duration-100"
-                            x-transition:enter-start="opacity-0 scale-95"
-                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-100"
+                            x-transition:enter-start="motion-safe:opacity-0 motion-safe:scale-95"
+                            x-transition:enter-end="motion-safe:opacity-100 motion-safe:scale-100"
                             role="menu"
                             aria-label="{{ __('Chat actions') }}"
                             class="absolute end-0 z-20 mt-1.5 w-56 origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
@@ -346,7 +353,7 @@
                                 role="menuitem"
                                 @click="openInFullPage()"
                                 x-show="fullPageUrl()"
-                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                             >
                                 <x-heroicon-o-arrows-pointing-out class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                 {{ __('Open in full page') }}
@@ -357,7 +364,7 @@
                                 role="menuitem"
                                 @click="copyConversationId()"
                                 x-show="currentConversationId"
-                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                             >
                                 <x-heroicon-o-document-duplicate class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                                 <span x-text="copied ? @js(__('Copied!')) : @js(__('Copy chat ID'))"></span>
@@ -370,7 +377,7 @@
                                 role="menuitem"
                                 @click="deleteCurrentConversation()"
                                 x-show="currentConversationId"
-                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-danger-600 transition hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10"
+                                class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-danger-600 transition hover:bg-danger-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-danger-500 dark:text-danger-400 dark:hover:bg-danger-500/10"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Delete') }}

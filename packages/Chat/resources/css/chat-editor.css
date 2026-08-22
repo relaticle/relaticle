@@ -5,12 +5,12 @@
 .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     float: left;
-    color: rgb(156 163 175); /* gray-400 */
+    color: var(--color-gray-400);
     pointer-events: none;
     height: 0;
 }
 .dark .ProseMirror p.is-editor-empty:first-child::before {
-    color: rgb(107 114 128); /* gray-500 */
+    color: var(--color-gray-500);
 }
 
 /* Mention chips inside the editor — match the existing chip styling so

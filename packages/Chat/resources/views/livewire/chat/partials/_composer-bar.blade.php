@@ -23,7 +23,7 @@
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
 @endphp
 
-<div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] transition focus-within:border-primary-500">
+<div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] transition focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20">
     {{-- wire:ignore: TipTap mounts into this node imperatively; without it
          Livewire's morphdom wipes the editor on every chat-interface re-render
          (e.g. after the first message), leaving an empty, unusable composer. --}}
@@ -61,6 +61,15 @@
                     })"
                     class="contents"
                 >
+                    {{-- Elapsed readout: the 2-minute auto-stop must not arrive
+                         unannounced. tabular-nums keeps the tick from jittering. --}}
+                    <span
+                        x-show="recording"
+                        x-cloak
+                        x-text="recordingElapsed()"
+                        class="text-[length:var(--text-micro)] font-medium tabular-nums text-red-600 dark:text-red-400"
+                        aria-hidden="true"
+                    ></span>
                     <button
                         type="button"
                         x-on:click="toggleRecording()"
@@ -68,7 +77,8 @@
                         :aria-pressed="recording"
                         :aria-label="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
                         :title="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
-                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition disabled:cursor-progress"
+                        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress"
+                        :aria-busy="transcribing"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'
                             : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white'"
@@ -86,7 +96,7 @@
                         x-show="voiceError"
                         x-cloak
                         role="alert"
-                        class="absolute bottom-full left-0 mb-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+                        class="absolute bottom-full start-0 mb-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
                     >
                         <span x-text="voiceError"></span>
                         <button

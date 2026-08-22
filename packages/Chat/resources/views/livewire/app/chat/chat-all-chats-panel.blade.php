@@ -47,12 +47,12 @@
         {{-- Panel body --}}
         <div
             @click.outside="if (open) $wire.close()"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="-translate-x-full"
-            x-transition:enter-end="translate-x-0"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="translate-x-0"
-            x-transition:leave-end="-translate-x-full"
+            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200"
+            x-transition:enter-start="motion-safe:-translate-x-full"
+            x-transition:enter-end="motion-safe:translate-x-0"
+            x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-150"
+            x-transition:leave-start="motion-safe:translate-x-0"
+            x-transition:leave-end="motion-safe:-translate-x-full"
             class="relative flex flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
             {{-- Header --}}
@@ -83,13 +83,19 @@
             </div>
 
             {{-- Search --}}
-            <div class="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+            <div class="relative border-b border-gray-200 px-3 py-2 dark:border-gray-700">
                 <input
                     type="search"
                     wire:model.live.debounce.250ms="search"
                     placeholder="{{ __('Search chats...') }}"
                     aria-label="{{ __('Search chats') }}"
-                    class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 pe-8 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                />
+                <x-heroicon-o-arrow-path
+                    wire:loading
+                    wire:target="search"
+                    class="absolute end-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 motion-safe:animate-spin"
+                    aria-hidden="true"
                 />
             </div>
 
@@ -169,10 +175,10 @@
                                     href="{{ $chatUrl }}"
                                     wire:navigate
                                     @click="$wire.close()"
-                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                                 >
                                     <x-heroicon-o-chat-bubble-left class="h-4 w-4 text-gray-400" />
-                                    <span data-title class="truncate pe-16">{{ $displayTitle }}</span>
+                                    <span data-title title="{{ $rawTitle }}" class="truncate pe-16">{{ $displayTitle }}</span>
                                 </a>
                             </template>
 
@@ -190,7 +196,7 @@
                                         x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                         maxlength="255"
                                         aria-label="{{ __('Rename chat') }}"
-                                        class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                     />
                                 </form>
                             </template>

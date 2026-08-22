@@ -1113,7 +1113,18 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
 
         if (e.key === 'Escape') {
-            if (!this.switcherOpen && !this.searchOpen && !this.searchJumping) return;
+            if (!this.switcherOpen && !this.searchOpen && !this.searchJumping) {
+                // Nothing overlay-like open: Escape stops an active generation
+                // (the ChatGPT/Claude convention). Guarded to this full-page
+                // context by the top of this handler, so the side panel keeps
+                // its own Escape-closes-panel behaviour.
+                if (this.isStreaming) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.cancelStream();
+                }
+                return;
+            }
             e.preventDefault();
             // Stops the side panel's own window-level Escape handler from also
             // acting on this same keypress (it closes the panel/its dropdowns

@@ -1,9 +1,9 @@
 {{-- In-conversation search overlay: Cmd+F / Ctrl+F (see onChatRootKeydown() in
      transcript.js). Deliberately identical in shape and interaction to
-     _switcher.blade.php (same panel chrome, same Esc kbd, same listbox
-     semantics, arrows + Enter) so the two overlays read as one pattern. Also
-     a normal, non-teleported descendant of the chat root for the same reason:
-     keydowns inside it must keep bubbling to the root's x-on:keydown. --}}
+     _switcher.blade.php (same panel chrome, same Esc kbd, same combobox and
+     listbox semantics, arrows + Enter) so the two overlays read as one pattern.
+     Also a normal, non-teleported descendant of the chat root for the same
+     reason: keydowns inside it must keep bubbling to the root's x-on:keydown. --}}
 <div
     x-show="searchOpen"
     x-cloak
@@ -12,12 +12,12 @@
     role="dialog"
     aria-modal="true"
     aria-label="{{ __('Search this conversation') }}"
-    x-transition:enter="transition ease-out duration-150"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-100"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
+    x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
+    x-transition:enter-start="motion-safe:opacity-0"
+    x-transition:enter-end="motion-safe:opacity-100"
+    x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-100"
+    x-transition:leave-start="motion-safe:opacity-100"
+    x-transition:leave-end="motion-safe:opacity-0"
 >
     <div class="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
         <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
@@ -27,6 +27,10 @@
                 x-model="searchQuery"
                 x-on:input="onMessageSearchInput()"
                 type="search"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="chat-message-search-options"
+                :aria-activedescendant="searchResults.length > 0 ? ('chat-message-search-option-' + searchActiveIndex) : null"
                 placeholder="{{ __('Search this conversation...') }}"
                 aria-label="{{ __('Search this conversation') }}"
                 class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 dark:text-white"
@@ -34,10 +38,12 @@
             <kbd class="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium text-gray-400 sm:inline dark:border-gray-600">Esc</kbd>
         </div>
 
-        <div class="max-h-80 overflow-y-auto py-1" role="listbox" aria-label="{{ __('Matching messages') }}">
-            {{-- Dead end for the hit the user picked: either it is gone, or the
-                 history walk that was fetching it never came back. Either way
-                 the remaining rows below stay listed and clickable. --}}
+        <div class="max-h-80 overflow-y-auto py-1">
+            {{-- Status rows live OUTSIDE the listbox: role=status children are
+                 invalid listbox content and corrupt the announced option count.
+                 First branch is the dead end for the hit the user picked: either
+                 it is gone, or the history walk that was fetching it never came
+                 back. Either way the remaining rows stay listed and clickable. --}}
             <template x-if="messageSearchNotice()">
                 <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400" role="status" x-text="messageSearchNotice()"></p>
             </template>
@@ -59,20 +65,23 @@
                 </p>
             </template>
 
-            <template x-for="(match, idx) in searchResults" :key="match.message_id">
-                <button
-                    type="button"
-                    role="option"
-                    x-on:click="jumpToMessage(match.message_id)"
-                    x-on:mouseenter="searchActiveIndex = idx"
-                    :aria-selected="idx === searchActiveIndex"
-                    class="flex w-full items-start gap-2 px-3 py-2 text-start text-sm text-gray-700 transition dark:text-gray-200"
-                    :class="idx === searchActiveIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
-                >
-                    <x-heroicon-o-chat-bubble-left class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                    <span class="line-clamp-2 [overflow-wrap:anywhere]" x-text="match.snippet"></span>
-                </button>
-            </template>
+            <div id="chat-message-search-options" role="listbox" aria-label="{{ __('Matching messages') }}">
+                <template x-for="(match, idx) in searchResults" :key="match.message_id">
+                    <button
+                        type="button"
+                        role="option"
+                        :id="'chat-message-search-option-' + idx"
+                        x-on:click="jumpToMessage(match.message_id)"
+                        x-on:mouseenter="searchActiveIndex = idx"
+                        :aria-selected="idx === searchActiveIndex"
+                        class="flex w-full items-start gap-2 px-3 py-2 text-start text-sm text-gray-700 transition focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200"
+                        :class="idx === searchActiveIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
+                    >
+                        <x-heroicon-o-chat-bubble-left class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                        <span class="line-clamp-2 [overflow-wrap:anywhere]" x-text="match.snippet"></span>
+                    </button>
+                </template>
+            </div>
         </div>
     </div>
 </div>

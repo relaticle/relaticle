@@ -3,12 +3,22 @@
         label: 'Chats',
         onKeydown(e) {
             const tag = e.target?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+            {{-- Bare keys must never fire while a dialog, dropdown, or the chat
+                 side panel owns the interaction. getComputedStyle (not
+                 offsetParent, which is always null for position:fixed) detects
+                 the panel's x-show display:none state. --}}
+            if (e.target?.closest?.('[role="dialog"], [role="menu"], [role="listbox"], .fi-modal')) return;
+            const sidePanel = document.querySelector('[data-chat-side-panel]');
+            if (sidePanel && getComputedStyle(sidePanel).display !== 'none') return;
+            if (document.querySelector('.fi-modal-open')) return;
 
             if (e.key === 'n') {
                 e.preventDefault();
-                window.location = @js(\App\Filament\Pages\Dashboard::getUrl());
+                window.Livewire?.navigate
+                    ? window.Livewire.navigate(@js(\App\Filament\Pages\Dashboard::getUrl()))
+                    : (window.location = @js(\App\Filament\Pages\Dashboard::getUrl()));
                 return;
             }
 
@@ -153,6 +163,7 @@
                                 x-transition:enter="fi-transition-enter"
                                 x-transition:enter-start="fi-transition-enter-start"
                                 x-transition:enter-end="fi-transition-enter-end"
+                                title="{{ $rawTitle }}"
                                 class="fi-sidebar-item-label truncate"
                             >
                                 {{ $displayTitle }}
@@ -174,7 +185,7 @@
                                 x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                 maxlength="255"
                                 aria-label="{{ __('Rename chat') }}"
-                                class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             />
                         </form>
                     </template>

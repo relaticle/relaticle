@@ -230,6 +230,20 @@
                                 <div class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                     <button
                                         type="button"
+                                        x-on:click="copyMessage(msg)"
+                                        :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
+                                        :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                    >
+                                        <template x-if="copiedKey === msg.clientKey">
+                                            <x-heroicon-s-check class="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
+                                        </template>
+                                        <template x-if="copiedKey !== msg.clientKey">
+                                            <x-heroicon-o-document-duplicate class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </template>
+                                    </button>
+                                    <button
+                                        type="button"
                                         data-edit-button
                                         x-on:click="(canEdit(index) && rateLimit === null) && startEdit(msg, index)"
                                         :disabled="!canEdit(index) || rateLimit !== null"
@@ -245,13 +259,16 @@
                     </div>
                 </template>
 
-                {{-- Assistant message --}}
+                {{-- Assistant message: flat on the canvas, no bubble. Long-form
+                     markdown (headings, tables, code) reads better unconstrained,
+                     which is the layout ChatGPT/Claude/Attio converged on; the
+                     user bubble opposite keeps who-said-what scanning. --}}
                 <template x-if="msg.role === 'assistant' && (msg.rendered || msg.content || msg.streamError || (index === messages.length - 1 && isStreaming && currentToolStatus))">
                     <div class="flex flex-col items-start" data-assistant-bubble :data-grouped="decorations(index).grouped">
                         <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
                                 :title="msg.created_at ? @js(__('Completed :time')).replace(':time', new Date(msg.created_at).toLocaleString()) : ''"
-                                class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
+                                class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
                             >
                                 <template x-if="msg.rendered && msg.prerendered">
                                     <div x-html="msg.content"></div>
@@ -278,7 +295,7 @@
                         <template x-if="msg.streamError">
                             <div class="mt-2 flex max-w-[85%] items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-700 dark:bg-amber-900/20" role="alert">
                                 <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                                <span class="flex-1 text-xs text-amber-800 dark:text-amber-200" x-text="msg.streamError"></span>
+                                <span class="flex-1 text-xs text-amber-800 [overflow-wrap:anywhere] dark:text-amber-200" x-text="msg.streamError"></span>
                                 <button
                                     type="button"
                                     data-retry-button
@@ -296,7 +313,7 @@
                              displayBlocks() has already dropped any type this build
                              does not know (see chat/blocks.js). --}}
                         <template x-for="(block, blockIdx) in displayBlocks(msg)" :key="blockIdx">
-                            <div class="mt-3 w-full max-w-[85%]">
+                            <div class="mt-3 w-full">
                                 <template x-if="block.block === 'records_table'">
                                     @include('chat::livewire.chat.partials._block-records-table')
                                 </template>
@@ -385,7 +402,7 @@
 
                         {{-- Thumbs-down detail funnel: category chips + optional comment --}}
                         <template x-if="msg.feedbackPanelOpen">
-                            <div class="mt-2 w-full max-w-[85%] rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+                            <div class="mt-2 w-full max-w-[85%] rounded-xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] p-3">
                                 <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ __('What went wrong?') }}</p>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     <template x-for="cat in feedbackCategories" :key="cat.value">
@@ -393,7 +410,8 @@
                                             type="button"
                                             x-on:click="msg.feedbackCategory = (msg.feedbackCategory === cat.value ? null : cat.value)"
                                             x-text="cat.label"
-                                            class="rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                                            :aria-pressed="msg.feedbackCategory === cat.value"
+                                            class="rounded-full border px-3 py-1.5 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                             :class="msg.feedbackCategory === cat.value
                                                 ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
                                                 : 'border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] text-gray-600 hover:border-gray-300 dark:text-gray-300'"
@@ -406,7 +424,7 @@
                                     maxlength="1000"
                                     placeholder="{{ __('Tell us more (optional)') }}"
                                     aria-label="{{ __('Feedback details') }}"
-                                    class="mt-2 block w-full resize-none rounded-md border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                                    class="mt-2 block w-full resize-none rounded-md border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:ring-primary-500 dark:text-gray-100"
                                 ></textarea>
                                 <div class="mt-2 flex justify-end gap-2">
                                     <button
@@ -462,9 +480,11 @@
 
                                 {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
                                      derived from the persisted action by proposalOutcome(), not a stored message. --}}
+                                {{-- Flat status line, matching the flattened assistant text
+                                     it follows; the sparkles icon marks it as the agent's note. --}}
                                 <template x-if="action.status !== 'pending' && proposalOutcome(action)">
                                     <div class="flex justify-start">
-                                        <div class="inline-flex max-w-[85%] items-start gap-1.5 rounded-2xl rounded-bl-md bg-white px-3 py-2 text-sm text-gray-700 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700">
+                                        <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
                                             <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
                                             <span x-text="proposalOutcome(action)"></span>
                                         </div>
@@ -477,14 +497,13 @@
             </div>
         </template>
 
-        {{-- Pre-token streaming indicator: shimmer label inside an empty assistant bubble --}}
+        {{-- Pre-token streaming indicator: flat shimmer label where the
+             assistant's text will land --}}
         <template x-if="isStreaming && !currentToolStatus && (messages.length === 0 || messages[messages.length-1].role !== 'assistant' || !messages[messages.length-1].content)">
             <div class="flex justify-start" aria-label="{{ __('Assistant is thinking') }}" role="status">
-                <div class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
-                    <div data-chat-loading-indicator class="flex items-center gap-2 text-sm">
-                        <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
-                        <span data-chat-loading-label x-text="pendingLabel"></span>
-                    </div>
+                <div data-chat-loading-indicator class="flex items-center gap-2 px-1 py-2 text-sm text-gray-600 dark:text-gray-300">
+                    <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
+                    <span data-chat-loading-label x-text="pendingLabel"></span>
                 </div>
             </div>
         </template>

@@ -12,8 +12,10 @@
         <span class="text-xs font-semibold text-gray-700 dark:text-gray-200" x-text="blockTitle(block)"></span>
     </div>
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+    {{-- tabindex + role=region: a wide table scrolls horizontally, and a
+         keyboard user can only scroll a focusable region. --}}
+    <div class="overflow-x-auto" tabindex="0" role="region" :aria-label="blockTitle(block)">
+        <table class="w-full text-start text-sm" :aria-label="blockTitle(block)">
             <thead>
                 <tr>
                     <template x-for="column in (block.columns || [])" :key="column.key">
@@ -25,7 +27,7 @@
                     </template>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+            <tbody class="divide-y divide-[var(--surface-card-border)]">
                 <template x-for="row in (block.rows || [])" :key="row.id">
                     <tr>
                         <template x-for="column in (block.columns || [])" :key="column.key">
@@ -41,7 +43,7 @@
                                     </a>
                                 </template>
                                 <template x-if="!blockCellLinksRecord(block, row, column)">
-                                    <span class="block truncate" x-text="blockCell(row, column)"></span>
+                                    <span class="block truncate" :title="blockCell(row, column)" x-text="blockCell(row, column)"></span>
                                 </template>
                             </td>
                         </template>
@@ -49,6 +51,10 @@
                 </template>
             </tbody>
         </table>
+
+        <template x-if="(block.rows || []).length === 0">
+            <p class="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">{{ __('No records to show.') }}</p>
+        </template>
     </div>
 
     <template x-if="blockHasMore(block)">

@@ -16,7 +16,9 @@
         </script>
     @endunless
 
-    <div class="-mx-6 -mb-6 flex flex-1 flex-col" style="height: calc(100vh - 10rem);">
+    {{-- dvh, not vh: mobile browser toolbars shrink the visual viewport and
+         100vh would push the composer under them. --}}
+    <div class="-mx-6 -mb-6 flex flex-1 flex-col" style="height: calc(100dvh - 10rem);">
         <livewire:chat.chat-interface
             :conversation-id="$conversationId"
             :initial-message="$initialMessage"

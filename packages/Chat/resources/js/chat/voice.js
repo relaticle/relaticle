@@ -27,6 +27,16 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
         recording: false,
         transcribing: false,
         voiceError: null,
+        // Elapsed seconds while recording, for the mm:ss readout next to the
+        // mic: without it the 2-minute auto-stop arrives unannounced.
+        recordingSeconds: 0,
+        _elapsedTimer: null,
+
+        recordingElapsed() {
+            const m = Math.floor(this.recordingSeconds / 60);
+            const s = String(this.recordingSeconds % 60).padStart(2, '0');
+            return `${m}:${s}`;
+        },
 
         // Kept off the reactive surface deliberately: a MediaRecorder wrapped
         // in Alpine's proxy loses its native `this` on the event callbacks.
@@ -49,6 +59,7 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
         destroy() {
             this._destroyed = true;
             clearTimeout(this._stopTimer);
+            clearInterval(this._elapsedTimer);
             this._recorder?.stream?.getTracks().forEach((track) => track.stop());
             this._recorder = null;
         },
@@ -98,6 +109,7 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
 
             recorder.onstop = () => {
                 clearTimeout(this._stopTimer);
+                clearInterval(this._elapsedTimer);
                 // Without this the browser keeps the tab's recording indicator
                 // lit (and the mic hot) until the page is closed.
                 stream.getTracks().forEach((track) => track.stop());
@@ -110,8 +122,10 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
 
             this._recorder = recorder;
             this.recording = true;
+            this.recordingSeconds = 0;
             recorder.start();
 
+            this._elapsedTimer = setInterval(() => { this.recordingSeconds++; }, 1000);
             this._stopTimer = setTimeout(() => this._recorder?.stop(), MAX_RECORDING_MS);
         },
 

@@ -5,6 +5,13 @@
      localStorage (the full chat persists, the dashboard does not). --}}
 currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
 currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
+{{-- Null when billing is off or no tenant is bound (tenant-less pages/tests):
+     the locked-model hint then renders without a link. --}}
+upgradeUrl: @js(
+    (\Laravel\Pennant\Feature::active(\App\Features\Billing::class) && auth()->user()?->currentTeam !== null)
+        ? \App\Filament\Pages\Billing::getUrl(panel: 'app', tenant: auth()->user()->currentTeam)
+        : null
+),
 allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
 modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 ...window.ChatModules.modelPickerModule({

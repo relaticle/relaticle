@@ -40,19 +40,23 @@
                             type="button"
                             wire:click="stepPrev"
                             @disabled($position <= 1)
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
                             aria-label="{{ __('Previous record') }}"
                         >
                             <x-heroicon-o-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
 
-                        <span class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500">{{ $position }}&hairsp;/&hairsp;{{ $remainingCount }}</span>
+                        <span
+                            class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500"
+                            aria-live="polite"
+                            aria-label="{{ __('Record :position of :total', ['position' => $position, 'total' => $remainingCount]) }}"
+                        >{{ $position }}&hairsp;/&hairsp;{{ $remainingCount }}</span>
 
                         <button
                             type="button"
                             wire:click="stepNext"
                             @disabled($position >= $remainingCount)
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
+                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
                             aria-label="{{ __('Next record') }}"
                         >
                             <x-heroicon-o-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
@@ -154,7 +158,7 @@
                                     <button
                                         type="button"
                                         wire:click="editField(@js($code))"
-                                        class="ml-auto inline-flex shrink-0 items-center justify-center rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-gray-600 group-hover/field:opacity-100 focus-visible:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
+                                        class="ms-auto inline-flex shrink-0 items-center justify-center rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 group-hover/field:opacity-100 focus-visible:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
                                         aria-label="{{ __('Edit :field', ['field' => $row['label'] ?? '']) }}"
                                     >
                                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
@@ -179,8 +183,9 @@
                     wire:click="discardCurrent"
                     wire:loading.attr="disabled"
                     @disabled($editingFieldCode !== null)
+                    @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
+                        'inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
@@ -192,17 +197,22 @@
                     wire:click="createCurrent"
                     wire:loading.attr="disabled"
                     @disabled($editingFieldCode !== null)
+                    @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
-                        'bg-red-600 hover:bg-red-500' => $operation === 'delete',
-                        'bg-primary-600 hover:bg-primary-500' => $operation !== 'delete',
+                        'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
+                        'bg-red-600 hover:bg-red-500 focus-visible:outline-red-500' => $operation === 'delete',
+                        'bg-primary-600 hover:bg-primary-500 focus-visible:outline-primary-500' => $operation !== 'delete',
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="createCurrent" aria-hidden="true" />
+                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 motion-safe:animate-spin" wire:loading wire:target="createCurrent" aria-hidden="true" />
                     <x-heroicon-o-check class="h-3.5 w-3.5" wire:loading.remove wire:target="createCurrent" aria-hidden="true" />
                     <span>{{ $createLabel }}</span>
-                    <kbd class="hidden rounded bg-white/20 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline">&#8984;&#9166;</kbd>
+                    <kbd
+                        x-data
+                        x-text="/Mac|iP/.test(navigator.platform) ? '\u2318\u23CE' : 'Ctrl+\u23CE'"
+                        class="hidden rounded bg-white/20 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
+                    ></kbd>
                 </button>
             </div>
         </div>

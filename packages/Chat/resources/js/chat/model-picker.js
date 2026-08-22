@@ -11,14 +11,16 @@ export function modelPickerModule({ providerIcons, persistSelection = false }) {
     return {
         providerIcons,
         selectedModel: 'auto',
+        // Set when a plan-locked option is clicked; the picker renders an
+        // inline upgrade hint (a silent no-op taught users the row was broken).
+        lockedModelHint: false,
 
         selectModel(value) {
             if (!this.allowedModels.includes(value)) {
-                window.dispatchEvent(new CustomEvent('chat:model-locked', {
-                    detail: { model: value, plan: this.currentPlan, planLabel: this.currentPlanLabel },
-                }));
+                this.lockedModelHint = true;
                 return;
             }
+            this.lockedModelHint = false;
             this.selectedModel = value;
             if (persistSelection) {
                 try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
@@ -41,7 +43,7 @@ export function modelPickerModule({ providerIcons, persistSelection = false }) {
 
         modelLabel(value) {
             const found = this.modelOptions.find((o) => o.value === value);
-            return (found || this.modelOptions[0]).label;
+            return (found ?? this.modelOptions[0])?.label ?? '';
         },
 
         modelProvider(value) {
