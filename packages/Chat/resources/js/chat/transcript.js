@@ -1380,6 +1380,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         if (!messageId) return;
 
         this.dismissMessageSearch();
+        // Parks focus on the composer (still inside the chat root) instead of
+        // leaving it stranded on the now-hidden search input, whose display:none
+        // drops focus to <body>, outside onChatRootKeydown's subtree, meaning
+        // Escape could never reach the handler to cancel this same walk.
+        this.restoreInputFocus();
         this.searchJumping = true;
 
         try {
