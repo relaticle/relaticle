@@ -115,9 +115,15 @@
                             x-data="{
                                 editing: false,
                                 renamed: '',
+                                saving: false,
+                                {{-- Blur commits, Escape cancels — mirrors the sidebar row,
+                                     including the post-save dispatches: without them a rename
+                                     here left the sidebar, page H1 and tab title stale. --}}
                                 async save() {
+                                    if (!this.editing || this.saving) return;
                                     const text = this.renamed.trim();
-                                    if (!text) { this.editing = false; return; }
+                                    if (!text || text === @js($rawTitle)) { this.editing = false; return; }
+                                    this.saving = true;
                                     try {
                                         const res = await fetch(@js($renameUrl), {
                                             method: 'POST',
@@ -132,8 +138,23 @@
                                             const body = await res.json();
                                             const titleEl = $el.querySelector('[data-title]');
                                             if (titleEl) titleEl.textContent = body.title;
+
+                                            window.dispatchEvent(new CustomEvent('chat:renamed', {
+                                                detail: {
+                                                    conversationId: body.conversation_id,
+                                                    title: body.title,
+                                                },
+                                            }));
+
+                                            if (window.Livewire?.dispatch) {
+                                                window.Livewire.dispatch('chat:conversation-renamed', {
+                                                    conversationId: body.conversation_id,
+                                                    title: body.title,
+                                                });
+                                            }
                                         }
                                     } catch (_) { /* network errors silently abort */ }
+                                    this.saving = false;
                                     this.editing = false;
                                 },
                                 startEdit() {
@@ -165,7 +186,7 @@
                                         x-model="renamed"
                                         @keydown.escape.prevent="editing = false"
                                         @click.stop
-                                        @blur="editing = false"
+                                        @blur="save()"
                                         x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                         maxlength="255"
                                         aria-label="Rename chat"

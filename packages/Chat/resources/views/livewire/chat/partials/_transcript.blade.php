@@ -75,9 +75,11 @@
                 <button
                     type="button"
                     x-on:click="loadEarlier()"
-                    class="rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5"
+                    :disabled="loadingEarlier"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait dark:text-gray-300 dark:hover:bg-white/5"
                 >
-                    {{ __('Load earlier messages') }}
+                    <x-heroicon-o-arrow-path x-show="loadingEarlier" x-cloak class="h-3 w-3 motion-safe:animate-spin" aria-hidden="true" />
+                    <span x-text="loadingEarlier ? @js(__('Loading earlier messages…')) : @js(__('Load earlier messages'))"></span>
                 </button>
             </div>
         </template>
@@ -146,13 +148,19 @@
                             <template x-if="msg.sendState && !msg.editing">
                                 <div
                                     class="flex items-center gap-1 px-1 text-[length:var(--text-micro)]"
-                                    :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-primary-100/70 dark:text-gray-500'"
+                                    :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'"
                                 >
                                     <template x-if="msg.sendState === 'sending'">
-                                        <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" role="status" aria-label="{{ __('Sending') }}" />
+                                        <span role="status" class="inline-flex">
+                                            <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            <span class="sr-only">{{ __('Sending') }}</span>
+                                        </span>
                                     </template>
                                     <template x-if="msg.sendState === 'sent'">
-                                        <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" role="status" aria-label="{{ __('Sent') }}" />
+                                        <span role="status" class="inline-flex">
+                                            <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            <span class="sr-only">{{ __('Sent') }}</span>
+                                        </span>
                                     </template>
                                     <template x-if="msg.sendState === 'failed'">
                                         <span class="inline-flex items-center gap-1" role="alert">
@@ -174,7 +182,6 @@
 
                             <template x-if="msg.editing">
                                 <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-600 p-2">
-                                    <label :for="'chat-edit-' + index" class="sr-only">Edit message</label>
                                     <textarea
                                         :id="'chat-edit-' + index"
                                         x-ref="editArea"

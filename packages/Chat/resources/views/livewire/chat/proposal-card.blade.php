@@ -118,14 +118,20 @@
 
                                     @if (is_array($row['values'] ?? null) && $row['values'] !== [])
                                         @if (($row['type'] ?? null) === 'link')
-                                            @foreach ($row['values'] as $url)
-                                                <a
-                                                    href="{{ (str_starts_with((string) $url, 'http') ? '' : 'https://').$url }}"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="truncate text-primary-600 hover:underline dark:text-primary-400"
-                                                >{{ $url }}</a>
-                                            @endforeach
+                                            {{-- min-w-0 on the anchors AND their row: flex items default to
+                                                 min-width:auto (their untruncated text width), so without it a
+                                                 UTM-length URL bursts the card sideways — the exact measured bug
+                                                 _proposal-field.blade.php documents. --}}
+                                            <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                                                @foreach ($row['values'] as $url)
+                                                    <a
+                                                        href="{{ (str_starts_with((string) $url, 'http') ? '' : 'https://').$url }}"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="min-w-0 truncate text-primary-600 hover:underline dark:text-primary-400"
+                                                    >{{ $url }}</a>
+                                                @endforeach
+                                            </span>
                                         @else
                                             @foreach ($row['values'] as $badge)
                                                 <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 dark:bg-white/10 dark:text-gray-300">{{ $badge }}</span>
@@ -172,7 +178,6 @@
                     type="button"
                     wire:click="discardCurrent"
                     wire:loading.attr="disabled"
-                    x-on:click="$el.disabled = true"
                     @disabled($editingFieldCode !== null)
                     @class([
                         'inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
@@ -186,7 +191,6 @@
                     type="button"
                     wire:click="createCurrent"
                     wire:loading.attr="disabled"
-                    x-on:click="$el.disabled = true"
                     @disabled($editingFieldCode !== null)
                     @class([
                         'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',

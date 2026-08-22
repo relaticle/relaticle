@@ -243,8 +243,9 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         this.beforeUnloadHandler = (e) => {
             if (!this.isStreaming) return;
+            // Browsers show their own generic prompt; custom strings are ignored.
             e.preventDefault();
-            e.returnValue = 'Your message is still being generated. Leave anyway?';
+            e.returnValue = '';
         };
         window.addEventListener('beforeunload', this.beforeUnloadHandler);
 

@@ -796,17 +796,19 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                 && (msg.feedback?.category || (msg.feedbackComment || '').trim() !== '');
             if (hasSavedDetail && !window.confirm(feedbackDeleteConfirmText)) return;
 
+            const previous = msg.feedback ? { ...msg.feedback } : null;
             msg.feedback = null;
             msg.feedbackPanelOpen = false;
-            await this.postFeedback(msg, null);
+            await this.postFeedback(msg, null, previous);
             return;
         }
 
+        const previous = msg.feedback ? { ...msg.feedback } : null;
         msg.feedback = { rating, category: null };
         msg.feedbackPanelOpen = rating === 'down';
         msg.feedbackCategory = null;
         msg.feedbackComment = '';
-        await this.postFeedback(msg, { rating });
+        await this.postFeedback(msg, { rating }, previous);
     },
 
     async submitFeedbackDetail(msg) {
@@ -814,16 +816,20 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             msg.feedbackPanelOpen = false;
             return;
         }
+        const previous = msg.feedback ? { ...msg.feedback } : null;
         msg.feedback = { rating: 'down', category: msg.feedbackCategory ?? null };
         msg.feedbackPanelOpen = false;
         await this.postFeedback(msg, {
             rating: 'down',
             category: msg.feedbackCategory ?? null,
             comment: (msg.feedbackComment || '').trim() || null,
-        });
+        }, previous);
     },
 
-    async postFeedback(msg, payload) {
+    // Optimistic UI with a revert: the thumbs never block the conversation,
+    // but a failed request must not leave a rating painted as saved. `previous`
+    // is the caller's pre-mutation snapshot of msg.feedback.
+    async postFeedback(msg, payload, previous = null) {
         try {
             const url = messagesUrl + '/' + msg.id + '/feedback';
             const headers = {
@@ -831,12 +837,14 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
             };
-            if (payload === null) {
-                await fetch(url, { method: 'DELETE', headers });
-                return;
-            }
-            await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
-        } catch (_) { /* fire-and-forget — never block the conversation on feedback */ }
+            const res = payload === null
+                ? await fetch(url, { method: 'DELETE', headers })
+                : await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
+            if (!res.ok) throw new Error('failed');
+        } catch (_) {
+            msg.feedback = previous;
+            msg.feedbackPanelOpen = false;
+        }
     },
 
     canRegenerate(index) {

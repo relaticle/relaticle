@@ -102,9 +102,9 @@
             @endif
 
             <button
-                @if ($showStopButton) x-show="!isStreaming" @endif
+                @if ($showStopButton) x-show="!isStreaming" x-cloak @endif
                 type="submit"
-                class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 disabled:bg-primary-200 disabled:text-white dark:disabled:bg-primary-900/40 dark:disabled:text-primary-300"
+                class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-600 text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700 dark:disabled:text-gray-500"
                 :disabled="{{ $sendDisabled }}"
                 aria-label="{{ __('Send message') }}"
             >
@@ -114,9 +114,10 @@
             @if ($showStopButton)
                 <button
                     x-show="isStreaming"
+                    x-cloak
                     type="button"
                     x-on:click="cancelStream()"
-                    class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-white transition hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
+                    class="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-900 text-white transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
                     aria-label="{{ __('Stop generation') }}"
                 >
                     <svg class="h-3 w-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

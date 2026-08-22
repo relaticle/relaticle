@@ -1,10 +1,9 @@
 {{-- Read-tool `records_table` display block. Expects the Alpine scope var
      `block`: {block, title, type, core, columns[], rows[], total}.
 
-     Ported from the never-wired components/chat/data-table.blade.php, with two
-     corrections it could not make: the record link hangs off the CORE column
-     (query-aware promotion routinely puts a filtered field first), and the row
-     `cells` map is read defensively because it is sparse. --}}
+     The record link hangs off the CORE column (query-aware promotion routinely
+     puts a filtered field first), and the row `cells` map is read defensively
+     because it is sparse. --}}
 <div
     :data-block="block.block"
     class="overflow-hidden rounded-2xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] shadow-sm"

@@ -3,7 +3,15 @@
     <div
         x-data="{
             open: @entangle('isOpen'),
-            width: Math.max(360, Math.min(720, parseInt(localStorage.getItem('chat-panel-width') || '420', 10) || 420)),
+            {{-- try/catch: storage access throws in Safari private mode, and an
+                 exception here would kill the whole component's init. --}}
+            width: (() => {
+                try {
+                    return Math.max(360, Math.min(720, parseInt(localStorage.getItem('chat-panel-width') || '420', 10) || 420));
+                } catch (_) {
+                    return 420;
+                }
+            })(),
             minWidth: 360,
             maxWidth: 720,
             resizing: false,
@@ -52,14 +60,6 @@
                 };
                 window.addEventListener('keydown', this.keydownHandler);
 
-                this.chatSendHandler = (e) => {
-                    if (e.detail?.message) {
-                        this.open = true;
-                        $wire.handleSendFromDashboard(e.detail.message, e.detail.source ?? 'dashboard');
-                    }
-                };
-                window.addEventListener('chat:send', this.chatSendHandler);
-
                 this.conversationCreatedHandler = (e) => {
                     if (e.detail?.id) {
                         this.currentConversationId = e.detail.id;
@@ -73,7 +73,6 @@
 
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
-                window.removeEventListener('chat:send', this.chatSendHandler);
                 window.removeEventListener('chat:conversation-created', this.conversationCreatedHandler);
                 window.removeEventListener('resize', this.resizeHandler);
             },
@@ -197,7 +196,7 @@
 
                 const onMouseUp = () => {
                     this.resizing = false;
-                    localStorage.setItem('chat-panel-width', this.width.toString());
+                    try { localStorage.setItem('chat-panel-width', this.width.toString()); } catch (_) { /* ignore */ }
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
                 };
@@ -390,8 +389,12 @@
                 </div>
             </div>
 
-            {{-- Chat Content Area --}}
-            <div class="flex-1 overflow-y-auto" data-chat-messages>
+            {{-- Chat Content Area. min-h-0 (not overflow-y-auto): the chat
+                 interface owns its own transcript scroller ($refs.messages), and
+                 a second scroll container here would be the one that actually
+                 scrolls, stranding the sticky date/jump pills and the
+                 pinned-to-bottom tracking inside a box that never moves. --}}
+            <div class="min-h-0 flex-1" data-chat-messages>
                 @livewire('chat.chat-interface', [
                     'conversationId' => $conversationId,
                     'context' => 'side-panel',

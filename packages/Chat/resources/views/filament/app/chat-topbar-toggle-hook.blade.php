@@ -9,7 +9,11 @@
         },
         init() {
             this.check();
-            document.addEventListener('livewire:navigated', () => this.check());
+            this.navigatedHandler = () => this.check();
+            document.addEventListener('livewire:navigated', this.navigatedHandler);
+        },
+        destroy() {
+            document.removeEventListener('livewire:navigated', this.navigatedHandler);
         }
     }"
     x-show="!onChatPage"

@@ -75,16 +75,6 @@ final class ChatSidePanel extends BaseLivewireComponent
     }
 
     /**
-     * Called when the dashboard hero input sends a message.
-     * Opens the panel and forwards the message to the embedded chat.
-     */
-    public function handleSendFromDashboard(string $message, string $source = 'dashboard'): void
-    {
-        $this->isOpen = true;
-        $this->dispatch('chat:send-message', message: $message);
-    }
-
-    /**
      * Resolve context for a URL supplied by the browser.
      *
      * Null means "no URL available" (a direct call outside a page context),
