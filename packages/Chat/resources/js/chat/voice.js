@@ -14,6 +14,14 @@ const RECORDING_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
 
 const MAX_RECORDING_MS = 120_000;
 
+// Set explicitly rather than inherited: Chrome defaults this codec to 128 kbps
+// (measured), which puts a full-length recording within a few percent of the
+// server cap, and the default is free to change between engines and releases.
+// Opus is a speech codec and 32 kbps is transparent for dictation, so pinning
+// it makes the client ceiling a known number the server cap can be checked
+// against. See the cap comment in TranscribeController.
+const AUDIO_BITS_PER_SECOND = 32_000;
+
 export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, failedText, silentText }) {
     return {
         recording: false,
@@ -25,6 +33,7 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
         _recorder: null,
         _stopTimer: null,
         _root: null,
+        _destroyed: false,
 
         init() {
             this._root = this.$el;
@@ -32,10 +41,16 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
 
         // wire:navigate tears this component down without firing onstop, so a
         // navigation mid-recording would leave the tab's recording indicator
-        // lit and the mic hot. Stopping here runs onstop, which releases the
-        // tracks.
+        // lit and the mic hot. The tracks are released directly rather than via
+        // stop(): stop() runs the full onstop handler, which would upload and
+        // transcribe a recording nobody is waiting for, burning a rate-limit
+        // slot on a component that no longer exists. The flag makes that
+        // handler a no-op if the browser fires it anyway.
         destroy() {
-            this._recorder?.stop();
+            this._destroyed = true;
+            clearTimeout(this._stopTimer);
+            this._recorder?.stream?.getTracks().forEach((track) => track.stop());
+            this._recorder = null;
         },
 
         // The composer bar is shared, so the editor is found by walking up from
@@ -75,7 +90,7 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
             }
 
             const chunks = [];
-            const recorder = new MediaRecorder(stream, { mimeType });
+            const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
 
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) chunks.push(event.data);
@@ -90,7 +105,7 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
                 this.recording = false;
 
                 const blob = new Blob(chunks, { type: recorder.mimeType });
-                if (blob.size > 0) this.transcribeBlob(blob);
+                if (blob.size > 0 && ! this._destroyed) this.transcribeBlob(blob);
             };
 
             this._recorder = recorder;
