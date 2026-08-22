@@ -64,14 +64,6 @@ abstract class BaseReadListTool implements Tool
 
     abstract public function description(): string;
 
-    /**
-     * The custom-fields entity alias, which is also the citation/morph alias.
-     */
-    protected function entityType(): string
-    {
-        return $this->citationType();
-    }
-
     /** @return array<string, mixed> */
     protected function additionalSchema(JsonSchema $schema): array
     {
@@ -98,7 +90,7 @@ abstract class BaseReadListTool implements Tool
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
-        $entityType = $this->entityType();
+        $entityType = $this->citationType();
 
         $customFieldsDescription = 'Filter by custom field values.';
         $sortable = $this->nativeSorts();
@@ -212,7 +204,7 @@ abstract class BaseReadListTool implements Tool
         }
 
         $team = $user->currentTeam;
-        $entityType = $this->entityType();
+        $entityType = $this->citationType();
         $coreKey = $this->searchFilterName();
 
         // Nothing stops a team from coding a custom field `name` or `title`.
@@ -308,15 +300,9 @@ abstract class BaseReadListTool implements Tool
      */
     private function promotedCodes(Request $request): array
     {
-        $codes = [];
-
         $customFields = $request['custom_fields'] ?? null;
 
-        if (is_array($customFields)) {
-            foreach (array_keys($customFields) as $code) {
-                $codes[] = (string) $code;
-            }
-        }
+        $codes = is_array($customFields) ? array_map(strval(...), array_keys($customFields)) : [];
 
         $sort = $request['sort'] ?? null;
 
@@ -379,7 +365,7 @@ abstract class BaseReadListTool implements Tool
         ));
 
         $customFields = resolve(CustomFieldsFilterTranslator::class)
-            ->translate($user, $this->entityType(), $request['custom_fields'] ?? null);
+            ->translate($user, $this->citationType(), $request['custom_fields'] ?? null);
 
         if ($customFields !== []) {
             $nativeFilters['custom_fields'] = $customFields;

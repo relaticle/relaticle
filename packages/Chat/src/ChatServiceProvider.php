@@ -129,16 +129,10 @@ final class ChatServiceProvider extends ServiceProvider
             }
         };
 
-        Company::saved($invalidate);
-        Company::deleted($invalidate);
-        People::saved($invalidate);
-        People::deleted($invalidate);
-        Opportunity::saved($invalidate);
-        Opportunity::deleted($invalidate);
-        Task::saved($invalidate);
-        Task::deleted($invalidate);
-        Note::saved($invalidate);
-        Note::deleted($invalidate);
+        foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+            $model::saved($invalidate);
+            $model::deleted($invalidate);
+        }
     }
 
     private function registerRenderHooks(): void

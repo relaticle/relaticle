@@ -12,7 +12,7 @@ use Illuminate\Database\Query\Builder;
  * conversation": the join onto the conversation plus every visibility
  * predicate the transcript applies.
  *
- * Two callers build on it and must stay identical. ListConversationMessages
+ * Its callers build on it and must stay identical. ListConversationMessages
  * pages the transcript; ChatController::searchMessages returns message ids
  * that the client then pages BACKWARDS to reach. A row search can see but the
  * pager cannot would send that load-until-found loop through the entire

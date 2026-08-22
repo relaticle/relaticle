@@ -14,6 +14,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\TranscriptScope;
 
 final class ChatInterface extends BaseLivewireComponent
 {
@@ -71,25 +72,13 @@ final class ChatInterface extends BaseLivewireComponent
         $this->initialModel = $initialModel ?? $modelQuery;
 
         if ($this->conversationId !== null) {
-            $this->messages = $this->fetchMessages();
+            $this->messages = resolve(ListConversationMessages::class)->execute(
+                $this->authUser(),
+                $this->conversationId,
+            );
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
         }
-    }
-
-    /**
-     * @return array<int, array{id: string, role: string, content: string, created_at: ?string, pending_actions: array<int, mixed>}>
-     */
-    public function fetchMessages(): array
-    {
-        if ($this->conversationId === null) {
-            return [];
-        }
-
-        return resolve(ListConversationMessages::class)->execute(
-            $this->authUser(),
-            $this->conversationId,
-        );
     }
 
     /**
@@ -157,14 +146,8 @@ final class ChatInterface extends BaseLivewireComponent
 
         $user = $this->authUser();
 
-        $row = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.conversation_id', $conversationId)
-            ->where('m.participant_type', $user->getMorphClass())
-            ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
+        $row = TranscriptScope::apply(DB::table('agent_conversation_messages as m'), $user, $conversationId)
             ->where('m.role', 'assistant')
-            ->whereNull('m.superseded_at')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
             ->first(['m.id', 'm.content', 'm.tool_results']);

@@ -11,7 +11,6 @@ use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
-use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
@@ -63,7 +62,7 @@ use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
 #[MaxSteps(15)]
 #[Temperature(0.3)]
 #[Timeout(120)]
-final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasProviderOptions, HasTools
+final class CrmAssistant implements Agent, Conversational, HasProviderOptions, HasTools
 {
     use Promptable;
     use RemembersConversations;
@@ -163,9 +162,7 @@ final class CrmAssistant implements Agent, Conversational, HasMiddleware, HasPro
 
     public function instructions(): string
     {
-        $suffix = $this->dynamicInstructions();
-
-        return $suffix === '' ? $this->staticInstructions() : $this->staticInstructions().$suffix;
+        return $this->staticInstructions().$this->dynamicInstructions();
     }
 
     /**
@@ -602,14 +599,6 @@ PROMPT;
             UpdateCustomFieldTool::class,
             AddCustomFieldOptionsTool::class,
         ];
-    }
-
-    /**
-     * @return array<int, class-string>
-     */
-    public function middleware(): array
-    {
-        return [];
     }
 
     private function sanitizeLabel(string $label): string

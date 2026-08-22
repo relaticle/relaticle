@@ -403,8 +403,6 @@ abstract class BaseReadShowTool implements Tool
 
     private function truncateFreeText(string $html): string
     {
-        $text = strip_tags($html);
-
-        return Str::limit(trim((string) preg_replace('/\s+/', ' ', $text)), self::FREE_TEXT_LIMIT);
+        return Str::limit(Str::squish(strip_tags($html)), self::FREE_TEXT_LIMIT);
     }
 }

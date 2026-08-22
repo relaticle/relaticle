@@ -553,13 +553,7 @@ final readonly class ListActivityTool implements Tool
 
     private function stringOrNull(mixed $value): ?string
     {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $trimmed = trim($value);
-
-        return $trimmed === '' ? null : $trimmed;
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
     private function error(string $message): string
