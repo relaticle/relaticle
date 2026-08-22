@@ -54,3 +54,18 @@ it('forbids per-result headings that would strand above the blocks', function ()
         ->toContain('never write a heading or label naming a result set')
         ->toContain('Never write a heading or bold label naming a set of results');
 });
+
+/**
+ * DestinationResolver gained an export_* destination per entity, but the model
+ * only reaches for a destination the prompt routes to. Without both of these,
+ * "how do I export my companies?" falls through to the product-question rule
+ * and answers with documentation steps and no link into the workspace, which
+ * the prompt itself calls a downgrade.
+ */
+it('routes export requests to the export destinations', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
+        ->toContain('(custom field definitions, bulk imports, exports, team members)');
+});
