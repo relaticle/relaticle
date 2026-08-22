@@ -39,8 +39,14 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
         ->middleware('throttle:30,1')
         ->name('chat.messages.supersede');
 
+    // Transcription is unmetered: it reserves no credit, so the limiters are the
+    // only ceiling on provider spend. The per-minute one bounds a stuck client,
+    // the daily one bounds the account (a human dictating tops out at two or
+    // three a minute). The third argument is a key PREFIX, and it is required:
+    // without it both limiters hash to the same signature, count every request
+    // twice, and the 60s decay of the first stops the daily bucket accumulating.
     Route::post('/chat/transcribe', TranscribeController::class)
-        ->middleware('throttle:10,1')
+        ->middleware(['throttle:10,1', 'throttle:60,1440,transcribe-daily'])
         ->name('chat.transcribe');
 
     Route::post('/chat/messages/{messageId}/feedback', [MessageFeedbackController::class, 'store'])
