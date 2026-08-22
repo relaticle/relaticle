@@ -13,28 +13,34 @@ use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\PendingAction;
 use Tests\Helpers\ChatDocument;
 
-it('returns the persisted latest assistant message for reconciliation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-
+function latestAssistantSeedConversation(User $user, string $title = 'T'): string
+{
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
         'team_id' => $user->currentTeam->getKey(),
-        'title' => 'T',
+        'title' => $title,
         'created_at' => now(),
         'updated_at' => now(),
     ]);
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::ulid(),
+
+    return $conversationId;
+}
+
+/** @param array<string, mixed> $overrides */
+function latestAssistantSeedMessage(User $user, string $conversationId, array $overrides = []): string
+{
+    $id = (string) Str::ulid();
+    DB::table('agent_conversation_messages')->insert(array_merge([
+        'id' => $id,
         'conversation_id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant',
-        'content' => 'Final answer',
+        'content' => '',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
         'tool_calls' => '[]',
@@ -43,7 +49,17 @@ it('returns the persisted latest assistant message for reconciliation', function
         'meta' => '{}',
         'created_at' => now(),
         'updated_at' => now(),
-    ]);
+    ], $overrides));
+
+    return $id;
+}
+
+it('returns the persisted latest assistant message for reconciliation', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = latestAssistantSeedConversation($user);
+    latestAssistantSeedMessage($user, $conversationId, ['content' => 'Final answer']);
 
     $component = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId]);
     $result = $component->instance()->latestAssistantMessage();
@@ -55,33 +71,8 @@ it('returns still-pending proposal cards so a dropped tool_result can be reconci
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'T',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::ulid(),
-        'conversation_id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
-        'role' => 'assistant',
-        'content' => 'Proposed it',
-        'document' => ChatDocument::emptyJson(),
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '{}',
-        'meta' => '{}',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user);
+    latestAssistantSeedMessage($user, $conversationId, ['content' => 'Proposed it']);
     $pending = PendingAction::query()->create([
         'team_id' => $user->currentTeam->getKey(),
         'user_id' => $user->getKey(),
@@ -141,16 +132,7 @@ it('returns the most recent assistant message when several exist', function (): 
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'T',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user);
 
     $base = [
         'conversation_id' => $conversationId,
@@ -193,16 +175,7 @@ it('returns null when the conversation has no assistant message', function (): v
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'T',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user);
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
@@ -284,16 +257,7 @@ it('returns display blocks from a client-supplied id when the server property is
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'T',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user);
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::ulid(),
         'conversation_id' => $conversationId,
@@ -369,16 +333,7 @@ it('exposes the conversation title for header sync', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'Create 3 random companies',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user, 'Create 3 random companies');
 
     Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
         ->call('conversationTitle')
@@ -389,16 +344,7 @@ it('resolves the title from a client-supplied id when the server property is uns
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
-        'title' => 'What companies do I have?',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = latestAssistantSeedConversation($user, 'What companies do I have?');
 
     Livewire::test(ChatInterface::class)
         ->assertSet('conversationId', null)

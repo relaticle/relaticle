@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Tests\Helpers\ChatBrowser;
@@ -26,23 +25,6 @@ mutates(ListConversationMessages::class);
  *  - a link field carries a URL far longer than the free-text cap, which a
  *    blanket truncation would turn into a broken href.
  */
-function displayBlockSeedConversation(User $user, int|string $team): string
-{
-    $conversationId = (string) Str::uuid7();
-
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team,
-        'title' => 'display blocks',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    return $conversationId;
-}
-
 /**
  * @param  list<array<string, mixed>>  $blocks
  */
@@ -119,40 +101,10 @@ function displayBlockCardFixture(string $longUrl): array
     ];
 }
 
-/** Polls the transcript until the expected number of blocks has painted. */
-function displayBlockWaitForBlocks(AwaitableWebpage $page, int $expected): int
-{
-    $count = 0;
-
-    for ($i = 0; $i < 50; $i++) {
-        $count = $page->script(<<<'JS'
-            (() => document.querySelectorAll('[data-block]').length)();
-        JS);
-
-        if ($count === $expected) {
-            return $count;
-        }
-
-        usleep(100_000);
-    }
-
-    return $count;
-}
-
-function displayBlockLogIn(User $user, string $slug, string $conversationId): AwaitableWebpage
-{
-    return test()->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$slug}")
-        ->navigate("/app/{$slug}/chats/{$conversationId}");
-}
-
 it('paints persisted read results as a real table and card, and drops an unknown block type', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
-    $conversationId = displayBlockSeedConversation($user, $team->getKey());
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
 
     $longUrl = 'https://example.com/?ref='.str_repeat('a', 600);
 
@@ -167,10 +119,10 @@ it('paints persisted read results as a real table and card, and drops an unknown
         displayBlockCardFixture($longUrl),
     ], 60);
 
-    $page = displayBlockLogIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Here is Acme Corporation.');
 
-    expect(displayBlockWaitForBlocks($page, 2))->toBe(2);
+    $page->assertCount('[data-block]', 2);
 
     $shape = json_decode((string) $page->script(<<<'JS'
         (() => {
@@ -230,16 +182,16 @@ it('paints persisted read results as a real table and card, and drops an unknown
 it('attaches display blocks to the streamed bubble at stream-end reconcile', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
-    $conversationId = displayBlockSeedConversation($user, $team->getKey());
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
         displayBlockTableFixture(),
     ], 60);
 
-    $page = displayBlockLogIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
-    expect(displayBlockWaitForBlocks($page, 1))->toBe(1);
+    $page->assertCount('[data-block]', 1);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
@@ -267,5 +219,5 @@ it('attaches display blocks to the streamed bubble at stream-end reconcile', fun
         })();
     JS);
 
-    expect(displayBlockWaitForBlocks($page, 2))->toBe(2);
+    $page->assertCount('[data-block]', 2);
 });

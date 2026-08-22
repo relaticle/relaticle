@@ -65,7 +65,7 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
             data.currentToolStatus = 'Searching companies…';
             data.messages = [
                 { role: 'user', content: 'find acme' },
-                { role: 'assistant', content: '', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, copiedAt: 0, follow_ups: [] },
+                { role: 'assistant', content: '', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, follow_ups: [] },
             ];
             return true;
         })();
@@ -107,7 +107,7 @@ it('removes the shimmer once content arrives in the latest assistant message', f
             data.currentToolStatus = null;
             data.messages = [
                 { role: 'user', content: 'hi' },
-                { role: 'assistant', content: 'hello back', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, copiedAt: 0, follow_ups: [] },
+                { role: 'assistant', content: 'hello back', pending_actions: [], paywall: null, sessionExpired: false, rendered: false, prerendered: false, follow_ups: [] },
             ];
             return true;
         })();

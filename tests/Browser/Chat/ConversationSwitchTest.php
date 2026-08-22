@@ -40,19 +40,6 @@ mutates(ChatInterface::class);
  * exactly that assertion fail, not any timing assertion), so this is
  * failure-of-absence, not a race that luck can win.
  */
-function switchTestInsertConversation(string $id, User $user, int|string $team, string $title): void
-{
-    DB::table('agent_conversations')->insert([
-        'id' => $id,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team,
-        'title' => $title,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-}
-
 function switchTestInsertMessage(string $conversationId, User $user, string $role, string $content, ?Carbon $at = null): void
 {
     DB::table('agent_conversation_messages')->insert([
@@ -111,21 +98,14 @@ function switchTestArmSwitchProbe(AwaitableWebpage $page): void
  */
 function switchTestReadSwitchProbe(AwaitableWebpage $page): array
 {
-    $result = ['paint' => null, 'navigatedAt' => null];
+    $page->assertScript('(() => !!(window.__task7Paint && window.__task7Navigated))()');
 
-    for ($i = 0; $i < 40; $i++) {
-        /** @var array{paint: array{at: float, conversationId: ?string, text: ?string}|null, navigatedAt: float|null} $state */
-        $state = $page->script(<<<'JS'
-            (() => ({ paint: window.__task7Paint ?? null, navigatedAt: window.__task7Navigated ?? null }))();
-        JS);
-        $result = $state;
-        if ($result['paint'] !== null && $result['navigatedAt'] !== null) {
-            return $result;
-        }
-        usleep(100_000);
-    }
+    /** @var array{paint: array{at: float, conversationId: ?string, text: ?string}|null, navigatedAt: float|null} $state */
+    $state = $page->script(<<<'JS'
+        (() => ({ paint: window.__task7Paint ?? null, navigatedAt: window.__task7Navigated ?? null }))();
+    JS);
 
-    return $result;
+    return $state;
 }
 
 it('paints a previously visited conversation instantly, strictly before the real navigation swap', function (): void {
@@ -133,17 +113,12 @@ it('paints a previously visited conversation instantly, strictly before the real
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    switchTestInsertConversation($conversationA, $user, $team->getKey(), 'chat a');
-    switchTestInsertConversation($conversationB, $user, $team->getKey(), 'chat b');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo seed message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     // A -> B is a normal (uncached) transition: it is what causes A's
@@ -171,17 +146,12 @@ it('reconciles a cached (stale) paint against server truth once the real switch 
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    switchTestInsertConversation($conversationA, $user, $team->getKey(), 'chat a');
-    switchTestInsertConversation($conversationB, $user, $team->getKey(), 'chat b');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha original message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo original message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('Alpha original message');
 
     // A's cache entry is now stashed (its destroy() just ran as part of
@@ -218,17 +188,12 @@ it('never paints a transcript cached under a different user', function (): void 
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    switchTestInsertConversation($conversationA, $user, $team->getKey(), 'chat a');
-    switchTestInsertConversation($conversationB, $user, $team->getKey(), 'chat b');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha real message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo real message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('Alpha real message');
 
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
@@ -255,7 +220,6 @@ it('never paints a transcript cached under a different user', function (): void 
                 pending_actions: [],
                 follow_ups: [],
                 feedback: null,
-                copiedAt: 0,
             }]);
             window.__chatConversationCache = { owner: 'someone-else-entirely', entries };
             return true;
@@ -304,15 +268,10 @@ it('caps the conversation cache at 5 entries, evicting the least recently used',
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationSeed = (string) Str::uuid7();
-    switchTestInsertConversation($conversationSeed, $user, $team->getKey(), 'chat seed');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'chat seed', $conversationSeed);
     switchTestInsertMessage($conversationSeed, $user, 'user', 'Seed message');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationSeed}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationSeed)
         ->assertSourceHas('Seed message');
 
     $resolveInterface = ChatBrowser::resolveInterface();

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Pest\Browser\Api\AwaitableWebpage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Tests\Helpers\ChatBrowser;
 
@@ -35,11 +34,7 @@ it('mints the assistant stub as the same reference the reactive messages array h
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
@@ -61,41 +56,11 @@ it('mints the assistant stub as the same reference the reactive messages array h
     expect($identityMatches)->toBeTrue();
 });
 
-/** Polls the last assistant bubble's rendered `msg.content` text until it matches or times out. */
-function streamResumeStubPollBubbleText(AwaitableWebpage $page, string $expected): ?string
-{
-    $expectedJson = json_encode($expected, JSON_THROW_ON_ERROR);
-    $last = null;
-
-    for ($i = 0; $i < 30; $i++) {
-        $last = $page->script(<<<'JS'
-            (() => {
-                const bubbles = document.querySelectorAll('[data-assistant-bubble]');
-                const last = bubbles[bubbles.length - 1];
-                const el = last ? last.querySelector('[x-text="msg.content"]') : null;
-                return el ? el.textContent : null;
-            })();
-        JS);
-
-        if ($last === $expectedJson || $last === $expected) {
-            return $last;
-        }
-
-        usleep(100_000);
-    }
-
-    return $last;
-}
-
 it('paints a later mutation on the reference targetBubbleFor()\'s resume fallback returns', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
@@ -123,8 +88,14 @@ it('paints a later mutation on the reference targetBubbleFor()\'s resume fallbac
     // the synchronous mutation above has already landed), expected to pass
     // both pre- and post-fix, establishing the mounted effect this test
     // actually probes with the next mutation.
-    $firstPaint = streamResumeStubPollBubbleText($page, 'first chunk');
-    expect($firstPaint)->toBe('first chunk');
+    $page->assertScript(<<<'JS'
+        (() => {
+            const bubbles = document.querySelectorAll('[data-assistant-bubble]');
+            const last = bubbles[bubbles.length - 1];
+            const el = last ? last.querySelector('[x-text="msg.content"]') : null;
+            return el ? el.textContent : null;
+        })()
+    JS, 'first chunk');
 
     // The mounted x-text effect from the first paint is now subscribed to
     // this object's `content` property. Mutating the SAME reference again
@@ -136,6 +107,12 @@ it('paints a later mutation on the reference targetBubbleFor()\'s resume fallbac
         (() => { window.__resumeStub.content += ' second chunk'; return true; })();
     JS);
 
-    $secondPaint = streamResumeStubPollBubbleText($page, 'first chunk second chunk');
-    expect($secondPaint)->toBe('first chunk second chunk');
+    $page->assertScript(<<<'JS'
+        (() => {
+            const bubbles = document.querySelectorAll('[data-assistant-bubble]');
+            const last = bubbles[bubbles.length - 1];
+            const el = last ? last.querySelector('[x-text="msg.content"]') : null;
+            return el ? el.textContent : null;
+        })()
+    JS, 'first chunk second chunk');
 });

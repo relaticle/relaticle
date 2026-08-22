@@ -28,43 +28,19 @@ mutates(ChatInterface::class);
  * SAME deferred $nextTick pattern, not a $wire round trip; the fix guards
  * that $nextTick directly rather than relying on an await gap that does not
  * exist for that specific handler.
- *
- * chatInterfaceInsertConversation() below intentionally duplicates the tiny
- * insert helper already private to ConversationSwitchTest.php/ComposerDraftTest.php
- * rather than reusing theirs: PHP function names are global across the whole
- * suite, so this file needs its own uniquely-prefixed name to avoid a
- * redeclaration fatal when Pest loads every test file into one process.
  */
-function chatInterfaceInsertConversation(string $id, User $user, int|string $team, string $title): void
-{
-    DB::table('agent_conversations')->insert([
-        'id' => $id,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team,
-        'title' => $title,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-}
-
 it('does not write a queued document from conversation A into conversation B\'s live composer', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    chatInterfaceInsertConversation($conversationA, $user, $team->getKey(), 'conv a');
-    chatInterfaceInsertConversation($conversationB, $user, $team->getKey(), 'conv b');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv a', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv b', $conversationB);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Replace reconcileLatestAssistant() with a promise this test controls
@@ -143,16 +119,11 @@ it('still flushes a queued send into the editor when the instance was not torn d
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    chatInterfaceInsertConversation($conversationId, $user, $team->getKey(), 'conv single');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv single', $conversationId);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Same release-gate mock as the leak test above, but this time nothing
@@ -224,18 +195,13 @@ it('does not touch the editor or send when destroy lands between flushQueuedSend
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = (string) Str::uuid7();
-    chatInterfaceInsertConversation($conversationId, $user, $team->getKey(), 'conv flush race');
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv flush race', $conversationId);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $resolveInterface = ChatBrowser::resolveInterface();
     $conversationIdJson = json_encode($conversationId);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click($editor)->type($editor, 'OWN_TYPED_CONTENT');
@@ -259,22 +225,16 @@ it('does not touch the editor or send when destroy lands between flushQueuedSend
     JS);
 
     // Pre-fix: once the tick fires, setDocument() overwrites this with the
-    // queued marker text. Poll instead of a single fixed sleep so the check
-    // catches the overwrite whenever it lands within the window, not just at
-    // one sampled instant.
-    $editorTextAfterRace = null;
-    for ($i = 0; $i < 20; $i++) {
-        $editorTextAfterRace = $page->script(<<<'JS'
-            (() => {
-                const el = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]');
-                return el ? el.textContent : null;
-            })();
-        JS);
-        if ($editorTextAfterRace !== 'OWN_TYPED_CONTENT') {
-            break;
-        }
-        usleep(100_000);
-    }
+    // queued marker text. A fixed wait covers the whole window the deferred
+    // tick could land in; the single read below then samples the settled state.
+    $page->wait(2);
+
+    $editorTextAfterRace = $page->script(<<<'JS'
+        (() => {
+            const el = document.querySelector('[data-chat-context="conversation"] [contenteditable="true"]');
+            return el ? el.textContent : null;
+        })();
+    JS);
 
     expect($editorTextAfterRace)->toBe('OWN_TYPED_CONTENT');
 
@@ -282,19 +242,12 @@ it('does not touch the editor or send when destroy lands between flushQueuedSend
     // stop at setDocument(); it goes on to call sendMessage() with `this` still
     // bound to the torn-down instance's own conversationId, silently pushing the
     // queued marker into this.messages and POSTing it server-side.
-    $sentMarkerCount = null;
-    for ($i = 0; $i < 20; $i++) {
-        $sentMarkerCount = $page->script(<<<JS
-            (() => {
-                {$resolveInterface}
-                return data.messages.filter((m) => m.content === 'MARKER_QUEUED_SEND').length;
-            })();
-        JS);
-        if ($sentMarkerCount > 0) {
-            break;
-        }
-        usleep(100_000);
-    }
+    $sentMarkerCount = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            return data.messages.filter((m) => m.content === 'MARKER_QUEUED_SEND').length;
+        })();
+    JS);
 
     expect($sentMarkerCount)->toBe(0);
 

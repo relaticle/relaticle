@@ -73,43 +73,13 @@ function chatWarmUpRateLimiter(AwaitableWebpage $page): void
     });
 }
 
-/**
- * Polls the last user message's sendState via short, independent reads (no
- * side effects, so a Pest-level retry of any single read is harmless) until
- * it matches $targetState or attempts run out. Returns null on timeout.
- */
-function chatPollUserSendState(AwaitableWebpage $page, string $resolveInterface, string $targetState): ?string
-{
-    for ($i = 0; $i < 60; $i++) {
-        $state = $page->script(<<<JS
-            (() => {
-                {$resolveInterface}
-                const msg = data.messages.find((m) => m.role === 'user');
-                return msg?.sendState ?? null;
-            })();
-        JS);
-
-        if ($state === $targetState) {
-            return $state;
-        }
-
-        usleep(100_000);
-    }
-
-    return null;
-}
-
 it('carries the optimistic bubble through sending then sent on a real send', function (): void {
     Queue::fake();
 
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -132,9 +102,13 @@ it('carries the optimistic bubble through sending then sent on a real send', fun
 
     expect($sendingState)->toBe('sending');
 
-    $finalState = chatPollUserSendState($page, $resolveInterface, 'sent');
-
-    expect($finalState)->toBe('sent');
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            const msg = data.messages.find((m) => m.role === 'user');
+            return msg?.sendState ?? null;
+        })()
+    JS, 'sent');
 
     $domSentBubbles = $page->script(<<<'JS'
         (() => document.querySelectorAll('[data-user-bubble][data-send-state="sent"]').length)();
@@ -202,11 +176,7 @@ it('marks an optimistic bubble failed on rate limit, and a real click resend doe
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -242,9 +212,13 @@ it('marks an optimistic bubble failed on rate limit, and a real click resend doe
     // terminal state instead of reading it right after the click.
     $page->click('[data-resend-button]');
 
-    $sendStateAfterClick = chatPollUserSendState($page, $resolveInterface, 'failed');
-
-    expect($sendStateAfterClick)->toBe('failed');
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            const msg = data.messages.find((m) => m.role === 'user');
+            return msg?.sendState ?? null;
+        })()
+    JS, 'failed');
 
     $stillFailed = $page->script(<<<JS
         (() => {
@@ -273,11 +247,7 @@ it('recovers a failed bubble to sent once the rate limit window clears, reusing 
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -299,9 +269,13 @@ it('recovers a failed bubble to sent once the rate limit window clears, reusing 
         })();
     JS);
 
-    $finalState = chatPollUserSendState($page, $resolveInterface, 'sent');
-
-    expect($finalState)->toBe('sent');
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            const msg = data.messages.find((m) => m.role === 'user');
+            return msg?.sendState ?? null;
+        })()
+    JS, 'sent');
 
     $afterResend = $page->script(<<<JS
         (() => {
@@ -334,22 +308,9 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
     // persisted yet, matching the client's still-optimistic turn) makes the
     // repro faithful: without conversationId set, regenerateMessage's resend
     // would take the wrong branch and 429 on conversation creation instead.
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -366,8 +327,8 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
             // regenerate target, so regenerateMessage(1) has a real preceding
             // user message to resend.
             data.messages = [
-                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
             ];
             return true;
         })();
@@ -383,9 +344,13 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
         })();
     JS);
 
-    $failedState = chatPollUserSendState($page, $resolveInterface, 'failed');
-
-    expect($failedState)->toBe('failed');
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            const msg = data.messages.find((m) => m.role === 'user');
+            return msg?.sendState ?? null;
+        })()
+    JS, 'failed');
 
     $result = $page->script(<<<JS
         (() => {
@@ -416,16 +381,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
 
     // Same reasoning as the fixture above: regenerate always happens inside
     // an EXISTING conversation.
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
     // A real persisted row for the turn regenerateMessage() targets. Without
     // one, supersedeServerTurns()'s anchor lookup finds nothing to match and
@@ -449,11 +405,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
         'updated_at' => now(),
     ]);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -475,9 +427,9 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
             data.conversationId = {$conversationIdJson};
 
             data.messages = [
-                data.ensureClientKey({ id: {$targetMessageIdJson}, role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
-                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ id: {$targetMessageIdJson}, role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
             const failedMsg = data.messages[data.messages.length - 1];
@@ -524,22 +476,9 @@ it('leaves the transcript untouched when retryTurn is triggered while an earlier
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -559,9 +498,9 @@ it('leaves the transcript untouched when retryTurn is triggered while an earlier
             data.conversationId = {$conversationIdJson};
 
             data.messages = [
-                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
-                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
             const streamErrorMsg = data.messages[1];
@@ -604,16 +543,7 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
     // A real persisted row for the turn being edited. saveEdit() supersedes
     // this row server-side BEFORE splicing local state (unlike retryTurn(),
@@ -638,11 +568,7 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
         'updated_at' => now(),
     ]);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -670,9 +596,9 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
             data.conversationId = {$conversationIdJson};
 
             data.messages = [
-                data.ensureClientKey({ id: {$editedMessageIdJson}, role: 'user', content: 'first attempt', editing: true, editText: 'edited while rate limited', sendState: 'sent', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
-                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
+                data.ensureClientKey({ id: {$editedMessageIdJson}, role: 'user', content: 'first attempt', editing: true, editText: 'edited while rate limited', sendState: 'sent', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
             const failedMsg = data.messages[data.messages.length - 1];
@@ -728,22 +654,9 @@ it('does not soft-lock the composer when subscribeToConversation throws on a non
     // A real, already-existing conversation so deliverMessage() takes the
     // non-first-message branch (the one whose channel-subscribe await used to
     // sit outside the try/catch).
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -769,9 +682,13 @@ it('does not soft-lock the composer when subscribeToConversation throws on a non
         })();
     JS);
 
-    $failedState = chatPollUserSendState($page, $resolveInterface, 'failed');
-
-    expect($failedState)->toBe('failed');
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            const msg = data.messages.find((m) => m.role === 'user');
+            return msg?.sendState ?? null;
+        })()
+    JS, 'failed');
 
     $result = $page->script(<<<JS
         (() => {
@@ -798,22 +715,9 @@ it('disables Regenerate/Edit and hides Retry while rate-limited, so the affordan
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $conversationId = (string) Str::uuid7();
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'participant_type' => 'user',
-        'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
-        'title' => 'test',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    $page = ChatBrowser::logIn($user, $team->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -835,10 +739,10 @@ it('disables Regenerate/Edit and hides Retry while rate-limited, so the affordan
             data.conversationId = {$conversationIdJson};
 
             data.messages = [
-                data.ensureClientKey({ role: 'user', content: 'editable message', sendState: 'sent', editing: false, editText: '', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'a reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
-                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', copiedAt: 0, page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, copiedAt: 0, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'editable message', sendState: 'sent', editing: false, editText: '', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: 'a reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
             ];
 
             const failedMsg = data.messages[2];

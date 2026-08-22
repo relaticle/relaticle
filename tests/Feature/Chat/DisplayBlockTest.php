@@ -39,6 +39,11 @@ mutates(ListTasksTool::class);
 mutates(ListConversationMessages::class);
 mutates(SupersededAwareConversationStore::class);
 
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($this->user);
+});
+
 /**
  * Create a text custom field and force its display settings, which
  * UpdateCustomField deliberately does not expose.
@@ -252,8 +257,7 @@ function seedBlockConversation(User $user, array $toolResults, bool $withToolCal
 // --- (a) list tool emits a records_table block ---
 
 it('returns a records_table block with reference urls and formatted cells', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'company', 'segment', 'Segment');
 
@@ -278,8 +282,7 @@ it('returns a records_table block with reference urls and formatted cells', func
 });
 
 it('keeps the model-facing rows under data alongside the block', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     app(CreateCompany::class)->execute($user, ['name' => 'Acme']);
 
@@ -294,8 +297,7 @@ it('keeps the model-facing rows under data alongside the block', function (): vo
 // --- (b) show tool emits a record_card block ---
 
 it('returns a record_card block for a single record', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'company', 'segment', 'Segment');
 
@@ -318,8 +320,7 @@ it('returns a record_card block for a single record', function (): void {
 // --- block values are capped: the envelope is persisted forever ---
 
 it('caps a long free-text value harder in a table cell than on a card', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'company', 'briefing', 'Briefing');
 
@@ -350,8 +351,7 @@ it('caps a long free-text value harder in a table cell than on a card', function
 // --- a custom field may be coded like the core column ---
 
 it('keeps the core column single when a custom field shares its code', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'company', 'name', 'Legal Name');
 
@@ -367,8 +367,7 @@ it('keeps the core column single when a custom field shares its code', function 
 });
 
 it('keeps the core column single when a same-coded custom field is promoted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'company', 'name', 'Legal Name', ['visible_in_list' => false]);
 
@@ -386,8 +385,7 @@ it('keeps the core column single when a same-coded custom field is promoted', fu
 // --- the row links from the core column, wherever promotion moved it ---
 
 it('names the core column even when a promoted field leads the table', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'opportunity', 'deal_source', 'Deal Source', ['visible_in_list' => false]);
 
@@ -404,8 +402,7 @@ it('names the core column even when a promoted field leads the table', function 
 });
 
 it('names title as the core column on an entity that has no name', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     Task::factory()->for($user->currentTeam)->create(['title' => 'Call Acme']);
 
@@ -418,8 +415,7 @@ it('names title as the core column on an entity that has no name', function (): 
 // --- an empty result must not paint a headless table ---
 
 it('emits no block when the list matches no records', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
@@ -430,8 +426,7 @@ it('emits no block when the list matches no records', function (): void {
 // --- the cap is for free-form prose, not for values a card renders as links ---
 
 it('keeps a long link value whole so a card href cannot break', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     forceDisplaySettings($user, 'company', 'domains');
 
@@ -449,8 +444,7 @@ it('keeps a long link value whole so a card href cannot break', function (): voi
 });
 
 it('carries choice option names as a values list so the card renders chips', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $stage = forceDisplaySettings($user, 'opportunity', 'stage');
     $option = $stage->options->first();
@@ -469,8 +463,7 @@ it('carries choice option names as a values list so the card renders chips', fun
 // --- (c) blocks are re-derived from persisted tool_results on reload ---
 
 it('derives display_blocks from persisted tool_results on reload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $conversationId = seedBlockConversation($user, blockToolResults());
 
@@ -483,8 +476,7 @@ it('derives display_blocks from persisted tool_results on reload', function (): 
 });
 
 it('returns display_blocks on the latest assistant message for stream-end reconcile', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $conversationId = seedBlockConversation($user, blockToolResults());
 
@@ -497,29 +489,10 @@ it('returns display_blocks on the latest assistant message for stream-end reconc
 
 // --- (d) selection derives from the team's own visibility settings ---
 
-it('hides a list-toggleable field from the table but keeps it on the card', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+it('applies the team visibility settings to the table and the card', function (array $settings, bool $inTable, bool $onCard): void {
+    $user = $this->user;
 
-    seedDisplayField($user, 'company', 'hq', 'HQ', ['list_toggleable_hidden' => true]);
-
-    $company = app(CreateCompany::class)->execute($user, [
-        'name' => 'Acme',
-        'custom_fields' => ['hq' => 'Berlin'],
-    ]);
-
-    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
-    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
-
-    expect(blockColumnKeys($table))->not->toContain('hq')
-        ->and(blockFieldLabels($card))->toContain('HQ');
-});
-
-it('hides a list-hidden field from the table while the card still shows it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-
-    seedDisplayField($user, 'company', 'hq', 'HQ', ['visible_in_list' => false, 'visible_in_view' => true]);
+    seedDisplayField($user, 'company', 'hq', 'HQ', $settings);
 
     $company = app(CreateCompany::class)->execute($user, [
         'name' => 'Acme',
@@ -529,45 +502,14 @@ it('hides a list-hidden field from the table while the card still shows it', fun
     $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
     $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
 
-    expect(blockColumnKeys($table))->not->toContain('hq')
-        ->and(blockFieldLabels($card))->toContain('HQ');
-});
-
-it('hides a view-hidden field from the card while the table still shows it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-
-    seedDisplayField($user, 'company', 'hq', 'HQ', ['visible_in_list' => true, 'visible_in_view' => false]);
-
-    $company = app(CreateCompany::class)->execute($user, [
-        'name' => 'Acme',
-        'custom_fields' => ['hq' => 'Berlin'],
-    ]);
-
-    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
-    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
-
-    expect(blockColumnKeys($table))->toContain('hq')
-        ->and(blockFieldLabels($card))->not->toContain('HQ');
-});
-
-it('drops a field its team hid from both surfaces', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
-
-    seedDisplayField($user, 'company', 'hq', 'HQ', ['visible_in_list' => false, 'visible_in_view' => false]);
-
-    $company = app(CreateCompany::class)->execute($user, [
-        'name' => 'Acme',
-        'custom_fields' => ['hq' => 'Berlin'],
-    ]);
-
-    $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
-    $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
-
-    expect(blockColumnKeys($table))->not->toContain('hq')
-        ->and(blockFieldLabels($card))->not->toContain('HQ');
-});
+    expect(in_array('hq', blockColumnKeys($table), true))->toBe($inTable)
+        ->and(in_array('HQ', blockFieldLabels($card), true))->toBe($onCard);
+})->with([
+    'list-toggleable hidden: card only' => [['list_toggleable_hidden' => true], false, true],
+    'list hidden: card only' => [['visible_in_list' => false, 'visible_in_view' => true], false, true],
+    'view hidden: table only' => [['visible_in_list' => true, 'visible_in_view' => false], true, false],
+    'hidden from both: dropped' => [['visible_in_list' => false, 'visible_in_view' => false], false, false],
+]);
 
 it('never selects another team display fields', function (): void {
     $owner = User::factory()->withPersonalTeam()->create();
@@ -602,8 +544,7 @@ it('never selects another team display fields', function (): void {
 // --- (e) query-aware promotion overrides the team's list settings ---
 
 it('promotes a filtered hidden field to the first column', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'opportunity', 'deal_source', 'Deal Source', [
         'visible_in_list' => false,
@@ -627,8 +568,7 @@ it('promotes a filtered hidden field to the first column', function (): void {
 });
 
 it('promotes a sorted field to the first column', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     seedDisplayField($user, 'opportunity', 'deal_source', 'Deal Source', ['visible_in_list' => false]);
 
@@ -672,8 +612,7 @@ it('promotes this team field when both teams share the code', function (): void 
 // --- token containment: the block never rides back into the replayed history ---
 
 it('strips display_block from the replayed agent history while the row keeps it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $this->actingAs($user);
+    $user = $this->user;
 
     $conversationId = seedBlockConversation($user, blockToolResults(), withToolCalls: true);
 
