@@ -39,3 +39,18 @@ it('tells the model its read results are rendered as a block under the reply', f
         ->toContain('rendered as a table or card block under your reply')
         ->toContain('ONE short lead-in sentence');
 });
+
+/**
+ * Blocks are appended after the whole reply, so with two read tools in one turn
+ * a model-written "**Companies**" header can never sit next to its table: both
+ * headers strand at the bottom of the bubble and both tables land under them.
+ * The only header that can be adjacent is the block's own title, so the prompt
+ * has to forbid the model's.
+ */
+it('forbids per-result headings that would strand above the blocks', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('never write a heading or label naming a result set')
+        ->toContain('Never write a heading or bold label naming a set of results');
+});
