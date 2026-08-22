@@ -71,7 +71,6 @@
                         :aria-pressed="recording"
                         :aria-label="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
                         :title="recording ? @js(__('Stop recording')) : @js(__('Start voice input'))"
-                        data-voice-button
                         class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition disabled:cursor-progress"
                         :class="recording
                             ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400 dark:hover:bg-red-500/30'

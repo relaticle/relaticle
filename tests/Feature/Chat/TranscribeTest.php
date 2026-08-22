@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
 use Relaticle\Chat\Services\ModelRegistry;
@@ -56,7 +58,7 @@ it('422s when no audio is uploaded', function (): void {
 
 it('422s when the audio exceeds the size cap', function (): void {
     $this->postJson(route('chat.transcribe'), [
-        'audio' => UploadedFile::fake()->create('recording.webm', 25601, 'audio/webm'),
+        'audio' => UploadedFile::fake()->create('recording.webm', 2049, 'audio/webm'),
     ])
         ->assertStatus(422)
         ->assertJsonValidationErrors('audio');
@@ -77,7 +79,10 @@ it('returns the transcribed text', function (): void {
         ->assertOk()
         ->assertExactJson(['text' => 'Schedule a follow up with Acme next Tuesday']);
 
-    Transcription::assertGenerated(fn (): bool => true);
+    // Asserts on the bytes that actually reached the SDK, so a controller that
+    // forwarded the wrong file, or returned a hardcoded string without calling
+    // the provider at all, fails here.
+    Transcription::assertGenerated(fn (TranscriptionPrompt $prompt): bool => $prompt->audio->content() === file_get_contents(base_path('tests/fixtures/audio/recording.webm')));
 });
 
 it('accepts every container a browser MediaRecorder produces', function (string $fixture): void {
@@ -88,3 +93,14 @@ it('accepts every container a browser MediaRecorder produces', function (string 
     'chrome webm/opus' => 'recording.webm',
     'safari mp4/aac' => 'recording.m4a',
 ]);
+
+it('throttles after 10 requests a minute', function (): void {
+    Transcription::fake(['ok']);
+    Cache::flush();
+
+    for ($i = 0; $i < 10; $i++) {
+        $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertOk();
+    }
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
+});
