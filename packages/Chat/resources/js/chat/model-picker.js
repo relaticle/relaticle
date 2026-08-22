@@ -7,9 +7,23 @@
 //
 //   ...window.ChatModules.modelPickerModule({ providerIcons: @js([...]) }),
 //   modelOptions: @js(...),
-export function modelPickerModule({ providerIcons }) {
+export function modelPickerModule({ providerIcons, persistSelection = false }) {
     return {
         providerIcons,
+        selectedModel: 'auto',
+
+        selectModel(value) {
+            if (!this.allowedModels.includes(value)) {
+                window.dispatchEvent(new CustomEvent('chat:model-locked', {
+                    detail: { model: value, plan: this.currentPlan, planLabel: this.currentPlanLabel },
+                }));
+                return;
+            }
+            this.selectedModel = value;
+            if (persistSelection) {
+                try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
+            }
+        },
 
         providerIconHtml(provider) {
             if (!provider) return '';

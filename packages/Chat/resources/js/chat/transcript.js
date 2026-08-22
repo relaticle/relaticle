@@ -109,7 +109,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null, messageSearchUnreachableText = 'That message is no longer part of this conversation.', messageSearchStalledText = 'Could not load enough history to reach that message. Try again.', todayLabel = 'Today', yesterdayLabel = 'Yesterday', feedbackDeleteConfirmText = 'Remove this feedback? Your category and comment will be deleted.', blockTitles = {}, blockColumnLabels = {}, blockFooterTemplate = 'Showing :showing of :total' }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -120,8 +120,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     // call repeatedly before the first request even lands.
     loadingEarlier: false,
     _loadEarlierObserver: null,
-    now: Date.now(),
-    copyTickerId: null,
+    // clientKey of the message whose "Copied" indicator is showing.
+    copiedKey: null,
+    _copiedTimer: null,
 
     // Floating sticky-date pill (see initDaySeparatorObserver): the label of
     // the last inline day separator the user has scrolled past, or null when
@@ -187,6 +188,30 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
             m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
         }
         return m;
+    },
+
+    // Normalizes a server-fetched message row for the transcript: stable
+    // client key, marks assistant rows as already-rendered HTML, and seeds
+    // the per-row UI state the templates bind to. Shared by the initial
+    // mount hydration and the chat:messages-prepended handler (see
+    // chat-interface.blade.php).
+    hydrateServerMessage(m) {
+        this.ensureClientKey(m);
+        if (m.role === 'assistant') {
+            m.rendered = true;
+            m.prerendered = true;
+            if (!Array.isArray(m.follow_ups)) {
+                m.follow_ups = [];
+            }
+            m.feedback = m.feedback ?? null;
+            m.feedbackPanelOpen = false;
+            m.feedbackCategory = m.feedback?.category ?? null;
+            m.feedbackComment = '';
+        }
+        if (m.role === 'user') {
+            m.editing = false;
+            m.editText = '';
+        }
     },
 
     // Calendar-day comparison uses the BROWSER's local timezone. No user
@@ -256,7 +281,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     // rather than in the template means an unregistered type leaves no empty
     // frame or stray margin behind.
     displayBlocks(msg) {
-        return (msg?.display_blocks || []).filter((block) => window.ChatModules.blockTemplate(block?.block));
+        return (msg?.display_blocks || []).filter((block) => window.ChatModules.isKnownBlock(block?.block));
     },
 
     blockTitle(block) {
@@ -431,7 +456,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     // wire:navigate round trip resolves. Server truth always wins: whatever
     // this paints is provisional only, because the navigation that follows
     // always finishes by destroying this instance and mounting a fresh one
-    // from ChatInterface::mount() -> fetchMessages(), which wholesale
+    // from ChatInterface::mount()'s ListConversationMessages fetch, which wholesale
     // replaces it regardless of whether the cache was right, stale, or
     // (via the ownership tag) refused outright. Returns true on a cache hit.
     switchConversation(targetConversationId) {
@@ -575,8 +600,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
 
     renderMentionNode(node, ctx = {}) {
         const id = node.attrs?.id ?? '';
-        const idAttr = this.escapeAttr(id);
-        const type = this.escapeAttr(node.attrs?.type ?? '');
+        const idAttr = this.escapeHtml(id);
+        const type = this.escapeHtml(node.attrs?.type ?? '');
         const label = this.escapeHtml(node.attrs?.label ?? '');
         const baseClass = MENTION_CHIP_CLASS;
 
@@ -586,7 +611,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         }
 
         if (url && this.isSafeUrl(url)) {
-            const href = this.escapeAttr(url);
+            const href = this.escapeHtml(url);
             return `<a href="${href}" target="_blank" rel="noopener noreferrer" data-mention-id="${idAttr}" data-mention-type="${type}" class="${baseClass} no-underline transition-colors hover:bg-primary-200 dark:hover:bg-primary-900/60">@${label}</a>`;
         }
 
@@ -614,10 +639,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
-    },
-
-    escapeAttr(str) {
-        return this.escapeHtml(str);
     },
 
     // Shared by the manual "Load earlier messages" button and the top-sentinel
@@ -728,24 +749,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         }
     },
 
-    startCopyTicker() {
-        if (this.copyTickerId) return;
-        this.copyTickerId = setInterval(() => {
-            this.now = Date.now();
-            const stillActive = this.messages.some((m) => m.copiedAt && this.now - m.copiedAt < 1500);
-            if (!stillActive) {
-                this.stopCopyTicker();
-            }
-        }, 200);
-    },
-
-    stopCopyTicker() {
-        if (this.copyTickerId) {
-            clearInterval(this.copyTickerId);
-            this.copyTickerId = null;
-        }
-    },
-
     // Record citations are stored root-relative (`/r/{type}/{id}`) so a
     // transcript renders on whatever host serves it. Pasted anywhere else they
     // have to carry the origin. Both forms are rewritten because `msg.content`
@@ -764,22 +767,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         if (!text) return;
 
         try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(text);
-            } else {
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.setAttribute('readonly', '');
-                textarea.style.position = 'absolute';
-                textarea.style.left = '-9999px';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-            }
-            msg.copiedAt = Date.now();
-            this.now = msg.copiedAt;
-            this.startCopyTicker();
+            await navigator.clipboard.writeText(text);
+            this.copiedKey = msg.clientKey;
+            clearTimeout(this._copiedTimer);
+            this._copiedTimer = setTimeout(() => { this.copiedKey = null; }, 1500);
         } catch (_) { /* clipboard blocked — silently ignore */ }
     },
 
@@ -853,12 +844,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         if (msg?.pending_actions?.some((a) => a.status === 'pending')) {
             return false;
         }
-        for (let i = index - 1; i >= 0; i--) {
-            if (this.messages[i].role === 'user') {
-                return true;
-            }
-        }
-        return false;
+        return this.messages.slice(0, index).some((m) => m.role === 'user');
     },
 
     canEdit(index) {
@@ -1042,10 +1028,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         }
     },
 
-    jumpToLatest() {
-        this.scrollToBottom(true);
-    },
-
     // Keyboard layer. Bound via `x-on:keydown` directly on the chat root
     // element (see chat-interface.blade.php), NOT `window`/`document`: Alpine
     // tears the listener down with the component for free, and it only fires
@@ -1146,11 +1128,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     // edit pencil on the last user message (isStreaming and a pending-approval
     // block are already covered by canEdit()).
     maybeEditLastUserMessage() {
-        for (let i = this.messages.length - 1; i >= 0; i--) {
-            if (this.messages[i].role !== 'user') continue;
-            if (this.canEdit(i)) this.startEdit(this.messages[i], i);
-            return;
-        }
+        const i = this.messages.findLastIndex((m) => m.role === 'user');
+        if (i !== -1 && this.canEdit(i)) this.startEdit(this.messages[i], i);
     },
 
     filteredSwitcherItems() {
@@ -1210,7 +1189,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         this.closeSwitcher();
         if (!item?.id || !this.switcherConversationUrlTemplate) return;
         if (item.id === this.conversationId) return;
-        const url = this.switcherConversationUrlTemplate.replace(this.switcherConversationUrlPlaceholder, item.id);
+        const url = this.switcherConversationUrlTemplate.replace(CONVERSATION_ID_PLACEHOLDER, item.id);
         if (window.Alpine?.navigate) {
             window.Alpine.navigate(url);
         } else {
@@ -1452,12 +1431,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
             const el = container.querySelector(`[data-message-id="${id}"]`);
             if (!el) return;
 
-            const containerRect = container.getBoundingClientRect();
-            const elRect = el.getBoundingClientRect();
-            const offset = (elRect.top - containerRect.top) - (containerRect.height - elRect.height) / 2;
-
-            container.scrollTo({
-                top: container.scrollTop + offset,
+            el.scrollIntoView({
+                block: 'center',
                 behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
             });
         }, 0);

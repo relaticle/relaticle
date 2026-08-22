@@ -82,7 +82,7 @@ import { chatEditor } from './chat-editor';
 import { transcriptModule } from './chat/transcript';
 import { sendModule } from './chat/send';
 import { streamModule } from './chat/stream';
-import { registerBlock, blockTemplate } from './chat/blocks';
+import { isKnownBlock } from './chat/blocks';
 import { modelPickerModule } from './chat/model-picker';
 import { voiceRecorder } from './chat/voice';
 
@@ -104,7 +104,7 @@ if (!registerChatComponents()) {
 // server data). These module factories are exposed here so that inline
 // script can compose them without a bundler import.
 //
-// registerBlock/blockTemplate/recordChipIcon are plain functions, not module
-// factories: exposed alongside so the transcript partials (also inline,
-// unbundled) can call window.ChatModules.blockTemplate() directly.
-window.ChatModules = { transcriptModule, sendModule, streamModule, registerBlock, blockTemplate, recordChipIcon, modelPickerModule };
+// isKnownBlock/recordChipIcon are plain functions, not module factories:
+// exposed alongside so the transcript partials (also inline, unbundled) can
+// call window.ChatModules.isKnownBlock() directly.
+window.ChatModules = { transcriptModule, sendModule, streamModule, isKnownBlock, recordChipIcon, modelPickerModule };

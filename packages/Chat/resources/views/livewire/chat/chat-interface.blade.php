@@ -11,7 +11,6 @@
         pageContextConsumed = false;
     "
     data-chat-context="{{ $context ?? 'conversation' }}"
-    data-chat-context-name="{{ $context ?? 'conversation' }}"
     class="relative flex h-full flex-col"
 >
     @include('chat::livewire.chat.partials._transcript')
@@ -73,7 +72,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     ...window.ChatModules.sendModule({
         sendUrl,
         createConversationUrl: @js(route('chat.conversations.create')),
-        conversationsUrl: @js(url('/chat/conversations')),
     }),
     ...window.ChatModules.streamModule(),
 
@@ -89,14 +87,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // a UrlGenerationException for the missing {tenant} route parameter).
     conversationsUrl: @js(url('/chat/conversations')),
     switcherConversationUrlTemplate: @js(\Filament\Facades\Filament::getTenant() === null ? null : \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => '__CONVERSATION_ID__'])),
-    switcherConversationUrlPlaceholder: '__CONVERSATION_ID__',
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     isStreaming: false,
-    currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
-    currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-    allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
-    selectedModel: 'auto',
+    @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),
     // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
@@ -139,33 +133,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         return icons[this.pageContext?.type] ?? icons.company;
     },
 
+    // Scoped lookup of THIS chat-interface's TipTap editor. Avoids a global
+    // that breaks when multiple chat-interface instances render simultaneously
+    // (e.g. side panel + main page). Deliberately `document.querySelector`
+    // scoped by data-chat-context rather than `this.$root.querySelector`:
+    // Livewire's morphdom can briefly detach children from the root during a
+    // re-render, which is exactly when sendMessage() needs the editor most.
     localEditor() {
         const ctx = (this.$root || this.$el)?.getAttribute?.('data-chat-context') ?? 'conversation';
         const wrapper = document.querySelector(`[data-chat-context="${ctx}"][x-data*="chatEditor"]`);
         if (! wrapper || ! window.Alpine) return null;
         return window.Alpine.$data(wrapper);
-    },
-
-    modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
-
-    ...window.ChatModules.modelPickerModule({
-        providerIcons: @js([
-            'anthropic' => svg('ri-claude-fill')->toHtml(),
-            'openai' => svg('ri-openai-fill')->toHtml(),
-            'ollama' => svg('ri-server-line')->toHtml(),
-            'selfhosted' => svg('ri-server-line')->toHtml(),
-        ]),
-    }),
-
-    selectModel(value) {
-        if (! this.allowedModels.includes(value)) {
-            window.dispatchEvent(new CustomEvent('chat:model-locked', {
-                detail: { model: value, plan: this.currentPlan, planLabel: this.currentPlanLabel },
-            }));
-            return;
-        }
-        this.selectedModel = value;
-        try { localStorage.setItem('chat:model', value); } catch (_) { /* ignore */ }
     },
 
     // Record-aware when the side panel supplies them (so the chips name the record
@@ -178,7 +156,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     ]),
 
     init() {
-        this.context = this.$root?.dataset?.chatContextName ?? 'conversation';
+        this.context = this.$root?.dataset?.chatContext ?? 'conversation';
         this.installConversationSwitchWatch();
         this.initDaySeparatorObserver();
 
@@ -190,27 +168,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         const candidate = stored || initialModel || 'auto';
         this.selectedModel = validModels.includes(candidate) ? candidate : 'auto';
 
-        this.messages.forEach((m) => {
-            this.ensureClientKey(m);
-            if (m.role === 'assistant') {
-                m.rendered = true;
-                m.prerendered = true;
-                if (!Array.isArray(m.follow_ups)) {
-                    m.follow_ups = [];
-                }
-                m.feedback = m.feedback ?? null;
-                m.feedbackPanelOpen = false;
-                m.feedbackCategory = m.feedback?.category ?? null;
-                m.feedbackComment = '';
-            }
-            if (m.role === 'user') {
-                m.editing = false;
-                m.editText = '';
-            }
-            if (typeof m.copiedAt === 'undefined') {
-                m.copiedAt = 0;
-            }
-        });
+        this.messages.forEach((m) => this.hydrateServerMessage(m));
 
         if (this.conversationId) {
             this.subscribeToConversation(this.conversationId);
@@ -329,27 +287,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             const earlier = (payload && payload.messages) || [];
             const hasMore = payload ? !!payload.hasMore : false;
             if (earlier.length > 0) {
-                earlier.forEach((m) => {
-                    this.ensureClientKey(m);
-                    if (m.role === 'assistant') {
-                        m.rendered = true;
-                        m.prerendered = true;
-                        if (!Array.isArray(m.follow_ups)) {
-                            m.follow_ups = [];
-                        }
-                        m.feedback = m.feedback ?? null;
-                        m.feedbackPanelOpen = false;
-                        m.feedbackCategory = m.feedback?.category ?? null;
-                        m.feedbackComment = '';
-                    }
-                    if (m.role === 'user') {
-                        m.editing = false;
-                        m.editText = '';
-                    }
-                    if (typeof m.copiedAt === 'undefined') {
-                        m.copiedAt = 0;
-                    }
-                });
+                earlier.forEach((m) => this.hydrateServerMessage(m));
                 this.messages = [...earlier, ...this.messages];
             }
             this.hasMoreMessages = hasMore;
@@ -400,7 +338,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.teardownLoadEarlierObserver();
         this.teardownMessageSearch();
         this.clearStreamTimeout();
-        this.stopCopyTicker();
+        clearTimeout(this._copiedTimer);
         this.clearRateLimit();
         // Without this, a pending saveDraft() debounce outlives this instance
         // (e.g. a fragment typed here, then the user switches conversations

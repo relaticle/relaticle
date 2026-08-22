@@ -1,10 +1,17 @@
 // sendMessage, retry/resume, rate-limit handling, and the optimistic user
 // bubble. Spread into the `chatInterface` Alpine component alongside
 // transcriptModule() and streamModule(): see chat-interface.blade.php for
-// the composition. `sendUrl`, `createConversationUrl`, and `conversationsUrl`
-// replace what were `@js(...)` Blade calls inline in these method bodies
-// before the move; they carry the exact same route values.
-export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl }) => ({
+// the composition. `sendUrl` and `createConversationUrl` replace what were
+// `@js(...)` Blade calls inline in these method bodies before the move; they
+// carry the exact same route values. Conversation-scoped endpoints build on
+// `this.conversationsUrl`, set on the composed component by the same blade.
+const jsonHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+});
+
+export const sendModule = ({ sendUrl, createConversationUrl }) => ({
     input: '',
     streamAbortController: null,
 
@@ -20,17 +27,6 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     // with its own resend control.
     rateLimit: null,
 
-    // Scoped lookup of THIS chat-interface's TipTap editor. Avoids the
-    // window.__chatEditor global that breaks when multiple chat-interface
-    // instances render simultaneously (e.g. side panel + main page).
-    //
-    // We deliberately use `document.querySelector` scoped by data-chat-context
-    // rather than `this.$root.querySelector` because Livewire's morphdom can
-    // briefly detach children from the chat-interface root during a re-render,
-    // and `this.$root.querySelector` returns null for the editor wrapper in
-    // that window — which is exactly when sendMessage() needs it most to
-    // call clear() after a send. Both this.$root and the chatEditor wrapper
-    // expose data-chat-context, so the selector is unambiguous.
     // Documents stashed in Alpine state come back as reactive Proxies, and
     // TipTap's setDocument structuredClones its input — Proxies cannot be
     // structuredCloned, so the call throws and silently kills whatever line
@@ -180,13 +176,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // makes it unreachable by click in the first place.
         if (this.rateLimit) return;
 
-        let userIndex = -1;
-        for (let i = index - 1; i >= 0; i--) {
-            if (this.messages[i].role === 'user') {
-                userIndex = i;
-                break;
-            }
-        }
+        const userIndex = this.messages.slice(0, index).findLastIndex((m) => m.role === 'user');
         if (userIndex === -1) return;
 
         const userMsg = this.messages[userIndex];
@@ -208,13 +198,9 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     async supersedeServerTurns(userMsg) {
         if (!this.conversationId) return true;
         try {
-            const res = await fetch(conversationsUrl + '/' + this.conversationId + '/messages/supersede', {
+            const res = await fetch(this.conversationsUrl + '/' + this.conversationId + '/messages/supersede', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
+                headers: jsonHeaders(),
                 body: JSON.stringify({
                     anchor_id: userMsg.id ?? null,
                     anchor_content: userMsg.id ? null : (userMsg.content || null),
@@ -296,7 +282,6 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
             document: payload,
             editing: false,
             editText: '',
-            copiedAt: 0,
             created_at: nowIso,
             page_context: contextForSend,
             sendState: 'sending',
@@ -343,6 +328,43 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId);
     },
 
+    // Shared failure path for a non-OK create/send response. Paints the
+    // status-specific state on the latest assistant stub (429 throttle
+    // countdown, 401/419 session-expired with a local draft, 402 paywall,
+    // generic message otherwise) and marks the user turn failed.
+    async failSend(res, userMsg) {
+        const body = await res.json().catch(() => ({}));
+
+        if (res.status === 429 && body?.error === 'rate_limited') {
+            this.handleSendRateLimit(userMsg, body);
+            return;
+        }
+
+        const assistantMsg = this.messages[this.messages.length - 1];
+
+        if (res.status === 401 || res.status === 419) {
+            try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
+            assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
+            assistantMsg.sessionExpired = true;
+        } else if (res.status === 402 && body?.error === 'credits_exhausted') {
+            const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
+            assistantMsg.paywall = {
+                heading: "You've used all your AI credits",
+                body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
+                upgrade_url: body.top_up_url || body.upgrade_url || '/app',
+            };
+            assistantMsg.content = '';
+        } else {
+            assistantMsg.content = body?.errors?.document?.[0] || body?.message || `Error ${res.status}: ${res.statusText}`;
+        }
+
+        assistantMsg.rendered = true;
+        userMsg.sendState = 'failed';
+        this.isStreaming = false;
+        this.clearStreamTimeout();
+        this.restoreInputFocus();
+    },
+
     // The network round trip shared by a fresh sendMessage() and a
     // resendMessage() retry. `userMsg` is mutated in place (sendState only,
     // never re-pushed), so both callers converge on the exact same bubble.
@@ -365,11 +387,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 // attempting to subscribe.
                 const createRes = await fetch(createConversationUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
+                    headers: jsonHeaders(),
                     body: JSON.stringify({
                         document: payload,
                         model: this.selectedModel !== 'auto' ? this.selectedModel : undefined,
@@ -377,26 +395,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 });
 
                 if (!createRes.ok) {
-                    const body = await createRes.json().catch(() => ({}));
-
-                    if (createRes.status === 429 && body?.error === 'rate_limited') {
-                        this.handleSendRateLimit(userMsg, body);
-                        return;
-                    }
-
-                    const assistantMsg = this.messages[this.messages.length - 1];
-
-                    if (createRes.status === 401 || createRes.status === 419) {
-                        try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
-                        assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
-                        assistantMsg.sessionExpired = true;
-                    } else {
-                        assistantMsg.content = body?.errors?.document?.[0] ?? body?.message ?? `Error ${createRes.status}: ${createRes.statusText}`;
-                    }
-                    assistantMsg.rendered = true;
-                    userMsg.sendState = 'failed';
-                    this.isStreaming = false;
-                    this.restoreInputFocus();
+                    await this.failSend(createRes, userMsg);
                     return;
                 }
 
@@ -429,11 +428,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
 
                 const sendRes = await fetch(sendUrl.replace(/\/$/, '') + '/' + newId, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    },
+                    headers: jsonHeaders(),
                     body: JSON.stringify({
                         document: payload,
                         conversation_id: newId,
@@ -444,31 +439,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
                 });
 
                 if (!sendRes.ok) {
-                    const body = await sendRes.json().catch(() => ({}));
-
-                    if (sendRes.status === 429 && body?.error === 'rate_limited') {
-                        this.handleSendRateLimit(userMsg, body);
-                        return;
-                    }
-
-                    const assistantMsg = this.messages[this.messages.length - 1];
-
-                    if (sendRes.status === 402 && body?.error === 'credits_exhausted') {
-                        const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
-                        assistantMsg.paywall = {
-                            heading: "You've used all your AI credits",
-                            body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                            upgrade_url: body.top_up_url || body.upgrade_url || '/app',
-                        };
-                        assistantMsg.content = '';
-                    } else {
-                        assistantMsg.content = body?.message || `Error ${sendRes.status}: ${sendRes.statusText}`;
-                    }
-                    assistantMsg.rendered = true;
-                    userMsg.sendState = 'failed';
-                    this.isStreaming = false;
-                    this.clearStreamTimeout();
-                    this.restoreInputFocus();
+                    await this.failSend(sendRes, userMsg);
                     return;
                 }
 
@@ -521,11 +492,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
 
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': window.document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
+                headers: jsonHeaders(),
                 body: JSON.stringify({
                     document: payload,
                     conversation_id: this.conversationId,
@@ -536,44 +503,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
             });
 
             if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-
-                if (response.status === 429 && body?.error === 'rate_limited') {
-                    this.handleSendRateLimit(userMsg, body);
-                    return;
-                }
-
-                const assistantMsg = this.messages[this.messages.length - 1];
-
-                if (response.status === 401 || response.status === 419) {
-                    try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
-                    assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
-                    assistantMsg.sessionExpired = true;
-                    assistantMsg.rendered = true;
-                    userMsg.sendState = 'failed';
-                    this.isStreaming = false;
-                    this.clearStreamTimeout();
-                    this.restoreInputFocus();
-                    return;
-                }
-
-                if (response.status === 402 && body?.error === 'credits_exhausted') {
-                    const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
-                    assistantMsg.paywall = {
-                        heading: "You've used all your AI credits",
-                        body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
-                        upgrade_url: body.top_up_url || body.upgrade_url || '/app',
-                    };
-                    assistantMsg.content = '';
-                } else {
-                    assistantMsg.content = body.message || `Error ${response.status}: ${response.statusText}`;
-                }
-
-                assistantMsg.rendered = true;
-                userMsg.sendState = 'failed';
-                this.isStreaming = false;
-                this.clearStreamTimeout();
-                this.restoreInputFocus();
+                await this.failSend(response, userMsg);
                 return;
             }
 
@@ -613,7 +543,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
     async cancelStream() {
         if (this.conversationId) {
             try {
-                await fetch(conversationsUrl + '/' + this.conversationId + '/cancel', {
+                await fetch(this.conversationsUrl + '/' + this.conversationId + '/cancel', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
@@ -656,11 +586,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, conversationsUrl })
         // preceding user message from local state (same flow as edit-resend).
         // Compute userIndex BEFORE committing to any state change so the no-op
         // path never sets _retrying.
-        const idx = this.messages.indexOf(msg);
-        let userIndex = -1;
-        for (let i = idx - 1; i >= 0; i--) {
-            if (this.messages[i].role === 'user') { userIndex = i; break; }
-        }
+        const userIndex = this.messages.slice(0, this.messages.indexOf(msg)).findLastIndex((m) => m.role === 'user');
         if (userIndex === -1) return;
 
         const userText = this.messages[userIndex].content;

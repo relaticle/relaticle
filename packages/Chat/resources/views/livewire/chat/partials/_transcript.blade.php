@@ -32,12 +32,7 @@
                     </p>
                     <div class="mt-4 flex flex-wrap justify-center gap-2">
                         <template x-for="starter in starterPrompts" :key="starter.label">
-                            <button
-                                type="button"
-                                x-on:click="input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())"
-                                x-text="starter.label"
-                                class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                            ></button>
+                            @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'starter', 'click' => 'input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())'])
                         </template>
                     </div>
                 @endif
@@ -291,14 +286,14 @@
 
                         {{-- Read-tool display blocks: the real table/card that replaces the
                              markdown table the model used to hand-write. Dispatched through the
-                             same registry as the proposal card above (see chat/blocks.js);
-                             displayBlocks() has already dropped anything unregistered. --}}
+                             displayBlocks() has already dropped any type this build
+                             does not know (see chat/blocks.js). --}}
                         <template x-for="(block, blockIdx) in displayBlocks(msg)" :key="blockIdx">
                             <div class="mt-3 w-full max-w-[85%]">
-                                <template x-if="window.ChatModules.blockTemplate(block.block) === 'chat-block-records-table'">
+                                <template x-if="block.block === 'records_table'">
                                     @include('chat::livewire.chat.partials._block-records-table')
                                 </template>
-                                <template x-if="window.ChatModules.blockTemplate(block.block) === 'chat-block-record-card'">
+                                <template x-if="block.block === 'record_card'">
                                     @include('chat::livewire.chat.partials._block-record-card')
                                 </template>
                             </div>
@@ -307,12 +302,7 @@
                         <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
                             <div class="mt-2 flex flex-wrap gap-2">
                                 <template x-for="chip in msg.follow_ups" :key="chip.prompt">
-                                    <button
-                                        type="button"
-                                        x-on:click="input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())"
-                                        x-text="chip.label"
-                                        class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                                    ></button>
+                                    @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'chip', 'click' => 'input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())'])
                                 </template>
                             </div>
                         </template>
@@ -322,14 +312,14 @@
                                 <button
                                     type="button"
                                     x-on:click="copyMessage(msg)"
-                                    :aria-label="(now - (msg.copiedAt || 0) < 1500) ? 'Copied' : 'Copy message'"
-                                    :title="(now - (msg.copiedAt || 0) < 1500) ? 'Copied' : 'Copy message'"
+                                    :aria-label="copiedKey === msg.clientKey ? 'Copied' : 'Copy message'"
+                                    :title="copiedKey === msg.clientKey ? 'Copied' : 'Copy message'"
                                     class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                                 >
-                                    <template x-if="now - (msg.copiedAt || 0) < 1500">
+                                    <template x-if="copiedKey === msg.clientKey">
                                         <x-heroicon-s-check class="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
                                     </template>
-                                    <template x-if="!(now - (msg.copiedAt || 0) < 1500)">
+                                    <template x-if="copiedKey !== msg.clientKey">
                                         <x-heroicon-o-document-duplicate class="h-3.5 w-3.5" aria-hidden="true" />
                                     </template>
                                 </button>
@@ -458,10 +448,7 @@
                     <div class="mt-3 space-y-3">
                         <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
                             <div class="space-y-2">
-                                {{-- Block-renderer registry lookup (packages/Chat/resources/js/chat/blocks.js):
-                                     an unregistered type renders nothing, silently. Only 'pending_action' is
-                                     registered today, mapped to this proposal-card partial. --}}
-                                <template x-if="window.ChatModules.blockTemplate('pending_action') && (action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0))">
+                                <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
                                     @include('chat::livewire.chat.partials._proposal-card')
                                 </template>
 
@@ -505,7 +492,7 @@
         <template x-if="hasUnseenBelow">
             <button
                 type="button"
-                x-on:click="jumpToLatest()"
+                x-on:click="scrollToBottom(true)"
                 class="flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
                 x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
