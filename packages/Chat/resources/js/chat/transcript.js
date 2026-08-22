@@ -291,10 +291,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         return column?.key === block?.core && !!row?.url && this.blockCell(row, column) !== '';
     },
 
-    blockChipIcon(type) {
-        return window.ChatModules.recordChipIcon(type) ?? '';
-    },
-
     blockFooter(block) {
         const showing = (block?.rows || []).length;
 

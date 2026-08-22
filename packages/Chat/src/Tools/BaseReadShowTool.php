@@ -80,14 +80,6 @@ abstract class BaseReadShowTool implements Tool
 
     abstract public function description(): string;
 
-    /**
-     * The custom-fields entity alias, which is also the citation/morph alias.
-     */
-    protected function entityType(): string
-    {
-        return $this->citationType();
-    }
-
     /** @return array<int, string> */
     protected function eagerLoad(): array
     {
@@ -201,7 +193,7 @@ abstract class BaseReadShowTool implements Tool
     {
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
             $model,
-            resolve(DisplayFieldSelector::class)->cardFields($user->currentTeam, $this->entityType()),
+            resolve(DisplayFieldSelector::class)->cardFields($user->currentTeam, $this->citationType()),
             self::FREE_TEXT_LIMIT,
         );
 

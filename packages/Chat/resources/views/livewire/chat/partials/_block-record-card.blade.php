@@ -12,7 +12,7 @@
     <template x-if="block.url">
         <a class="chat-chip" :data-record-type="block.type" :href="block.url">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" :d="blockChipIcon(block.type)"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
             </svg>
             <span class="chat-chip-label" x-text="block.title"></span>
         </a>

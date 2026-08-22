@@ -199,7 +199,7 @@ final readonly class CustomFieldsDisplayFormatter
      */
     private function condense(string $value, ?int $limit): string
     {
-        $oneLine = trim((string) preg_replace('/\s+/', ' ', $value));
+        $oneLine = Str::squish($value);
 
         return $limit === null ? $oneLine : Str::limit($oneLine, $limit);
     }
