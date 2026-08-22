@@ -26,7 +26,7 @@ function hasContent(doc) {
     return true;
 }
 
-export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofocus } = {}) {
+export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofocus, mentionTexts } = {}) {
     return {
         editorEl: null,
         // Reactive mirror of the editor's plain text. Alpine bindings depending
@@ -73,7 +73,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                     Placeholder.configure({ placeholder: placeholder ?? 'Ask anything…' }),
                     ChatMention.configure({
                         HTMLAttributes: { class: 'mention' },
-                        suggestion: createMentionSuggestion(),
+                        suggestion: createMentionSuggestion({ texts: mentionTexts }),
                     }),
                 ],
                 // ProseMirror requires `block+` content; pass an empty paragraph rather

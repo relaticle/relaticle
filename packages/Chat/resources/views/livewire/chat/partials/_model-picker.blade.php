@@ -12,7 +12,7 @@
             : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-700 dark:hover:text-white'"
         :aria-expanded="menuOpen"
         aria-haspopup="listbox"
-        aria-label="Select AI model"
+        aria-label="{{ __('Select AI model') }}"
     >
         <span
             x-show="modelProvider(selectedModel)"
@@ -28,7 +28,7 @@
         x-on:click.away="menuOpen = false"
         x-transition.opacity.duration.100ms
         role="listbox"
-        aria-label="AI model options"
+        aria-label="{{ __('AI model options') }}"
         class="absolute bottom-full right-0 z-10 mb-2 w-56 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800"
         style="display: none;"
     >

@@ -27,7 +27,9 @@
             </div>
 
             <p class="mt-2 text-xs text-gray-400 dark:text-gray-500"
-               x-text="`${Object.keys(action.itemResults || {}).length} of ${(action.display?.items?.length ?? 0)} resolved — review the rest below`"></p>
+               x-text="@js(__(':resolved of :total resolved. Review the rest below.'))
+                   .replace(':resolved', String(Object.keys(action.itemResults || {}).length))
+                   .replace(':total', String(action.display?.items?.length ?? 0))"></p>
         </div>
     </template>
 
@@ -57,9 +59,15 @@
                 </div>
 
                 <div class="min-w-0 flex-1 pt-1">
-                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? (action.operation.charAt(0).toUpperCase() + action.operation.slice(1))"></p>
+                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? ((@js([
+                        'create' => __('Create'),
+                        'update' => __('Update'),
+                        'delete' => __('Delete'),
+                    ]))[action.operation] ?? action.operation)"></p>
                 </div>
 
+                {{-- Translated label map, not charAt-capitalized enum values:
+                     'superseded' also reads as jargon, so it shows as Replaced. --}}
                 <span
                     class="mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
                     :class="{
@@ -67,7 +75,12 @@
                         'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
                         'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
                     }"
-                    x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
+                    x-text="(@js([
+                        'approved' => __('Approved'),
+                        'rejected' => __('Rejected'),
+                        'expired' => __('Expired'),
+                        'superseded' => __('Replaced'),
+                    ]))[action.status] ?? action.status"
                 ></span>
             </div>
 

@@ -68,12 +68,57 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ],
         ]),
         blockFooterTemplate: @js(__('Showing :showing of :total')),
+        feedbackCategories: @js([
+            ['value' => 'inaccurate', 'label' => __('Inaccurate')],
+            ['value' => 'did_not_follow', 'label' => __("Didn't do what I asked")],
+            ['value' => 'too_slow', 'label' => __('Too slow')],
+            ['value' => 'other', 'label' => __('Other')],
+        ]),
+        proposalTexts: @js([
+            'createdVerb' => __('Created'),
+            'updatedVerb' => __('Updated'),
+            'deletedVerb' => __('Deleted'),
+            'keptWord' => __('kept'),
+            'skippedWord' => __('skipped'),
+            'outcomePart' => __(':verb :names'),
+            'outcomeSingle' => __(':verb :name.'),
+            'fallbackRecord' => __('record'),
+            'fallbackTheRecord' => __('the record'),
+            'keptDeletionDiscarded' => __('Kept :name, deletion discarded.'),
+            'deletionDiscarded' => __('Deletion discarded.'),
+            'discardedName' => __('Discarded :name.'),
+            'proposalDiscarded' => __('Proposal discarded.'),
+        ]),
     }),
     ...window.ChatModules.sendModule({
         sendUrl,
         createConversationUrl: @js(route('chat.conversations.create')),
+        texts: @js([
+            'sessionExpired' => __('Your session expired. Please sign in again: your message is saved locally.'),
+            'paywallHeading' => __("You've used all your AI credits"),
+            'paywallReset' => __('Your plan resets on :date.'),
+            'paywallTopUp' => __('Add credits to keep chatting.'),
+            'requestError' => __('Error :status: :text'),
+            'networkError' => __('Network error. Please try again.'),
+            'cancelled' => __('Cancelled.'),
+        ]),
     }),
-    ...window.ChatModules.streamModule(),
+    ...window.ChatModules.streamModule({
+        texts: @js([
+            'runningTool' => __('Running tool…'),
+            'readingSummary' => __('Reading CRM summary…'),
+            'searchingCrm' => __('Searching CRM…'),
+            'runningName' => __('Running :name…'),
+            'searchingEntity' => __('Searching :entity…'),
+            'lookingUpEntity' => __('Looking up :entity…'),
+            'draftingEntity' => __('Drafting :entity…'),
+            'updatingEntity' => __('Preparing :entity changes…'),
+            'deletingEntity' => __('Preparing :entity deletion…'),
+            'streamError' => __('The assistant encountered an error. Please try again.'),
+            'timeout' => __('The assistant took too long to respond.'),
+            'retrying' => __('Provider is busy, retrying (attempt :attempt of :max)…'),
+        ]),
+    }),
 
     conversationId: initialConversationId,
     userId,
@@ -149,10 +194,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // Record-aware when the side panel supplies them (so the chips name the record
     // you are looking at); generic fallback on the full-page chat, which has no record.
     starterPrompts: @js($contextPrompts !== [] ? $contextPrompts : [
-        ['label' => 'Give me a CRM overview', 'prompt' => 'Give me a CRM overview'],
-        ['label' => 'Show overdue tasks', 'prompt' => 'Show overdue tasks'],
-        ['label' => 'Recent companies', 'prompt' => 'Recent companies'],
-        ['label' => 'Pipeline summary', 'prompt' => 'Pipeline summary'],
+        ['label' => __('Give me a CRM overview'), 'prompt' => __('Give me a CRM overview')],
+        ['label' => __('Show overdue tasks'), 'prompt' => __('Show overdue tasks')],
+        ['label' => __('Recent companies'), 'prompt' => __('Recent companies')],
+        ['label' => __('Pipeline summary'), 'prompt' => __('Pipeline summary')],
     ]),
 
     init() {
@@ -268,7 +313,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             if (!detail.conversationId || detail.conversationId !== this.conversationId) return;
 
             // Update document.title for the browser tab.
-            document.title = `${detail.title || 'Untitled'} - Relaticle`;
+            document.title = `${detail.title || @js(__('Untitled chat'))} - ${@js(config('app.name'))}`;
 
             // Update the visible H1 if present (Filament page header).
             const h1 = document.querySelector('main h1');
@@ -360,7 +405,19 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     },
 
     get pendingLabel() {
-        return this.currentToolStatus ?? 'Thinking…';
+        return this.currentToolStatus ?? @js(__('Thinking…'));
+    },
+
+    // Shared by :title and :aria-label on the transcript's edit/regenerate
+    // buttons, so the four call sites stay one string each.
+    editButtonLabel(index) {
+        if (this.rateLimit !== null) return @js(__('Cannot edit: sending too fast'));
+        return this.canEdit(index) ? @js(__('Edit message')) : @js(__('Cannot edit: pending approval'));
+    },
+
+    regenerateButtonLabel(index) {
+        if (this.rateLimit !== null) return @js(__('Cannot regenerate: sending too fast'));
+        return this.canRegenerate(index) ? @js(__('Regenerate response')) : @js(__('Cannot regenerate: pending approval'));
     },
 
     restoreInputFocus() {

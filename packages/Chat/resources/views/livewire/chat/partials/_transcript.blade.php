@@ -191,7 +191,7 @@
                                         @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); saveEdit(msg, index) }"
                                         rows="1"
                                         maxlength="5000"
-                                        aria-label="Edit message"
+                                        aria-label="{{ __('Edit message') }}"
                                         class="block min-h-[28px] w-full resize-none rounded-xl border-0 bg-primary-700/40 px-3 py-2 text-sm leading-6 text-white placeholder:text-primary-100/70 focus:outline-none focus:ring-2 focus:ring-white/40"
                                         style="max-height: 200px;"
                                     ></textarea>
@@ -209,17 +209,17 @@
                                             <button
                                                 type="button"
                                                 x-on:click="cancelEdit(msg)"
-                                                class="rounded-lg bg-primary-700/40 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700/70"
+                                                class="rounded-lg bg-primary-700/40 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60"
                                             >
-                                                Cancel
+                                                {{ __('Cancel') }}
                                             </button>
                                             <button
                                                 type="button"
                                                 x-on:click="saveEdit(msg, index)"
                                                 :disabled="!(msg.editText || '').trim() || (msg.editText || '').length > 5000 || isStreaming || rateLimit !== null"
-                                                class="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:bg-white/60 disabled:text-primary-400"
+                                                class="rounded-lg bg-white px-2.5 py-1 text-xs font-medium text-primary-700 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/60 disabled:cursor-not-allowed disabled:bg-white/60 disabled:text-primary-400"
                                             >
-                                                Save &amp; resend
+                                                {{ __('Save & resend') }}
                                             </button>
                                         </div>
                                     </div>
@@ -233,9 +233,9 @@
                                         data-edit-button
                                         x-on:click="(canEdit(index) && rateLimit === null) && startEdit(msg, index)"
                                         :disabled="!canEdit(index) || rateLimit !== null"
-                                        :title="rateLimit !== null ? 'Cannot edit: sending too fast' : (canEdit(index) ? 'Edit message' : 'Cannot edit: pending approval')"
-                                        :aria-label="rateLimit !== null ? 'Cannot edit: sending too fast' : (canEdit(index) ? 'Edit message' : 'Cannot edit: pending approval')"
-                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                        :title="editButtonLabel(index)"
+                                        :aria-label="editButtonLabel(index)"
+                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                                     >
                                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
                                     </button>
@@ -250,7 +250,7 @@
                     <div class="flex flex-col items-start" data-assistant-bubble :data-grouped="decorations(index).grouped">
                         <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
-                                :title="msg.created_at ? 'Completed ' + new Date(msg.created_at).toLocaleString() : ''"
+                                :title="msg.created_at ? @js(__('Completed :time')).replace(':time', new Date(msg.created_at).toLocaleString()) : ''"
                                 class="prose prose-sm dark:prose-invert max-w-[85%] rounded-2xl rounded-bl-md bg-white px-4 py-3 text-gray-900 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
                             >
                                 <template x-if="msg.rendered && msg.prerendered">
@@ -284,9 +284,9 @@
                                     data-retry-button
                                     x-show="msg.retryable && !isStreaming && !rateLimit"
                                     x-on:click="retryTurn(msg)"
-                                    class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white hover:bg-amber-700"
+                                    class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                                 >
-                                    Retry
+                                    {{ __('Retry') }}
                                 </button>
                             </div>
                         </template>
@@ -319,9 +319,9 @@
                                 <button
                                     type="button"
                                     x-on:click="copyMessage(msg)"
-                                    :aria-label="copiedKey === msg.clientKey ? 'Copied' : 'Copy message'"
-                                    :title="copiedKey === msg.clientKey ? 'Copied' : 'Copy message'"
-                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                                    :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
+                                    :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
+                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-200"
                                 >
                                     <template x-if="copiedKey === msg.clientKey">
                                         <x-heroicon-s-check class="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
@@ -330,18 +330,19 @@
                                         <x-heroicon-o-document-duplicate class="h-3.5 w-3.5" aria-hidden="true" />
                                     </template>
                                 </button>
+                                {{-- Icon-only like its copy/thumbs siblings (ChatGPT's action-row
+                                     density); the tooltip carries the label. --}}
                                 <button
                                     type="button"
                                     data-regenerate-button
                                     x-show="!isStreaming"
                                     x-on:click="regenerateMessage(index)"
                                     :disabled="!canRegenerate(index) || rateLimit !== null"
-                                    :aria-label="rateLimit !== null ? 'Cannot regenerate: sending too fast' : (canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate: pending approval')"
-                                    :title="rateLimit !== null ? 'Cannot regenerate: sending too fast' : (canRegenerate(index) ? 'Regenerate response' : 'Cannot regenerate: pending approval')"
-                                    class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-400"
+                                    :aria-label="regenerateButtonLabel(index)"
+                                    :title="regenerateButtonLabel(index)"
+                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-400"
                                 >
                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
-                                    <span>Regenerate</span>
                                 </button>
                                 <template x-if="msg.id">
                                     <span class="flex items-center gap-0.5">
@@ -349,9 +350,9 @@
                                             type="button"
                                             x-on:click="rateMessage(msg, 'up')"
                                             :aria-pressed="msg.feedback?.rating === 'up'"
-                                            aria-label="Good response"
-                                            title="Good response"
-                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            aria-label="{{ __('Good response') }}"
+                                            title="{{ __('Good response') }}"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800"
                                             :class="msg.feedback?.rating === 'up' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
                                         >
                                             <template x-if="msg.feedback?.rating === 'up'">
@@ -365,9 +366,9 @@
                                             type="button"
                                             x-on:click="rateMessage(msg, 'down')"
                                             :aria-pressed="msg.feedback?.rating === 'down'"
-                                            aria-label="Bad response"
-                                            title="Bad response"
-                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            aria-label="{{ __('Bad response') }}"
+                                            title="{{ __('Bad response') }}"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800"
                                             :class="msg.feedback?.rating === 'down' ? 'text-red-600 dark:text-red-400' : 'text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
                                         >
                                             <template x-if="msg.feedback?.rating === 'down'">
@@ -385,7 +386,7 @@
                         {{-- Thumbs-down detail funnel: category chips + optional comment --}}
                         <template x-if="msg.feedbackPanelOpen">
                             <div class="mt-2 w-full max-w-[85%] rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-                                <p class="text-xs font-medium text-gray-700 dark:text-gray-300">What went wrong?</p>
+                                <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ __('What went wrong?') }}</p>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     <template x-for="cat in feedbackCategories" :key="cat.value">
                                         <button
@@ -403,24 +404,24 @@
                                     x-model="msg.feedbackComment"
                                     rows="2"
                                     maxlength="1000"
-                                    placeholder="Tell us more (optional)"
-                                    aria-label="Feedback details"
+                                    placeholder="{{ __('Tell us more (optional)') }}"
+                                    aria-label="{{ __('Feedback details') }}"
                                     class="mt-2 block w-full resize-none rounded-md border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
                                 ></textarea>
                                 <div class="mt-2 flex justify-end gap-2">
                                     <button
                                         type="button"
                                         x-on:click="msg.feedbackPanelOpen = false"
-                                        class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                        class="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:bg-gray-700"
                                     >
-                                        Skip
+                                        {{ __('Skip') }}
                                     </button>
                                     <button
                                         type="button"
                                         x-on:click="submitFeedbackDetail(msg)"
-                                        class="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700"
+                                        class="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                     >
-                                        Submit
+                                        {{ __('Submit') }}
                                     </button>
                                 </div>
                             </div>
@@ -438,8 +439,8 @@
                             </div>
                             <p class="text-sm text-amber-800 dark:text-amber-200" x-text="msg.paywall.body"></p>
                             <div class="flex gap-2">
-                                <a :href="msg.paywall.upgrade_url" class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">
-                                    Add credits
+                                <a :href="msg.paywall.upgrade_url" class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400">
+                                    {{ __('Add credits') }}
                                 </a>
                             </div>
                         </div>
@@ -478,7 +479,7 @@
 
         {{-- Pre-token streaming indicator: shimmer label inside an empty assistant bubble --}}
         <template x-if="isStreaming && !currentToolStatus && (messages.length === 0 || messages[messages.length-1].role !== 'assistant' || !messages[messages.length-1].content)">
-            <div class="flex justify-start" aria-label="Assistant is thinking" role="status">
+            <div class="flex justify-start" aria-label="{{ __('Assistant is thinking') }}" role="status">
                 <div class="rounded-2xl rounded-bl-md bg-white px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
                     <div data-chat-loading-indicator class="flex items-center gap-2 text-sm">
                         <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>

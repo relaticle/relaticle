@@ -41,7 +41,7 @@
                 <button
                     type="button"
                     x-on:click="pageContextDismissed = true"
-                    x-bind:aria-label="'Stop referring to ' + pageContextLabel"
+                    x-bind:aria-label="@js(__('Stop referring to :label')).replace(':label', pageContextLabel)"
                     class="-me-0.5 shrink-0 rounded p-0.5 transition hover:bg-primary-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 dark:hover:bg-primary-400/20"
                 >
                     <x-heroicon-m-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
@@ -54,6 +54,19 @@
                 x-data="chatEditor({
                     placeholder: @js(__('Ask anything...')),
                     autofocus: @js(($context ?? 'conversation') !== 'side-panel'),
+                    mentionTexts: {
+                        listLabel: @js(__('Mention suggestions')),
+                        searching: @js(__('Searching…')),
+                        loadFailed: @js(__("Couldn't load suggestions.")),
+                        noMatches: @js(__('No matches for ":query".')),
+                        typeLabels: @js([
+                            'company' => __('Company'),
+                            'people' => __('Person'),
+                            'opportunity' => __('Deal'),
+                            'task' => __('Task'),
+                            'note' => __('Note'),
+                        ]),
+                    },
                     onSubmit: () => $root.dispatchEvent(new CustomEvent('chat:editor-submit', { bubbles: true })),
                     onChange: ({ document, text }) => {
                         $root.dispatchEvent(new CustomEvent('chat:editor-change', { bubbles: true, detail: { document, text } }));

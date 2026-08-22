@@ -39,7 +39,7 @@
         x-cloak
         role="dialog"
         aria-modal="false"
-        aria-label="All chats"
+        aria-label="{{ __('All chats') }}"
         tabindex="-1"
         class="fi-chat-all-chats-panel fixed inset-y-0 z-40 flex w-[360px] max-w-full"
         data-chat-all-chats-panel
@@ -57,15 +57,15 @@
         >
             {{-- Header --}}
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Chats</h3>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Chats') }}</h3>
 
                 <div class="flex items-center gap-1">
                     <a
                         href="{{ $newChatUrl }}"
                         wire:navigate
                         @click="$wire.close()"
-                        aria-label="New chat"
-                        title="New chat"
+                        aria-label="{{ __('New chat') }}"
+                        title="{{ __('New chat') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
                         <x-heroicon-o-plus class="h-4 w-4" />
@@ -74,7 +74,7 @@
                     <button
                         type="button"
                         @click="$wire.close()"
-                        aria-label="Close all chats panel"
+                        aria-label="{{ __('Close all chats panel') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
                         <x-heroicon-o-x-mark class="h-4 w-4" />
@@ -87,8 +87,8 @@
                 <input
                     type="search"
                     wire:model.live.debounce.250ms="search"
-                    placeholder="Search chats..."
-                    aria-label="Search chats"
+                    placeholder="{{ __('Search chats...') }}"
+                    aria-label="{{ __('Search chats') }}"
                     class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
             </div>
@@ -108,15 +108,15 @@
                         @php
                             $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
                             $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
-                            $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: 'Untitled chat', 40);
-                            $rawTitle = $conversation->title ?: 'Untitled chat';
+                            $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: __('Untitled chat'), 40);
+                            $rawTitle = $conversation->title ?: __('Untitled chat');
                         @endphp
                         <li
                             x-data="{
                                 editing: false,
                                 renamed: '',
                                 saving: false,
-                                {{-- Blur commits, Escape cancels — mirrors the sidebar row,
+                                {{-- Blur commits, Escape cancels: mirrors the sidebar row,
                                      including the post-save dispatches: without them a rename
                                      here left the sidebar, page H1 and tab title stale. --}}
                                 async save() {
@@ -189,7 +189,7 @@
                                         @blur="save()"
                                         x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                         maxlength="255"
-                                        aria-label="Rename chat"
+                                        aria-label="{{ __('Rename chat') }}"
                                         class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                                     />
                                 </form>
@@ -199,8 +199,8 @@
                                 type="button"
                                 @click.stop.prevent="startEdit()"
                                 x-show="!editing"
-                                aria-label="Rename chat"
-                                title="Rename chat"
+                                aria-label="{{ __('Rename chat') }}"
+                                title="{{ __('Rename chat') }}"
                                 class="absolute inset-y-0 end-9 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
                             >
                                 <x-heroicon-o-pencil-square class="h-4 w-4" />
@@ -209,10 +209,10 @@
                             <button
                                 type="button"
                                 wire:click="deleteConversation(@js($conversation->id))"
-                                wire:confirm="Delete this chat? Messages and any pending actions will be removed."
+                                wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
                                 x-show="!editing"
-                                aria-label="Delete chat"
-                                title="Delete chat"
+                                aria-label="{{ __('Delete chat') }}"
+                                title="{{ __('Delete chat') }}"
                                 class="absolute inset-y-0 end-3 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4" />

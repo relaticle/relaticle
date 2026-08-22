@@ -173,7 +173,7 @@
                     return;
                 }
 
-                if (!window.confirm('Delete this chat? Messages and any pending actions will be removed.')) {
+                if (!window.confirm(@js(__('Delete this chat? Messages and any pending actions will be removed.')))) {
                     return;
                 }
 
@@ -215,7 +215,7 @@
         x-cloak
         role="dialog"
         aria-modal="true"
-        aria-label="Chat side panel"
+        aria-label="{{ __('Chat side panel') }}"
         tabindex="-1"
         class="fixed inset-y-0 right-0 z-50 flex max-w-full"
         :style="{ width: (viewportWidth < 640 ? viewportWidth : width) + 'px' }"
@@ -244,8 +244,8 @@
                         <button
                             type="button"
                             @click="toggleHistory()"
-                            aria-label="View history"
-                            title="View history"
+                            aria-label="{{ __('View history') }}"
+                            title="{{ __('View history') }}"
                             :aria-expanded="historyOpen"
                             class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': historyOpen }"
@@ -260,7 +260,7 @@
                             x-transition:enter-start="opacity-0 scale-95"
                             x-transition:enter-end="opacity-100 scale-100"
                             role="dialog"
-                            aria-label="Chat history"
+                            aria-label="{{ __('Chat history') }}"
                             class="absolute end-0 z-20 mt-1.5 w-80 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900"
                         >
                             <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2 dark:border-gray-700">
@@ -269,15 +269,15 @@
                                     x-ref="historySearch"
                                     x-model="historySearch"
                                     type="search"
-                                    placeholder="Search history..."
-                                    aria-label="Search chat history"
+                                    placeholder="{{ __('Search history...') }}"
+                                    aria-label="{{ __('Search chat history') }}"
                                     class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 dark:text-white"
                                 />
                                 <button
                                     type="button"
                                     @click="startNewChat()"
-                                    aria-label="New chat"
-                                    title="New chat"
+                                    aria-label="{{ __('New chat') }}"
+                                    title="{{ __('New chat') }}"
                                     class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                                 >
                                     <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
@@ -286,12 +286,12 @@
 
                             <div class="max-h-72 overflow-y-auto py-1">
                                 <template x-if="historyLoading">
-                                    <p class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" role="status">Loading…</p>
+                                    <p class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400" role="status">{{ __('Loading…') }}</p>
                                 </template>
 
                                 <template x-if="!historyLoading && historyError">
                                     <p class="px-3 py-2 text-xs text-danger-600 dark:text-danger-400" role="status">
-                                        Could not load your chats. Try again.
+                                        {{ __('Could not load your chats. Try again.') }}
                                     </p>
                                 </template>
 
@@ -310,7 +310,7 @@
                                         :class="{ 'bg-gray-50 font-medium dark:bg-white/5': item.id === currentConversationId }"
                                     >
                                         <x-heroicon-o-chat-bubble-left class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                                        <span class="truncate" x-text="item.title || 'Untitled chat'"></span>
+                                        <span class="truncate" x-text="item.title || @js(__('Untitled chat'))" :title="item.title || @js(__('Untitled chat'))"></span>
                                     </button>
                                 </template>
                             </div>
@@ -322,8 +322,8 @@
                         <button
                             type="button"
                             @click="menuOpen = !menuOpen; historyOpen = false"
-                            aria-label="Chat actions"
-                            title="Chat actions"
+                            aria-label="{{ __('Chat actions') }}"
+                            title="{{ __('Chat actions') }}"
                             :aria-expanded="menuOpen"
                             class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                             :class="{ 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300': menuOpen }"
@@ -338,7 +338,7 @@
                             x-transition:enter-start="opacity-0 scale-95"
                             x-transition:enter-end="opacity-100 scale-100"
                             role="menu"
-                            aria-label="Chat actions"
+                            aria-label="{{ __('Chat actions') }}"
                             class="absolute end-0 z-20 mt-1.5 w-56 origin-top-right overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-900"
                         >
                             <button
@@ -349,7 +349,7 @@
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                             >
                                 <x-heroicon-o-arrows-pointing-out class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                                Open in full page
+                                {{ __('Open in full page') }}
                             </button>
 
                             <button
@@ -360,7 +360,7 @@
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                             >
                                 <x-heroicon-o-document-duplicate class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                                <span x-text="copied ? 'Copied!' : 'Copy chat ID'"></span>
+                                <span x-text="copied ? @js(__('Copied!')) : @js(__('Copy chat ID'))"></span>
                             </button>
 
                             <div x-show="currentConversationId" class="my-1 border-t border-gray-200 dark:border-gray-700"></div>
@@ -373,7 +373,7 @@
                                 class="flex w-full items-center gap-2.5 px-3 py-2 text-start text-sm text-danger-600 transition hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                Delete
+                                {{ __('Delete') }}
                             </button>
                         </div>
                     </div>
@@ -381,7 +381,7 @@
                     <button
                         @click="open = false"
                         type="button"
-                        aria-label="Close chat panel"
+                        aria-label="{{ __('Close chat panel') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                     >
                         <x-heroicon-o-x-mark class="h-5 w-5" aria-hidden="true" />

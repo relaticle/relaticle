@@ -62,7 +62,7 @@
                     :class="idx === switcherActiveIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
                 >
                     <x-heroicon-o-chat-bubble-left class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-                    <span class="truncate" x-text="item.title || 'Untitled chat'"></span>
+                    <span class="truncate" :title="item.title || @js(__('Untitled chat'))" x-text="item.title || @js(__('Untitled chat'))"></span>
                 </button>
             </template>
         </div>

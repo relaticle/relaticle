@@ -94,9 +94,9 @@ final class Dashboard extends Page
         $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {
-            $hour < 12 => "Good morning, {$firstName}.",
-            $hour < 18 => "Good afternoon, {$firstName}.",
-            default => "Good evening, {$firstName}.",
+            $hour < 12 => __('Good morning, :name.', ['name' => $firstName]),
+            $hour < 18 => __('Good afternoon, :name.', ['name' => $firstName]),
+            default => __('Good evening, :name.', ['name' => $firstName]),
         };
     }
 

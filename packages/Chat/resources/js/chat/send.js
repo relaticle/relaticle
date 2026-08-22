@@ -11,9 +11,22 @@ const jsonHeaders = () => ({
     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
 });
 
-export const sendModule = ({ sendUrl, createConversationUrl }) => ({
+export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     input: '',
     streamAbortController: null,
+
+    // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
+    // same pattern voice.js uses); the defaults keep the module standalone.
+    sendTexts: {
+        sessionExpired: 'Your session expired. Please sign in again: your message is saved locally.',
+        paywallHeading: "You've used all your AI credits",
+        paywallReset: 'Your plan resets on :date.',
+        paywallTopUp: 'Add credits to keep chatting.',
+        requestError: 'Error :status: :text',
+        networkError: 'Network error. Please try again.',
+        cancelled: 'Cancelled.',
+        ...texts,
+    },
 
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
@@ -344,18 +357,19 @@ export const sendModule = ({ sendUrl, createConversationUrl }) => ({
 
         if (res.status === 401 || res.status === 419) {
             try { localStorage.setItem('chat:draft', userMsg.content); } catch (_) { /* ignore */ }
-            assistantMsg.content = 'Your session expired. Please sign in again — your message is saved locally.';
+            assistantMsg.content = this.sendTexts.sessionExpired;
             assistantMsg.sessionExpired = true;
         } else if (res.status === 402 && body?.error === 'credits_exhausted') {
             const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
             assistantMsg.paywall = {
-                heading: "You've used all your AI credits",
-                body: resetLabel ? `Your plan resets on ${resetLabel}.` : 'Add credits to keep chatting.',
+                heading: this.sendTexts.paywallHeading,
+                body: resetLabel ? this.sendTexts.paywallReset.replace(':date', resetLabel) : this.sendTexts.paywallTopUp,
                 upgrade_url: body.top_up_url || body.upgrade_url || '/app',
             };
             assistantMsg.content = '';
         } else {
-            assistantMsg.content = body?.errors?.document?.[0] || body?.message || `Error ${res.status}: ${res.statusText}`;
+            assistantMsg.content = body?.errors?.document?.[0] || body?.message
+                || this.sendTexts.requestError.replace(':status', String(res.status)).replace(':text', res.statusText);
         }
 
         assistantMsg.rendered = true;
@@ -454,7 +468,7 @@ export const sendModule = ({ sendUrl, createConversationUrl }) => ({
                     return;
                 }
                 const assistantMsg = this.messages[this.messages.length - 1];
-                assistantMsg.content = 'Network error. Please try again.';
+                assistantMsg.content = this.sendTexts.networkError;
                 assistantMsg.rendered = true;
                 userMsg.sendState = 'failed';
                 this.isStreaming = false;
@@ -528,7 +542,7 @@ export const sendModule = ({ sendUrl, createConversationUrl }) => ({
             // the user message.
             const assistantMsg = this.messages[this.messages.length - 1];
             if (assistantMsg?.role === 'assistant') {
-                assistantMsg.content = 'Network error. Please try again.';
+                assistantMsg.content = this.sendTexts.networkError;
                 assistantMsg.rendered = true;
             }
             userMsg.sendState = 'failed';
@@ -561,7 +575,7 @@ export const sendModule = ({ sendUrl, createConversationUrl }) => ({
         const assistantMsg = this.messages[this.messages.length - 1];
         if (assistantMsg?.role === 'assistant') {
             if (!assistantMsg.content) {
-                assistantMsg.content = 'Cancelled.';
+                assistantMsg.content = this.sendTexts.cancelled;
             }
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;

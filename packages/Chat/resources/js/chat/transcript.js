@@ -109,7 +109,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -774,12 +774,33 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         } catch (_) { /* clipboard blocked — silently ignore */ }
     },
 
-    feedbackCategories: [
+    // Injected translated labels (chat-interface.blade.php); defaults keep the
+    // module standalone.
+    feedbackCategories: feedbackCategories || [
         { value: 'inaccurate', label: 'Inaccurate' },
         { value: 'did_not_follow', label: "Didn't do what I asked" },
         { value: 'too_slow', label: 'Too slow' },
         { value: 'other', label: 'Other' },
     ],
+
+    // Injected translated copy for the proposal chips and outcome sentences.
+    // The en defaults are asserted byte-for-byte by ProposalOutcomeSummaryTest.
+    proposalTexts: {
+        createdVerb: 'Created',
+        updatedVerb: 'Updated',
+        deletedVerb: 'Deleted',
+        keptWord: 'kept',
+        skippedWord: 'skipped',
+        outcomePart: ':verb :names',
+        outcomeSingle: ':verb :name.',
+        fallbackRecord: 'record',
+        fallbackTheRecord: 'the record',
+        keptDeletionDiscarded: 'Kept :name, deletion discarded.',
+        deletionDiscarded: 'Deletion discarded.',
+        discardedName: 'Discarded :name.',
+        proposalDiscarded: 'Proposal discarded.',
+        ...proposalTexts,
+    },
 
     // Thumbs funnel: up = one tap; down = rating recorded immediately, then an
     // optional category/comment panel. Tapping the active thumb retracts.
@@ -940,7 +961,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // Past-tense verb for a resolved item's chip, by operation.
     itemVerb(action) {
         const op = action?.operation;
-        return op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+        return op === 'delete'
+            ? this.proposalTexts.deletedVerb
+            : (op === 'update' ? this.proposalTexts.updatedVerb : this.proposalTexts.createdVerb);
     },
 
     // Reload-safe agent outcome summary for a finalized proposal. Built purely from
@@ -951,7 +974,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         if (!action || action.status === 'pending') return null;
 
         const op = action.operation;
-        const verb = op === 'delete' ? 'Deleted' : (op === 'update' ? 'Updated' : 'Created');
+        const verb = this.itemVerb(action);
         const items = action.display?.items;
 
         if (Array.isArray(items) && items.length > 0) {
@@ -960,27 +983,33 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             items.forEach((item, i) => {
                 const res = this.itemResult(action, i) || this.itemResult(action, String(i));
                 if (!res) return;
-                const name = res.record?.label || this.proposalItemName(item) || 'record';
+                const name = res.record?.label || this.proposalItemName(item) || this.proposalTexts.fallbackRecord;
                 if (res.status === 'approved') created.push(name);
                 else if (res.status === 'skipped') skipped.push(name);
             });
-            const skippedVerb = op === 'delete' ? 'kept' : 'skipped';
+            const skippedVerb = op === 'delete' ? this.proposalTexts.keptWord : this.proposalTexts.skippedWord;
             const parts = [];
-            if (created.length) parts.push(`${verb} ${this.joinNames(created)}`);
-            if (skipped.length) parts.push(`${skippedVerb} ${this.joinNames(skipped)}`);
+            if (created.length) parts.push(this.proposalTexts.outcomePart.replace(':verb', verb).replace(':names', this.joinNames(created)));
+            if (skipped.length) parts.push(this.proposalTexts.outcomePart.replace(':verb', skippedVerb).replace(':names', this.joinNames(skipped)));
             if (parts.length === 0) return null;
             const sentence = parts.join('; ') + '.';
             return sentence.charAt(0).toUpperCase() + sentence.slice(1);
         }
 
         if (action.status === 'approved') {
-            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || 'the record';
-            return `${verb} ${label}.`;
+            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || this.proposalTexts.fallbackTheRecord;
+            return this.proposalTexts.outcomeSingle.replace(':verb', verb).replace(':name', label);
         }
         if (action.status === 'rejected') {
             const label = this.extractQuotedName(action.display?.summary);
-            if (op === 'delete') return label ? `Kept ${label} — deletion discarded.` : 'Deletion discarded.';
-            return label ? `Discarded ${label}.` : 'Proposal discarded.';
+            if (op === 'delete') {
+                return label
+                    ? this.proposalTexts.keptDeletionDiscarded.replace(':name', label)
+                    : this.proposalTexts.deletionDiscarded;
+            }
+            return label
+                ? this.proposalTexts.discardedName.replace(':name', label)
+                : this.proposalTexts.proposalDiscarded;
         }
         return null;
     },
@@ -1001,12 +1030,17 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return match ? match[1] : null;
     },
 
+    // Locale-aware list join: Intl.ListFormat produces "A and B" /
+    // "A, B, and C" for en (matching the sentences ProposalOutcomeSummaryTest
+    // asserts) and the right conjunction for every other locale for free.
     joinNames(names) {
         const list = names.filter(Boolean);
         if (list.length === 0) return '';
-        if (list.length === 1) return list[0];
-        if (list.length === 2) return `${list[0]} and ${list[1]}`;
-        return `${list.slice(0, -1).join(', ')}, and ${list[list.length - 1]}`;
+        try {
+            return new Intl.ListFormat(document.documentElement.lang || 'en', { style: 'long', type: 'conjunction' }).format(list);
+        } catch (_) {
+            return list.join(', ');
+        }
     },
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they

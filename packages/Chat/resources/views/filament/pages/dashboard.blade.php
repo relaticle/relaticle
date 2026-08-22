@@ -5,17 +5,17 @@
     >
         {{-- Greeting --}}
         <div class="text-center">
-            <h1 class="text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
+            <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
                 {{ $this->getGreeting() }}
             </h1>
 
             @if($recentChatId)
                 <a
                     href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
-                    class="mt-2 inline-flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                    class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                    <span>Recent chat &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? 'Untitled', 50) }}</span>
+                    <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
+                    <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
                 </a>
             @endif
         </div>
@@ -27,6 +27,19 @@
                     placeholder: @js(__('Ask anything...')),
                     autofocus: true,
                     onSubmit: () => $root.dispatchEvent(new CustomEvent('dashboard:editor-submit', { bubbles: true })),
+                    mentionTexts: {
+                        listLabel: @js(__('Mention suggestions')),
+                        searching: @js(__('Searching…')),
+                        loadFailed: @js(__("Couldn't load suggestions.")),
+                        noMatches: @js(__('No matches for ":query".')),
+                        typeLabels: @js([
+                            'company' => __('Company'),
+                            'people' => __('Person'),
+                            'opportunity' => __('Deal'),
+                            'task' => __('Task'),
+                            'note' => __('Note'),
+                        ]),
+                    },
                 })"
                 x-on:dashboard:editor-submit.window="submit()"
                 data-chat-context="dashboard"
@@ -112,12 +125,15 @@
                         model: this.selectedModel,
                     }));
                 } catch (_) {
-                    this.error = 'Could not save message. Try again.';
+                    this.error = @js(__('Could not save message. Try again.'));
                     this.submitting = false;
                     return;
                 }
 
-                window.location.href = chatUrl;
+                // SPA navigation, mirroring openSwitcherItem in transcript.js:
+                // a full reload here repainted the whole Filament shell on
+                // every first message.
+                window.Alpine?.navigate ? window.Alpine.navigate(chatUrl) : (window.location.href = chatUrl);
             },
         }));
     </script>

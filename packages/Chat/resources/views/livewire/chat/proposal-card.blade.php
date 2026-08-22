@@ -120,7 +120,7 @@
                                         @if (($row['type'] ?? null) === 'link')
                                             {{-- min-w-0 on the anchors AND their row: flex items default to
                                                  min-width:auto (their untruncated text width), so without it a
-                                                 UTM-length URL bursts the card sideways — the exact measured bug
+                                                 UTM-length URL bursts the card sideways, the exact measured bug
                                                  _proposal-field.blade.php documents. --}}
                                             <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                                                 @foreach ($row['values'] as $url)

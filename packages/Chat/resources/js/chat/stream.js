@@ -4,9 +4,26 @@
 // chat-interface.blade.php for the composition and the `pendingLabel`
 // accessor that stays inline there because a `get` property cannot survive
 // an object spread.
-export const streamModule = () => ({
+export const streamModule = ({ texts = {} } = {}) => ({
     channel: null,
     streamTimeoutId: null,
+    // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
+    // same pattern voice.js uses); the defaults keep the module standalone.
+    streamTexts: {
+        runningTool: 'Running tool…',
+        readingSummary: 'Reading CRM summary…',
+        searchingCrm: 'Searching CRM…',
+        runningName: 'Running :name…',
+        searchingEntity: 'Searching :entity…',
+        lookingUpEntity: 'Looking up :entity…',
+        draftingEntity: 'Drafting :entity…',
+        updatingEntity: 'Preparing :entity changes…',
+        deletingEntity: 'Preparing :entity deletion…',
+        streamError: 'The assistant encountered an error. Please try again.',
+        timeout: 'The assistant took too long to respond.',
+        retrying: 'Provider is busy, retrying (attempt :attempt of :max)…',
+        ...texts,
+    },
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
     // (window.Echo.leave) stops NEW events from being delivered but cannot cancel a
     // handler already mid-execution. handleStreamEnd/handleStreamFailed/the watchdog
@@ -202,25 +219,31 @@ export const streamModule = () => ({
     },
 
     friendlyToolStatus(toolName) {
-        if (!toolName) return 'Running tool…';
+        if (!toolName) return this.streamTexts.runningTool;
         const normalized = String(toolName)
             .replace(/Tool$/, '')
             .replace(/([a-z])([A-Z])/g, '$1_$2')
             .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
             .toLowerCase();
 
-        if (normalized === 'get_crm_summary') return 'Reading CRM summary…';
-        if (normalized === 'search_crm') return 'Searching CRM…';
+        if (normalized === 'get_crm_summary') return this.streamTexts.readingSummary;
+        if (normalized === 'search_crm') return this.streamTexts.searchingCrm;
 
         const m = normalized.match(/^(list|get|create|update|delete)_(.+)$/);
-        if (!m) return `Running ${normalized}…`;
+        if (!m) return this.streamTexts.runningName.replace(':name', normalized);
 
         const [, op, rest] = m;
         const entity = rest.replace(/_/g, ' ');
 
-        if (op === 'list') return `Searching ${entity}…`;
-        if (op === 'get') return `Looking up ${entity}…`;
-        return `Preparing ${op} ${entity} proposal…`;
+        const template = ({
+            list: this.streamTexts.searchingEntity,
+            get: this.streamTexts.lookingUpEntity,
+            create: this.streamTexts.draftingEntity,
+            update: this.streamTexts.updatingEntity,
+            delete: this.streamTexts.deletingEntity,
+        })[op];
+
+        return template.replace(':entity', entity);
     },
 
     startStreamTimeout(timeoutMs = null) {
@@ -239,7 +262,7 @@ export const streamModule = () => ({
             if (this.destroyed) return;
             if (assistantMsg?.role === 'assistant') {
                 if (!assistantMsg.content) {
-                    assistantMsg.streamError = 'The assistant took too long to respond.';
+                    assistantMsg.streamError = this.streamTexts.timeout;
                     assistantMsg.retryable = true;
                 }
                 assistantMsg.rendered = true;
@@ -424,7 +447,7 @@ export const streamModule = () => ({
         if (b && !b.rendered) {
             b.content = '';
             b.invocationId = null;
-            b.streamError = event?.message || 'The assistant encountered an error. Please try again.';
+            b.streamError = event?.message || this.streamTexts.streamError;
             b.retryable = true;
             b.rendered = true;
             b.prerendered = false;
@@ -469,7 +492,9 @@ export const streamModule = () => ({
             b._needsSeparator = false;
         }
         this.isStreaming = true;
-        this.currentToolStatus = `Provider is busy — retrying (attempt ${event?.attempt ?? '?'} of ${event?.maxAttempts ?? 5})…`;
+        this.currentToolStatus = this.streamTexts.retrying
+            .replace(':attempt', String(event?.attempt ?? '?'))
+            .replace(':max', String(event?.maxAttempts ?? 5));
         this.startStreamTimeout(((event?.delaySeconds ?? 0) * 1000) + this.streamTimeoutMs);
     },
 

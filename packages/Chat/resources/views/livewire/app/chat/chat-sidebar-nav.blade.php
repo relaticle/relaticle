@@ -27,7 +27,7 @@
         }
     }"
     @keydown.window="onKeydown($event)"
-    data-group-label="Chats"
+    data-group-label="{{ __('Chats') }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{-- -ml-2 matches Filament's .fi-sidebar-nav-groups list which has margin-left: -8px;
          this hook renders as a sibling of that list inside .fi-sidebar-nav, so without
@@ -43,12 +43,12 @@
         x-transition:enter-end="fi-transition-enter-end"
         class="fi-sidebar-group-btn"
     >
-        <span class="fi-sidebar-group-label">Chats</span>
+        <span class="fi-sidebar-group-label">{{ __('Chats') }}</span>
 
         <x-filament::icon-button
             color="gray"
             :icon="\Filament\Support\Icons\Heroicon::ChevronUp"
-            label="Chats"
+            label="{{ __('Chats') }}"
             x-bind:aria-expanded="! $store.sidebar.groupIsCollapsed(label)"
             x-on:click.stop="$store.sidebar.toggleCollapsedGroup(label)"
             class="fi-sidebar-group-collapse-btn"
@@ -78,15 +78,15 @@
                     $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
                     $isActive = request()->url() === $chatUrl;
                     $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
-                    $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: 'Untitled chat', 30);
-                    $rawTitle = $conversation->title ?: 'Untitled chat';
+                    $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: __('Untitled chat'), 30);
+                    $rawTitle = $conversation->title ?: __('Untitled chat');
                 @endphp
                 <li
                     x-data="{
                         editing: false,
                         renamed: '',
                         saving: false,
-                        {{-- Blur commits (Notion/Linear convention) — Escape is the
+                        {{-- Blur commits (Notion/Linear convention): Escape is the
                              only cancel. The guards make the Enter-then-unmount blur
                              and the Escape-then-blur sequences single-shot no-ops. --}}
                         async save() {
@@ -173,7 +173,7 @@
                                 @blur="save()"
                                 x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                 maxlength="255"
-                                aria-label="Rename chat"
+                                aria-label="{{ __('Rename chat') }}"
                                 class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                             />
                         </form>
@@ -183,8 +183,8 @@
                         type="button"
                         @click.stop.prevent="startEdit()"
                         x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="Rename chat"
-                        title="Rename chat"
+                        aria-label="{{ __('Rename chat') }}"
+                        title="{{ __('Rename chat') }}"
                         class="absolute inset-y-0 end-7 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
                         <x-heroicon-o-pencil-square class="h-4 w-4" />
@@ -193,10 +193,10 @@
                     <button
                         type="button"
                         wire:click="deleteConversation(@js($conversation->id))"
-                        wire:confirm="Delete this chat? Messages and any pending actions will be removed."
+                        wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
                         x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="Delete chat"
-                        title="Delete chat"
+                        aria-label="{{ __('Delete chat') }}"
+                        title="{{ __('Delete chat') }}"
                         class="absolute inset-y-0 end-1 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
                     >
                         <x-heroicon-o-trash class="h-4 w-4" />
@@ -213,7 +213,7 @@
                         type="button"
                         @click="window.dispatchEvent(new CustomEvent('chat:open-all-chats'))"
                         class="fi-sidebar-item-btn w-full text-start opacity-60 transition hover:opacity-100"
-                        aria-label="Open all chats"
+                        aria-label="{{ __('Open all chats') }}"
                     >
                         <x-heroicon-o-ellipsis-horizontal class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                         <span
@@ -223,7 +223,7 @@
                             x-transition:enter-end="fi-transition-enter-end"
                             class="fi-sidebar-item-label"
                         >
-                            All chats
+                            {{ __('All chats') }}
                         </span>
                     </button>
                 </li>
