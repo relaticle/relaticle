@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\ChatConversation;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,67 @@ use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
 mutates(ChatInterface::class);
+mutates(ChatConversation::class);
+
+it('places the conversation title in the topbar and the toggle beside the workspace menu', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'Pipeline review', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertVisible('[data-page-heading]')
+        ->assertMissing('main h1')
+        ->assertNoJavaScriptErrors();
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const sidebar = document.querySelector('#fi-main-sidebar');
+            const workspace = sidebar.querySelector('.fi-tenant-menu');
+            const toggle = sidebar.querySelector('[data-sidebar-workspace-toggle]');
+            const title = document.querySelector('[data-page-heading]');
+            const workspaceRect = workspace.getBoundingClientRect();
+            const toggleRect = toggle.getBoundingClientRect();
+            const titleRect = title.getBoundingClientRect();
+            const sidebarRect = sidebar.getBoundingClientRect();
+
+            return {
+                title: title.textContent.trim(),
+                titleInTopbar: !!title.closest('nav[aria-label=Topbar]'),
+                toggleInSidebar: !!toggle.closest('#fi-main-sidebar'),
+                toggleAfterWorkspace: toggleRect.left >= workspaceRect.right,
+                titleAfterSidebar: titleRect.left >= sidebarRect.right,
+                oldDesktopToggleHidden: getComputedStyle(document.querySelector('.fi-topbar-collapse-sidebar-btn-ctn')).display === 'none',
+            };
+        })();
+    JS);
+
+    expect($chrome)->toMatchArray([
+        'title' => 'Pipeline review',
+        'titleInTopbar' => true,
+        'toggleInSidebar' => true,
+        'toggleAfterWorkspace' => true,
+        'titleAfterSidebar' => true,
+        'oldDesktopToggleHidden' => true,
+    ]);
+
+    $page->click('[data-sidebar-workspace-toggle]')
+        ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
+        ->click('[data-sidebar-workspace-toggle]')
+        ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
+        ->resize(390, 844)
+        ->assertVisible('[data-page-heading]')
+        ->assertScript('(() => Array.from(document.querySelectorAll("nav[aria-label=Topbar] button[aria-label^=Expand]")).filter((button) => button.getClientRects().length > 0).length === 1)()')
+        ->assertScript('(() => getComputedStyle(document.querySelector("[data-sidebar-workspace-toggle]")).display === "none")()');
+
+    $page->script(<<<JS
+        (() => window.dispatchEvent(new CustomEvent('chat:renamed', {
+            detail: { conversationId: '{$conversationId}', title: 'Updated pipeline review' },
+        })))();
+    JS);
+
+    $page->assertSeeIn('[data-page-heading]', 'Updated pipeline review');
+});
 
 /**
  * Cache-first conversation switching: a wire:navigate sidebar link destroys

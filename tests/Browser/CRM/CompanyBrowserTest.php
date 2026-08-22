@@ -66,3 +66,31 @@ it('paints the header action dropdown above the table toolbar', function (): voi
 
     expect($hitsPanel)->toBeTrue();
 });
+
+it('keeps app page headings in the topbar across navigation and viewport sizes', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/companies")
+        ->assertVisible('[data-page-heading]')
+        ->assertSeeIn('[data-page-heading]', 'Companies')
+        ->assertMissing('main h1')
+        ->assertNoJavaScriptErrors();
+
+    $page->click("a.fi-sidebar-item-btn[href$='/app/{$team->slug}/people']")
+        ->assertPathIs("/app/{$team->slug}/people")
+        ->assertVisible('[data-page-heading]')
+        ->assertSeeIn('[data-page-heading]', 'People')
+        ->assertMissing('main h1')
+        ->resize(390, 844)
+        ->assertVisible('[data-page-heading]')
+        ->assertNoJavaScriptErrors();
+
+    expect($page->script('document.querySelector("[data-page-heading]").closest("nav")?.getAttribute("aria-label")'))
+        ->toBe('Topbar');
+});

@@ -173,6 +173,11 @@ final class ChatServiceProvider extends ServiceProvider
         );
 
         FilamentView::registerRenderHook(
+            PanelsRenderHook::TENANT_MENU_AFTER,
+            fn (): View|Factory => view('chat::filament.app.chat-sidebar-toggle-hook'),
+        );
+
+        FilamentView::registerRenderHook(
             PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
             fn (): View|Factory => view('chat::filament.app.chat-topbar-toggle-hook'),
         );

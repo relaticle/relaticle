@@ -16,9 +16,9 @@
         </script>
     @endunless
 
-    {{-- dvh, not vh: mobile browser toolbars shrink the visual viewport and
-         100vh would push the composer under them. --}}
-    <div class="-mx-6 -mb-6 flex flex-1 flex-col" style="height: calc(100dvh - 10rem);">
+    {{-- The shared page heading lives in the topbar. Six rem accounts for the
+         topbar and page padding without leaving space for the old heading. --}}
+    <div class="-mx-6 -mb-6 flex flex-1 flex-col" style="height: calc(100dvh - 6rem);">
         <livewire:chat.chat-interface
             :conversation-id="$conversationId"
             :initial-message="$initialMessage"

@@ -315,10 +315,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             // Update document.title for the browser tab.
             document.title = `${detail.title || @js(__('Untitled chat'))} - ${@js(config('app.name'))}`;
 
-            // Update the visible H1 if present (Filament page header).
-            const h1 = document.querySelector('main h1');
-            if (h1 && detail.title) {
-                h1.textContent = detail.title;
+            const title = document.querySelector('[data-page-heading]');
+            if (title && detail.title) {
+                title.textContent = detail.title;
+                title.setAttribute('title', detail.title);
             }
         };
         window.addEventListener('chat:renamed', this.renamedHandler);
