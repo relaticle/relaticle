@@ -216,6 +216,88 @@ it('places a block at its {{block:N}} marker inside the reply and appends unplac
         ->and($shape['leaksMarker'])->toBeFalse();
 });
 
+it('honors markers separated by single newlines, the shape the model actually writes', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    // Single newlines reflect the model's observed output.
+    // Parsers fold these markers into one paragraph unless normalization isolates them.
+    displayBlockInsertAssistantMessage(
+        $conversationId,
+        $user,
+        "Here is everything:\n{{block:1}}\n{{block:2}}\nEnjoy!",
+        [displayBlockTableFixture(), displayBlockCardFixture('https://example.com/?ref=tight')],
+        60,
+    );
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Enjoy!');
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const bubble = document.querySelector('[data-assistant-bubble]');
+            const parts = Array.from(bubble.querySelectorAll('.prose, [data-block]'))
+                .map((el) => el.dataset.block ?? ('text:' + el.textContent.trim().slice(0, 12)));
+
+            return JSON.stringify({
+                parts,
+                leaksMarker: bubble.textContent.includes('{{block:'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($shape['parts'])->toBe(['text:Here is ever', 'records_table', 'record_card', 'text:Enjoy!'])
+        ->and($shape['leaksMarker'])->toBeFalse();
+});
+
+it('renders streamed text as markdown and hides incomplete trailing tokens', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Earlier turn.', [], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Earlier turn.');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    // The stream ends with completed Markdown, a block marker, and an incomplete link.
+    // Raw syntax must never paint.
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            window.Echo = null;
+            data.isStreaming = true;
+            const stub = data.targetBubbleFor('inv-stream-md');
+            stub.content = 'Deals worth **\$78,000** total.\\n\\n{{block:1}}\\n\\nSee the [import guide](https://example.com/guide), [Missing record](null), and the [People imp';
+            return true;
+        })();
+    JS);
+
+    $painted = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const el = document.querySelector('[x-html="streamingHtml(msg)"]');
+            return JSON.stringify({
+                bold: !!el.querySelector('strong'),
+                link: el.querySelector('a')?.getAttribute('href') ?? null,
+                linkCount: el.querySelectorAll('a').length,
+                text: el.textContent,
+            });
+        })();
+    JS), true, 1024, JSON_THROW_ON_ERROR);
+
+    expect($painted['bold'])->toBeTrue()
+        ->and($painted['link'])->toBe('https://example.com/guide')
+        ->and($painted['linkCount'])->toBe(1)
+        ->and($painted['text'])->toContain('Missing record')
+        ->and($painted['text'])->not->toContain('**')
+        ->and($painted['text'])->not->toContain('{{block')
+        ->and($painted['text'])->not->toContain('[People imp')
+        ->and($painted['text'])->not->toContain('](');
+});
+
 it('attaches display blocks to the streamed bubble at stream-end reconcile', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();

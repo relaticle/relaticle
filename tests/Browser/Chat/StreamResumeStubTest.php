@@ -92,8 +92,8 @@ it('paints a later mutation on the reference targetBubbleFor()\'s resume fallbac
         (() => {
             const bubbles = document.querySelectorAll('[data-assistant-bubble]');
             const last = bubbles[bubbles.length - 1];
-            const el = last ? last.querySelector('[x-text="streamingText(msg)"]') : null;
-            return el ? el.textContent : null;
+            const el = last ? last.querySelector('[x-html="streamingHtml(msg)"]') : null;
+            return el ? el.textContent.trim() : null;
         })()
     JS, 'first chunk');
 
@@ -111,8 +111,8 @@ it('paints a later mutation on the reference targetBubbleFor()\'s resume fallbac
         (() => {
             const bubbles = document.querySelectorAll('[data-assistant-bubble]');
             const last = bubbles[bubbles.length - 1];
-            const el = last ? last.querySelector('[x-text="streamingText(msg)"]') : null;
-            return el ? el.textContent : null;
+            const el = last ? last.querySelector('[x-html="streamingHtml(msg)"]') : null;
+            return el ? el.textContent.trim() : null;
         })()
     JS, 'first chunk second chunk');
 });

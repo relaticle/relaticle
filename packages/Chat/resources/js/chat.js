@@ -72,9 +72,16 @@ const applyRecordChips = (html) => {
     return chipped ? container.innerHTML : html
 }
 
+// Keep this normalization aligned with MarkdownRenderer.
+// Blank lines isolate block markers before parsing.
+// Null record links fall back to plain text.
+const normalizeChatMarkdown = (text) => text
+    .replace(/^[ \t]*(\{\{block:\d+\}\})[ \t]*$/gm, '\n$1\n')
+    .replace(/\[([^\]]+)\]\(null\)/g, '$1')
+
 window.renderMarkdown = (text) => {
     if (!text) return ''
-    return applyRecordChips(DOMPurify.sanitize(marked.parse(text)))
+    return applyRecordChips(DOMPurify.sanitize(marked.parse(normalizeChatMarkdown(text))))
 }
 
 import '../css/chat-editor.css';

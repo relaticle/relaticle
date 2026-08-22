@@ -1,4 +1,8 @@
 {{-- Messages --}}
+@php
+    // Keep streamed and persisted Markdown styling identical.
+    $proseClasses = 'prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0';
+@endphp
 <div
     x-ref="messages"
     role="log"
@@ -8,7 +12,9 @@
     aria-relevant="additions text"
     aria-atomic="false"
     x-on:scroll.passive="trackScrollPosition()"
-    class="flex-1 overflow-y-auto px-4 py-6"
+    {{-- Keep sr-only descendants inside the transcript scroll container.
+         Otherwise, their static positions can inflate the page height. --}}
+    class="relative flex-1 overflow-y-auto px-4 py-6"
 >
     <template x-if="messages.length === 0 && !isStreaming">
         <div class="flex h-full items-center justify-center px-6">
@@ -284,7 +290,7 @@
                                                 <template x-if="seg.type === 'html'">
                                                     <div
                                                         x-html="seg.html"
-                                                        class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0"
+                                                        class="{{ $proseClasses }}"
                                                     ></div>
                                                 </template>
                                                 {{-- Single-element x-for: binds the loop var name
@@ -308,12 +314,14 @@
                                     </div>
                                 </template>
                                 <template x-if="!msg.rendered">
-                                    <div class="prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100">
+                                    <div class="w-full">
+                                        {{-- Hide incomplete Markdown while tokens arrive.
+                                             Match the persisted reply styling to prevent reflow. --}}
                                         <template x-if="msg.content">
-                                            <div x-text="streamingText(msg)" class="whitespace-pre-wrap"></div>
+                                            <div x-html="streamingHtml(msg)" class="{{ $proseClasses }}"></div>
                                         </template>
                                         <template x-if="index === messages.length - 1 && isStreaming && currentToolStatus">
-                                            <div data-chat-loading-indicator class="flex items-center gap-2 text-xs" role="status" :class="{ 'mt-2': msg.content }">
+                                            <div data-chat-loading-indicator class="flex items-center gap-2 px-1 py-1 text-xs" role="status" :class="{ 'mt-2': msg.content }">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
                                                 <span data-chat-loading-label x-text="pendingLabel"></span>
                                             </div>

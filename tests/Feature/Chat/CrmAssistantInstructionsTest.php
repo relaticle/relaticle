@@ -39,6 +39,18 @@ it('tells the model it can read a record\'s change history', function (): void {
  * tables, bullet lists and per-record prose leaves the model no way to show a
  * search hit at all: the user gets "I found 3 matches" over an empty screen.
  */
+/*
+ * An observed "show me all my records" request used GetCrmSummaryTool.
+ * The summary tool must remain limited to counts and overviews.
+ */
+it('steers show-me-records requests to the list tools over the summary', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('call the list tools. List tools render real record tables')
+        ->toContain('Never use it instead of showing records.');
+});
+
 it('scopes the block claim to the read tools that emit one', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 

@@ -75,3 +75,25 @@ it('keeps inline markup inside a chip label', function (): void {
 
     expect($html)->toContain('<strong>Acme</strong> Inc');
 });
+
+it('isolates single-newline-separated block markers into their own paragraphs', function (): void {
+    $html = (new MarkdownRenderer)->render("Here is everything:\n{{block:1}}\n{{block:2}}\nEnjoy!");
+
+    expect($html)->toContain('<p>{{block:1}}</p>')
+        ->toContain('<p>{{block:2}}</p>')
+        ->toContain('<p>Here is everything:</p>')
+        ->toContain('<p>Enjoy!</p>');
+});
+
+it('leaves an inline block marker untouched', function (): void {
+    $html = (new MarkdownRenderer)->render('see {{block:1}} here');
+
+    expect($html)->toContain('<p>see {{block:1}} here</p>');
+});
+
+it('degrades a null-url citation to its plain name', function (): void {
+    $html = (new MarkdownRenderer)->render('Linked to [Test Person](null).');
+
+    expect($html)->not->toContain('<a')
+        ->toContain('Linked to Test Person.');
+});

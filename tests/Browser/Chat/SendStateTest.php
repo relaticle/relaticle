@@ -117,6 +117,42 @@ it('carries the optimistic bubble through sending then sent on a real send', fun
     expect($domSentBubbles)->toBe(1);
 });
 
+/*
+ * The sent glyph's sr-only label uses absolute positioning.
+ * Its containing block must remain inside the visible transcript scroller.
+ */
+it('keeps the sent glyph sr-only label inside the transcript scroll container', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'sent glyph containment');
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            data.messages.push(data.ensureClientKey({
+                role: 'user',
+                content: 'containment probe',
+                sendState: 'sent',
+                created_at: new Date().toISOString(),
+            }));
+            return true;
+        })();
+    JS);
+
+    $page->assertScript(<<<'JS'
+        (() => {
+            const span = document.querySelector('[data-user-bubble][data-send-state="sent"] .sr-only');
+            const scroller = span?.closest('[x-ref="messages"]');
+            return !!(span && scroller && scroller.contains(span.offsetParent));
+        })()
+    JS, true);
+});
+
 /**
  * Sends a message on an already-loaded chat page after exhausting the rate
  * limiter, returning the failure snapshot once sendState settles to 'failed'.

@@ -324,10 +324,18 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return segments;
     },
 
-    // Streamed (pre-render) text with placement markers hidden: the raw
-    // {{block:N}} token must not flash on screen while tokens arrive.
-    streamingText(msg) {
-        return (msg?.content || '').replace(/\{\{block:\d+\}\}/g, '');
+    // Render streaming Markdown without exposing raw syntax.
+    // Hide block markers until reconciliation.
+    // Hide incomplete trailing markers and links until they close.
+    streamingHtml(msg) {
+        const text = (msg?.content || '')
+            .replace(/\{\{block:\d+\}\}/g, '')
+            .replace(/\{\{[^}]*\}?$/, '')
+            .replace(/\{$/, '')
+            .replace(/\[([^\]]*)\]\([^)]*$/, '$1')
+            .replace(/\[[^\]]*$/, '');
+
+        return window.renderMarkdown(text);
     },
 
     blockTitle(block) {

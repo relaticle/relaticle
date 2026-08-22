@@ -33,6 +33,14 @@ final readonly class MarkdownRenderer
 
     public function render(string $markdown): string
     {
-        return $this->converter->convert($markdown)->getContent();
+        return $this->converter->convert($this->normalize($markdown))->getContent();
+    }
+
+    /** Keep this normalization aligned with window.renderMarkdown. */
+    private function normalize(string $markdown): string
+    {
+        $markdown = (string) preg_replace('/^[ \t]*(\{\{block:\d+\}\})[ \t]*$/m', "\n$1\n", $markdown);
+
+        return (string) preg_replace('/\[([^\]]+)\]\(null\)/', '$1', $markdown);
     }
 }
