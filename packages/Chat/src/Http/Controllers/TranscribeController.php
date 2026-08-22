@@ -26,11 +26,12 @@ final class TranscribeController
         // spellings of each container are listed because that sniff is what a
         // real MediaRecorder upload arrives as.
         //
-        // 2 MB is roughly double what the client can produce: it hard-stops at
-        // 120s, and 120s of Opus is about 1 MB. The cap is this tight because
-        // the SDK triples the bytes in memory, holding the raw upload plus its
-        // base64 (Base64Audio::fromUpload) and then base64-decoding the whole
-        // thing again for the outbound attach.
+        // The client pins Opus at 32 kbps and hard-stops at 120s, so the most
+        // it can send is 32000 * 120 / 8 = 480 KB. This cap is roughly 4x that.
+        // Do not widen it without lowering AUDIO_BITS_PER_SECOND in voice.js to
+        // match: the SDK triples the bytes in memory, holding the raw upload
+        // plus its base64 (Base64Audio::fromUpload) and then base64-decoding
+        // the whole thing again for the outbound attach.
         $request->validate([
             'audio' => ['required', 'file', 'max:2048', 'mimetypes:audio/webm,video/webm,audio/mp4,video/mp4'],
         ]);
