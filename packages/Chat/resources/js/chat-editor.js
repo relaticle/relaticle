@@ -14,13 +14,6 @@ import { MENTION_CHIP_CLASS } from './chat/mention-chip';
 // when transactions are applied.
 const editorByEl = new WeakMap();
 
-function deepClone(value) {
-    if (typeof structuredClone === 'function') {
-        return structuredClone(value);
-    }
-    return JSON.parse(JSON.stringify(value));
-}
-
 function hasContent(doc) {
     if (! doc || ! Array.isArray(doc.content) || doc.content.length === 0) return false;
     // A doc with a single empty paragraph is treated as no content.
@@ -33,7 +26,7 @@ function hasContent(doc) {
     return true;
 }
 
-export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, onArrowUp, autofocus } = {}) {
+export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofocus } = {}) {
     return {
         editorEl: null,
         // Reactive mirror of the editor's plain text. Alpine bindings depending
@@ -86,9 +79,7 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, o
                 // ProseMirror requires `block+` content; pass an empty paragraph rather
                 // than an empty content array so the Placeholder extension has a node to
                 // attach to and the editor reports a non-zero selection range.
-                content: hasContent(initialDocument)
-                    ? deepClone(initialDocument)
-                    : { type: 'doc', content: [{ type: 'paragraph' }] },
+                content: { type: 'doc', content: [{ type: 'paragraph' }] },
                 editorProps: {
                     attributes: {
                         class: 'prose prose-sm max-w-none focus:outline-none min-h-[64px] max-h-[40vh] overflow-y-auto px-4 pt-3 pb-2 text-sm leading-6',
@@ -182,7 +173,7 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, o
             const editor = editorByEl.get(this.editorEl);
             if (! editor) return;
             const content = hasContent(doc)
-                ? deepClone(doc)
+                ? structuredClone(doc)
                 : { type: 'doc', content: [{ type: 'paragraph' }] };
             editor.commands.setContent(content);
             this.text = editor.getText();

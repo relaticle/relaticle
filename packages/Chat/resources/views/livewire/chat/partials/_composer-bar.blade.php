@@ -11,7 +11,7 @@
      $showStopButton (bool, default true): dashboard has no streaming
      concept: it navigates to the conversation page instead, so it passes
      false and the send button never hides behind a stop control.
-     $sendDisabled (string, default below): the Alpine boolean expression fed
+     $sendDisabled (string, required): the Alpine boolean expression fed
      to the send button's :disabled through an escaped echo. Blade escaping
      round-trips safely here: the browser decodes `&gt;` back to `>` when it
      reads the attribute, so Alpine still gets the original expression.
@@ -20,7 +20,6 @@
      dashboard gets the same gate without having to remember it. --}}
 @php
     $showStopButton ??= true;
-    $sendDisabled ??= 'text.trim().length === 0 || text.length > 5000';
     $voiceAvailable = app(\Relaticle\Chat\Services\ModelRegistry::class)->voiceInputAvailable();
 @endphp
 
@@ -30,7 +29,7 @@
          (e.g. after the first message), leaving an empty, unusable composer. --}}
     <div x-ref="editor" class="relative" wire:ignore></div>
 
-    <div class="flex items-center justify-between gap-2 px-3 pb-2">
+    <div class="flex items-center gap-2 px-3 pb-2">
         <span
             x-show="text.length > 4000"
             x-cloak
@@ -43,9 +42,7 @@
             class="text-[length:var(--text-micro)]"
             aria-live="polite"
         ></span>
-        <div x-show="text.length <= 4000" class="flex-1"></div>
-
-        <div class="flex items-center gap-1.5">
+        <div class="ms-auto flex items-center gap-1.5">
             @include('chat::livewire.chat.partials._model-picker')
 
             {{-- Push-to-talk dictation. Hidden entirely, not disabled, when the

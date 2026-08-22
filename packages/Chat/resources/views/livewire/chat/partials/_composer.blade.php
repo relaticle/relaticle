@@ -52,7 +52,6 @@
         <form x-show="!hasPendingProposal" x-on:submit.prevent="sendMessage()">
             <div
                 x-data="chatEditor({
-                    initialDocument: { type: 'doc', content: [] },
                     placeholder: @js(__('Ask anything...')),
                     autofocus: @js(($context ?? 'conversation') !== 'side-panel'),
                     onSubmit: () => $root.dispatchEvent(new CustomEvent('chat:editor-submit', { bubbles: true })),

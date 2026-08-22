@@ -38,7 +38,6 @@
                 role="option"
                 :aria-selected="selectedModel === opt.value"
                 :aria-disabled="! allowedModels.includes(opt.value)"
-                :disabled="false"
                 x-on:click="selectModel(opt.value); menuOpen = false"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 dark:hover:bg-gray-700"
                 :class="{

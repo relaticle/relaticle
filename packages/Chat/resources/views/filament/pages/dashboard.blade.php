@@ -24,16 +24,11 @@
         <form @submit.prevent="submit()" class="mt-10">
             <div
                 x-data="chatEditor({
-                    initialDocument: { type: 'doc', content: [] },
                     placeholder: @js(__('Ask anything...')),
                     autofocus: true,
                     onSubmit: () => $root.dispatchEvent(new CustomEvent('dashboard:editor-submit', { bubbles: true })),
-                    onChange: ({ document, text }) => {
-                        $root.dispatchEvent(new CustomEvent('dashboard:editor-change', { bubbles: true, detail: { document, text } }));
-                    },
                 })"
                 x-on:dashboard:editor-submit.window="submit()"
-                x-on:dashboard:editor-change.window="input = $event.detail.text"
                 data-chat-context="dashboard"
             >
                 @include('chat::livewire.chat.partials._composer-bar', [
@@ -55,12 +50,7 @@
                  has to be started from. --}}
             <div class="mt-4 flex flex-wrap justify-center gap-2">
                 <template x-for="starter in starterPrompts" :key="starter.label">
-                    <button
-                        type="button"
-                        x-on:click="useStarter(starter.prompt)"
-                        x-text="starter.label"
-                        class="inline-flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                    ></button>
+                    @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'starter', 'click' => 'useStarter(starter.prompt)'])
                 </template>
             </div>
         </form>
@@ -71,23 +61,10 @@
     @script
     <script>
         Alpine.data('dashboardChatInput', (chatUrl, defaultModel) => ({
-            input: '',
             submitting: false,
             error: null,
             starterPrompts: @js($this->starterPrompts),
-            currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
-            currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
-            allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentTeam?->plan ?? \App\Enums\Plan::default())),
-            selectedModel: 'auto',
-            modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
-            ...window.ChatModules.modelPickerModule({
-                providerIcons: @js([
-                    'anthropic' => svg('ri-claude-fill')->toHtml(),
-                    'openai' => svg('ri-openai-fill')->toHtml(),
-                    'ollama' => svg('ri-server-line')->toHtml(),
-                    'selfhosted' => svg('ri-server-line')->toHtml(),
-                ]),
-            }),
+            @include('chat::livewire.chat.partials._model-state')
 
             init() {
                 const candidate = defaultModel || 'auto';
@@ -95,16 +72,6 @@
                     && this.modelOptions.some((o) => o.value === candidate)
                     ? candidate
                     : 'auto';
-            },
-
-            selectModel(value) {
-                if (! this.allowedModels.includes(value)) {
-                    window.dispatchEvent(new CustomEvent('chat:model-locked', {
-                        detail: { model: value, plan: this.currentPlan, planLabel: this.currentPlanLabel },
-                    }));
-                    return;
-                }
-                this.selectedModel = value;
             },
 
             // Scoped lookup of the dashboard's TipTap editor — avoids the
@@ -124,7 +91,6 @@
                 if (!editor || this.submitting) return;
 
                 editor.setText(prompt);
-                this.input = prompt;
                 this.$nextTick(() => this.submit());
             },
 

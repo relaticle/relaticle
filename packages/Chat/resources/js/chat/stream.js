@@ -43,7 +43,6 @@ export const streamModule = () => ({
             sessionExpired: false,
             rendered: false,
             prerendered: false,
-            copiedAt: 0,
             follow_ups: [],
             created_at: new Date().toISOString(),
             invocationId: null,
@@ -70,10 +69,7 @@ export const streamModule = () => ({
     },
 
     lastAssistantBubble() {
-        for (let i = this.messages.length - 1; i >= 0; i--) {
-            if (this.messages[i].role === 'assistant') return this.messages[i];
-        }
-        return null;
+        return this.messages.findLast((m) => m.role === 'assistant') ?? null;
     },
 
     // Resolve which bubble a stream event belongs to.
@@ -87,10 +83,8 @@ export const streamModule = () => ({
     //    stub for (e.g. resume) -> mint one bound to this invocation
     targetBubbleFor(invocationId) {
         if (invocationId !== null) {
-            for (let i = this.messages.length - 1; i >= 0; i--) {
-                const m = this.messages[i];
-                if (m.role === 'assistant' && m.invocationId === invocationId) return m;
-            }
+            const bound = this.messages.findLast((m) => m.role === 'assistant' && m.invocationId === invocationId);
+            if (bound) return bound;
         }
         const b = this.lastAssistantBubble();
         if (b && !b.rendered) {
@@ -176,15 +170,8 @@ export const streamModule = () => ({
         // Chips belong to the turn that just COMPLETED. If a queued send
         // already minted a fresh stub, the last assistant bubble is the wrong
         // (unstarted) one — attach to the last rendered bubble instead.
-        for (let i = this.messages.length - 1; i >= 0; i--) {
-            const m = this.messages[i];
-            if (m.role === 'assistant' && m.rendered) {
-                m.follow_ups = chips;
-                return;
-            }
-        }
-        const last = this.lastAssistantBubble();
-        if (last) last.follow_ups = chips;
+        const target = this.messages.findLast((m) => m.role === 'assistant' && m.rendered) ?? this.lastAssistantBubble();
+        if (target) target.follow_ups = chips;
     },
 
     // Server marked pending actions as superseded (user sent a new message without
@@ -371,23 +358,16 @@ export const streamModule = () => ({
     async handleStreamEnd(event) {
         this.currentToolStatus = null;
         const inv = event?.invocation_id ?? null;
-        let assistantMsg = null;
-        if (inv !== null) {
-            for (let i = this.messages.length - 1; i >= 0; i--) {
-                const m = this.messages[i];
-                if (m.role === 'assistant' && m.invocationId === inv) { assistantMsg = m; break; }
-            }
-        }
+        let assistantMsg = inv === null
+            ? null
+            : this.messages.findLast((m) => m.role === 'assistant' && m.invocationId === inv) ?? null;
         if (!assistantMsg) {
             assistantMsg = this.lastAssistantBubble();
             // Never finalize an unstarted continuation stub minted AFTER the
             // ended stream — the ended turn is the assistant bubble before it.
             if (assistantMsg && assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered) {
                 const idx = this.messages.indexOf(assistantMsg);
-                for (let i = idx - 1; i >= 0; i--) {
-                    const m = this.messages[i];
-                    if (m.role === 'assistant') { assistantMsg = m; break; }
-                }
+                assistantMsg = this.messages.slice(0, idx).findLast((m) => m.role === 'assistant') ?? assistantMsg;
             }
         }
         await this.reconcileLatestAssistant(assistantMsg);
@@ -440,12 +420,7 @@ export const streamModule = () => ({
         // Prefer the bubble that is actually mid-stream (unrendered). The last
         // bubble can be a fresh continuation stub minted after the failing
         // turn — painting the error there would mislabel a different turn.
-        let b = null;
-        for (let i = this.messages.length - 1; i >= 0; i--) {
-            const m = this.messages[i];
-            if (m.role === 'assistant' && !m.rendered) { b = m; break; }
-        }
-        if (!b) b = this.lastAssistantBubble();
+        const b = this.messages.findLast((m) => m.role === 'assistant' && !m.rendered) ?? this.lastAssistantBubble();
         if (b && !b.rendered) {
             b.content = '';
             b.invocationId = null;
@@ -481,16 +456,9 @@ export const streamModule = () => ({
         // invocation (handles approve-mid-stream where the last bubble may be a
         // freshly-minted continuation stub, not the one that's retrying).
         // Fall back to lastAssistantBubble() when no id is available.
-        let b = null;
-        if (event?.invocation_id) {
-            for (let i = this.messages.length - 1; i >= 0; i--) {
-                const m = this.messages[i];
-                if (m.role === 'assistant' && m.invocationId === event.invocation_id) {
-                    b = m;
-                    break;
-                }
-            }
-        }
+        let b = event?.invocation_id
+            ? this.messages.findLast((m) => m.role === 'assistant' && m.invocationId === event.invocation_id) ?? null
+            : null;
         if (!b) {
             b = this.lastAssistantBubble();
         }
