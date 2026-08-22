@@ -338,6 +338,118 @@ it('cancels an in-flight search jump on Esc and stops the walk', function (): vo
     $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
 });
 
+/**
+ * The case above sends Escape via Playwright's press(), which focuses its
+ * target element directly, bypassing the real focus path entirely. That is
+ * not what a real keypress does: dismissMessageSearch() hides the search
+ * input the instant the walk starts, and a display:none'd focused element
+ * drops the browser's own focus to <body>, which sits outside the chat
+ * root's x-on:keydown subtree. A keydown there could never bubble to the
+ * handler, no matter what the handler's own guard checks. jumpToMessage()
+ * must therefore move focus onto something still inside the root (the
+ * composer) before Escape has any chance of being seen at all.
+ *
+ * This case never targets a selector for the keypress: it reads whatever
+ * document.activeElement actually is and dispatches Escape there, exactly
+ * as a real untargeted keypress would land.
+ */
+it('reaches Escape from the real post-Enter focus, not just a targeted keypress', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Untargeted escape chat');
+
+    $total = 300;
+    $rows = [];
+
+    foreach (range(1, $total) as $i) {
+        $rows[] = [
+            'id' => sprintf('ke-%04d', $i),
+            'conversation_id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => $i % 2 === 1 ? 'user' : 'assistant',
+            'content' => $i === 2 ? 'the flibbertigibbet quarterly digest' : "filler line {$i}",
+            'document' => ChatDocument::emptyJson(),
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '{}',
+            'meta' => '{}',
+            'created_at' => now()->subMinutes($total - $i + 1),
+            'updated_at' => now()->subMinutes($total - $i + 1),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert($rows);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->assertSourceHas("filler line {$total}");
+
+    $page->assertMissing('[data-message-id="ke-0002"]');
+
+    $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
+    $page->assertVisible(KEYBOARD_TEST_MESSAGE_SEARCH);
+
+    $page->type(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'flibbertigibbet');
+    $page->assertSeeIn(KEYBOARD_TEST_MESSAGE_SEARCH, 'the flibbertigibbet quarterly digest');
+
+    $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Enter');
+
+    // Waits for focus to actually settle off the (now hidden) search input,
+    // then dispatches Escape on whatever document.activeElement really is,
+    // never on a chosen selector. Measured beforehand: fixed code settles
+    // onto the composer within ~5 animation frames; unfixed code settles
+    // onto <body> just as fast and stays there.
+    $landed = $page->script(<<<'JS'
+        (async () => {
+            const isSearchInput = (el) => !!el?.closest?.(
+                '[role="dialog"][aria-label="Search this conversation"]'
+            );
+            let el = document.activeElement;
+            for (let i = 0; i < 30 && isSearchInput(el); i++) {
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+                el = document.activeElement;
+            }
+            const insideRoot = !!el?.closest?.('[data-chat-context="conversation"]');
+            el.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape',
+                bubbles: true,
+                cancelable: true,
+            }));
+            return { tag: el?.tagName, isBody: el === document.body, insideRoot };
+        })();
+    JS);
+
+    // The mechanism itself, not just its effect: with the fix, focus is
+    // parked inside the root (the composer) before Escape is ever sent.
+    expect($landed['insideRoot'])->toBeTrue();
+    expect($landed['isBody'])->toBeFalse();
+
+    $page->wait(1);
+
+    $loadedAfterGrace = (int) $page->script(<<<'JS'
+        window.Alpine.$data(document.querySelector('[data-chat-context="conversation"]')).messages.length
+    JS);
+
+    $page->wait(3);
+
+    $loadedAfterFurtherWait = (int) $page->script(<<<'JS'
+        window.Alpine.$data(document.querySelector('[data-chat-context="conversation"]')).messages.length
+    JS);
+
+    expect($loadedAfterFurtherWait)->toBe($loadedAfterGrace);
+
+    $page->assertMissing('[data-message-id="ke-0002"]');
+    $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
+});
+
 it('closes search on Esc without loading any history', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
