@@ -84,17 +84,19 @@ import { sendModule } from './chat/send';
 import { streamModule } from './chat/stream';
 import { registerBlock, blockTemplate } from './chat/blocks';
 import { modelPickerModule } from './chat/model-picker';
+import { voiceRecorder } from './chat/voice';
 
-const registerChatEditor = () => {
+const registerChatComponents = () => {
     if (!window.Alpine) {
         return false;
     }
     window.Alpine.data('chatEditor', chatEditor);
+    window.Alpine.data('voiceRecorder', voiceRecorder);
     return true;
 };
 
-if (!registerChatEditor()) {
-    document.addEventListener('alpine:init', registerChatEditor);
+if (!registerChatComponents()) {
+    document.addEventListener('alpine:init', registerChatComponents);
 }
 
 // chatInterface's Alpine.data() factory lives inline in

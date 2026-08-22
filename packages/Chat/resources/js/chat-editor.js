@@ -166,6 +166,18 @@ export function chatEditor({ initialDocument, placeholder, onSubmit, onChange, o
             this.text = text;
         },
 
+        // Drops text at the caret and leaves the caret after it, so a dictated
+        // sentence lands wherever the user was typing and they keep editing.
+        // The content is passed as an explicit text node rather than a string:
+        // TipTap parses a string as HTML, and a transcription is arbitrary user
+        // speech that may contain angle brackets.
+        insertText(text) {
+            const editor = editorByEl.get(this.editorEl);
+            if (! editor || ! text) return;
+            editor.chain().focus().insertContent({ type: 'text', text }).run();
+            this.text = editor.getText();
+        },
+
         setDocument(doc) {
             const editor = editorByEl.get(this.editorEl);
             if (! editor) return;
