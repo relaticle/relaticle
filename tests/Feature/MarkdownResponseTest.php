@@ -87,3 +87,24 @@ it('converts a real html table to pipe-table markdown', function (): void {
         ->and($markdown)->toContain('| Free | $0 |')
         ->and($markdown)->toContain('| Pro | $29 |');
 });
+
+it('gives agents a markdown 404 that links the indexes, and browsers the html page', function (): void {
+    $this->get('/no-such-page', ['Accept' => 'text/markdown'])
+        ->assertNotFound()
+        ->assertHeader('content-type', 'text/markdown; charset=UTF-8')
+        ->assertSee('# Not found', false)
+        ->assertSee(route('llms-txt'), false)
+        ->assertSee(route('openapi.json'), false);
+
+    $this->get('/no-such-page', ['Accept' => '*/*'])
+        ->assertNotFound()
+        ->assertHeader('content-type', 'text/markdown; charset=UTF-8');
+
+    $this->get('/no-such-page', ['Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8'])
+        ->assertNotFound()
+        ->assertHeader('content-type', 'text/html; charset=UTF-8');
+
+    $this->getJson('/api/v1/no-such-endpoint')
+        ->assertNotFound()
+        ->assertHeader('content-type', 'application/json');
+});

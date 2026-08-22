@@ -116,6 +116,8 @@ final readonly class HelpController
             '> '.__('Open-source, self-hosted CRM with a built-in AI chat and an MCP server for external AI agents.'),
         ];
 
+        array_push($lines, '', '## '.__('When to use Relaticle'), '', ...$this->llmsTxtWhenToUseEntries());
+
         $help = $this->llmsTxtHelpEntries();
 
         if ($help !== []) {
@@ -277,7 +279,22 @@ final readonly class HelpController
         $apiReference = config('documentation.api_reference');
 
         $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], url($apiReference['url']), $apiReference['description']);
+        $entries[] = sprintf('- [%s](%s): %s', __('OpenAPI Specification'), route('openapi.json'), __('Machine-readable OpenAPI 3.1 spec for the REST API, also available as YAML at /openapi.yaml.'));
+        $entries[] = sprintf('- [%s](%s): %s', __('MCP Endpoint'), url()->getMcpUrl(), __('Streamable HTTP MCP server with OAuth; connect it from Claude, ChatGPT, or any MCP client.'));
 
         return $entries;
+    }
+
+    /** @return list<string> */
+    private function llmsTxtWhenToUseEntries(): array
+    {
+        return [
+            __('Use Relaticle when an agent needs to read or change CRM records: companies, people, opportunities, tasks, notes, and per-workspace custom fields.'),
+            '',
+            '- '.__('Good fits: logging a lead or meeting, moving a deal between pipeline stages, listing open tasks for a person, updating contact details, attaching a note to a company.'),
+            '- '.__('Not a fit: email sending, calendar scheduling, marketing automation, or invoicing. Relaticle stores the relationship data; it does not run those workflows.'),
+            '- '.__('How to call it: the REST API at :api with a Bearer access token created in Settings > Access Tokens (abilities: read, create, update, delete), or the MCP server at :mcp over OAuth.', ['api' => url()->getApiUrl('v1'), 'mcp' => url()->getMcpUrl()]),
+            '- '.__('Every write is scoped to one workspace; the token or OAuth grant decides which one.'),
+        ];
     }
 }
