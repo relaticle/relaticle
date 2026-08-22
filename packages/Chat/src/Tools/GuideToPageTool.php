@@ -18,7 +18,8 @@ final readonly class GuideToPageTool implements Tool
     {
         return 'Get a direct link to the workspace page where the user can perform an action this assistant '
             .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
-            .'from a file; or managing team members. Call this instead of telling the user something is impossible.';
+            .'from a file; exporting records to a file; or managing team members. Call this instead of telling '
+            .'the user something is impossible.';
     }
 
     /**
@@ -34,6 +35,8 @@ final readonly class GuideToPageTool implements Tool
                     .'"custom_fields" (create/edit/delete custom field definitions); '
                     .'"import_companies", "import_people", "import_opportunities", "import_tasks", "import_notes" '
                     .'(bulk-import many records of that type from a file); '
+                    .'"export_companies", "export_people", "export_opportunities", "export_tasks", "export_notes" '
+                    .'(export records of that type to a CSV or XLSX file); '
                     .'"team_members" (invite or manage team members).',
                 ),
         ];
