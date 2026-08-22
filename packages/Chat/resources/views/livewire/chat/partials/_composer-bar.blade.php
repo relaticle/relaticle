@@ -25,7 +25,7 @@
 
 <div
     data-chat-composer
-    class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-[var(--surface-input-bg)] dark:focus-within:border-primary-500/60"
+    class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60"
 >
     {{-- wire:ignore: TipTap mounts into this node imperatively; without it
          Livewire's morphdom wipes the editor on every chat-interface re-render
