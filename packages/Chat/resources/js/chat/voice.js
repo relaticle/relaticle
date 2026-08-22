@@ -30,6 +30,14 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
             this._root = this.$el;
         },
 
+        // wire:navigate tears this component down without firing onstop, so a
+        // navigation mid-recording would leave the tab's recording indicator
+        // lit and the mic hot. Stopping here runs onstop, which releases the
+        // tracks.
+        destroy() {
+            this._recorder?.stop();
+        },
+
         // The composer bar is shared, so the editor is found by walking up from
         // this island rather than by a context name. This lands on the same
         // wrapper chatInterface.localEditor() and the dashboard's own helper
