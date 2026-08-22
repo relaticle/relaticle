@@ -248,6 +248,96 @@ it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit bel
     expect((int) $focusReturnedToChat)->toBe(1);
 });
 
+/**
+ * jumpToMessage() dismisses the search overlay the instant it starts, so the
+ * only element left inside the chat root that a real keypress can land on is
+ * the composer; Esc there must still cancel the walk. Reaching this hit needs
+ * 6 real loadEarlier() round trips (300 seeded messages, target 2 rows deep):
+ * measured beforehand at ~1.6s to run to completion uncancelled, comfortably
+ * inside this test's wait budget, so Escape sent immediately after Enter is
+ * given every chance to land mid-walk rather than after it.
+ */
+it('cancels an in-flight search jump on Esc and stops the walk', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    keyboardTestInsertConversation($conversationId, $user, $team->getKey(), 'Very deep history chat');
+
+    $total = 300;
+    $rows = [];
+
+    foreach (range(1, $total) as $i) {
+        $rows[] = [
+            'id' => sprintf('kc-%04d', $i),
+            'conversation_id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
+            'agent' => CrmAssistant::class,
+            'role' => $i % 2 === 1 ? 'user' : 'assistant',
+            'content' => $i === 2 ? 'the zylophonic migration record' : "filler line {$i}",
+            'document' => ChatDocument::emptyJson(),
+            'attachments' => '[]',
+            'tool_calls' => '[]',
+            'tool_results' => '[]',
+            'usage' => '{}',
+            'meta' => '{}',
+            'created_at' => now()->subMinutes($total - $i + 1),
+            'updated_at' => now()->subMinutes($total - $i + 1),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert($rows);
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->type('[id="form.password"]', 'password')
+        ->click('button.fi-btn')
+        ->assertPathIs("/app/{$team->slug}")
+        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->assertSourceHas("filler line {$total}");
+
+    $page->assertMissing('[data-message-id="kc-0002"]');
+
+    $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
+    $page->assertVisible(KEYBOARD_TEST_MESSAGE_SEARCH);
+
+    $page->type(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'zylophonic');
+    $page->assertSeeIn(KEYBOARD_TEST_MESSAGE_SEARCH, 'the zylophonic migration record');
+
+    $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Enter');
+    $page->keys(KEYBOARD_TEST_EDITOR, 'Escape');
+
+    // The cancel flag is only checked once per loop iteration (by design: it
+    // must not abort a page load already in flight), so the single round trip
+    // that was already running when Escape landed is still allowed to finish.
+    // This wait is that one grace page settling, not the proof itself.
+    $page->wait(1);
+
+    $loadedAfterGrace = (int) $page->script(<<<'JS'
+        window.Alpine.$data(document.querySelector('[data-chat-context="conversation"]')).messages.length
+    JS);
+
+    // Left unfixed, the walk needs ~1.6s total to reach the target on its
+    // own; this waits well past that so an uncancelled walk would already
+    // have finished growing.
+    $page->wait(3);
+
+    $loadedAfterFurtherWait = (int) $page->script(<<<'JS'
+        window.Alpine.$data(document.querySelector('[data-chat-context="conversation"]')).messages.length
+    JS);
+
+    // The proof the walk actually stopped, rather than merely not having
+    // reached the target yet: no page loaded beyond that one grace round
+    // trip. Left unfixed, the walk keeps paging in the background and this
+    // count keeps growing well past both waits, until it reaches the target.
+    expect($loadedAfterFurtherWait)->toBe($loadedAfterGrace);
+
+    $page->assertMissing('[data-message-id="kc-0002"]');
+    // A cancel is the user leaving, not a failure: it must not reopen the
+    // overlay (with a stalled/unreachable notice or otherwise).
+    $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
+});
+
 it('closes search on Esc without loading any history', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();

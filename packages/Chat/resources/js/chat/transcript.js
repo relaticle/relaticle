@@ -166,6 +166,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
     searchJumping: false,
     searchUnreachable: false,
     searchStalled: false,
+    // Set by Escape (see onChatRootKeydown) while searchJumping is true; the
+    // loop below checks it once per page and bails, a user-left exit rather
+    // than a failure, so it must not set searchStalled/searchUnreachable.
+    searchJumpCancelled: false,
     highlightedMessageId: null,
     _searchDebounceTimer: null,
     _searchRequestToken: 0,
@@ -1089,12 +1093,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
         }
 
         if (e.key === 'Escape') {
-            if (!this.switcherOpen && !this.searchOpen) return;
+            if (!this.switcherOpen && !this.searchOpen && !this.searchJumping) return;
             e.preventDefault();
             // Stops the side panel's own window-level Escape handler from also
             // acting on this same keypress (it closes the panel/its dropdowns
             // when open): the two must not both react to one Esc.
             e.stopPropagation();
+            if (this.searchJumping) {
+                this.searchJumpCancelled = true;
+                return;
+            }
             this.switcherOpen ? this.closeSwitcher() : this.closeMessageSearch();
             return;
         }
@@ -1376,6 +1384,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
 
         try {
             for (let page = 0; page < MAX_SEARCH_JUMP_PAGES; page++) {
+                if (this.searchJumpCancelled) return;
+
                 // First: let any load the top sentinel already started finish,
                 // otherwise loadEarlier() below would no-op on its re-entry
                 // guard and this loop would give up on its first pass.
@@ -1390,6 +1400,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate = null,
             }
         } finally {
             this.searchJumping = false;
+            this.searchJumpCancelled = false;
         }
 
         if (this.destroyed) return;
