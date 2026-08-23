@@ -110,9 +110,13 @@ production: message ordering, approval races, duplicate proposals.
   the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
   result without that flag renders, so a new read tool must either emit a block
   or be named in the prompt's no-block list.
-- Replayed proposal tool results are stamped with their decided status
-  (`SupersededAwareConversationStore`) and `<resolved_actions>` carries record
-  titles and urls; never label a proposal by its card heading.
+- A new list tool needs `availableIncludes()` (copy its sibling `Get*Tool`'s
+  allowlist) or the prompt's related-records rule has nothing to call for it.
+- Replayed proposal tool results are NEVER rewritten: mutating an earlier
+  message invalidates the Anthropic prompt-cache prefix from that turn on.
+  Decided status travels only in `<resolved_actions>`, auto-cancelled status in
+  `<superseded_proposals>`, both re-queried per turn. Never label a proposal by
+  its card heading.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation
   to document.

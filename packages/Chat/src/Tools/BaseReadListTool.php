@@ -277,12 +277,13 @@ abstract class BaseReadListTool implements Tool
     /**
      * Eager-loads each requested relation across the whole result page in one
      * query per relation, scoped to the user's team and ordered by recency.
-     * Deliberately no `->limit()` in the closure: a *Many relation's eager
-     * load spans every parent row in the collection in a single query, so a
-     * limit there caps the WHOLE result set rather than each row's own slice
-     * (row 1 could eat the limit and leave row 2 with zero). The per-row cap
-     * is applied afterwards in PHP, once each row's own related collection is
-     * already resolved.
+     *
+     * The `->limit()` inside the closure is per PARENT, not per result set:
+     * a *Many relation compiles it through Builder::groupLimit(), which emits
+     * `row_number() over (partition by <fk>)`, so every row gets its own slice.
+     * Without it a company with 500 notes would hydrate all 500 just to count
+     * them. The true count comes from loadCount(), which is a separate
+     * aggregate and therefore unaffected by the slice.
      *
      * @param  LengthAwarePaginator<int, Model>  $results
      * @param  list<string>  $includes
@@ -301,9 +302,27 @@ abstract class BaseReadListTool implements Tool
             $models->load([$relation => function (Relation $query) use ($team): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
-                $query->whereBelongsTo($team)->latest($orderColumn);
+                $query->whereBelongsTo($team)->latest($orderColumn)->limit(self::INCLUDE_ITEM_LIMIT);
             }]);
+
+            // Counted with the same team scope as the load above: an unscoped
+            // count would describe a cross-team related record the items list
+            // omits, so one relation would report two different totals.
+            $models->loadCount([$relation => $this->scopeToTeam($team)]);
         }
+    }
+
+    /**
+     * Team-scoping constraint shared by the include load and its count.
+     *
+     * Typed `mixed` deliberately: load() hands the callback a Relation and
+     * loadCount() hands it an Eloquent Builder, and both accept whereBelongsTo.
+     */
+    private function scopeToTeam(?Team $team): callable
+    {
+        return static function (mixed $query) use ($team): void {
+            $query->whereBelongsTo($team);
+        };
     }
 
     /**
@@ -336,8 +355,11 @@ abstract class BaseReadListTool implements Tool
                 'url' => $resolver->referenceUrl($citationType, (string) $m->getKey()),
             ])->all());
 
+            // From loadCount(), never $related->count(): the eager load is
+            // sliced to INCLUDE_ITEM_LIMIT per row, so counting the loaded
+            // collection would cap every total at the slice size.
             $included[$relation] = [
-                'total' => $related->count(),
+                'total' => (int) $model->getAttribute(Str::snake($relation).'_count'),
                 'showing' => count($items),
                 'items' => $items,
             ];

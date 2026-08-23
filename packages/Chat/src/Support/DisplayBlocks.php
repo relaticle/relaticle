@@ -71,6 +71,9 @@ final readonly class DisplayBlocks
 
         unset($decoded[self::KEY]);
 
-        return json_encode($decoded);
+        // Same flag the tools encode with: this re-encode is what the model
+        // actually replays for every block-carrying result, so dropping it
+        // would put escaped slashes back into the prefix the tools just cleaned.
+        return json_encode($decoded, JSON_UNESCAPED_SLASHES);
     }
 }

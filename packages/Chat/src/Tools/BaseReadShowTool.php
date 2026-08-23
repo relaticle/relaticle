@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -309,7 +310,12 @@ abstract class BaseReadShowTool implements Tool
         $included = [];
 
         foreach ($includes as $relationName) {
-            $model->loadCount($relationName);
+            // Scoped like the load below it: an unscoped count would report a
+            // cross-team related record the items list then omits, so the same
+            // relation would show two different totals here and in a list row.
+            $model->loadCount([$relationName => function (Builder $query) use ($user): void {
+                $query->whereBelongsTo($user->currentTeam);
+            }]);
             $model->load([$relationName => function (Relation $query) use ($user): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
