@@ -18,6 +18,10 @@ mutates(ChatConversation::class);
 it('places the conversation title in the topbar and the toggle beside the workspace menu', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
+    // A faker team name can wrap to a second line in the sidebar (font-load
+    // dependent), which drops the tenant-menu center 8px and flakes the strict
+    // alignment probes. Pin a short name so the geometry is deterministic.
+    $team->update(['name' => 'Acme']);
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'Pipeline review', $conversationId);
 
@@ -58,6 +62,8 @@ it('places the conversation title in the topbar and the toggle beside the worksp
                 oldDesktopToggleHidden: getComputedStyle(document.querySelector('.fi-topbar-collapse-sidebar-btn-ctn')).display === 'none',
                 chromeCentersAligned: Math.abs(workspaceRect.top + workspaceRect.height / 2 - titleRect.top - titleRect.height / 2) <= 0.5
                     && Math.abs(workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2) <= 0.5,
+                titleCenterDelta: workspaceRect.top + workspaceRect.height / 2 - titleRect.top - titleRect.height / 2,
+                toggleCenterDelta: workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2,
                 composerInsideViewport: composerRect.bottom <= window.innerHeight,
                 headingOnlyHeaderRemovedFromFlow: getComputedStyle(document.querySelector('.fi-header-page-heading-only')).display === 'contents',
                 topbarHeight: topbarRect.height,
@@ -78,6 +84,8 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         usleep(250_000);
         $chrome = $settleChrome();
     }
+
+    expect(($chrome['chromeCentersAligned'] ?? false) === true)->toBe(true, 'Chrome centers never settled: '.json_encode($chrome));
 
     expect($chrome)->toMatchArray([
         'title' => 'Pipeline review',
@@ -128,10 +136,14 @@ it('places the conversation title in the topbar and the toggle beside the worksp
             })()
             JS;
 
+    // Exact widths differ per renderer (32px locally, 38px on the CI runner's
+    // font metrics); the contract is a compact avatar-sized control, not a pixel.
+    $compact = static fn (mixed $width): bool => is_numeric($width) && $width >= 28 && $width <= 44;
+
     $collapsedOk = static fn (mixed $probe): bool => is_array($probe)
         && $probe['ordered'] === true
-        && $probe['workspaceWidth'] === 32
-        && $probe['toggleWidth'] === 32
+        && $compact($probe['workspaceWidth'])
+        && $compact($probe['toggleWidth'])
         && $probe['centersAligned'] === true
         && $probe['workspaceHit'] === true
         && $probe['toggleHit'] === true;
