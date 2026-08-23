@@ -131,6 +131,12 @@ it('carries the grounding, join, and formatting rules', function (): void {
         ->toContain('say so in your first sentence');
 });
 
+it('tells the model to name only the records its answer turns on', function (): void {
+    expect(app(CrmAssistant::class)->staticInstructions())
+        ->toContain('Name only the records the answer turns on')
+        ->toContain('Walking every row to show your work is re-listing');
+});
+
 it('tells the model to reach for include when asked for related records', function (): void {
     $instructions = app(CrmAssistant::class)->staticInstructions();
 

@@ -61,6 +61,15 @@ abstract class BaseReadListTool implements Tool
      */
     private const int INCLUDE_ITEM_LIMIT = 3;
 
+    /**
+     * Page cap applied when any include is requested. A full page of rows times
+     * every available relation times INCLUDE_ITEM_LIMIT is a large result for one
+     * tool call, and the whole payload then sits in the prompt cache for the rest
+     * of the conversation. `total` still reports the real count, so the model can
+     * say it is showing a subset.
+     */
+    private const int INCLUDE_PAGE_LIMIT = 25;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -149,7 +158,8 @@ abstract class BaseReadListTool implements Tool
                 ->items($schema->string())
                 ->description(
                     "Related records to attach per row under `included` and as a chip column in the table. Valid values: {$valid}. "
-                    .'Only the '.self::INCLUDE_ITEM_LIMIT.' most recent related records per row are attached; `total` inside each row\'s `included` entry gives the real count.'
+                    .'Only the '.self::INCLUDE_ITEM_LIMIT.' most recent related records per row are attached; `total` inside each row\'s `included` entry gives the real count. '
+                    .'Asking for any include caps this call at '.self::INCLUDE_PAGE_LIMIT.' rows, so leave it off when you want a long list.'
                 );
         }
 
@@ -183,7 +193,7 @@ abstract class BaseReadListTool implements Tool
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
-                perPage: max(1, min((int) ($request['per_page'] ?? 15), 50)),
+                perPage: $this->perPageFor($request, $requestedIncludes),
                 page: isset($request['page']) ? (int) $request['page'] : null,
                 request: $httpRequest,
             );
@@ -257,6 +267,18 @@ abstract class BaseReadListTool implements Tool
         }
 
         return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param  list<string>  $requestedIncludes
+     */
+    private function perPageFor(Request $request, array $requestedIncludes): int
+    {
+        $perPage = max(1, min((int) ($request['per_page'] ?? 15), 50));
+
+        return $requestedIncludes === []
+            ? $perPage
+            : min($perPage, self::INCLUDE_PAGE_LIMIT);
     }
 
     /**

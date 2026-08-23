@@ -36,7 +36,8 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  *
  * A record can also be soft-deleted after a chat transcript cited it: the
  * lookup is `withTrashed()` and, for a team member, a trashed record renders
- * a friendly "this record no longer exists" page instead of redirecting. The
+ * a friendly "this record no longer exists" page (410, the state it describes)
+ * instead of redirecting. The
  * team-membership check still runs BEFORE the trashed check, so a foreign
  * caller 404s whether the record is live, trashed, or absent. Trashed state
  * is only ever revealed to someone who could already see the record.
@@ -78,7 +79,7 @@ final readonly class RecordRedirectController
         abort_unless($user->belongsToTeamId($record->team_id), 404);
 
         if ($record->trashed()) {
-            return response()->view('chat::record-gone');
+            return response()->view('chat::record-gone', status: Response::HTTP_GONE);
         }
 
         $url = $resolver->urlFor($type, $id, $record->team);

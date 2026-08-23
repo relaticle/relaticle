@@ -135,6 +135,19 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      */
     public ?array $currentUser = null;
 
+    /**
+     * The id of the turn being streamed. Every proposal this turn creates carries
+     * it, which is what groups a chained multi-step write into one plan card.
+     */
+    public ?string $turnId = null;
+
+    public function withTurnId(?string $turnId): self
+    {
+        $this->turnId = $turnId === '' ? null : $turnId;
+
+        return $this;
+    }
+
     public function withConversationId(?string $conversationId): self
     {
         $this->conversationId = $conversationId;
@@ -209,7 +222,7 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 3. Blocks: results from the list tools, the get tools and ListActivityTool are rendered as a table or card block under your reply, in tool-call order, each with its own title. Nothing else renders a block. SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block, and neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool, so present those results yourself as a short markdown list or sentence, still never printing a raw ID. A list with zero results renders no block either: say so in prose.
 4. Lookups: when you call a read tool only to find ids for another tool call (before an update, a delete, or a get), use SearchCrmTool, or pass `lookup: true` to the list or get tool. A lookup renders nothing. Only a call the user asked to see renders a block.
 5. Lead-in: write ONE short lead-in sentence for the entire turn, even when you call several read tools, and never write a heading or bold label naming a result set: every block prints its own title.
-6. No repetition: where a block renders, never repeat its records as a markdown table, a bullet list, or per-record prose. Answering a question ABOUT the data (a count, a total, which record is largest) is still your job; re-listing the data is not.
+6. No repetition: where a block renders, never repeat its records as a markdown table, a bullet list, or per-record prose. Answering a question ABOUT the data (a count, a total, which record is largest) is still your job; re-listing the data is not. Name only the records the answer turns on: the largest, the tie, the exception. Walking every row to show your work is re-listing.
 7. Related records: when the user asks to see records WITH their related ones ("companies and their deals", "contacts with their tasks"), pass `include` to the list tool. One call returns the related records per row and the block renders them as chips, so no second call and no hand-written table are needed. Check the tool's `include` values before reaching for anything else.
 8. Join tables: a markdown table of records is allowed ONLY for a cross-entity or derived view no single block and no `include` can show, and ONLY with values present in this turn's tool results. Pass `lookup: true` on every read call that feeds it so no block renders the same data twice. At most one such table per turn.
 9. Placement: by default every block renders below your WHOLE reply. To place one at a specific point, put {{block:N}} alone on its own line. N counts tool calls in this turn, including calls that render nothing: a lookup then a get means the card is {{block:2}}. Use a marker only when text genuinely continues AFTER the data.
@@ -601,6 +614,10 @@ PROMPT;
     {
         if (method_exists($tool, 'setConversationId')) {
             $tool->setConversationId($this->conversationId);
+        }
+
+        if (method_exists($tool, 'setTurnId')) {
+            $tool->setTurnId($this->turnId);
         }
 
         return $tool;

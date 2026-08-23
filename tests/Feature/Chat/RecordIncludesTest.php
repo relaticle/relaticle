@@ -72,6 +72,23 @@ it('caps included items at ten while reporting the true total', function (): voi
         ->and($payload['included']['notes']['items'])->toHaveCount(10);
 });
 
+it('clamps the page size when includes are requested and leaves it alone when they are not', function (): void {
+    Company::factory()->count(30)->for($this->team)->create();
+
+    $withIncludes = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
+        'per_page' => 50,
+        'include' => ['people'],
+    ])), true);
+
+    $withoutIncludes = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
+        'per_page' => 50,
+    ])), true);
+
+    expect($withIncludes['total'])->toBe(30)
+        ->and($withIncludes['showing'])->toBe(25)
+        ->and($withoutIncludes['showing'])->toBe(30);
+});
+
 it('returns an error naming the valid includes when given an unknown one', function (): void {
     $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
 

@@ -82,7 +82,7 @@ it('shows a gone page for a soft deleted record in the user team', function (): 
 
     $this->actingAs($user)
         ->get("/r/company/{$company->getKey()}")
-        ->assertOk()
+        ->assertStatus(410)
         ->assertSee(__('This record no longer exists'));
 });
 
