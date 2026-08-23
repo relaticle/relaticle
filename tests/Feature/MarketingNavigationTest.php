@@ -157,3 +157,14 @@ it('links the product pages from page copy, not only from the sitewide nav', fun
     expect($body)->toContain('href="'.route('ai').'"')
         ->and($body)->toContain('href="'.route('selfHosted').'"');
 })->with(['/', '/pricing', '/compare/relaticle-vs-twenty', '/alternatives/attio']);
+
+it('renders the works-with strip on the homepage with a link to the developer docs', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    preg_match('/<section[^>]*aria-label="Works with"[^>]*>.*?<\/section>/s', $html, $matches);
+    $strip = $matches[0] ?? '';
+
+    expect($strip)->not->toBe('')
+        ->and($strip)->toContain('Claude', 'ChatGPT', 'Cursor', 'Gemini', '+ any MCP client')
+        ->and($strip)->toContain('href="'.route('documentation.index').'"');
+});

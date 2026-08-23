@@ -15,7 +15,7 @@
                 One CRM. Three ways to work: UI, chat, and agents.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                Manage records by hand, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask Relaticle in the app</a>, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
+                Manage records by hand, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask Relaticle in the app</a>, or connect any external agent through MCP. Every path works from the same permissions, schema, and customer data.
             </p>
         </div>
 

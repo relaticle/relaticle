@@ -1,0 +1,32 @@
+@php
+    $clients = [
+        ['ri-claude-fill', 'text-[#D4763C]', 'Claude'],
+        ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT'],
+        ['ri-cursor-ai-fill', 'text-gray-900 dark:text-gray-200', 'Cursor'],
+        ['ri-gemini-fill', 'text-blue-500', 'Gemini'],
+    ];
+@endphp
+
+<section aria-label="{{ __('Works with') }}" class="relative bg-white dark:bg-gray-950 border-y border-gray-200 dark:border-white/[0.08]">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-2 md:grid-cols-7 divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-white/[0.08] border-x border-gray-200 dark:border-white/[0.08]">
+            <div class="col-span-2 flex items-center px-5 py-4 md:py-6">
+                <p class="font-mono uppercase tracking-[0.14em] text-[10px] leading-relaxed text-gray-500 dark:text-gray-400">
+                    {{ __('Works with the agents your team already uses') }}
+                </p>
+            </div>
+
+            @foreach($clients as [$icon, $color, $name])
+                <div class="flex items-center justify-center gap-2.5 px-4 py-5 md:py-6">
+                    <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 {{ $color }}"/>
+                    <span class="text-sm font-semibold tracking-tight text-gray-800 dark:text-gray-200">{{ $name }}</span>
+                </div>
+            @endforeach
+
+            <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-4 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                {{ __('+ any MCP client') }}
+                <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
+            </a>
+        </div>
+    </div>
+</section>

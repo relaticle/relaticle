@@ -1,4 +1,4 @@
-<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-20 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
+<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
 
     {{-- Background system — layered depth --}}
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
