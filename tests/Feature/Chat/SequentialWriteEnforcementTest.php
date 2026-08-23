@@ -145,6 +145,7 @@ it('system prompt instructs the agent to stop after writes and handle approvals'
     expect($instructions)
         ->toContain('After ANY write tool call')
         ->toContain('STOP your turn immediately')
-        ->toContain('[approval]')
+        ->toContain('never ask the user to approve one record at a time')
+        ->not->toContain('[approval]')
         ->not->toContain('automatically be prompted to continue');
 });

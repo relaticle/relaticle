@@ -29,6 +29,13 @@ final class CreatePersonTool extends BaseWriteCreateTool
         return 'people';
     }
 
+    protected function ownedForeignKeys(): array
+    {
+        return [
+            'company_id' => Company::class,
+        ];
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [

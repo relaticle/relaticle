@@ -54,10 +54,10 @@ it('UpdateCompanyTool proposes a name change and approval persists it', function
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $company->id,
         'name' => 'New Co',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -77,10 +77,10 @@ it('UpdateNoteTool proposes a title change and approval persists it', function (
     $tool = resolve(UpdateNoteTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $note->id,
         'title' => 'New title',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -101,10 +101,10 @@ it('UpdateNoteTool can resync linked people via people_ids', function (): void {
     $tool = resolve(UpdateNoteTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $note->id,
         'people_ids' => [(string) $alice->id],
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -141,10 +141,10 @@ it('UpdateOpportunityTool proposes a name change and approval persists it', func
     $tool = resolve(UpdateOpportunityTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $opportunity->id,
         'name' => 'New deal',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -165,10 +165,10 @@ it('UpdateOpportunityTool can repoint contact_id and persist it', function (): v
     $tool = resolve(UpdateOpportunityTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $opportunity->id,
         'contact_id' => (string) $contact->id,
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -188,10 +188,10 @@ it('UpdatePersonTool proposes a name change and approval persists it', function 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->id,
         'name' => 'New name',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -212,10 +212,10 @@ it('UpdatePersonTool can repoint company_id and persist it', function (): void {
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->id,
         'company_id' => (string) $newCompany->id,
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -237,10 +237,10 @@ it('UpdateCompanyTool proposes an account owner change with names in the display
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $company->id,
         'account_owner_id' => (string) $teammate->getKey(),
-    ]));
+    ]]]));
 
     expect($response)->toContain('pending_action');
 
@@ -267,10 +267,10 @@ it('UpdateCompanyTool rejects a non-member account_owner_id without creating a p
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $company->id,
         'account_owner_id' => (string) $stranger->getKey(),
-    ]));
+    ]]]));
 
     expect($response)->toContain('must be a workspace team member')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
@@ -285,10 +285,10 @@ it('UpdateCompanyTool unassigns the account owner when an empty string is passed
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $company->id,
         'account_owner_id' => '',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -319,10 +319,10 @@ it('UpdateTaskTool rejects a non-member assignee id before proposing', function 
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'assignee_ids' => [(string) $stranger->getKey()],
-    ]));
+    ]]]));
 
     expect($response)->toContain('assignee_ids must be a workspace team member')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
@@ -336,10 +336,10 @@ it('UpdateTaskTool accepts a workspace member as assignee', function (): void {
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'assignee_ids' => [(string) $teammate->getKey()],
-    ]));
+    ]]]));
 
     expect($response)->toContain('pending_action');
 });

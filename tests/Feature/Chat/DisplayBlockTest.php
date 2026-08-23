@@ -651,3 +651,21 @@ it('strips display_block from the replayed agent history while the row keeps it'
         ->and($history)->toContain('Acme')
         ->and($history)->not->toContain('display_block');
 });
+
+it('emits no block when the list is called in lookup mode, keeping the data for chaining', function (): void {
+    app(CreateCompany::class)->execute($this->user, ['name' => 'Lookup Co']);
+
+    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request(['search' => 'Lookup', 'lookup' => true])), true);
+
+    expect($decoded)->not->toHaveKey('display_block')
+        ->and($decoded['data'][0]['attributes']['name'])->toBe('Lookup Co');
+});
+
+it('emits no card when a single record is fetched in lookup mode', function (): void {
+    $company = app(CreateCompany::class)->execute($this->user, ['name' => 'Lookup Co']);
+
+    $decoded = json_decode(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey(), 'lookup' => true])), true);
+
+    expect($decoded)->not->toHaveKey('display_block')
+        ->and($decoded['attributes']['name'])->toBe('Lookup Co');
+});

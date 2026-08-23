@@ -82,6 +82,20 @@ it('validates required fields on create', function (): void {
         ->assertInvalid(['title']);
 });
 
+it('validates a required custom field on create', function (): void {
+    Sanctum::actingAs($this->user);
+
+    DB::table('custom_fields')
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->update(['validation_rules' => json_encode(['required' => true])]);
+
+    $this->postJson('/api/v1/tasks', ['title' => 'No status'])
+        ->assertUnprocessable()
+        ->assertInvalid(['custom_fields.status']);
+});
+
 it('can show a task', function (): void {
     Sanctum::actingAs($this->user);
 

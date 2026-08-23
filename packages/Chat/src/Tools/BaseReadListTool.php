@@ -113,6 +113,7 @@ abstract class BaseReadListTool implements Tool
                 ),
                 'per_page' => $schema->integer()->description('Results per page (default 15, max 50).')->default(15),
                 'page' => $schema->integer()->description('Page number.')->default(1),
+                'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
             ],
         );
     }
@@ -143,7 +144,7 @@ abstract class BaseReadListTool implements Tool
         // Captured before the resource collection is built: wrapping a paginator
         // in a resource collection replaces its items with resource instances,
         // and the display block reads stored custom-field values off the models.
-        $block = $results instanceof LengthAwarePaginator
+        $block = $results instanceof LengthAwarePaginator && ! $this->isLookup($request)
             ? $this->buildDisplayBlock($user, $results, $request)
             : null;
 
@@ -184,6 +185,11 @@ abstract class BaseReadListTool implements Tool
         }
 
         return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_PRETTY_PRINT);
+    }
+
+    private function isLookup(Request $request): bool
+    {
+        return filter_var($request['lookup'] ?? false, FILTER_VALIDATE_BOOL);
     }
 
     /**

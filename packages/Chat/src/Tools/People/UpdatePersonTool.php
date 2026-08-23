@@ -41,20 +41,30 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
         return 'Person';
     }
 
+    protected function ownedForeignKeys(): array
+    {
+        return [
+            'company_id' => Company::class,
+        ];
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [
             'name' => $schema->string()->description('The new person name.'),
-            'company_id' => $schema->string()->description('The new company ID.'),
+            'company_id' => $schema->string()->description('The new company ULID. Pass null to unlink the person from their company.'),
         ];
     }
 
     protected function extractActionData(Request $request): array
     {
-        return array_filter([
-            'name' => $request['name'] ?? null,
-            'company_id' => $request['company_id'] ?? null,
-        ], fn (mixed $v): bool => $v !== null);
+        $data = array_filter(['name' => $request['name'] ?? null], fn (mixed $v): bool => $v !== null);
+
+        if (array_key_exists('company_id', $request->all())) {
+            $data['company_id'] = $this->stringOrNull($request, 'company_id');
+        }
+
+        return $data;
     }
 
     protected function buildDisplayData(Request $request, Model $model): array
@@ -73,12 +83,12 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
             ];
         }
 
-        $newCompanyId = $this->stringOrNull($request, 'company_id');
-        if ($newCompanyId !== null) {
+        if (array_key_exists('company_id', $request->all())) {
+            $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
                 'old' => $this->nameForId($model->getAttribute('company_id'), Company::class, 'name', $team),
-                'new' => $this->nameForId($newCompanyId, Company::class, 'name', $team),
+                'new' => $newCompanyId === null ? __('(none)') : $this->nameForId($newCompanyId, Company::class, 'name', $team),
             ];
         }
 

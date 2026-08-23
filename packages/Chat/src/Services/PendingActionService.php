@@ -36,6 +36,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
@@ -399,9 +400,8 @@ final readonly class PendingActionService
 
     /**
      * Execute one batch item by the proposal's operation and return the affected model.
-     * Create runs the create action on the record payload; Delete resolves the record's
-     * own `_record_id`/`_model_class` within the tenant and runs the delete action.
-     * Update is never batched (one record per Update proposal), so it is rejected here.
+     * Create runs the create action on the record payload; Update and Delete resolve the
+     * record's own `_record_id`/`_model_class` within the tenant and run the action on it.
      *
      * @param  array<string, mixed>  $record
      */
@@ -420,6 +420,14 @@ final readonly class PendingActionService
             return $model;
         }
 
+        if ($pendingAction->operation === PendingActionOperation::Update) {
+            $model = $this->resolveModel($this->resolveModelClass($record), $pendingAction, $record['_record_id'] ?? null);
+            unset($record['_record_id'], $record['_model_class']);
+
+            /** @var Model */
+            return $action->execute($user, $model, $record);
+        }
+
         /** @var Model */
         return $action->execute($user, $record, CreationSource::CHAT);
     }
@@ -430,12 +438,6 @@ final readonly class PendingActionService
             in_array($pendingAction->action_class, self::ALLOWED_ACTION_CLASSES, true),
             RuntimeException::class,
             'Action class not allowlisted',
-        );
-
-        throw_if(
-            $pendingAction->operation === PendingActionOperation::Update,
-            RuntimeException::class,
-            'Per-item resolution applies to create and delete proposals',
         );
 
         return app()->make($pendingAction->action_class);
@@ -510,14 +512,14 @@ final readonly class PendingActionService
     }
 
     /**
-     * Every terminal proposal for the conversation (newest 20, presented
-     * oldest-first). Deliberately NOT windowed to "since the last assistant
-     * turn": resolutions write nothing into the replayed transcript, whose
-     * tool results keep claiming the proposal is pending — so the outcome must
-     * be re-injected on every turn or the model treats a rejected proposal as
-     * still awaiting approval.
+     * Every proposal this conversation has decided (approved, rejected, expired):
+     * newest 20, presented oldest-first. Deliberately NOT windowed to "since the
+     * last assistant turn": resolutions write nothing into the replayed transcript,
+     * whose tool results keep claiming the proposal is pending, so the outcome must
+     * be re-injected on every turn. Superseded proposals are left out: they travel
+     * in their own block and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>}>
      */
     public function resolvedForConversation(string $conversationId): array
     {
@@ -527,7 +529,6 @@ final readonly class PendingActionService
                 PendingActionStatus::Approved->value,
                 PendingActionStatus::Rejected->value,
                 PendingActionStatus::Expired->value,
-                PendingActionStatus::Superseded->value,
             ])
             ->whereNotNull('resolved_at')
             ->latest('resolved_at')
@@ -544,20 +545,124 @@ final readonly class PendingActionService
             'label' => $this->resolveActionLabel($action),
             'record_id' => $this->resolveResultRecordId($action),
             'record_ids' => $this->resolveResultRecordIds($action),
+            'records' => $this->resolvedRecords($action),
         ], $actions->all()));
     }
 
+    /**
+     * The record name(s) a proposal is about, never the card heading
+     * ("Create Task", "Delete 3 Notes"), which is what the model would
+     * otherwise be told the record is called.
+     */
     public function resolveActionLabel(PendingAction $action): ?string
     {
-        $display = $action->display_data;
-        $data = $action->action_data;
+        $labels = array_values(array_filter(array_map(
+            fn (array $item): ?string => $this->recordLabel($item['data'], $item['display']),
+            $this->proposalItems($action),
+        )));
 
-        foreach (['name', 'title'] as $field) {
-            if (isset($display[$field]) && is_string($display[$field]) && $display[$field] !== '') {
-                return $display[$field];
+        return $labels === [] ? null : implode(', ', $labels);
+    }
+
+    /**
+     * Approved records with the label and citation url the read tools use, so a
+     * later turn can name and link a record it created without a re-fetch.
+     *
+     * @return list<array{id: string, label: string|null, url: string}>
+     */
+    private function resolvedRecords(PendingAction $action): array
+    {
+        if ($action->status !== PendingActionStatus::Approved) {
+            return [];
+        }
+
+        $resolver = resolve(RecordReferenceResolver::class);
+
+        if (($action->action_data['_batch'] ?? false) !== true) {
+            $id = $this->resolveResultRecordId($action);
+
+            return $id === null ? [] : [[
+                'id' => $id,
+                'label' => $this->resolveActionLabel($action),
+                'url' => $resolver->referenceUrl($action->entity_type, $id),
+            ]];
+        }
+
+        $items = $this->proposalItems($action);
+        $resultData = is_array($action->result_data) ? $action->result_data : [];
+        $resultItems = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+        $records = [];
+
+        foreach ($resultItems as $index => $result) {
+            $id = is_array($result) ? ($result['id'] ?? null) : null;
+
+            if (! is_string($id) && ! is_int($id)) {
+                continue;
             }
-            if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
+
+            $item = $items[(int) $index] ?? null;
+            $records[] = [
+                'id' => (string) $id,
+                'label' => $item === null ? null : $this->recordLabel($item['data'], $item['display']),
+                'url' => $resolver->referenceUrl($action->entity_type, (string) $id),
+            ];
+        }
+
+        return $records;
+    }
+
+    /**
+     * One (data, display) pair per record the proposal covers: a batch yields one
+     * per item, anything else yields the proposal itself.
+     *
+     * @return list<array{data: array<string, mixed>, display: array<string, mixed>}>
+     */
+    private function proposalItems(PendingAction $action): array
+    {
+        $data = $action->action_data;
+        $display = $action->display_data;
+
+        if (($data['_batch'] ?? false) !== true) {
+            return [['data' => $data, 'display' => $display]];
+        }
+
+        $records = is_array($data['records'] ?? null) ? array_values($data['records']) : [];
+        $items = is_array($display['items'] ?? null) ? array_values($display['items']) : [];
+        $count = max(count($records), count($items));
+
+        if ($count === 0) {
+            return [];
+        }
+
+        return array_map(static fn (int $index): array => [
+            'data' => is_array($records[$index] ?? null) ? $records[$index] : [],
+            'display' => is_array($items[$index] ?? null) ? $items[$index] : [],
+        ], range(0, $count - 1));
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $display
+     */
+    private function recordLabel(array $data, array $display): ?string
+    {
+        foreach (['name', 'title'] as $field) {
+            if (is_string($data[$field] ?? null) && $data[$field] !== '') {
                 return $data[$field];
+            }
+        }
+
+        $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
+
+        foreach ($fields as $row) {
+            if (! is_array($row) || ! in_array($row['label'] ?? null, ['Name', 'Title'], true)) {
+                continue;
+            }
+
+            $value = $row['new'] ?? $row['value'] ?? $row['old'] ?? null;
+
+            if (is_string($value) && $value !== '') {
+                return $value;
             }
         }
 
@@ -638,7 +743,7 @@ final readonly class PendingActionService
 
         unset($data['_record_id'], $data['_model_class']);
 
-        $model = $this->resolveModel($modelClass, $pendingAction);
+        $model = $this->resolveModel($modelClass, $pendingAction, $pendingAction->action_data['_record_id'] ?? null);
 
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
@@ -673,10 +778,8 @@ final readonly class PendingActionService
         return $modelClass;
     }
 
-    private function resolveModel(string $modelClass, PendingAction $pendingAction): Model
+    private function resolveModel(string $modelClass, PendingAction $pendingAction, mixed $recordId): Model
     {
-        $recordId = $pendingAction->action_data['_record_id'] ?? null;
-
         throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in action data');
 
         // CustomField uses tenant_id (from the custom-fields package) rather than the

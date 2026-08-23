@@ -27,6 +27,8 @@ use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
+use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\Streaming\Events\ToolCall;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Events\ChatStreamFailed;
@@ -78,6 +80,10 @@ final class ProcessChatMessage implements ShouldQueue
         $this->onQueue('chat');
         $this->afterCommit = true;
     }
+
+    private string $textAfterLastToolCall = '';
+
+    private bool $sawToolCall = false;
 
     public function retryUntil(): \DateTimeInterface
     {
@@ -149,6 +155,11 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withConversationId($this->conversationId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
+            $agent->withCurrentUser([
+                'name' => $this->user->name,
+                'id' => (string) $this->user->getKey(),
+                'role' => $this->user->ownsTeam($this->team) ? 'owner' : 'member',
+            ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -192,10 +203,19 @@ final class ProcessChatMessage implements ShouldQueue
 
             $cancelled = false;
             $cacheKey = "chat:cancel:{$this->conversationId}";
+            $this->textAfterLastToolCall = '';
+            $this->sawToolCall = false;
 
             $response->each(function (StreamEvent $event) use ($broadcaster, $cacheKey, &$cancelled): void {
                 if ($event instanceof Error) {
                     throw ProviderStreamError::toException($event);
+                }
+
+                if ($event instanceof ToolCall) {
+                    $this->sawToolCall = true;
+                    $this->textAfterLastToolCall = '';
+                } elseif ($event instanceof TextDelta) {
+                    $this->textAfterLastToolCall .= $event->delta;
                 }
 
                 if (! $cancelled && Cache::pull($cacheKey) !== null) {
@@ -650,10 +670,10 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
     {
-        // Collapse here too so the `document` column owns its own correctness — the
-        // store fixes `content`, but the document is built independently. Idempotent
-        // if the store already collapsed the shared response instance.
-        $assistantContent = AssistantText::collapseRepeated($streamedResponse->text);
+        // The store persisted the full concatenated text; the row is rewritten here
+        // with the reply the user should keep (see AssistantText::finalReply), and
+        // the document is built from that same text so both columns agree.
+        $assistantContent = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
 
         if ($assistantContent === '') {
             return;
@@ -669,7 +689,10 @@ final class ProcessChatMessage implements ShouldQueue
 
         DB::table('agent_conversation_messages')
             ->where('id', $latestId)
-            ->update(['document' => json_encode($document, JSON_THROW_ON_ERROR)]);
+            ->update([
+                'content' => $assistantContent,
+                'document' => json_encode($document, JSON_THROW_ON_ERROR),
+            ]);
     }
 
     private function getParser(): TipTapDocumentParser

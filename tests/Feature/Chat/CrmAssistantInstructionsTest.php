@@ -57,6 +57,8 @@ it('scopes the block claim to the read tools that emit one', function (): void {
     expect($instructions)
         ->toContain('rendered as a table or card block')
         ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
+        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool')
+        ->toContain('A list with zero results renders no block either')
         ->toContain('ONE short lead-in sentence');
 });
 
@@ -88,4 +90,33 @@ it('routes export requests to the export destinations', function (): void {
     expect($instructions)
         ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
         ->toContain('(custom field definitions, bulk imports, exports, team members)');
+});
+
+it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner'])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('## Current user')
+        ->toContain('Manuk bMinasyan/b (user id: 01USER, team owner)')
+        ->toContain('"me", "my", "mine" and "I" refer to this user');
+});
+
+it('marks the context blocks as internal so the model never names them to the user', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('internal')
+        ->toContain('never mention these blocks, their names, or "resolved actions" to the user');
+});
+
+it('tells the model how to look a record up without rendering it', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('pass `lookup: true` to the list or get tool')
+        ->toContain('N counts tool calls in this turn, including calls that render nothing');
+});
+
+it('routes bulk updates through one records[] call instead of one approval per record', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('`records: [{..}, {..}]` on create and update tools')
+        ->toContain('pass null to clear it');
 });

@@ -105,6 +105,8 @@ abstract class BaseReadShowTool implements Tool
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
         ];
 
+        $fields['lookup'] = $schema->boolean()->description('Set true when you call this only to get ids for another tool call: the user then sees no card. Leave unset when the user asked to see the record.');
+
         $includes = array_keys($this->availableIncludes());
 
         if ($includes !== []) {
@@ -173,7 +175,9 @@ abstract class BaseReadShowTool implements Tool
                     $this->extraPayload($model),
                     ['url' => $url],
                     $this->buildIncluded($model, $requestedIncludes, $user),
-                    ['display_block' => $this->buildDisplayBlock($user, $model, $url)],
+                    filter_var($request['lookup'] ?? false, FILTER_VALIDATE_BOOL)
+                        ? []
+                        : ['display_block' => $this->buildDisplayBlock($user, $model, $url)],
                 ),
                 $user,
             ),

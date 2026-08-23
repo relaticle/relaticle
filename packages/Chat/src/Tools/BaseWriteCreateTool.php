@@ -14,11 +14,12 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
-use Relaticle\Chat\Support\PromptText;
+use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteCreateTool implements Tool
 {
+    use ValidatesOwnedForeignKeys;
     use WithConversationContext;
 
     /** @return class-string */
@@ -76,11 +77,6 @@ abstract class BaseWriteCreateTool implements Tool
                     .' or up to '.config('chat.max_batch_size').' items to create them all in ONE proposal'
                     .' (never loop one call per record).',
                 ),
-            'plan' => $schema->object([
-                'original_request' => $schema->string()->description("The user's original multi-step request, verbatim."),
-                'position' => $schema->integer()->description('Which step this proposal is (1-based).'),
-                'total' => $schema->integer()->description('Total steps in the request.'),
-            ])->description('OPTIONAL — only when this proposal is one step of a multi-step request that records[] cannot cover in one call (e.g. mixed entity types).'),
         ];
     }
 
@@ -112,7 +108,7 @@ abstract class BaseWriteCreateTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}] must be an object."]);
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null);
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false);
 
             if ($validation->error !== null) {
                 return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
@@ -125,6 +121,12 @@ abstract class BaseWriteCreateTool implements Tool
             }
 
             $data = $this->extractRecordData($record);
+            $foreignKeyError = $this->foreignKeyError($user, $data);
+
+            if ($foreignKeyError !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"]);
+            }
+
             if ($validation->cleanFields !== []) {
                 $data['custom_fields'] = $validation->cleanFields;
             }
@@ -154,20 +156,6 @@ abstract class BaseWriteCreateTool implements Tool
             ]
             : $items[0];
 
-        $plan = $request['plan'] ?? null;
-        if (is_array($plan)
-            && is_string($plan['original_request'] ?? null)
-            && is_numeric($plan['position'] ?? null) && is_numeric($plan['total'] ?? null)) {
-            $sanitized = $this->sanitizePlanText($plan['original_request']);
-            if ($sanitized !== '') {
-                $displayData['plan'] = [
-                    'original_request' => $sanitized,
-                    'position' => (int) $plan['position'],
-                    'total' => (int) $plan['total'],
-                ];
-            }
-        }
-
         $pending = resolve(PendingActionService::class)->createProposal(
             user: $user,
             conversationId: $this->resolveConversationId(),
@@ -188,10 +176,5 @@ abstract class BaseWriteCreateTool implements Tool
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
         ], JSON_PRETTY_PRINT);
-    }
-
-    private function sanitizePlanText(string $text): string
-    {
-        return PromptText::sanitize($text, 300);
     }
 }

@@ -35,6 +35,15 @@ final class CreateTaskTool extends BaseWriteCreateTool
         return 'task';
     }
 
+    protected function ownedForeignKeyLists(): array
+    {
+        return [
+            'company_ids' => Company::class,
+            'people_ids' => People::class,
+            'opportunity_ids' => Opportunity::class,
+        ];
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [

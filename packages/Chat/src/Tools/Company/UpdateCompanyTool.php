@@ -47,7 +47,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             'account_owner_id' => $schema->string()->description(
                 'Set the account owner — the team member responsible for this company.'
                 .' MUST be a user id from the list team members tool (contacts/people are not valid).'
-                .' Pass an empty string to unassign the owner.',
+                .' Pass null to unassign the owner.',
             ),
         ];
     }
@@ -63,7 +63,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             'name' => $request['name'] ?? null,
         ], fn (mixed $v): bool => $v !== null);
 
-        $owner = $this->requestedOwner($request['account_owner_id'] ?? null);
+        $owner = $this->requestedOwner($request);
 
         if ($owner !== false) {
             $data['account_owner_id'] = $owner;
@@ -80,7 +80,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             $fields[] = ['label' => 'Name', 'old' => $model->getAttribute('name'), 'new' => $request['name']];
         }
 
-        $owner = $this->requestedOwner($request['account_owner_id'] ?? null);
+        $owner = $this->requestedOwner($request);
 
         if ($owner !== false) {
             /** @var Company $company */
@@ -101,15 +101,17 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
     }
 
     /**
-     * Tri-state owner param: false = not provided, null = unassign (empty
-     * string on the wire), string = the new owner's user id.
+     * Tri-state owner param: false = not provided, null = unassign (null or
+     * an empty string on the wire), string = the new owner's user id.
      */
-    private function requestedOwner(mixed $raw): string|null|false
+    private function requestedOwner(Request $request): string|null|false
     {
-        if ($raw === null) {
+        if (! array_key_exists('account_owner_id', $request->all())) {
             return false;
         }
 
-        return $raw === '' ? null : (string) $raw;
+        $raw = $request['account_owner_id'];
+
+        return $raw === null || $raw === '' ? null : (string) $raw;
     }
 }

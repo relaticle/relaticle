@@ -137,10 +137,10 @@ it('returns a tool error for an unknown custom field code', function (): void {
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'custom_fields' => ['this_does_not_exist' => 'whatever'],
-    ]));
+    ]]]));
 
     expect($response)->toContain('this_does_not_exist');
 });
@@ -151,10 +151,10 @@ it('returns a tool error for an unknown option label on a choice field', functio
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'custom_fields' => ['status' => 'Bananas'],
-    ]));
+    ]]]));
 
     expect($response)->toContain('Bananas');
 });
@@ -168,10 +168,10 @@ function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array
     $tool = resolve($toolClass);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $model->getKey(),
         'custom_fields' => $customFields,
-    ]));
+    ]]]));
 }
 
 function latestPendingForCustomFieldsTest(): PendingAction

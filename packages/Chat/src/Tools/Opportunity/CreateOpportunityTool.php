@@ -30,6 +30,14 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
         return 'opportunity';
     }
 
+    protected function ownedForeignKeys(): array
+    {
+        return [
+            'company_id' => Company::class,
+            'contact_id' => People::class,
+        ];
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [
