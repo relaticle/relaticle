@@ -178,7 +178,11 @@ abstract class BaseReadListTool implements Tool
             return $item;
         }, $items);
 
-        $payload = ['data' => $items];
+        $payload = [
+            'data' => $items,
+            'total' => $results->total(),
+            'showing' => count($items),
+        ];
 
         if ($block !== null) {
             $payload['display_block'] = $block;

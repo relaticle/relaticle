@@ -127,10 +127,11 @@ final readonly class ListActivityTool implements Tool
             }
         }
 
-        $payload = ['days' => $days, 'data' => $entries];
+        $totalEntries = $this->countEntries($scope);
+        $payload = ['days' => $days, 'data' => $entries, 'total' => $totalEntries, 'showing' => count($entries)];
 
         if ($entries !== []) {
-            $payload['display_block'] = $this->buildDisplayBlock($entries, $this->countEntries($scope));
+            $payload['display_block'] = $this->buildDisplayBlock($entries, $totalEntries);
         }
 
         return (string) json_encode($payload, JSON_PRETTY_PRINT);

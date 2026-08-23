@@ -11,10 +11,13 @@ use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Tools\BaseReadListTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\ListNotesTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Services\TenantContextService;
+
+mutates(BaseReadListTool::class);
 
 /**
  * The list tools return either a bare array of rows or a resource envelope.
@@ -355,3 +358,17 @@ it('filters every list tool by creation date, including tasks and notes', functi
     'tasks' => [ListTasksTool::class, Task::class],
     'notes' => [ListNotesTool::class, Note::class],
 ]);
+
+it('reports total and showing when results exceed one page', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    Company::factory()->count(17)->for($team)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['total'])->toBe(17)
+        ->and($payload['showing'])->toBe(15)
+        ->and($payload['data'])->toHaveCount(15);
+});

@@ -308,7 +308,9 @@ it('reports the true entry count when the window holds more than one fetch', fun
         // The footer reads "Showing :showing of :total". A count taken over the
         // returned entries would say 50 here and mislead by exactly the rows it
         // could not fetch.
-        ->and($payload['display_block']['total'])->toBe(51);
+        ->and($payload['display_block']['total'])->toBe(51)
+        ->and($payload['total'])->toBe(51)
+        ->and($payload['showing'])->toBe(count($payload['data']));
 });
 
 it('ignores activity older than the requested window', function (): void {
