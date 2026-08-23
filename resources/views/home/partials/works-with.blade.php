@@ -8,9 +8,9 @@
 @endphp
 
 <section aria-label="{{ __('Works with') }}" class="relative bg-white dark:bg-gray-950 border-y border-gray-200 dark:border-white/[0.08]">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid grid-cols-2 md:grid-cols-7 divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-white/[0.08] border-x border-gray-200 dark:border-white/[0.08]">
-            <div class="col-span-2 flex items-center px-5 py-4 md:py-6">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-2 md:grid-cols-[2fr_repeat(4,1fr)_1.5fr] divide-x divide-y md:divide-y-0 divide-gray-200 dark:divide-white/[0.08] border-x border-gray-200 dark:border-white/[0.08]">
+            <div class="col-span-2 md:col-span-1 flex items-center px-5 py-4 md:py-6">
                 <p class="font-mono uppercase tracking-[0.14em] text-[10px] leading-relaxed text-gray-500 dark:text-gray-400">
                     {{ __('Works with the agents your team already uses') }}
                 </p>
@@ -23,7 +23,7 @@
                 </div>
             @endforeach
 
-            <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-4 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+            <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                 {{ __('+ any MCP client') }}
                 <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
             </a>
