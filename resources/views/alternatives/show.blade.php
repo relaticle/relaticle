@@ -56,20 +56,36 @@
         'hubspot' => __('HubSpot Alternative'),
     ];
 
+    /*
+     * The <title> tag, deliberately not the same string as the H1. "Open source"
+     * leads because that is the language of the queries these pages already rank
+     * for, and the phrasing mirrors them directly rather than restating the H1.
+     * Kept under ~60 characters so Google does not truncate it.
+     */
+    $metaTitles = [
+        'attio' => __('Open Source Attio Alternative, Self-Hosted | Relaticle'),
+        'hubspot' => __('Open Source HubSpot Alternative, Self-Hosted | Relaticle'),
+    ];
+
+    /*
+     * Structural facts only, no prices or counts: those live in
+     * competitor-facts.php so `gtm:stale-facts` can age them out.
+     */
     $descriptions = [
-        'attio' => __('Looking for an Attio alternative? Relaticle is open-source and self-hosted with flat pricing and built-in AI. Compare features and see the CSV migration path.'),
-        'hubspot' => __('Looking for a HubSpot alternative? Relaticle is open-source, self-hosted, and flatly priced with built-in AI. Compare features and see how to migrate your data.'),
+        'attio' => __('Attio is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
+        'hubspot' => __('HubSpot is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
     ];
 
     $title = $titles[$competitorSlug];
+    $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
     $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->format('F j, Y');
 @endphp
 
 <x-guest-layout
-    :title="$title . ' - Relaticle'"
+    :title="$metaTitle"
     :description="$description"
-    :ogTitle="$title . ' - Relaticle'"
+    :ogTitle="$metaTitle"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>

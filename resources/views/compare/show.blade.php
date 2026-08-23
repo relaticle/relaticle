@@ -70,12 +70,31 @@
         'espocrm' => __('Relaticle vs EspoCRM'),
     ];
 
+    /*
+     * The <title> tag, deliberately not the same string as the H1. These pages rank
+     * (avg position 6-12) but earn no clicks, and the queries that do convert read
+     * like "open source ai crm", so the search-result title leads with that language
+     * while the on-page heading stays short. Kept under ~60 characters so Google
+     * does not truncate it, and free of the "- Relaticle" suffix the layout used to
+     * get, which spent characters repeating a brand the title already opens with.
+     */
+    $metaTitles = [
+        'twenty' => __('Relaticle vs Twenty: Open Source CRM Compared'),
+        'espocrm' => __('Relaticle vs EspoCRM: Open Source CRM Compared'),
+    ];
+
+    /*
+     * No competitor prices or counts here on purpose: those live in
+     * competitor-facts.php so `gtm:stale-facts` can age them out. A number copied
+     * into a meta description is a second source of truth nothing checks.
+     */
     $descriptions = [
-        'twenty' => __('Relaticle vs Twenty compared on license, pricing, GitHub stars, contributors, tech stack, and AI/MCP self-hosting, so you can pick the right open-source CRM.'),
-        'espocrm' => __('Relaticle vs EspoCRM compared on license, pricing, tech stack, and AI tooling, so you can pick the self-hosted PHP CRM with AI chat and MCP support today.'),
+        'twenty' => __('Both are open source and self-hostable. Relaticle bills one flat rate for unlimited users and runs AI chat and MCP self-hosted; Twenty prices per seat.'),
+        'espocrm' => __('Both are AGPL-3.0 PHP CRMs you can self-host. Relaticle adds a built-in AI assistant and a first-party MCP server, and bills flat; EspoCRM prices per seat.'),
     ];
 
     $title = $titles[$competitorSlug];
+    $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
     $factsVerifiedDate = \Carbon\CarbonImmutable::parse($relaticle['verified']);
     $factsVerifiedAt = $factsVerifiedDate->format('F j, Y');
@@ -90,9 +109,9 @@
 @endphp
 
 <x-guest-layout
-    :title="$title . ' - Relaticle'"
+    :title="$metaTitle"
     :description="$description"
-    :ogTitle="$title . ' - Relaticle'"
+    :ogTitle="$metaTitle"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>

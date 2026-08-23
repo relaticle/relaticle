@@ -47,6 +47,45 @@ it('marks comparison pages with dateModified and about entities in the JSON-LD g
         ->and($html)->toContain('https://github.com/espocrm/espocrm');
 });
 
+it('gives each page a search title that leads with open source and stays under 60 characters', function (string $url, string $expected): void {
+    $html = $this->get($url)->assertOk()->getContent();
+
+    expect($html)->toContain("<title>{$expected}</title>")
+        ->and($html)->toContain('<meta property="og:title" content="'.$expected.'"')
+        ->and(mb_strlen($expected))->toBeLessThanOrEqual(60)
+        ->and($expected)->toContain('Open Source');
+})->with([
+    ['/compare/relaticle-vs-twenty', 'Relaticle vs Twenty: Open Source CRM Compared'],
+    ['/compare/relaticle-vs-espocrm', 'Relaticle vs EspoCRM: Open Source CRM Compared'],
+    ['/alternatives/attio', 'Open Source Attio Alternative, Self-Hosted | Relaticle'],
+    ['/alternatives/hubspot', 'Open Source HubSpot Alternative, Self-Hosted | Relaticle'],
+]);
+
+it('keeps the on-page heading short and distinct from the longer search title', function (string $url, string $heading): void {
+    $html = $this->get($url)->assertOk()->getContent();
+
+    expect($html)->toContain(">\n                    {$heading}\n                </h1>")
+        ->and($html)->not->toContain("<title>{$heading} - Relaticle</title>");
+})->with([
+    ['/compare/relaticle-vs-twenty', 'Relaticle vs Twenty'],
+    ['/alternatives/attio', 'Attio Alternative'],
+]);
+
+it('keeps competitor prices out of meta descriptions so the facts file stays the only source', function (string $url): void {
+    $html = $this->get($url)->assertOk()->getContent();
+
+    preg_match('/<meta name="description" content="([^"]*)"/', $html, $matches);
+
+    expect($matches[1] ?? '')->not->toBeEmpty()
+        ->and($matches[1])->not->toMatch('/\$\d/')
+        ->and(mb_strlen($matches[1]))->toBeLessThanOrEqual(160);
+})->with([
+    '/compare/relaticle-vs-twenty',
+    '/compare/relaticle-vs-espocrm',
+    '/alternatives/attio',
+    '/alternatives/hubspot',
+]);
+
 it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {
     $html = $this->get('/alternatives/attio')->assertOk()->getContent();
 
