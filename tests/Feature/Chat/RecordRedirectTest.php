@@ -74,9 +74,29 @@ it("redirects to the record's own team panel when the record belongs to a non-cu
         ->and($expectedUrl)->not->toContain($currentTeam->slug);
 });
 
+it('shows a gone page for a soft deleted record in the user team', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $company = Company::factory()->for($team)->create();
+    $company->delete();
+
+    $this->actingAs($user)
+        ->get("/r/company/{$company->getKey()}")
+        ->assertOk()
+        ->assertSee(__('This record no longer exists'));
+});
+
 it('404s for a record outside every team the user belongs to', function (): void {
     $user = User::factory()->withTeam()->create();
     $other = Company::factory()->create(); // unrelated team
+
+    $this->actingAs($user)->get("/r/company/{$other->getKey()}")->assertNotFound();
+});
+
+it('still 404s a soft deleted record outside every team the user belongs to', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $other = Company::factory()->create(); // unrelated team
+    $other->delete();
 
     $this->actingAs($user)->get("/r/company/{$other->getKey()}")->assertNotFound();
 });

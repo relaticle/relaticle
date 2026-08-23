@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 
 /**
@@ -33,6 +34,13 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * caller's current team, so a citation to a record in a non-current (but
  * still accessible) team lands on that team's panel.
  *
+ * A record can also be soft-deleted after a chat transcript cited it: the
+ * lookup is `withTrashed()` and, for a team member, a trashed record renders
+ * a friendly "this record no longer exists" page instead of redirecting. The
+ * team-membership check still runs BEFORE the trashed check, so a foreign
+ * caller 404s whether the record is live, trashed, or absent. Trashed state
+ * is only ever revealed to someone who could already see the record.
+ *
  * `custom_field` is not in CHIP_TYPES and skips this fetch-then-check step: custom
  * fields have no `team_id` column (they are tenant-scoped by `tenant_id`), and
  * `RecordReferenceResolver::customFieldUrl()` already runs its own
@@ -43,7 +51,7 @@ final readonly class RecordRedirectController
 {
     private const string CUSTOM_FIELD_TYPE = 'custom_field';
 
-    public function __invoke(Request $request, RecordReferenceResolver $resolver, string $type, string $id): RedirectResponse
+    public function __invoke(Request $request, RecordReferenceResolver $resolver, string $type, string $id): RedirectResponse|Response
     {
         if ($type === self::CUSTOM_FIELD_TYPE) {
             $url = $resolver->urlFor($type, $id);
@@ -63,11 +71,15 @@ final readonly class RecordRedirectController
         /** @var User $user */
         $user = $request->user();
 
-        $record = $modelClass::query()->find($id);
+        $record = $modelClass::query()->withTrashed()->find($id);
 
         abort_if($record === null, 404);
 
         abort_unless($user->belongsToTeamId($record->team_id), 404);
+
+        if ($record->trashed()) {
+            return response()->view('chat::record-gone');
+        }
 
         $url = $resolver->urlFor($type, $id, $record->team);
 
