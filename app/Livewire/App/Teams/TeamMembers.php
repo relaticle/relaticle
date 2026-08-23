@@ -53,10 +53,15 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             // header row over two fields reads as table chrome around a list.
             ->columns([
                 Tables\Columns\Layout\Split::make([
-                    Tables\Columns\ImageColumn::make('profile_photo_url')
+                    // State, not a column name: `profile_photo_url` falls back to
+                    // ui-avatars.com, which would send every member's initials to
+                    // a third party. The panel's avatar provider resolves the
+                    // uploaded photo when there is one and the local AvatarService
+                    // SVG when there is not, matching the rest of the app.
+                    Tables\Columns\ImageColumn::make('avatar')
                         ->circular()
                         ->imageSize(32)
-                        ->defaultImageUrl(fn (User $record): string => Filament::getUserAvatarUrl($record))
+                        ->state(fn (User $record): string => Filament::getUserAvatarUrl($record))
                         ->grow(false),
                     Tables\Columns\TextColumn::make('name')
                         ->description(fn (User $record): string => $record->email),
