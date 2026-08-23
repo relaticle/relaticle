@@ -22,6 +22,7 @@
     @endpush
 
     @include('home.partials.hero')
+    @include('home.partials.works-with')
     @include('home.partials.features')
     @include('home.partials.community')
     @include('home.partials.faq')

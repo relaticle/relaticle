@@ -34,6 +34,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
+use App\Services\DockerHubService;
 use App\Services\GitHubService;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -534,6 +535,10 @@ final class AppServiceProvider extends ServiceProvider
                 'githubStars' => $starsCount,
                 'formattedGithubStars' => $formattedStarsCount,
             ]);
+        });
+
+        Facades\View::composer('home.partials.works-with', function (View $view): void {
+            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
     }
 }
