@@ -37,6 +37,7 @@ use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\FollowUpsSuggested;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
@@ -61,7 +62,7 @@ final class ProcessChatMessage implements ShouldQueue
     private const int CONTEXT_LEDGER_CAP = 10;
 
     /**
-     * @param  array{provider: string|null, model: string|null}  $resolved
+     * @param  array{provider: string|null, model: string|null, id: string|null, source: string}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
      * @param  array{type: string, id: string, label: string}|null  $pageContext
@@ -76,6 +77,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly array $document = ['type' => 'doc', 'content' => []],
         public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
+        public readonly int $failoverDepth = 0,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -85,6 +87,14 @@ final class ProcessChatMessage implements ShouldQueue
     private string $textAfterLastToolCall = '';
 
     private bool $sawToolCall = false;
+
+    /**
+     * Whether any stream event has actually reached the broadcaster. Failover
+     * to the next auto-chain model is only safe before this turns true: once
+     * the client has seen partial output, a fresh model would either repeat
+     * or contradict it.
+     */
+    private bool $streamedAnything = false;
 
     public function retryUntil(): \DateTimeInterface
     {
@@ -233,6 +243,7 @@ final class ProcessChatMessage implements ShouldQueue
                     return;
                 }
 
+                $this->streamedAnything = true;
                 $broadcaster->broadcast($event);
             });
 
@@ -306,6 +317,44 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->release($delay);
 
                 return;
+            }
+
+            // The user's model choice was 'auto' and nothing has streamed yet: fail
+            // over to the next plan-allowed chain entry instead of failing the turn.
+            // An explicit pick never lands here (source stays 'explicit'), so a user
+            // who chose a model deliberately always sees today's error, never a
+            // silent swap to a different (differently priced) model. Bounded to one
+            // hop by failoverDepth so a chain of bad providers still terminates.
+            // The credit reservation is untouched here, exactly like the transient
+            // retry above: it stays open under the same resolutionKey (keyed on
+            // turnId, which the re-dispatched job keeps), and whichever attempt
+            // finally finishes the turn settles it exactly once.
+            if ($this->resolved['source'] === 'auto'
+                && $this->failoverDepth === 0
+                && ! $this->streamedAnything) {
+                $next = resolve(AiModelResolver::class)->failoverNext($this->user, (string) ($this->resolved['id'] ?? ''));
+
+                if ($next !== null) {
+                    ChatTelemetry::breadcrumb('stream.failover', [
+                        'from' => $this->resolved['id'] ?? null,
+                        'to' => $next['id'],
+                        'exception' => $e::class,
+                    ]);
+                    dispatch(new self(
+                        user: $this->user,
+                        team: $this->team,
+                        message: $this->message,
+                        conversationId: $this->conversationId,
+                        resolved: $next,
+                        mentions: $this->mentions,
+                        document: $this->document,
+                        pageContext: $this->pageContext,
+                        turnId: $this->turnId,
+                        failoverDepth: $this->failoverDepth + 1,
+                    ));
+
+                    return;
+                }
             }
 
             throw $e;
