@@ -10,6 +10,7 @@ mutates(DockerHubService::class);
 
 beforeEach(function (): void {
     Cache::forget('dockerhub_pulls_manukminasyan_relaticle');
+    Cache::forget('dockerhub_pulls_manukminasyan_relaticle_last_good');
 });
 
 it('rounds the pull count down to the nearest thousand', function (): void {
@@ -38,4 +39,17 @@ it('caches the pull count', function (): void {
     $service->getPullCount();
 
     Http::assertSentCount(1);
+});
+
+it('keeps the last good pull count when Docker Hub fails on the next fetch', function (): void {
+    Http::fake(['hub.docker.com/*' => Http::sequence()
+        ->push(['pull_count' => 21030])
+        ->push(null, 500)]);
+    $service = new DockerHubService;
+
+    expect($service->getFormattedPullCount())->toBe('21,000+');
+
+    Cache::forget('dockerhub_pulls_manukminasyan_relaticle');
+
+    expect($service->getFormattedPullCount())->toBe('21,000+');
 });

@@ -14,22 +14,26 @@ final readonly class DockerHubService
 {
     public function getPullCount(string $namespace = 'manukminasyan', string $repo = 'relaticle', int $cacheMinutes = 60): int
     {
-        return (int) Cache::remember("dockerhub_pulls_{$namespace}_{$repo}", now()->addMinutes($cacheMinutes), function () use ($namespace, $repo): int {
+        $cacheKey = "dockerhub_pulls_{$namespace}_{$repo}";
+        $lastGoodKey = "{$cacheKey}_last_good";
+
+        return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($namespace, $repo, $lastGoodKey): int {
             try {
                 $response = Http::get("https://hub.docker.com/v2/repositories/{$namespace}/{$repo}/");
 
                 if ($response->successful()) {
-                    return (int) $response->json('pull_count', 0);
+                    $pulls = (int) $response->json('pull_count', 0);
+                    Cache::forever($lastGoodKey, $pulls);
+
+                    return $pulls;
                 }
 
                 Log::warning('Failed to fetch Docker Hub pulls: '.$response->status());
-
-                return 0;
             } catch (Exception $e) {
                 Log::error('Error fetching Docker Hub pulls: '.$e->getMessage());
-
-                return 0;
             }
+
+            return (int) Cache::get($lastGoodKey, 0);
         });
     }
 
