@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\People;
@@ -92,4 +93,27 @@ it('never surfaces another tenant\'s matching custom field value', function (): 
     $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'stripe'])), true);
 
     expect($results['people'])->toBeEmpty();
+});
+
+it('discloses truncation instead of presenting a capped list as the whole truth', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Company::factory()->count(7)->for($user->currentTeam)->create(['name' => 'Truncation Probe Co']);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'Truncation Probe', 'limit' => 5])), true);
+
+    expect($results['companies'])->toHaveCount(5)
+        ->and($results['truncated']['companies'])->toBeTrue()
+        ->and($results['truncated']['people'])->toBeFalse();
+});
+
+it('reports no truncation when every match fits under the limit', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Company::factory()->count(2)->for($user->currentTeam)->create(['name' => 'Fits Under Cap Co']);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'Fits Under Cap', 'limit' => 5])), true);
+
+    expect($results['companies'])->toHaveCount(2)
+        ->and($results['truncated']['companies'])->toBeFalse();
 });

@@ -38,7 +38,9 @@ final class SearchCrmTool implements Tool
     public function description(): string
     {
         return 'Search across all CRM entity types (companies, people, opportunities, tasks, notes) by keyword. '
-            .'Matches names, titles, and custom field values such as emails, phone numbers, and links.';
+            .'Matches names, titles, and custom field values such as emails, phone numbers, and links. '
+            .'Returns at most `limit` matches per entity type: when `truncated` is true for an entity there are more, '
+            .'so never state a total from these results.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -65,7 +67,7 @@ final class SearchCrmTool implements Tool
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'company', 'companies', $query, $tenantId);
                 })
-                ->limit($limit)
+                ->limit($limit + 1)
                 ->get(['id', 'name', 'created_at'])
                 ->toArray(),
             'people' => People::query()
@@ -74,7 +76,7 @@ final class SearchCrmTool implements Tool
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'people', 'people', $query, $tenantId);
                 })
-                ->limit($limit)
+                ->limit($limit + 1)
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'opportunities' => Opportunity::query()
@@ -83,7 +85,7 @@ final class SearchCrmTool implements Tool
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'opportunity', 'opportunities', $query, $tenantId);
                 })
-                ->limit($limit)
+                ->limit($limit + 1)
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'tasks' => Task::query()
@@ -92,7 +94,7 @@ final class SearchCrmTool implements Tool
                     $q->where('title', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'task', 'tasks', $query, $tenantId);
                 })
-                ->limit($limit)
+                ->limit($limit + 1)
                 ->get(['id', 'title', 'created_at'])
                 ->toArray(),
             'notes' => Note::query()
@@ -101,10 +103,23 @@ final class SearchCrmTool implements Tool
                     $q->where('title', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'note', 'notes', $query, $tenantId);
                 })
-                ->limit($limit)
+                ->limit($limit + 1)
                 ->get(['id', 'title', 'created_at'])
                 ->toArray(),
         ];
+
+        // Fetched one past the cap per entity: anything still present after the
+        // slice means there are more matches than shown. Without this the model
+        // reads a capped list as the whole truth and states a wrong count, which
+        // is the same ungrounded-number failure the list tools' `total` fixes.
+        $truncated = [];
+
+        foreach ($results as $entity => $rows) {
+            $truncated[$entity] = count($rows) > $limit;
+            $results[$entity] = array_slice($rows, 0, $limit);
+        }
+
+        $results['truncated'] = $truncated;
 
         return (string) json_encode($results, JSON_UNESCAPED_SLASHES);
     }
