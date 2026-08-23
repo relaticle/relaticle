@@ -94,6 +94,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
                 'label' => 'Company',
                 'old' => $this->nameForId($model->getAttribute('company_id'), Company::class, 'name', $team),
                 'new' => $newCompanyId === null ? __('(none)') : $this->nameForId($newCompanyId, Company::class, 'name', $team),
+                '_oldValue' => $model->getAttribute('company_id'),
+                '_newValue' => $newCompanyId,
             ];
         }
 
@@ -103,6 +105,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
                 'label' => 'Contact',
                 'old' => $this->nameForId($model->getAttribute('contact_id'), People::class, 'name', $team),
                 'new' => $newContactId === null ? __('(none)') : $this->nameForId($newContactId, People::class, 'name', $team),
+                '_oldValue' => $model->getAttribute('contact_id'),
+                '_newValue' => $newContactId,
             ];
         }
 

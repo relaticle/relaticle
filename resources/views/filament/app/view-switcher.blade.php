@@ -13,9 +13,10 @@
         wire:navigate
         @class([$segmentClasses, $activeClasses => $active === 'list', $inactiveClasses => $active !== 'list'])
         @if ($active === 'list') aria-current="page" @endif
+        aria-label="{{ __('filament/pages/boards.view_switcher.list') }}"
     >
         <x-filament::icon icon="heroicon-o-list-bullet" class="h-4 w-4" />
-        {{ __('filament/pages/boards.view_switcher.list') }}
+        <span class="fi-view-switcher-label">{{ __('filament/pages/boards.view_switcher.list') }}</span>
     </a>
 
     <a
@@ -23,8 +24,9 @@
         wire:navigate
         @class([$segmentClasses, $activeClasses => $active === 'board', $inactiveClasses => $active !== 'board'])
         @if ($active === 'board') aria-current="page" @endif
+        aria-label="{{ __('filament/pages/boards.view_switcher.board') }}"
     >
         <x-filament::icon icon="heroicon-o-view-columns" class="h-4 w-4" />
-        {{ __('filament/pages/boards.view_switcher.board') }}
+        <span class="fi-view-switcher-label">{{ __('filament/pages/boards.view_switcher.board') }}</span>
     </a>
 </nav>

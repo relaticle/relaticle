@@ -75,6 +75,11 @@ final readonly class CustomFieldsDisplayFormatter
             if ($oldModel instanceof Model) {
                 $oldValue = $this->lookupCurrentValue($field, $oldModel);
                 $row['old'] = $oldValue !== null ? $this->renderValue($field, $oldValue) : null;
+                // Raw values ride along so the no-op check compares stored data,
+                // not rendered labels (two options can share a label). The write
+                // base strips them before the row is persisted or displayed.
+                $row['_oldValue'] = $oldValue;
+                $row['_newValue'] = $newValue;
             }
 
             $rows[] = $row;

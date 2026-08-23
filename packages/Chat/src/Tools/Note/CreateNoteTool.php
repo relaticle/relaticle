@@ -43,6 +43,11 @@ final class CreateNoteTool extends BaseWriteCreateTool
         ];
     }
 
+    protected function nameAttribute(): string
+    {
+        return 'title';
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [

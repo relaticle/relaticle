@@ -135,4 +135,12 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->click(".fi-topbar-start a[href$='/app/{$team->slug}/tasks']")
         ->assertPathIs("/app/{$team->slug}/tasks")
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()');
+
+    $page->resize(390, 844)
+        ->assertVisible('.fi-view-switcher')
+        ->assertScript('(() => { const label = document.querySelector(".fi-view-switcher-label"); return label !== null && label.getClientRects().length === 0; })()')
+        ->assertScript('(() => document.querySelector(".fi-view-switcher a[aria-label]") !== null)()')
+        ->click(".fi-view-switcher a[href$='/app/{$team->slug}/tasks/board']")
+        ->assertPathIs("/app/{$team->slug}/tasks/board")
+        ->assertNoJavaScriptErrors();
 });

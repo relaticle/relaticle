@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CompleteTask;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Models\Task;
@@ -141,4 +142,33 @@ it('hides the completion control when the tenant has no Done status option', fun
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
         ->assertDontSeeHtml('role="checkbox"');
+});
+
+it('writes the Done option of the task team, not the ambient tenant, when the user belongs to both', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $other = User::factory()->withPersonalTeam()->create();
+    $other->currentTeam->users()->attach($user, ['role' => 'editor']);
+
+    $task = Task::factory()->for($other->currentTeam)->create(['title' => 'Cross-team task']);
+
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    resolve(CompleteTask::class)->execute($user, $task);
+
+    $written = DB::table('custom_field_values as v')
+        ->join('custom_fields as f', 'f.id', '=', 'v.custom_field_id')
+        ->where('v.entity_id', $task->id)
+        ->where('f.code', 'status')
+        ->first(['f.tenant_id', 'v.string_value']);
+
+    $doneOfTaskTeam = DB::table('custom_field_options as o')
+        ->join('custom_fields as f', 'f.id', '=', 'o.custom_field_id')
+        ->where('f.tenant_id', $other->currentTeam->getKey())
+        ->where('f.entity_type', 'task')->where('f.code', 'status')
+        ->where('o.name', 'Done')
+        ->value('o.id');
+
+    expect($written->tenant_id)->toBe($other->currentTeam->getKey())
+        ->and($written->string_value)->toBe($doneOfTaskTeam);
 });

@@ -74,6 +74,19 @@ return [
             'after_commit' => false,
         ],
 
+        // Chat turns stream for up to 130s (the chat supervisor's timeout), so
+        // this connection's retry_after must exceed that or a long turn is
+        // re-delivered mid-stream and replayed: a second provider spend and a
+        // superseded proposal the user never decided.
+        'redis-chat' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'chat',
+            'retry_after' => (int) env('CHAT_QUEUE_RETRY_AFTER', 150),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
     ],
 
     /*

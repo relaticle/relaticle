@@ -15,11 +15,13 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteUpdateTool implements Tool
 {
+    use GuardsRecordNames;
     use ValidatesOwnedForeignKeys;
     use WithConversationContext;
 
@@ -49,15 +51,6 @@ abstract class BaseWriteUpdateTool implements Tool
 
     /** @return array<string, mixed> */
     abstract protected function extractActionData(Request $request): array;
-
-    /**
-     * The attribute that names a record of this entity; it can be changed but
-     * never cleared.
-     */
-    protected function nameAttribute(): string
-    {
-        return 'name';
-    }
 
     /**
      * Entity-specific request validation beyond custom fields. Return an
@@ -240,43 +233,62 @@ abstract class BaseWriteUpdateTool implements Tool
     /**
      * A row whose old and new values are identical is not a change; a model
      * that re-proposes an already-approved update would otherwise get a card
-     * full of "X -> X" rows and ask the user to approve nothing.
+     * full of "X -> X" rows and ask the user to approve nothing. Rows that
+     * carry raw `_oldValue`/`_newValue` are compared on those (rendered labels
+     * collide: two companies or options can share a name); the raw keys are
+     * stripped afterwards so only presentation is persisted.
      *
      * @param  list<mixed>  $rows
      * @return list<mixed>
      */
     private function rowsThatChange(array $rows): array
     {
-        return array_values(array_filter($rows, static function (mixed $row): bool {
-            if (! is_array($row) || ! array_key_exists('old', $row) || ! array_key_exists('new', $row)) {
+        $changed = array_filter($rows, function (mixed $row): bool {
+            if (! is_array($row)) {
+                return true;
+            }
+
+            if (array_key_exists('_oldValue', $row) && array_key_exists('_newValue', $row)) {
+                return ! $this->sameValue($row['_oldValue'], $row['_newValue']);
+            }
+
+            if (! array_key_exists('old', $row) || ! array_key_exists('new', $row)) {
                 return true;
             }
 
             return $row['old'] !== $row['new'];
-        }));
+        });
+
+        return array_values(array_map(static function (mixed $row): mixed {
+            if (is_array($row)) {
+                unset($row['_oldValue'], $row['_newValue']);
+            }
+
+            return $row;
+        }, $changed));
     }
 
     /**
-     * @param  array<string, mixed>  $record
+     * Lists compare as unordered id sets; everything else compares loosely
+     * enough to treat 5 and "5" as the same stored value.
      */
-    private function nameError(array $record): ?string
+    private function sameValue(mixed $old, mixed $new): bool
     {
-        $attribute = $this->nameAttribute();
+        if (is_array($old) && is_array($new)) {
+            $normalize = static function (array $values): array {
+                $strings = array_map(static fn (mixed $value): string => (string) (is_scalar($value) ? $value : json_encode($value)), $values);
+                sort($strings);
 
-        if (! array_key_exists($attribute, $record)) {
-            return null;
+                return $strings;
+            };
+
+            return $normalize($old) === $normalize($new);
         }
 
-        $value = $record[$attribute];
-
-        if (! is_string($value) || trim($value) === '') {
-            return "The {$attribute} cannot be empty.";
+        if (is_scalar($old) && is_scalar($new)) {
+            return (string) $old === (string) $new;
         }
 
-        if (mb_strlen($value) > 255) {
-            return "The {$attribute} may not be longer than 255 characters.";
-        }
-
-        return null;
+        return $old === $new;
     }
 }

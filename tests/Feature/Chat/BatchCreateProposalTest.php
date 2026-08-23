@@ -92,3 +92,14 @@ it('rejects a linked record from another workspace at proposal time', function (
     expect($result['error'])->toContain('records[0]')->toContain('company_ids')
         ->and(PendingAction::query()->count())->toBe(0);
 });
+
+it('rejects a missing, blank, or over-length title at proposal time instead of after approval', function (): void {
+    $missing = json_decode(proposeTasks($this->convId, [['custom_fields' => []]]), true);
+    $blank = json_decode(proposeTasks($this->convId, [['title' => '  ']]), true);
+    $tooLong = json_decode(proposeTasks($this->convId, [['title' => str_repeat('x', 256)]]), true);
+
+    expect($missing['error'])->toContain('records[0]')->toContain('title is required')
+        ->and($blank['error'])->toContain('title is required')
+        ->and($tooLong['error'])->toContain('longer than 255')
+        ->and(PendingAction::query()->count())->toBe(0);
+});

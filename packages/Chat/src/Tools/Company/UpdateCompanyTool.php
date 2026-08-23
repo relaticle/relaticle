@@ -90,6 +90,8 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
                 'label' => 'Account Owner',
                 'old' => $company->accountOwner->name ?? __('(none)'),
                 'new' => $owner === null ? __('(none)') : (TeamMembersContext::nameOf($owner) ?? $owner),
+                '_oldValue' => $company->getAttribute('account_owner_id'),
+                '_newValue' => $owner,
             ];
         }
 

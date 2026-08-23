@@ -77,6 +77,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
     ) {
+        $this->onConnection('redis-chat');
         $this->onQueue('chat');
         $this->afterCommit = true;
     }

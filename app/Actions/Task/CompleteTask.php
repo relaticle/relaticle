@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class CompleteTask
 {
@@ -16,21 +17,32 @@ final readonly class CompleteTask
     {
         abort_unless($user->can('update', $task), 403);
 
-        /** @var CustomField|null $status */
-        $status = CustomField::query()
-            ->with('options')
-            ->forEntity(Task::class)
-            ->where('code', TaskField::STATUS)
-            ->first();
+        // The custom-fields tenant scope and saveCustomFieldValue() both resolve
+        // against the ambient tenant context, so pin it to the task's own team:
+        // a caller holding a task from another of the user's teams must not get
+        // a foreign status field id written onto it.
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($task->team_id);
 
-        $done = $status?->options->firstWhere('name', 'Done');
+        try {
+            /** @var CustomField|null $status */
+            $status = CustomField::query()
+                ->with('options')
+                ->forEntity(Task::class)
+                ->where('code', TaskField::STATUS)
+                ->first();
 
-        abort_unless(
-            $status instanceof CustomField && $done instanceof CustomFieldOption,
-            422,
-            'This workspace has no Done task status.',
-        );
+            $done = $status?->options->firstWhere('name', 'Done');
 
-        $task->saveCustomFieldValue($status, $done->getKey());
+            abort_unless(
+                $status instanceof CustomField && $done instanceof CustomFieldOption,
+                422,
+                __('This workspace has no Done task status.'),
+            );
+
+            $task->saveCustomFieldValue($status, $done->getKey());
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+        }
     }
 }

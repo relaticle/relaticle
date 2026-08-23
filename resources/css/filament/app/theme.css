@@ -181,8 +181,14 @@
         @apply min-w-0 truncate;
     }
 
+    /* Below md the labels drop and the switcher stays as an icon pair, so
+       phones keep a way to reach the board; the links carry aria-labels. */
     .fi-view-switcher {
-        @apply hidden shrink-0 md:inline-flex;
+        @apply inline-flex shrink-0;
+    }
+
+    .fi-view-switcher-label {
+        @apply hidden md:inline;
     }
 }
 

@@ -14,11 +14,13 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteCreateTool implements Tool
 {
+    use GuardsRecordNames;
     use ValidatesOwnedForeignKeys;
     use WithConversationContext;
 
@@ -106,6 +108,12 @@ abstract class BaseWriteCreateTool implements Tool
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
                 return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+            }
+
+            $nameError = $this->nameError($record, required: true);
+
+            if ($nameError !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"]);
             }
 
             $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false);

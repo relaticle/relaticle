@@ -202,3 +202,42 @@ it('refuses a re-proposed update whose values already match the record', functio
     expect($result['error'])->toContain('Already up to date')
         ->and(PendingAction::query()->count())->toBe(0);
 });
+
+it('treats records with identical display labels as different when their ids differ', function (): void {
+    $acmeOne = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acmeTwo = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $person = People::factory()->for($this->team)->create(['name' => 'Jane', 'company_id' => $acmeOne->getKey()]);
+
+    $tool = resolve(UpdatePersonTool::class);
+    $tool->setConversationId($this->convId);
+    $result = json_decode($tool->handle(new Request(['records' => [['id' => (string) $person->getKey(), 'company_id' => (string) $acmeTwo->getKey()]]])), true);
+
+    $pending = latestPending($this->user);
+    $companyRow = collect($pending->display_data['fields'])->firstWhere('label', 'Company');
+
+    expect($result['type'])->toBe('pending_action')
+        ->and($companyRow)->not->toHaveKey('_oldValue')
+        ->and($companyRow['old'])->toBe('Acme')
+        ->and($companyRow['new'])->toBe('Acme');
+
+    resolve(PendingActionService::class)->approve($pending, $this->user);
+
+    expect($person->refresh()->company_id)->toBe($acmeTwo->getKey());
+});
+
+it('still refuses an update whose raw values already match, and ignores link order', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'Call']);
+    $alice = People::factory()->for($this->team)->create(['name' => 'Alice']);
+    $bob = People::factory()->for($this->team)->create(['name' => 'Bob']);
+    $task->people()->sync([$alice->getKey(), $bob->getKey()]);
+
+    $tool = resolve(UpdateTaskTool::class);
+    $tool->setConversationId($this->convId);
+    $result = json_decode($tool->handle(new Request(['records' => [[
+        'id' => (string) $task->getKey(),
+        'people_ids' => [(string) $bob->getKey(), (string) $alice->getKey()],
+    ]]])), true);
+
+    expect($result['error'])->toContain('Already up to date')
+        ->and(PendingAction::query()->count())->toBe(0);
+});

@@ -88,7 +88,7 @@ return [
     'waits' => [
         'redis:default' => 60,
         'redis:imports' => 120,
-        'redis:chat' => 30,
+        'redis-chat:chat' => 30,
     ],
 
     /*
@@ -291,7 +291,7 @@ return [
                 'nice' => 0,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
@@ -319,7 +319,7 @@ return [
                 'maxProcesses' => 5,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',

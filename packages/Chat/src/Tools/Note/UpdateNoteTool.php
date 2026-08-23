@@ -116,6 +116,8 @@ final class UpdateNoteTool extends BaseWriteUpdateTool
                 'label' => $label,
                 'old' => $this->joinNames(array_values($model->{$relation}()->pluck('name')->all())),
                 'new' => $this->namesForIds($ids, $modelClass, 'name', $team),
+                '_oldValue' => array_map(strval(...), $model->{$relation}()->pluck($model->{$relation}()->getRelated()->getQualifiedKeyName())->all()),
+                '_newValue' => $ids,
             ];
         }
 
