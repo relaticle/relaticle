@@ -55,7 +55,23 @@
                                         <span class="chat-chip-label" x-text="blockCell(row, column)"></span>
                                     </a>
                                 </template>
-                                <template x-if="!blockCellLinksRecord(block, row, column)">
+                                {{-- An `_include_<relation>` column's cell is an array of related
+                                     records ({label, url, type}), not a scalar: one chip per item,
+                                     matching the core column's own chip markup character for
+                                     character (see chat.js's applyRecordChips comment). --}}
+                                <template x-if="Array.isArray(blockCell(row, column))">
+                                    <span class="flex flex-wrap gap-1">
+                                        <template x-for="chip in blockCell(row, column)" :key="chip.url || chip.label">
+                                            <a class="chat-chip" :data-record-type="chip.type" :href="chip.url">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(chip.type)"></path>
+                                                </svg>
+                                                <span class="chat-chip-label" x-text="chip.label"></span>
+                                            </a>
+                                        </template>
+                                    </span>
+                                </template>
+                                <template x-if="!blockCellLinksRecord(block, row, column) && !Array.isArray(blockCell(row, column))">
                                     <span class="block truncate" :title="blockCell(row, column)" x-text="blockCell(row, column)"></span>
                                 </template>
                             </td>

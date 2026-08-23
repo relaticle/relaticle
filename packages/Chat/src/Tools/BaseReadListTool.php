@@ -8,7 +8,9 @@ use App\Models\CustomField;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -52,6 +54,13 @@ abstract class BaseReadListTool implements Tool
      */
     private const int CELL_VALUE_LIMIT = 120;
 
+    /**
+     * Related records attached per row under `included` and as a chip column.
+     * Tighter than the show tool's INCLUDE_LIMIT: a list block already carries
+     * up to ten rows, so each row's own chip column stays to a glance.
+     */
+    private const int INCLUDE_ITEM_LIMIT = 3;
+
     /** @return class-string */
     abstract protected function actionClass(): string;
 
@@ -66,6 +75,20 @@ abstract class BaseReadListTool implements Tool
 
     /** @return array<string, mixed> */
     protected function additionalSchema(JsonSchema $schema): array
+    {
+        return [];
+    }
+
+    /**
+     * Related collections rows may carry under `included`, keyed by relation
+     * name, valued by the resource the sibling Get*Tool serialises the same
+     * relation with. Only the relation names are read here (an allowlist for
+     * `include`); the list tool's own chips are lighter than a full resource.
+     * Mirrors the sibling Get*Tool's allowlist. Empty = no include support.
+     *
+     * @return array<string, class-string<JsonResource>>
+     */
+    protected function availableIncludes(): array
     {
         return [];
     }
@@ -101,7 +124,7 @@ abstract class BaseReadListTool implements Tool
             $sortable = array_merge($sortable, $describer->sortableCodes($user, $entityType));
         }
 
-        return array_merge(
+        $fields = array_merge(
             ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
             $this->additionalSchema($schema),
             [
@@ -116,12 +139,37 @@ abstract class BaseReadListTool implements Tool
                 'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
             ],
         );
+
+        $includes = $this->availableIncludes();
+
+        if ($includes !== []) {
+            $valid = implode(', ', array_keys($includes));
+
+            $fields['include'] = $schema->array()
+                ->items($schema->string())
+                ->description(
+                    "Related records to attach per row under `included` and as a chip column in the table. Valid values: {$valid}. "
+                    .'Only the first '.self::INCLUDE_ITEM_LIMIT.' related records per row are attached; `total` inside each row\'s `included` entry gives the real count.'
+                );
+        }
+
+        return $fields;
     }
 
     public function handle(Request $request): string
     {
         /** @var User $user */
         $user = auth()->user();
+
+        $availableIncludes = array_keys($this->availableIncludes());
+        $requestedIncludes = $this->normalizeIncludes($request['include'] ?? null);
+        $unknown = array_diff($requestedIncludes, $availableIncludes);
+
+        if ($unknown !== []) {
+            return (string) json_encode([
+                'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.implode(', ', $availableIncludes).'.',
+            ], JSON_UNESCAPED_SLASHES);
+        }
 
         try {
             $httpRequest = $this->buildHttpRequest($user, $request);
@@ -141,12 +189,25 @@ abstract class BaseReadListTool implements Tool
             return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
 
+        // Loaded onto the paginator's own model instances (not a copy), so the
+        // display block below and the `included` payload further down read the
+        // same eager-loaded relations without a second query.
+        if ($requestedIncludes !== [] && $results instanceof LengthAwarePaginator) {
+            $this->loadIncludes($results, $requestedIncludes, $user);
+        }
+
         // Captured before the resource collection is built: wrapping a paginator
         // in a resource collection replaces its items with resource instances,
         // and the display block reads stored custom-field values off the models.
         $block = $results instanceof LengthAwarePaginator && ! $this->isLookup($request)
-            ? $this->buildDisplayBlock($user, $results, $request)
+            ? $this->buildDisplayBlock($user, $results, $request, $requestedIncludes)
             : null;
+
+        // Same reason as the block above: this has to be read before the
+        // resource collection replaces the paginator's items with resource
+        // instances, or `$models[$index] instanceof Model` below is always
+        // false and `included` silently never attaches.
+        $models = array_values($results->items());
 
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
@@ -160,7 +221,8 @@ abstract class BaseReadListTool implements Tool
 
         $citationType = $this->citationType();
         $resolver = resolve(RecordReferenceResolver::class);
-        $items = array_map(function (mixed $item) use ($citationType, $resolver): mixed {
+
+        $items = array_map(function (mixed $item, int $index) use ($citationType, $resolver, $models, $requestedIncludes): mixed {
             if (! is_array($item)) {
                 return $item;
             }
@@ -175,8 +237,12 @@ abstract class BaseReadListTool implements Tool
                 $item['url'] = $resolver->referenceUrl($citationType, $id);
             }
 
+            if ($requestedIncludes !== [] && isset($models[$index]) && $models[$index] instanceof Model) {
+                $item['included'] = $this->includedFor($models[$index], $requestedIncludes, $resolver);
+            }
+
             return $item;
-        }, $items);
+        }, $items, array_keys($items));
 
         $payload = [
             'data' => $items,
@@ -191,6 +257,111 @@ abstract class BaseReadListTool implements Tool
         return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_UNESCAPED_SLASHES);
     }
 
+    /**
+     * @return list<string>
+     */
+    private function normalizeIncludes(mixed $include): array
+    {
+        if (! is_array($include)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn (mixed $value): string => is_string($value) ? $value : '', $include),
+            static fn (string $value): bool => $value !== '',
+        )));
+    }
+
+    /**
+     * Eager-loads each requested relation across the whole result page in one
+     * query per relation, scoped to the user's team and ordered by recency.
+     * Deliberately no `->limit()` in the closure: a *Many relation's eager
+     * load spans every parent row in the collection in a single query, so a
+     * limit there caps the WHOLE result set rather than each row's own slice
+     * (row 1 could eat the limit and leave row 2 with zero). The per-row cap
+     * is applied afterwards in PHP, once each row's own related collection is
+     * already resolved.
+     *
+     * @param  LengthAwarePaginator<int, Model>  $results
+     * @param  list<string>  $includes
+     */
+    private function loadIncludes(LengthAwarePaginator $results, array $includes, User $user): void
+    {
+        $models = new Collection(array_values($results->items()));
+
+        if ($models->isEmpty()) {
+            return;
+        }
+
+        $team = $user->currentTeam;
+
+        foreach ($includes as $relation) {
+            $models->load([$relation => function (Relation $query) use ($team): void {
+                $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
+
+                $query->whereBelongsTo($team)->latest($orderColumn);
+            }]);
+        }
+    }
+
+    /**
+     * The lightweight `included` entry a list row carries per relation: an id,
+     * a name, and a url per related record, plus the true total. Unlike the
+     * show tool's `included` (a full serialised record, because that tool
+     * answers "show me everything about this one record"), a list row is
+     * already one of many and only needs enough to link out.
+     *
+     * @param  list<string>  $includes
+     * @return array<string, array{total: int, showing: int, items: list<array{id: string, name: string, url: string}>}>
+     */
+    private function includedFor(Model $model, array $includes, RecordReferenceResolver $resolver): array
+    {
+        $included = [];
+
+        foreach ($includes as $relation) {
+            if (! $model->relationLoaded($relation)) {
+                continue;
+            }
+
+            $citationType = $this->includeCitationType($relation);
+
+            /** @var Collection<int, Model> $related */
+            $related = $model->getRelation($relation);
+
+            $items = array_values($related->take(self::INCLUDE_ITEM_LIMIT)->map(static fn (Model $m): array => [
+                'id' => (string) $m->getKey(),
+                'name' => (string) ($m->getAttribute('name') ?? $m->getAttribute('title') ?? ''),
+                'url' => $resolver->referenceUrl($citationType, (string) $m->getKey()),
+            ])->all());
+
+            $included[$relation] = [
+                'total' => $related->count(),
+                'showing' => count($items),
+                'items' => $items,
+            ];
+        }
+
+        return $included;
+    }
+
+    /**
+     * Maps a relation name to the citation type its chips and reference urls
+     * use. Most relation names already match the corresponding citation type;
+     * this only exists for the few that don't (a plural relation name versus
+     * a singular record type).
+     */
+    private function includeCitationType(string $relation): string
+    {
+        return match ($relation) {
+            'people' => 'people',
+            'opportunities' => 'opportunity',
+            'tasks' => 'task',
+            'notes' => 'note',
+            'companies', 'company' => 'company',
+            default => $relation,
+        };
+    }
+
     private function isLookup(Request $request): bool
     {
         return filter_var($request['lookup'] ?? false, FILTER_VALIDATE_BOOL);
@@ -203,9 +374,10 @@ abstract class BaseReadListTool implements Tool
      * because the model reasons over `data`, never over this.
      *
      * @param  LengthAwarePaginator<int, Model>  $results
+     * @param  list<string>  $includes
      * @return array<string, mixed>|null
      */
-    private function buildDisplayBlock(User $user, LengthAwarePaginator $results, Request $request): ?array
+    private function buildDisplayBlock(User $user, LengthAwarePaginator $results, Request $request, array $includes): ?array
     {
         $records = array_slice(array_values($results->items()), 0, self::BLOCK_ROW_LIMIT);
 
@@ -249,8 +421,9 @@ abstract class BaseReadListTool implements Tool
                 ...$this->fieldColumns($promoted),
                 ['key' => $coreKey, 'label' => Str::headline($coreKey)],
                 ...$this->fieldColumns($derived),
+                ...$this->includeColumns($includes),
             ],
-            'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey),
+            'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey, $includes),
             'total' => $results->total(),
         ];
     }
@@ -268,11 +441,24 @@ abstract class BaseReadListTool implements Tool
     }
 
     /**
+     * @param  list<string>  $includes
+     * @return list<array{key: string, label: string}>
+     */
+    private function includeColumns(array $includes): array
+    {
+        return array_map(
+            static fn (string $relation): array => ['key' => '_include_'.$relation, 'label' => Str::headline($relation)],
+            $includes,
+        );
+    }
+
+    /**
      * @param  list<Model>  $records
      * @param  list<CustomField>  $fields
-     * @return list<array{id: string, url: string, cells: array<string, string>}>
+     * @param  list<string>  $includes
+     * @return list<array{id: string, url: string, cells: array<string, mixed>}>
      */
-    private function blockRows(array $records, array $fields, string $coreKey): array
+    private function blockRows(array $records, array $fields, string $coreKey, array $includes): array
     {
         $resolver = resolve(RecordReferenceResolver::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
@@ -289,6 +475,10 @@ abstract class BaseReadListTool implements Tool
                 $cells[$row['code']] = $row['value'];
             }
 
+            foreach ($includes as $relation) {
+                $cells['_include_'.$relation] = $this->includeChips($record, $relation, $resolver);
+            }
+
             $rows[] = [
                 'id' => $id,
                 'url' => $resolver->referenceUrl($citationType, $id),
@@ -297,6 +487,32 @@ abstract class BaseReadListTool implements Tool
         }
 
         return $rows;
+    }
+
+    /**
+     * The chip list a `_include_<relation>` cell carries: up to
+     * INCLUDE_ITEM_LIMIT related records, each a label/url/type triple the
+     * table partial renders as a `chat-chip` link, matching the core column's
+     * own chip markup.
+     *
+     * @return list<array{label: string, url: string, type: string}>
+     */
+    private function includeChips(Model $record, string $relation, RecordReferenceResolver $resolver): array
+    {
+        if (! $record->relationLoaded($relation)) {
+            return [];
+        }
+
+        $citationType = $this->includeCitationType($relation);
+
+        /** @var Collection<int, Model> $related */
+        $related = $record->getRelation($relation);
+
+        return array_values($related->take(self::INCLUDE_ITEM_LIMIT)->map(fn (Model $m): array => [
+            'label' => (string) ($m->getAttribute('name') ?? $m->getAttribute('title') ?? ''),
+            'url' => $resolver->referenceUrl($citationType, (string) $m->getKey()),
+            'type' => $citationType,
+        ])->all());
     }
 
     /**
