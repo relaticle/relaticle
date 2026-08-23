@@ -91,7 +91,9 @@ it('keeps actions resolved before the last assistant message in context', functi
         ->and($resolved[1]['record_id'])->toBe('new-id');
 });
 
-it('caps the context at the 20 newest resolutions, oldest first', function (): void {
+it('caps the context at the configured message window, oldest first', function (): void {
+    config(['chat.max_conversation_messages' => 20]);
+
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-1', $user);
@@ -112,6 +114,49 @@ it('caps the context at the 20 newest resolutions, oldest first', function (): v
     expect($resolved)->toHaveCount(20)
         ->and($resolved[0]['label'])->toBe('Task 2')
         ->and($resolved[19]['label'])->toBe('Task 21');
+});
+
+it('derives the resolved and superseded context cap from chat.max_conversation_messages, not a hardcoded number', function (): void {
+    // Regression: the cap used to be a bare limit(20), independent of
+    // config('chat.max_conversation_messages') (the replayed message-row
+    // window). A decided/superseded proposal could fall out of that hardcoded
+    // 20-item cap while its tool result was still inside a much larger replay
+    // window, leaving the model with no context for a still-visible
+    // `pending_action` result. Pin a cap far from 20 so this only passes if the
+    // two are actually coupled through config, not coincidentally both "20".
+    config(['chat.max_conversation_messages' => 3]);
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-cap', $user);
+
+    foreach (range(1, 4) as $i) {
+        PendingAction::query()->create([
+            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'conversation_id' => 'conv-cap', 'action_class' => CreateTask::class,
+            'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
+            'action_data' => ['title' => "Approved {$i}"], 'display_data' => [],
+            'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+            'resolved_at' => now()->subMinutes(10 - $i), 'result_data' => ['id' => "id-{$i}"],
+        ]);
+
+        PendingAction::query()->create([
+            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'conversation_id' => 'conv-cap', 'action_class' => CreateTask::class,
+            'operation' => PendingActionOperation::Create, 'entity_type' => 'note',
+            'action_data' => ['title' => "Superseded {$i}"], 'display_data' => [],
+            'status' => PendingActionStatus::Superseded, 'expires_at' => now(),
+            'resolved_at' => now()->subMinutes(10 - $i),
+        ]);
+    }
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-cap');
+    $superseded = resolve(PendingActionService::class)->supersededForConversation('conv-cap');
+
+    expect($resolved)->toHaveCount(3)
+        ->and($resolved[2]['label'])->toBe('Approved 4')
+        ->and($superseded)->toHaveCount(3)
+        ->and($superseded[2]['label'])->toBe('Superseded 4');
 });
 
 it('returns an empty list for another conversation', function (): void {
@@ -330,4 +375,48 @@ it('tells the model stamped-pending results are stale via resolved actions', fun
         ->instructions();
 
     expect($instructions)->toContain('is STALE for any proposal listed here');
+});
+
+it('keeps a proposal superseded on an earlier turn visible when a later turn supersedes nothing new', function (): void {
+    // CRITICAL regression: <superseded_proposals> used to be fed straight off
+    // supersedePendingForConversation()'s return value for THIS job invocation
+    // only: the rows it just transitioned. Turn 3 below supersedes nothing
+    // new, so under the old wiring the block would go empty even though the
+    // proposal from turn 1 (auto-superseded on turn 2) still has a tool result
+    // sitting in the replayed transcript claiming type pending_action. The
+    // model would then have no context telling it the card is gone.
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-super', $user);
+
+    $pendingActions = resolve(PendingActionService::class);
+
+    // Turn 1: the assistant proposes.
+    PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => 'conv-super', 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
+        'action_data' => ['title' => 'Draft the outreach email'], 'display_data' => [],
+        'status' => PendingActionStatus::Pending, 'expires_at' => now()->addMinutes(15),
+    ]);
+
+    // Turn 2: the user sends a new message before deciding it, auto-superseding it.
+    $turn2 = $pendingActions->supersedePendingForConversation('conv-super');
+    expect($turn2)->toHaveCount(1);
+
+    // Turn 3: nothing is pending anymore, so this turn supersedes nothing new.
+    $turn3 = $pendingActions->supersedePendingForConversation('conv-super');
+    expect($turn3)->toBe([]);
+
+    $context = $pendingActions->supersededForConversation('conv-super');
+
+    expect($context)->toHaveCount(1)
+        ->and($context[0]['operation'])->toBe('create')
+        ->and($context[0]['entity_type'])->toBe('task')
+        ->and($context[0]['label'])->toBe('Draft the outreach email');
+
+    $instructions = (new CrmAssistant)->withSupersededProposals($context)->instructions();
+
+    expect($instructions)->toContain('<superseded_proposals>')
+        ->and($instructions)->toContain('Draft the outreach email');
 });

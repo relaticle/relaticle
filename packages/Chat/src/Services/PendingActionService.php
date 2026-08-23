@@ -513,11 +513,12 @@ final readonly class PendingActionService
 
     /**
      * Every proposal this conversation has decided (approved, rejected, expired):
-     * newest 20, presented oldest-first. Deliberately NOT windowed to "since the
-     * last assistant turn": resolutions write nothing into the replayed transcript,
-     * whose tool results keep claiming the proposal is pending, so the outcome must
-     * be re-injected on every turn. Superseded proposals are left out: they travel
-     * in their own block and were never decided by the user.
+     * newest first up to the context cap, presented oldest-first. Deliberately NOT
+     * windowed to "since the last assistant turn": resolutions write nothing into
+     * the replayed transcript, whose tool results keep claiming the proposal is
+     * pending, so the outcome must be re-injected on every turn. Superseded
+     * proposals are left out: they travel in their own block (see
+     * supersededForConversation()) and were never decided by the user.
      *
      * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>}>
      */
@@ -533,7 +534,7 @@ final readonly class PendingActionService
             ->whereNotNull('resolved_at')
             ->latest('resolved_at')
             ->orderByDesc('id')
-            ->limit(20)
+            ->limit($this->contextWindowCap())
             ->get()
             ->reverse()
             ->values();
@@ -547,6 +548,55 @@ final readonly class PendingActionService
             'record_ids' => $this->resolveResultRecordIds($action),
             'records' => $this->resolvedRecords($action),
         ], $actions->all()));
+    }
+
+    /**
+     * Every proposal superseded on this conversation (auto-cancelled because the
+     * user sent a new message before it was decided), oldest first, capped like
+     * resolvedForConversation().
+     *
+     * Persistent by design: supersedePendingForConversation() only returns the
+     * rows it transitioned during THIS job invocation, so a caller that fed the
+     * prompt straight off that return value lost every earlier supersession the
+     * moment a later turn superseded nothing new: the model then had no context
+     * for a `pending_action` tool result that was actually cancelled turns ago.
+     * This queries the persisted rows instead, so the block is never emptier than
+     * conversation history actually is.
+     *
+     * @return list<array{operation: string, entity_type: string, label: string|null}>
+     */
+    public function supersededForConversation(string $conversationId): array
+    {
+        $actions = PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->where('status', PendingActionStatus::Superseded->value)
+            ->whereNotNull('resolved_at')
+            ->latest('resolved_at')
+            ->orderByDesc('id')
+            ->limit($this->contextWindowCap())
+            ->get()
+            ->reverse()
+            ->values();
+
+        return array_values(array_map(fn (PendingAction $action): array => [
+            'operation' => $action->operation->value,
+            'entity_type' => $action->entity_type,
+            'label' => $this->resolveActionLabel($action),
+        ], $actions->all()));
+    }
+
+    /**
+     * Upper bound on how many decided/superseded proposals ride along in the
+     * system prompt. Tied to chat.max_conversation_messages (the replayed
+     * message-row window) rather than a standalone number: the replayed
+     * transcript can contain at most that many rows, so it can reference at
+     * most that many distinct proposals. A cap any smaller could let a proposal
+     * age out of both context blocks while its `pending_action` tool result is
+     * still being replayed to the model.
+     */
+    private function contextWindowCap(): int
+    {
+        return (int) config('chat.max_conversation_messages', 100);
     }
 
     /**

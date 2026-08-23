@@ -101,18 +101,21 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public array $contextLedger = [];
 
     /**
-     * Proposals that were auto-superseded because the user typed a new message
-     * before approving/rejecting them. Injected into the system prompt so the
-     * model knows not to silently re-propose them.
+     * Every proposal auto-superseded on this conversation because the user typed
+     * a new message before approving/rejecting it, re-injected each turn (not
+     * only proposals superseded this turn): see
+     * PendingActionService::supersededForConversation(). Tells the model not to
+     * silently re-propose them.
      *
      * @var list<array{operation: string, entity_type: string, label: string|null}>
      */
     public array $supersededProposals = [];
 
     /**
-     * Every terminal action (approved/rejected/expired/superseded) on this
+     * Every action the user decided (approved/rejected/expired) on this
      * conversation, re-injected each turn: resolutions never reach the replayed
      * transcript, whose tool results keep claiming the proposal is pending.
+     * Superseded proposals are NOT here: see $supersededProposals above.
      *
      * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>}>
      */

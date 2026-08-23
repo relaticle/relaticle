@@ -164,7 +164,9 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
-            $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
+            $agent->withSupersededProposals(
+                $pendingActions->supersededForConversation($this->conversationId),
+            );
             $agent->withResolvedActions(
                 $pendingActions->resolvedForConversation($this->conversationId),
             );
@@ -500,21 +502,6 @@ final class ProcessChatMessage implements ShouldQueue
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-    }
-
-    /**
-     * @param  list<PendingAction>  $superseded
-     * @return list<array{operation: string, entity_type: string, label: string|null}>
-     */
-    private function summarizeSuperseded(array $superseded): array
-    {
-        $pendingActions = resolve(PendingActionService::class);
-
-        return array_map(static fn (PendingAction $action): array => [
-            'operation' => $action->operation->value,
-            'entity_type' => $action->entity_type,
-            'label' => $pendingActions->resolveActionLabel($action),
-        ], $superseded);
     }
 
     /**

@@ -25,14 +25,23 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
  *
  * Replayed tool results are NEVER rewritten to reflect a later decision. A
  * proposal result still says `pending_action` forever in the replayed
- * history; whether the user has since approved, rejected, or let it expire
- * travels ONLY via the `<resolved_actions>` block CrmAssistant injects into
- * the per-turn system prompt (see CrmAssistant::resolvedBlock()). That block
- * lives outside the cached prefix, so it costs nothing to carry every turn.
- * Rewriting a tool result used to do this instead, but it mutated a message
- * earlier in the transcript on every approval, and Anthropic prompt caching
- * keys on an exact prefix: one mutation invalidated the cache for the rest
- * of the conversation. Do not reintroduce stamping.
+ * history. What actually happened to it travels entirely outside this store,
+ * in two persistent, per-turn (uncached) system prompt blocks CrmAssistant
+ * injects: `<resolved_actions>` for a proposal the user approved, rejected,
+ * or let expire (see CrmAssistant::resolvedBlock(), fed by
+ * PendingActionService::resolvedForConversation()), and
+ * `<superseded_proposals>` for one auto-cancelled because the user moved on
+ * without deciding it (a different status from the superseded_at message
+ * rows this class filters above; see CrmAssistant::supersededBlock(), fed by
+ * PendingActionService::supersededForConversation()). Both blocks query the
+ * PendingAction table fresh on every turn rather than depending on what any
+ * single turn transitioned, so a proposal decided or superseded many turns
+ * ago stays visible for as long as its tool result is still being replayed.
+ * These blocks live outside the cached prefix, so carrying them costs
+ * nothing. Rewriting a tool result used to carry decided status instead, but
+ * it mutated a message earlier in the transcript on every approval, and
+ * Anthropic prompt caching keys on an exact prefix: one mutation invalidated
+ * the cache for the rest of the conversation. Do not reintroduce stamping.
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
