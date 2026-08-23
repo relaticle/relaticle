@@ -97,3 +97,10 @@ it('degrades a null-url citation to its plain name', function (): void {
     expect($html)->not->toContain('<a')
         ->toContain('Linked to Test Person.');
 });
+
+it('wraps markdown tables in a scrollable region', function (): void {
+    $html = (new MarkdownRenderer)->render("| a | b |\n|---|---|\n| 1 | 2 |");
+
+    expect($html)->toContain('<div class="chat-md-table overflow-x-auto" tabindex="0" role="region"><table>')
+        ->and($html)->toContain('</table></div>');
+});

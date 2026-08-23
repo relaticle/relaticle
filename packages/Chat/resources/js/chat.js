@@ -79,9 +79,17 @@ const normalizeChatMarkdown = (text) => text
     .replace(/^[ \t]*(\{\{block:\d+\}\})[ \t]*$/gm, '\n$1\n')
     .replace(/\[([^\]]+)\]\(null\)/g, '$1')
 
+// Keep character-identical with MarkdownRenderer::wrapTables().
+const wrapTables = (html) => {
+    if (!html.includes('<table>')) return html
+    return html
+        .replaceAll('<table>', '<div class="chat-md-table overflow-x-auto" tabindex="0" role="region"><table>')
+        .replaceAll('</table>', '</table></div>')
+}
+
 window.renderMarkdown = (text) => {
     if (!text) return ''
-    return applyRecordChips(DOMPurify.sanitize(marked.parse(normalizeChatMarkdown(text))))
+    return wrapTables(applyRecordChips(DOMPurify.sanitize(marked.parse(normalizeChatMarkdown(text)))))
 }
 
 import '../css/chat-editor.css';
