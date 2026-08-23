@@ -73,7 +73,7 @@ it('forbids per-result headings that would strand above the blocks', function ()
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
-        ->toContain('never write a heading or label naming a result set')
+        ->toContain('never write a heading or bold label naming a result set')
         ->toContain('Never write a heading or bold label naming a set of results');
 });
 
@@ -119,4 +119,14 @@ it('routes bulk updates through one records[] call instead of one approval per r
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('`records: [{..}, {..}]` on create and update tools')
         ->toContain('pass null to clear it');
+});
+
+it('carries the grounding, join, and formatting rules', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('Never state a count, a total, or an absence')
+        ->toContain('lookup: true` on every read call that feeds it')
+        ->toContain('No emoji of any kind')
+        ->toContain('say so in your first sentence');
 });
