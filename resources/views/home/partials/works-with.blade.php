@@ -28,5 +28,12 @@
                 <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
             </a>
         </div>
+
+        @if($formattedDockerPulls !== null)
+            <p class="border-x border-t border-gray-200 dark:border-white/[0.08] px-5 py-3 text-center text-xs text-gray-500 dark:text-gray-400">
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $formattedDockerPulls }}</span> {{ __('Docker pulls') }}
+                <span class="mx-2 text-gray-300 dark:text-gray-600">/</span>{{ __('self-hosted, AGPL-3.0, shipping weekly') }}
+            </p>
+        @endif
     </div>
 </section>

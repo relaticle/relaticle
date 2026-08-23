@@ -159,6 +159,8 @@ it('links the product pages from page copy, not only from the sitewide nav', fun
 })->with(['/', '/pricing', '/compare/relaticle-vs-twenty', '/alternatives/attio']);
 
 it('renders the works-with strip on the homepage with a link to the developer docs', function (): void {
+    Cache::put('dockerhub_pulls_manukminasyan_relaticle', 21030, 60);
+
     $html = $this->get('/')->assertOk()->getContent();
 
     preg_match('/<section[^>]*aria-label="Works with"[^>]*>.*?<\/section>/s', $html, $matches);
@@ -166,5 +168,6 @@ it('renders the works-with strip on the homepage with a link to the developer do
 
     expect($strip)->not->toBe('')
         ->and($strip)->toContain('Claude', 'ChatGPT', 'Cursor', 'Gemini', '+ any MCP client')
-        ->and($strip)->toContain('href="'.route('documentation.index').'"');
+        ->and($strip)->toContain('href="'.route('documentation.index').'"')
+        ->and($strip)->toContain('21,000+');
 });
