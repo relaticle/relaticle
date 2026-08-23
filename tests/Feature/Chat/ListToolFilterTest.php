@@ -372,3 +372,17 @@ it('reports total and showing when results exceed one page', function (): void {
         ->and($payload['showing'])->toBe(15)
         ->and($payload['data'])->toHaveCount(15);
 });
+
+it('reports total equal to showing when results fit on one page', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    Company::factory()->count(3)->for($team)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['total'])->toBe(3)
+        ->and($payload['showing'])->toBe(3)
+        ->and($payload['data'])->toHaveCount(3);
+});

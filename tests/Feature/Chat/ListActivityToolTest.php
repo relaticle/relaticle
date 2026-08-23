@@ -330,5 +330,7 @@ it('renders no table when nothing changed in the window', function (): void {
     $payload = activityPayload();
 
     expect($payload['data'])->toBe([])
+        ->and($payload['total'])->toBe(0)
+        ->and($payload['showing'])->toBe(0)
         ->and($payload)->not->toHaveKey('display_block');
 });
