@@ -50,6 +50,7 @@ return [
         'save' => 'Save',
         'send_invitations' => 'Send invitations',
         'invite_link' => 'Invite link',
+        'close' => 'Close',
         'rotate_invite_link' => 'Generate a new link',
         'update_team_role' => 'Manage Role',
         'remove_team_member' => 'Remove',
@@ -81,6 +82,9 @@ return [
         ],
         'role_updated' => [
             'success' => 'Role updated.',
+        ],
+        'invite_link_role_updated' => [
+            'success' => 'Anyone joining with this link is now a :role.',
         ],
         'invite_link_rotated' => [
             'success' => 'A new invite link was generated. The previous link no longer works.',
@@ -198,6 +202,7 @@ return [
     ],
 
     'invite_link' => [
+        'heading' => 'Invite link',
         'url' => 'Anyone with this link can join',
         'default_role' => 'Role for people who join with this link',
         'join' => [

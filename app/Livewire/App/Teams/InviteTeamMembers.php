@@ -121,6 +121,11 @@ final class InviteTeamMembers extends BaseLivewireComponent
         );
     }
 
+    /**
+     * Google's share dialog shape: pick the role, then copy the link, and the
+     * role change saves on selection rather than behind a submit. The modal is
+     * a dismiss ("Close"), not a form to fill in and send.
+     */
     public function manageInviteLinkAction(): Action
     {
         return Action::make('manageInviteLink')
@@ -128,38 +133,47 @@ final class InviteTeamMembers extends BaseLivewireComponent
             ->icon('heroicon-m-link')
             ->color('gray')
             ->link()
+            ->modalHeading(__('teams.invite_link.heading'))
+            ->modalWidth('lg')
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('teams.actions.close'))
             ->schema([
-                TextEntry::make('url')
-                    ->label(__('teams.invite_link.url'))
-                    ->state(fn (): string => route('teams.join', ['token' => $this->team->invite_link_token]))
-                    ->copyable(),
                 Select::make('invite_link_default_role')
                     ->label(__('teams.invite_link.default_role'))
                     ->options(fn (): array => $this->assignableRoles())
                     ->in(fn (): array => array_keys($this->assignableRoles()))
                     ->default(fn (): string => $this->team->invite_link_default_role)
-                    ->required(),
+                    ->selectablePlaceholder(false)
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(function (?string $state): void {
+                        if ($state === null) {
+                            return;
+                        }
+
+                        resolve(UpdateInviteLinkSettings::class)->update($this->authUser(), $this->team, $state);
+
+                        $this->sendNotification(__('teams.notifications.invite_link_role_updated.success', [
+                            'role' => $this->assignableRoles()[$state] ?? $state,
+                        ]));
+                    }),
+                TextEntry::make('url')
+                    ->label(__('teams.invite_link.url'))
+                    ->state(fn (): string => route('teams.join', ['token' => $this->team->invite_link_token]))
+                    ->copyable(),
             ])
             ->extraModalFooterActions([
                 Action::make('rotateInviteLink')
                     ->label(__('teams.actions.rotate_invite_link'))
                     ->color('danger')
+                    ->link()
                     ->requiresConfirmation()
                     ->action(function (): void {
                         resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->team);
 
                         $this->sendNotification(__('teams.notifications.invite_link_rotated.success'));
                     }),
-            ])
-            ->action(function (array $data): void {
-                resolve(UpdateInviteLinkSettings::class)->update(
-                    $this->authUser(),
-                    $this->team,
-                    (string) $data['invite_link_default_role'],
-                );
-
-                $this->sendNotification();
-            });
+            ]);
     }
 
     public function render(): View

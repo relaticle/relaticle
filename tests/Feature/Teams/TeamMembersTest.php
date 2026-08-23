@@ -221,9 +221,9 @@ test('cumulative invite volume beyond the window cap is throttled, not just the 
 
 test('the owner can change the invite link default role', function (): void {
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->callAction('manageInviteLink', [
-            'invite_link_default_role' => TeamRole::Viewer->value,
-        ]);
+        ->mountAction('manageInviteLink')
+        ->setActionData(['invite_link_default_role' => TeamRole::Viewer->value])
+        ->assertHasNoActionErrors();
 
     expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Viewer->value);
 });
@@ -234,10 +234,8 @@ test('an admin cannot set the invite link default role to admin', function (): v
     $this->actingAs($admin);
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->callAction('manageInviteLink', [
-            'invite_link_default_role' => TeamRole::Admin->value,
-        ])
-        ->assertHasActionErrors();
+        ->mountAction('manageInviteLink')
+        ->setActionData(['invite_link_default_role' => TeamRole::Admin->value]);
 
     expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
 });
