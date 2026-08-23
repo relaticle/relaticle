@@ -110,6 +110,8 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
+        $startedAt = microtime(true);
+
         $this->team->refresh();
 
         if (resolve(HostedWorkspaceAccess::class)->isPaused($this->team)) {
@@ -251,7 +253,7 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
-            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService): void {
+            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
                 // promptTokens is the UNCACHED remainder only, so it understates the
                 // real prompt on a cached turn. Record the cache legs next to it;
                 // credits are still priced on model + tool calls, not tokens.
@@ -281,7 +283,7 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions();
                 $this->persistUserDocument();
-                $this->materializeAssistantDocument($streamedResponse);
+                $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->broadcastFollowUps($streamedResponse);
             });
         } catch (Throwable $e) {
@@ -656,7 +658,7 @@ final class ProcessChatMessage implements ShouldQueue
      * v1 emits no mention chips in assistant prose — future work can extract
      * structured entity references from tool results.
      */
-    private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
+    private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse, float $startedAt): void
     {
         // The store persisted the full concatenated text; the row is rewritten here
         // with the reply the user should keep (see AssistantText::finalReply), and
@@ -675,11 +677,16 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
+        $existingMeta = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $meta = is_array($existingMeta) ? $existingMeta : [];
+        $meta['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
+
         DB::table('agent_conversation_messages')
             ->where('id', $latestId)
             ->update([
                 'content' => $assistantContent,
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
+                'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
             ]);
     }
 
