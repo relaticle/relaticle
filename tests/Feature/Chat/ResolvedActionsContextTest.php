@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Messages\ToolResultMessage;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -255,7 +258,13 @@ it('leaves superseded proposals to their own block instead of listing them as de
     expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S'))->toBe([]);
 });
 
-it('stamps the decided status onto replayed proposal tool results so the transcript stops claiming they are pending', function (): void {
+it('replays proposal tool results unmutated after a decision', function (): void {
+    // Regression for the prompt-cache bug: stamping a decided status onto an
+    // earlier message's stored tool result mutated a prefix Anthropic caches,
+    // invalidating the cache for the rest of the conversation on every
+    // approval. Decided status now travels only via <resolved_actions> (see
+    // CrmAssistant::resolvedBlock()), so replayed tool results must stay
+    // byte-identical to what the tool actually returned.
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-R', $user);
@@ -296,15 +305,29 @@ it('stamps the decided status onto replayed proposal tool results so the transcr
         'usage' => '{}', 'meta' => '{}', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    $history = (string) json_encode(resolve(ConversationStore::class)->getLatestConversationMessages('conv-R', 100));
-    $decoded = json_decode($history, true);
-    $results = collect($decoded)->flatMap(static fn (array $message): array => $message['toolResults'] ?? [])
-        ->map(static fn (array $result): array => json_decode($result['result'], true))
-        ->keyBy('pending_action_id');
+    $store = resolve(ConversationStore::class);
+    $messages = $store->getLatestConversationMessages('conv-R', 100);
 
-    expect($results[$approved->getKey()]['type'])->toBe('resolved_action')
-        ->and($results[$approved->getKey()]['status'])->toBe('approved')
-        ->and($results[$approved->getKey()])->not->toHaveKey('display')
-        ->and($results[$approved->getKey()]['data']['title'])->toBe('Ship it')
-        ->and($results[$pending->getKey()]['type'])->toBe('pending_action');
+    $replayed = collect($messages)->filter(fn ($m): bool => $m instanceof ToolResultMessage)
+        ->flatMap(fn (ToolResultMessage $m): Collection => $m->toolResults)
+        ->mapWithKeys(function ($r): array {
+            $decoded = json_decode((string) $r->result, true);
+
+            return [$decoded['pending_action_id'] => $decoded];
+        });
+
+    expect($replayed[$approved->getKey()]['type'])->toBe('pending_action')
+        ->and($replayed[$approved->getKey()]['display'])->toBe($approved->display_data)
+        ->and($replayed[$approved->getKey()]['data']['title'])->toBe('Ship it')
+        ->and($replayed[$pending->getKey()]['type'])->toBe('pending_action');
+});
+
+it('tells the model stamped-pending results are stale via resolved actions', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withResolvedActions([
+            ['operation' => 'create', 'entity_type' => 'task', 'status' => 'approved', 'label' => 'Ship it', 'record_id' => 'task-1'],
+        ])
+        ->instructions();
+
+    expect($instructions)->toContain('is STALE for any proposal listed here');
 });

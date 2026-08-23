@@ -416,6 +416,7 @@ PROMPT;
             'NEVER describe a decided proposal as pending, awaiting approval, or "shown above". "expired" means the card timed out undecided.',
             'Do not re-propose them on your own initiative. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal.',
             'Use an approved record id to continue any multi-step request still in progress, and its url to link the record by name.',
+            'A tool result earlier in this conversation that still claims type pending_action is STALE for any proposal listed here: this block is the truth about its status.',
         ];
 
         foreach ($this->resolvedActions as $action) {

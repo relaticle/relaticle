@@ -11,8 +11,6 @@ use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Storage\DatabaseConversationStore;
-use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\FirstChatUsageTagger;
@@ -24,6 +22,17 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
  * ChatController::supersedeMessages). Without this filter the model keeps
  * "remembering" turns the user replaced — answering "I already proposed that"
  * against a transcript the user can no longer see.
+ *
+ * Replayed tool results are NEVER rewritten to reflect a later decision. A
+ * proposal result still says `pending_action` forever in the replayed
+ * history; whether the user has since approved, rejected, or let it expire
+ * travels ONLY via the `<resolved_actions>` block CrmAssistant injects into
+ * the per-turn system prompt (see CrmAssistant::resolvedBlock()). That block
+ * lives outside the cached prefix, so it costs nothing to carry every turn.
+ * Rewriting a tool result used to do this instead, but it mutated a message
+ * earlier in the transcript on every approval, and Anthropic prompt caching
+ * keys on an exact prefix: one mutation invalidated the cache for the rest
+ * of the conversation. Do not reintroduce stamping.
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
@@ -36,6 +45,10 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      * per read call for the rest of the conversation, against a prompt prefix we
      * fought to shrink. The persisted row keeps it; only the replay drops it.
      *
+     * Stripping is safe to keep (unlike stamping, see class docblock) because
+     * it is deterministic: the same stored result always strips to the same
+     * output, so it never invalidates the prompt cache.
+     *
      * This post-processes the parent's output rather than rebuilding it, so the
      * ownership note below still holds.
      *
@@ -44,104 +57,16 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
     public function getLatestConversationMessages(string $conversationId, int $limit): Collection
     {
         $messages = parent::getLatestConversationMessages($conversationId, $limit);
-        $decided = $this->decidedProposals($messages);
 
-        return $messages->each(function (Message $message) use ($decided): void {
+        return $messages->each(function (Message $message): void {
             if (! $message instanceof ToolResultMessage) {
                 return;
             }
 
             foreach ($message->toolResults as $toolResult) {
-                $toolResult->result = $this->stampDecision(DisplayBlocks::strip($toolResult->result), $decided);
+                $toolResult->result = DisplayBlocks::strip($toolResult->result);
             }
         });
-    }
-
-    /**
-     * Status of every proposal the replayed tool results refer to that the user
-     * has since decided. A proposal result says `pending_action` forever, so
-     * without this the model keeps asking the user to approve a card that was
-     * approved turns ago.
-     *
-     * @param  Collection<int, Message>  $messages
-     * @return array<string, string>
-     */
-    private function decidedProposals(Collection $messages): array
-    {
-        $ids = [];
-
-        foreach ($messages as $message) {
-            if (! $message instanceof ToolResultMessage) {
-                continue;
-            }
-
-            foreach ($message->toolResults as $toolResult) {
-                $id = $this->proposalId($toolResult->result);
-
-                if ($id !== null) {
-                    $ids[] = $id;
-                }
-            }
-        }
-
-        if ($ids === []) {
-            return [];
-        }
-
-        return PendingAction::query()
-            ->whereKey(array_unique($ids))
-            ->where('status', '!=', PendingActionStatus::Pending->value)
-            ->pluck('status', 'id')
-            ->map(static fn (PendingActionStatus $status): string => $status->value)
-            ->all();
-    }
-
-    private function proposalId(mixed $result): ?string
-    {
-        if (! is_string($result) || ! str_contains($result, 'pending_action_id')) {
-            return null;
-        }
-
-        $decoded = json_decode($result, true);
-
-        if (! is_array($decoded) || ($decoded['type'] ?? null) !== 'pending_action') {
-            return null;
-        }
-
-        $id = $decoded['pending_action_id'] ?? null;
-
-        return is_string($id) ? $id : null;
-    }
-
-    /**
-     * Rewrites a decided proposal result: the type flips to `resolved_action`,
-     * the status is stated, and the card rows are dropped (the model never
-     * needs them again, and they are the bulk of the payload).
-     *
-     * @param  array<string, string>  $decided
-     */
-    private function stampDecision(mixed $result, array $decided): mixed
-    {
-        $id = $this->proposalId($result);
-
-        if ($id === null || ! isset($decided[$id]) || ! is_string($result)) {
-            return $result;
-        }
-
-        $decoded = json_decode($result, true);
-
-        if (! is_array($decoded)) {
-            return $result;
-        }
-
-        unset($decoded['display'], $decoded['meta']);
-
-        return json_encode([
-            'type' => 'resolved_action',
-            'status' => $decided[$id],
-            'note' => 'The user already decided this proposal; its card is gone. Do not ask them to approve or reject it.',
-            ...array_diff_key($decoded, array_flip(['type', 'status', 'note'])),
-        ]);
     }
 
     /**
