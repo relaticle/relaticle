@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -295,7 +296,7 @@ it('stamps the decided status onto replayed proposal tool results so the transcr
         'usage' => '{}', 'meta' => '{}', 'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    $history = (string) json_encode(resolve(\Laravel\Ai\Contracts\ConversationStore::class)->getLatestConversationMessages('conv-R', 100));
+    $history = (string) json_encode(resolve(ConversationStore::class)->getLatestConversationMessages('conv-R', 100));
     $decoded = json_decode($history, true);
     $results = collect($decoded)->flatMap(static fn (array $message): array => $message['toolResults'] ?? [])
         ->map(static fn (array $result): array => json_decode($result['result'], true))
