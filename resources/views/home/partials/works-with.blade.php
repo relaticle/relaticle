@@ -23,10 +23,16 @@
                 </div>
             @endforeach
 
-            <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-                {{ __('+ any MCP client') }}
-                <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
-            </a>
+            @if(\Laravel\Pennant\Feature::active(\App\Features\Documentation::class))
+                <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    {{ __('+ any MCP client') }}
+                    <x-ri-arrow-right-up-line class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
+                </a>
+            @else
+                <div class="col-span-2 md:col-span-1 flex items-center justify-center px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ __('+ any MCP client') }}
+                </div>
+            @endif
         </div>
 
         @if($formattedDockerPulls !== null)
