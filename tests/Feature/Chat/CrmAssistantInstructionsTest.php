@@ -130,3 +130,11 @@ it('carries the grounding, join, and formatting rules', function (): void {
         ->toContain('No emoji of any kind')
         ->toContain('say so in your first sentence');
 });
+
+it('tells the model to reach for include when asked for related records', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('pass `include` to the list tool')
+        ->toContain('no single block and no `include` can show');
+});
