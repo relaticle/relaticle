@@ -53,11 +53,22 @@ final class AggregateCrmTool implements Tool
         $dateFrom = isset($request['date_from']) && is_string($request['date_from']) ? $request['date_from'] : null;
         $dateTo = isset($request['date_to']) && is_string($request['date_to']) ? $request['date_to'] : null;
 
+        $countOnly = $groupBy === 'people_per_company' || in_array($groupBy, ['task_status', 'task_priority'], true);
+
+        // Only the opportunity groupings honour a date range. Answering a dated
+        // question with all-time counts would hand the model a confident wrong
+        // number, so refuse instead of silently ignoring the filter.
+        if ($countOnly && ($dateFrom !== null || $dateTo !== null)) {
+            return (string) json_encode([
+                'error' => "date_from and date_to only apply to the \"stage\" and \"company\" groupings. Re-run \"{$groupBy}\" without a date range.",
+            ], JSON_UNESCAPED_SLASHES);
+        }
+
         if ($groupBy === 'people_per_company') {
             return $this->aggregatePeoplePerCompany($user);
         }
 
-        if (in_array($groupBy, ['task_status', 'task_priority'], true)) {
+        if ($countOnly) {
             return $this->aggregateTasksByOption($user, $groupBy === 'task_status' ? 'status' : 'priority', $groupBy);
         }
 
@@ -98,10 +109,13 @@ final class AggregateCrmTool implements Tool
             'count' => (int) $row->getAttribute('count'),
         ])->all();
 
+        // Counted separately rather than summed off $rows: the group list is
+        // capped, so summing it would under-report the moment a team has more
+        // than MAX_COMPANY_GROUPS companies. Mirrors AggregateOpportunities::grandTotals().
         return (string) json_encode([
             'group_by' => 'people_per_company',
             'rows' => $mappedRows,
-            'total_count' => (int) $rows->sum('count'),
+            'total_count' => People::query()->whereBelongsTo($team)->count(),
             'truncated' => $rows->count() === self::MAX_COMPANY_GROUPS,
         ], JSON_UNESCAPED_SLASHES);
     }

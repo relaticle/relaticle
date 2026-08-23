@@ -356,3 +356,40 @@ it('does not leak another team\'s tasks into task_status counts', function (): v
     $data = json_decode($response, true);
     expect($data['total_count'])->toBe(0);
 });
+
+it('reports the true people total when the company group list is capped', function (): void {
+    // Regression: total_count used to sum the capped rows, so a team with more
+    // companies than MAX_COMPANY_GROUPS silently under-reported its own headcount,
+    // which is the invented-number failure this tool exists to prevent.
+    $companies = Company::factory()->count(52)->for($this->team)->create();
+
+    foreach ($companies as $company) {
+        People::factory()->for($this->team)->create(['company_id' => $company->getKey()]);
+    }
+
+    $tool = resolve(AggregateCrmTool::class);
+    $data = json_decode($tool->handle(new Request(['group_by' => 'people_per_company'])), true);
+
+    expect($data['rows'])->toHaveCount(50)
+        ->and($data['truncated'])->toBeTrue()
+        ->and($data['total_count'])->toBe(52)
+        ->and(array_sum(array_column($data['rows'], 'count')))->toBe(50);
+});
+
+it('refuses a date range on the count-only groupings instead of ignoring it', function (): void {
+    $tool = resolve(AggregateCrmTool::class);
+
+    foreach (['people_per_company', 'task_status', 'task_priority'] as $groupBy) {
+        $data = json_decode($tool->handle(new Request([
+            'group_by' => $groupBy,
+            'date_from' => '2026-01-01',
+        ])), true);
+
+        expect($data)->toHaveKey('error')
+            ->and($data)->not->toHaveKey('rows');
+    }
+
+    $data = json_decode($tool->handle(new Request(['group_by' => 'stage', 'date_from' => '2026-01-01'])), true);
+
+    expect($data)->not->toHaveKey('error');
+});
