@@ -115,19 +115,31 @@ it('places the conversation title in the topbar and the toggle beside the worksp
                     toggleRect.top + toggleRect.height / 2,
                 );
 
-                return workspaceRect.right <= toggleRect.left
-                    && workspaceRect.width === 32
-                    && toggleRect.width === 32
-                    && Math.abs(workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2) <= 0.5
-                    && !!workspaceHit.closest('.fi-tenant-menu')
-                    && !!toggleHit.closest('[data-sidebar-workspace-toggle]');
+                return {
+                    ordered: workspaceRect.right <= toggleRect.left,
+                    workspaceWidth: workspaceRect.width,
+                    toggleWidth: toggleRect.width,
+                    centersAligned: Math.abs(workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2) <= 0.5,
+                    workspaceHit: !!workspaceHit.closest('.fi-tenant-menu'),
+                    toggleHit: !!toggleHit.closest('[data-sidebar-workspace-toggle]'),
+                    workspaceHitTag: workspaceHit.tagName + '.' + String(workspaceHit.className).slice(0, 60),
+                    toggleHitTag: toggleHit.tagName + '.' + String(toggleHit.className).slice(0, 60),
+                };
             })()
             JS;
+
+    $collapsedOk = static fn (mixed $probe): bool => is_array($probe)
+        && $probe['ordered'] === true
+        && $probe['workspaceWidth'] === 32
+        && $probe['toggleWidth'] === 32
+        && $probe['centersAligned'] === true
+        && $probe['workspaceHit'] === true
+        && $probe['toggleHit'] === true;
 
     $collapsedSettled = $page->script($collapsedChrome);
 
     foreach (range(1, 12) as $attempt) {
-        if ($collapsedSettled === true) {
+        if ($collapsedOk($collapsedSettled)) {
             break;
         }
 
@@ -135,7 +147,7 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         $collapsedSettled = $page->script($collapsedChrome);
     }
 
-    expect($collapsedSettled)->toBeTrue();
+    expect($collapsedOk($collapsedSettled))->toBe(true, 'Collapsed chrome probe never settled: '.json_encode($collapsedSettled));
 
     $page->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
