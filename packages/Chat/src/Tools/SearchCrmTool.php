@@ -71,6 +71,6 @@ final class SearchCrmTool implements Tool
                 ->toArray(),
         ];
 
-        return (string) json_encode($results, JSON_PRETTY_PRINT);
+        return (string) json_encode($results, JSON_UNESCAPED_SLASHES);
     }
 }

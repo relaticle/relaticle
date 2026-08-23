@@ -98,13 +98,13 @@ abstract class BaseWriteUpdateTool implements Tool
         $records = $request['records'] ?? null;
 
         if (! is_array($records) || $records === []) {
-            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of records to update, each with its id.']);
+            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of records to update, each with its id.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($records) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         $validator = resolve(CustomFieldsRequestValidator::class);
@@ -117,7 +117,7 @@ abstract class BaseWriteUpdateTool implements Tool
 
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
-                return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+                return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
             }
 
             $recordRequest = new Request($record);
@@ -129,36 +129,36 @@ abstract class BaseWriteUpdateTool implements Tool
                 ->first();
 
             if (! $model instanceof Model) {
-                return (string) json_encode(['error' => "records[{$index}]: {$label} with ID [{$id}] not found."]);
+                return (string) json_encode(['error' => "records[{$index}]: {$label} with ID [{$id}] not found."], JSON_UNESCAPED_SLASHES);
             }
 
             if ($user->cannot('update', $model)) {
-                return (string) json_encode(['error' => "records[{$index}]: You do not have permission to update this {$label}."]);
+                return (string) json_encode(['error' => "records[{$index}]: You do not have permission to update this {$label}."], JSON_UNESCAPED_SLASHES);
             }
 
             $nameError = $this->nameError($record);
 
             if ($nameError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null);
 
             if ($validation->error !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
             }
 
             $requestError = $this->validateRequest($recordRequest, $user);
 
             if ($requestError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$requestError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$requestError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $actionData = $this->extractActionData($recordRequest);
             $foreignKeyError = $this->foreignKeyError($user, $actionData);
 
             if ($foreignKeyError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $actionData['_record_id'] = $model->getKey();
@@ -180,11 +180,11 @@ abstract class BaseWriteUpdateTool implements Tool
             $displayData['fields'] = $this->rowsThatChange($requestedRows);
 
             if ($requestedRows === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass at least one field that changes."]);
+                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass at least one field that changes."], JSON_UNESCAPED_SLASHES);
             }
 
             if ($displayData['fields'] === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Already up to date. Every value passed matches what the {$label} has now, so there is nothing to change."]);
+                return (string) json_encode(['error' => "records[{$index}]: Already up to date. Every value passed matches what the {$label} has now, so there is nothing to change."], JSON_UNESCAPED_SLASHES);
             }
 
             $actionRecords[] = $actionData;
@@ -227,7 +227,7 @@ abstract class BaseWriteUpdateTool implements Tool
             'data' => $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     /**

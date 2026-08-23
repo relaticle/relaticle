@@ -134,7 +134,7 @@ final readonly class ListActivityTool implements Tool
             $payload['display_block'] = $this->buildDisplayBlock($entries, $totalEntries);
         }
 
-        return (string) json_encode($payload, JSON_PRETTY_PRINT);
+        return (string) json_encode($payload, JSON_UNESCAPED_SLASHES);
     }
 
     /**
@@ -559,6 +559,6 @@ final readonly class ListActivityTool implements Tool
 
     private function error(string $message): string
     {
-        return (string) json_encode(['error' => $message]);
+        return (string) json_encode(['error' => $message], JSON_UNESCAPED_SLASHES);
     }
 }

@@ -44,9 +44,9 @@ final class AggregateCrmTool implements Tool
                 dateTo: $dateTo,
             );
         } catch (HttpException $e) {
-            return (string) json_encode(['error' => $e->getMessage()]);
+            return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
 
-        return (string) json_encode($result, JSON_PRETTY_PRINT);
+        return (string) json_encode($result, JSON_UNESCAPED_SLASHES);
     }
 }

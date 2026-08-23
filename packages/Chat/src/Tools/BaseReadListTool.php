@@ -138,7 +138,7 @@ abstract class BaseReadListTool implements Tool
                 request: $httpRequest,
             );
         } catch (InvalidQuery $e) {
-            return (string) json_encode(['error' => $e->getMessage()]);
+            return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
 
         // Captured before the resource collection is built: wrapping a paginator
@@ -155,7 +155,7 @@ abstract class BaseReadListTool implements Tool
         $items = json_decode($collection->toJson(), true);
 
         if (! is_array($items)) {
-            return $collection->toJson(JSON_PRETTY_PRINT);
+            return $collection->toJson(JSON_UNESCAPED_SLASHES);
         }
 
         $citationType = $this->citationType();
@@ -188,7 +188,7 @@ abstract class BaseReadListTool implements Tool
             $payload['display_block'] = $block;
         }
 
-        return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_PRETTY_PRINT);
+        return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_UNESCAPED_SLASHES);
     }
 
     private function isLookup(Request $request): bool

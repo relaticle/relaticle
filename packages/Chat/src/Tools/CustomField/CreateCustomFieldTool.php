@@ -63,7 +63,7 @@ final class CreateCustomFieldTool implements Tool
         if (! $user->ownsTeam($user->currentTeam)) {
             return (string) json_encode([
                 'error' => 'Only team owners can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask your team owner to do this.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         try {
@@ -133,6 +133,6 @@ final class CreateCustomFieldTool implements Tool
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

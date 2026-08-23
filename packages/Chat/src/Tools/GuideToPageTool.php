@@ -55,13 +55,13 @@ final readonly class GuideToPageTool implements Tool
         if ($url === null) {
             return (string) json_encode([
                 'error' => "No page is available for destination [{$destination}].",
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         return (string) json_encode([
             'type' => 'navigation',
             'destination' => $destination,
             'url' => $url,
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

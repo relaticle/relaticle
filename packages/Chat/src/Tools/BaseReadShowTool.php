@@ -137,11 +137,11 @@ abstract class BaseReadShowTool implements Tool
             ->first();
 
         if (! $model instanceof Model) {
-            return (string) json_encode(['error' => "{$this->entityLabel()} with ID [{$id}] not found."]);
+            return (string) json_encode(['error' => "{$this->entityLabel()} with ID [{$id}] not found."], JSON_UNESCAPED_SLASHES);
         }
 
         if ($user->cannot('view', $model)) {
-            return (string) json_encode(['error' => "You do not have permission to view this {$this->entityLabel()}."]);
+            return (string) json_encode(['error' => "You do not have permission to view this {$this->entityLabel()}."], JSON_UNESCAPED_SLASHES);
         }
 
         $model->loadMissing($this->eagerLoad());
@@ -155,7 +155,7 @@ abstract class BaseReadShowTool implements Tool
 
             return (string) json_encode([
                 'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.($valid === '' ? '(none)' : $valid).'.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         /** @var class-string<JsonResource> $resourceClass */
@@ -181,7 +181,7 @@ abstract class BaseReadShowTool implements Tool
                 ),
                 $user,
             ),
-            JSON_PRETTY_PRINT,
+            JSON_UNESCAPED_SLASHES,
         );
     }
 

@@ -56,6 +56,6 @@ final class GetCrmSummaryTool implements Tool
             ],
         ];
 
-        return (string) json_encode($summary, JSON_PRETTY_PRINT);
+        return (string) json_encode($summary, JSON_UNESCAPED_SLASHES);
     }
 }

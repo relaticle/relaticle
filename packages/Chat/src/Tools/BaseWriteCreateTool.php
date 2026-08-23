@@ -90,13 +90,13 @@ abstract class BaseWriteCreateTool implements Tool
         $records = $request['records'] ?? null;
 
         if (! is_array($records) || $records === []) {
-            return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.']);
+            return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($records) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         $validator = resolve(CustomFieldsRequestValidator::class);
@@ -107,32 +107,32 @@ abstract class BaseWriteCreateTool implements Tool
 
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
-                return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+                return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
             }
 
             $nameError = $this->nameError($record, required: true);
 
             if ($nameError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false);
 
             if ($validation->error !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
             }
 
             $recordError = $this->validateRecord($record, $user);
 
             if ($recordError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $data = $this->extractRecordData($record);
             $foreignKeyError = $this->foreignKeyError($user, $data);
 
             if ($foreignKeyError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"], JSON_UNESCAPED_SLASHES);
             }
 
             if ($validation->cleanFields !== []) {
@@ -183,6 +183,6 @@ abstract class BaseWriteCreateTool implements Tool
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

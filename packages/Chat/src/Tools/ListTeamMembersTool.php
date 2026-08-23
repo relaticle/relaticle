@@ -39,6 +39,6 @@ final class ListTeamMembersTool implements Tool
         return (string) json_encode([
             'members' => $members,
             'note' => 'Use the id silently for account_owner_id / assignee_ids; never display ids to the user.',
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

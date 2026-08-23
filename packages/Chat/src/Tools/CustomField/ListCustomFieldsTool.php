@@ -73,6 +73,6 @@ final class ListCustomFieldsTool implements Tool
         return (string) json_encode([
             'custom_fields' => $data,
             'note' => 'System-defined fields cannot be modified from chat. To update or add options to a field, use its entity_type + code.',
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

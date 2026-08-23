@@ -61,27 +61,27 @@ final class AddCustomFieldOptionsTool implements Tool
         if (! $user->ownsTeam($user->currentTeam)) {
             return (string) json_encode([
                 'error' => 'Only team owners can manage custom field options.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $entityType = (string) ($request['entity_type'] ?? '');
         $code = (string) ($request['code'] ?? '');
 
         if ($entityType === '' || $code === '') {
-            return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.']);
+            return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.'], JSON_UNESCAPED_SLASHES);
         }
 
         $teamId = $user->currentTeam->getKey();
         $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
 
         if (! $field instanceof CustomField) {
-            return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."]);
+            return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
         }
 
         if (! in_array($field->type, CreateCustomField::CHOICE_TYPES, true)) {
             return (string) json_encode([
                 'error' => "Field type \"{$field->type}\" does not support options. Only select, multi-select, radio, checkbox-list, and toggle-buttons fields can have options added.",
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         try {
@@ -127,6 +127,6 @@ final class AddCustomFieldOptionsTool implements Tool
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

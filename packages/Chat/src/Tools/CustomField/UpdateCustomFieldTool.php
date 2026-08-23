@@ -66,19 +66,19 @@ final class UpdateCustomFieldTool implements Tool
         if (! $user->ownsTeam($user->currentTeam)) {
             return (string) json_encode([
                 'error' => 'Only team owners can update custom field definitions.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $records = $request['records'] ?? null;
 
         if (! is_array($records) || $records === []) {
-            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of fields to update, each with entity_type and code.']);
+            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of fields to update, each with entity_type and code.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($records) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         $teamId = $user->currentTeam->getKey();
@@ -87,24 +87,24 @@ final class UpdateCustomFieldTool implements Tool
 
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
-                return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+                return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
             }
 
             $entityType = (string) ($record['entity_type'] ?? '');
             $code = (string) ($record['code'] ?? '');
 
             if ($entityType === '' || $code === '') {
-                return (string) json_encode(['error' => "records[{$index}]: Both entity_type and code are required to identify the field."]);
+                return (string) json_encode(['error' => "records[{$index}]: Both entity_type and code are required to identify the field."], JSON_UNESCAPED_SLASHES);
             }
 
             $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
 
             if (! $field instanceof CustomField) {
-                return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."]);
+                return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
             }
 
             if ($field->isSystemDefined()) {
-                return (string) json_encode(['error' => "records[{$index}]: System-defined custom fields cannot be modified."]);
+                return (string) json_encode(['error' => "records[{$index}]: System-defined custom fields cannot be modified."], JSON_UNESCAPED_SLASHES);
             }
 
             try {
@@ -141,7 +141,7 @@ final class UpdateCustomFieldTool implements Tool
             }
 
             if ($displayFields === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass a new name or an active flag."]);
+                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass a new name or an active flag."], JSON_UNESCAPED_SLASHES);
             }
 
             $actionRecords[] = $actionData;
@@ -184,6 +184,6 @@ final class UpdateCustomFieldTool implements Tool
             'data' => $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

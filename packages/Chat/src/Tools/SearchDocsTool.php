@@ -104,13 +104,13 @@ final readonly class SearchDocsTool implements Tool
                 'results' => [],
                 'note' => 'The documentation has no section on this. Tell the user it is not covered and '
                     .'link the help centre: '.route('help.index'),
-            ], JSON_PRETTY_PRINT);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         return (string) json_encode([
             'results' => $results,
             'note' => 'First-party Relaticle documentation. Answer from it and cite the url as a markdown link.',
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     /**

@@ -54,13 +54,13 @@ abstract class BaseWriteDeleteTool implements Tool
         $requestedIds = $this->requestedIds($request);
 
         if ($requestedIds === []) {
-            return (string) json_encode(['error' => 'Provide `ids` (a non-empty array) of records to delete.']);
+            return (string) json_encode(['error' => 'Provide `ids` (a non-empty array) of records to delete.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($requestedIds) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         /** @var Collection<int, Model> $models */
@@ -78,7 +78,7 @@ abstract class BaseWriteDeleteTool implements Tool
             return (string) json_encode([
                 'error' => "No matching {$this->entityLabel()} records you can delete were found.",
                 'skipped' => $skipped,
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $pending = resolve(PendingActionService::class)->createProposal(
@@ -101,7 +101,7 @@ abstract class BaseWriteDeleteTool implements Tool
             'skipped' => $skipped,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     /** @return list<string> */

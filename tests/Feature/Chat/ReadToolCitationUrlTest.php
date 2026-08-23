@@ -174,3 +174,12 @@ it('ListNotesTool output items each have a /r/note/{id} reference url', function
             ->and($item['url'])->toBe("/r/note/{$item['id']}");
     }
 });
+
+it('serializes tool results without escaped slashes or pretty printing', function (): void {
+    Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+
+    $raw = app(ListCompaniesTool::class)->handle(new Request([]));
+
+    expect($raw)->not->toContain('\/')
+        ->and($raw)->not->toContain("\n    ");
+});
