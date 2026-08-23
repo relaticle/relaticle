@@ -209,3 +209,14 @@ describe('chat record permalinks - domain mode', function () use ($recordPermali
         expect(Route::currentRouteName())->toBe('filament.app.resources.people.view');
     });
 });
+
+it('gives every chat route throttle its own bucket so limiters cannot starve each other', function (): void {
+    $unprefixed = collect(app('router')->getRoutes())
+        ->filter(fn ($route): bool => str_starts_with((string) $route->getName(), 'chat.'))
+        ->flatMap(fn ($route) => collect($route->gatherMiddleware())
+            ->filter(fn ($m): bool => is_string($m) && preg_match('/^throttle:\d+,\d+$/', $m) === 1)
+            ->map(fn (string $m): string => $route->getName().' '.$m))
+        ->values();
+
+    expect($unprefixed->all())->toBe([]);
+});

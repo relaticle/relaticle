@@ -57,7 +57,7 @@ use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
 // Only a fallback: every chat turn passes an explicit provider resolved by
 // AiModelResolver, and laravel/ai reads this attribute only when the prompt's
 // provider argument is null. A provider LIST here would therefore never fail
-// over — to get failover, stream() has to receive the array.
+// over: to get failover, stream() has to receive the array.
 #[Provider(Lab::Anthropic)]
 #[MaxSteps(15)]
 #[Temperature(0.3)]
