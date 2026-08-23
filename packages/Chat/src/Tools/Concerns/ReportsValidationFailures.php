@@ -19,6 +19,6 @@ trait ReportsValidationFailures
     {
         return (string) json_encode([
             'error' => implode(' ', Arr::flatten($exception->errors())),
-        ]);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }
