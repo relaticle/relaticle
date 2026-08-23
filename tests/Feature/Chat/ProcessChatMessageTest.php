@@ -38,7 +38,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
@@ -66,7 +66,7 @@ it('settles the reserved minimum (not refund) when the job fails', function (): 
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
@@ -112,7 +112,7 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
         team: $team,
         message: 'hello',
         conversationId: 'conv-paused',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         turnId: 'turn-paused',
     );
 

@@ -46,7 +46,7 @@ it('materializes the assistant message document at stream end', function (): voi
         team: $this->team,
         message: 'Show me my deals',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
     )->handle(resolve(CreditService::class));
 
@@ -89,7 +89,7 @@ it('records turn duration in assistant message meta', function (): void {
         team: $this->team,
         message: 'Show me my deals',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
     )->handle(resolve(CreditService::class));
 

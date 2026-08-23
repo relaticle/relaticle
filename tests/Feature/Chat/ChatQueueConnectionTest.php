@@ -31,7 +31,7 @@ it('dispatches the chat turn on the redis-chat connection', function (): void {
         team: $user->currentTeam,
         message: 'hello',
         conversationId: (string) Str::uuid7(),
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     ));
 
     Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->connection === 'redis-chat' && $job->queue === 'chat');

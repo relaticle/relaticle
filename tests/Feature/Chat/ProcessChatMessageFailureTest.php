@@ -28,7 +28,7 @@ function makeFailedTurnJob(User $user, string $conversationId): ProcessChatMessa
         team: $user->currentTeam,
         message: 'Create a task titled BR-Foo',
         conversationId: $conversationId,
-        resolved: ['provider' => 'ollama', 'model' => 'qwen3:8b'],
+        resolved: ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto'],
         mentions: [],
         document: ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Create a task titled BR-Foo']]]]],
         turnId: (string) Str::ulid(),

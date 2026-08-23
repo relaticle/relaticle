@@ -31,7 +31,7 @@ it('settles the reserved minimum (does not refund) when the job fails', function
 
     $job = new ProcessChatMessage(
         user: $user, team: $team, message: 'hi', conversationId: 'c-1',
-        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01TURNFAILAAAAAAAAAAAAAAAA',
+        resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNFAILAAAAAAAAAAAAAAAA',
     );
     $job->failed(new RuntimeException('timeout'));
 
