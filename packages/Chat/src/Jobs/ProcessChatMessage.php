@@ -166,6 +166,7 @@ final class ProcessChatMessage implements ShouldQueue
         try {
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
+            $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withCurrentUser([
@@ -340,6 +341,16 @@ final class ProcessChatMessage implements ShouldQueue
                         'to' => $next['id'],
                         'exception' => $e::class,
                     ]);
+                    // Same signal the transient path sends, for the same reason: the
+                    // turn is still alive but nothing will stream for a moment, and a
+                    // silent gap here lets the client's watchdog call the turn dead.
+                    // Which model takes over stays unsaid - the user never picked one.
+                    $this->broadcastSafely(new ChatStreamRetrying(
+                        conversationId: $this->conversationId,
+                        attempt: $this->attempts() + 1,
+                        maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
+                        delaySeconds: 0,
+                    ));
                     dispatch(new self(
                         user: $this->user,
                         team: $this->team,

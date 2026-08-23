@@ -8,11 +8,13 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -297,6 +299,7 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
 
     fakeAnthropicSse(SSE_TERMINAL_ERROR);
     Queue::fake();
+    Event::fake([ChatStreamRetrying::class]);
 
     $job = new ProcessChatMessage(
         user: $user,
@@ -312,6 +315,12 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
     Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $pushed): bool => $pushed->failoverDepth === 1
         && $pushed->conversationId === $conversationId
         && $pushed->turnId === $turnId);
+
+    // The swap itself stays silent (the user never picked this model), but the
+    // client is told the turn is still alive so it re-arms its stream watchdog
+    // instead of sitting on "Thinking..." until it gives up.
+    Event::assertDispatched(fn (ChatStreamRetrying $event): bool => $event->conversationId === $conversationId
+        && $event->delaySeconds === 0);
 
     // The reservation made before dispatch is untouched by this failed attempt:
     // not refunded (the turn is still in flight on the re-dispatched job) and
