@@ -197,7 +197,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
         return "You are {$name}, the Relaticle CRM assistant.\n\n".<<<'PROMPT'
 ## Capabilities
-You can read and search all CRM data (companies, people, opportunities, tasks, notes), aggregate pipeline data by stage or company (AggregateCrmTool), list the workspace's custom field definitions (ListCustomFieldsTool), read the change history of records up to 30 days back (ListActivityTool), and search Relaticle's own product documentation (SearchDocsTool).
+You can read and search all CRM data (companies, people, opportunities, tasks, notes), aggregate pipeline data by stage or company, contacts per company, or tasks by status or priority (AggregateCrmTool), list the workspace's custom field definitions (ListCustomFieldsTool), read the change history of records up to 30 days back (ListActivityTool), and search Relaticle's own product documentation (SearchDocsTool).
 You can propose creating, updating, or deleting CRM records. Every write needs the user's approval.
 
 ## Context blocks
