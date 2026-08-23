@@ -8,9 +8,11 @@ use App\Actions\Opportunity\CreateOpportunity;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
 use Relaticle\Chat\Actions\ListConversationMessages;
@@ -180,7 +182,7 @@ function blockToolResults(string $callId = 'toolu_block_1'): array
         'name' => 'ListCompaniesTool',
         'arguments' => [],
         'result' => json_encode([
-            'data' => [['id' => '01ABC', 'type' => 'companies', 'attributes' => ['name' => 'Acme']]],
+            'data' => [['id' => '01ABC', 'type' => 'companies', 'attributes' => ['name' => 'Acme'], 'url' => '/r/company/01ABC']],
             'display_block' => [
                 'block' => 'records_table',
                 'title' => 'Companies',
@@ -650,6 +652,20 @@ it('strips display_block from the replayed agent history while the row keeps it'
     expect($persisted)->toContain('display_block')
         ->and($history)->toContain('Acme')
         ->and($history)->not->toContain('display_block');
+
+    // The strip re-encodes, so it must carry the same flag the tools encode
+    // with. Without it every replayed block-carrying result puts escaped
+    // slashes back into the cached prefix the tools just cleaned. Asserted on
+    // the replayed result STRING, never on json_encode() of the whole history:
+    // that outer encode escapes slashes itself and would mask the regression.
+    $replayed = collect($store->getLatestConversationMessages($conversationId, 100))
+        ->filter(fn (object $message): bool => $message instanceof ToolResultMessage)
+        ->flatMap(fn (ToolResultMessage $message): Collection => $message->toolResults)
+        ->map(fn (object $result): string => (string) $result->result)
+        ->implode("\n");
+
+    expect($replayed)->toContain('"url":"/r/company/01ABC"')
+        ->and($replayed)->not->toContain('\\/r\\/company');
 });
 
 it('emits no block when the list is called in lookup mode, keeping the data for chaining', function (): void {

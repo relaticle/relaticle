@@ -139,7 +139,11 @@ it('excludes a related record that belongs to another team, even when attached v
         'include' => ['notes'],
     ])), true);
 
+    // `total` as well as `showing`: an unscoped loadCount would report the
+    // cross-team note the items list omits, so one relation would state two
+    // different totals here and in the list tool's row.
     expect($payload['included']['notes']['showing'])->toBe(1)
+        ->and($payload['included']['notes']['total'])->toBe(1)
         ->and(array_column(array_column($payload['included']['notes']['items'], 'attributes'), 'title'))
         ->toBe(['Discovery call']);
 });
