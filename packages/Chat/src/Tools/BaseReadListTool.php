@@ -149,7 +149,7 @@ abstract class BaseReadListTool implements Tool
                 ->items($schema->string())
                 ->description(
                     "Related records to attach per row under `included` and as a chip column in the table. Valid values: {$valid}. "
-                    .'Only the first '.self::INCLUDE_ITEM_LIMIT.' related records per row are attached; `total` inside each row\'s `included` entry gives the real count.'
+                    .'Only the '.self::INCLUDE_ITEM_LIMIT.' most recent related records per row are attached; `total` inside each row\'s `included` entry gives the real count.'
                 );
         }
 
@@ -166,8 +166,10 @@ abstract class BaseReadListTool implements Tool
         $unknown = array_diff($requestedIncludes, $availableIncludes);
 
         if ($unknown !== []) {
+            $valid = implode(', ', $availableIncludes);
+
             return (string) json_encode([
-                'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.implode(', ', $availableIncludes).'.',
+                'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.($valid === '' ? '(none)' : $valid).'.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

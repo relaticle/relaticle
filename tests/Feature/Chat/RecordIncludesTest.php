@@ -8,15 +8,20 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
+use Relaticle\Chat\Tools\Opportunity\ListOpportunitiesTool;
+use Relaticle\Chat\Tools\People\ListPeopleTool;
 
 mutates(GetCompanyTool::class);
 mutates(ListCompaniesTool::class);
+mutates(ListPeopleTool::class);
+mutates(ListOpportunitiesTool::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -262,4 +267,32 @@ it('excludes an included note that belongs to another team from a list row', fun
     expect($row['included']['notes']['total'])->toBe(1)
         ->and($row['included']['notes']['showing'])->toBe(1)
         ->and($row['included']['notes']['items'][0]['name'])->toBe('Discovery call');
+});
+
+it('lists people with included tasks, truncated past the per-row limit', function (): void {
+    $jane = People::factory()->for($this->team)->create(['name' => 'Jane']);
+    $jane->tasks()->attach(Task::factory()->count(5)->for($this->team)->create());
+
+    $payload = json_decode(resolve(ListPeopleTool::class)->handle(new Request(['include' => ['tasks']])), true);
+
+    $row = collect($payload['data'])->firstWhere('id', (string) $jane->getKey());
+
+    expect($row['included']['tasks']['total'])->toBe(5)
+        ->and($row['included']['tasks']['showing'])->toBe(3)
+        ->and($row['included']['tasks']['items'])->toHaveCount(3)
+        ->and($row['included']['tasks']['items'][0])->toHaveKeys(['id', 'name', 'url']);
+});
+
+it('lists opportunities with included notes', function (): void {
+    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Big deal']);
+    $opportunity->notes()->attach(Note::factory()->count(2)->for($this->team)->create());
+
+    $payload = json_decode(resolve(ListOpportunitiesTool::class)->handle(new Request(['include' => ['notes']])), true);
+
+    $row = collect($payload['data'])->firstWhere('id', (string) $opportunity->getKey());
+
+    expect($row['included']['notes']['total'])->toBe(2)
+        ->and($row['included']['notes']['showing'])->toBe(2)
+        ->and($row['included']['notes']['items'])->toHaveCount(2)
+        ->and($row['included']['notes']['items'][0])->toHaveKeys(['id', 'name', 'url']);
 });
