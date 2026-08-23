@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Concerns;
 
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\HtmlString;
 use Relaticle\Flowforge\BoardResourcePage;
 
@@ -14,22 +15,35 @@ use Relaticle\Flowforge\BoardResourcePage;
  */
 trait HasBoardViewSwitcher
 {
-    public function getHeading(): string|Htmlable|null
+    public function getHeader(): ?View
     {
-        $heading = parent::getHeading();
+        $header = parent::getHeader();
 
+        if (! $this instanceof BoardResourcePage || ! $header instanceof View) {
+            return $header;
+        }
+
+        return view('filament.app.board-header', [
+            'boardToolbar' => $header,
+            'heading' => $this->getHeading(),
+            'headingEnd' => $this->getHeadingEnd(),
+        ]);
+    }
+
+    public function getHeadingEnd(): ?Htmlable
+    {
         $resource = static::getResource();
         $pages = $resource::getPages();
 
         if (! isset($pages['board'])) {
-            return $heading;
+            return null;
         }
 
         /** @var class-string<BoardResourcePage> $boardPage */
         $boardPage = $pages['board']->getPage();
 
         if (! $boardPage::canAccess()) {
-            return $heading;
+            return null;
         }
 
         $switcher = view('filament.app.view-switcher', [
@@ -38,6 +52,6 @@ trait HasBoardViewSwitcher
             'boardUrl' => $resource::getUrl('board'),
         ])->render();
 
-        return new HtmlString('<span>'.e($heading).'</span>'.$switcher);
+        return new HtmlString($switcher);
     }
 }

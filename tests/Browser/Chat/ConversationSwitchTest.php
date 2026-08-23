@@ -26,6 +26,10 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         ->assertMissing('main h1')
         ->assertNoJavaScriptErrors();
 
+    $page->script("window.Alpine.store('sidebar').open()");
+    $page->wait(0.3);
+    $page->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()');
+
     $chrome = $page->script(<<<'JS'
         (() => {
             const sidebar = document.querySelector('#fi-main-sidebar');
@@ -36,6 +40,9 @@ it('places the conversation title in the topbar and the toggle beside the worksp
             const toggleRect = toggle.getBoundingClientRect();
             const titleRect = title.getBoundingClientRect();
             const sidebarRect = sidebar.getBoundingClientRect();
+            const topbarRect = document.querySelector('.fi-topbar').getBoundingClientRect();
+            const chatSurfaceRect = document.querySelector('[data-chat-context="conversation"]').getBoundingClientRect();
+            const composerRect = document.querySelector('[data-chat-composer]').getBoundingClientRect();
 
             return {
                 title: title.textContent.trim(),
@@ -44,6 +51,13 @@ it('places the conversation title in the topbar and the toggle beside the worksp
                 toggleAfterWorkspace: toggleRect.left >= workspaceRect.right,
                 titleAfterSidebar: titleRect.left >= sidebarRect.right,
                 oldDesktopToggleHidden: getComputedStyle(document.querySelector('.fi-topbar-collapse-sidebar-btn-ctn')).display === 'none',
+                chromeCentersAligned: Math.abs(workspaceRect.top + workspaceRect.height / 2 - titleRect.top - titleRect.height / 2) <= 0.5
+                    && Math.abs(workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2) <= 0.5,
+                composerInsideViewport: composerRect.bottom <= window.innerHeight,
+                headingOnlyHeaderRemovedFromFlow: getComputedStyle(document.querySelector('.fi-header-page-heading-only')).display === 'contents',
+                topbarHeight: topbarRect.height,
+                chatSurfaceTopGap: chatSurfaceRect.top - topbarRect.bottom,
+                workspaceToggleGap: toggleRect.left - workspaceRect.right,
             };
         })();
     JS);
@@ -55,10 +69,42 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         'toggleAfterWorkspace' => true,
         'titleAfterSidebar' => true,
         'oldDesktopToggleHidden' => true,
+        'chromeCentersAligned' => true,
+        'composerInsideViewport' => true,
+        'headingOnlyHeaderRemovedFromFlow' => true,
+        'topbarHeight' => 64,
+        'chatSurfaceTopGap' => 0,
     ]);
+
+    expect($chrome['workspaceToggleGap'])
+        ->toBeGreaterThanOrEqual(4)
+        ->toBeLessThanOrEqual(8);
 
     $page->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
+        ->assertScript(<<<'JS'
+            (() => {
+                const workspace = document.querySelector('#fi-main-sidebar > .fi-tenant-menu');
+                const toggle = document.querySelector('[data-sidebar-workspace-toggle]');
+                const workspaceRect = workspace.getBoundingClientRect();
+                const toggleRect = toggle.getBoundingClientRect();
+                const workspaceHit = document.elementFromPoint(
+                    workspaceRect.left + workspaceRect.width / 2,
+                    workspaceRect.top + workspaceRect.height / 2,
+                );
+                const toggleHit = document.elementFromPoint(
+                    toggleRect.left + toggleRect.width / 2,
+                    toggleRect.top + toggleRect.height / 2,
+                );
+
+                return workspaceRect.right <= toggleRect.left
+                    && workspaceRect.width === 32
+                    && toggleRect.width === 32
+                    && Math.abs(workspaceRect.top + workspaceRect.height / 2 - toggleRect.top - toggleRect.height / 2) <= 0.5
+                    && !!workspaceHit.closest('.fi-tenant-menu')
+                    && !!toggleHit.closest('[data-sidebar-workspace-toggle]');
+            })()
+            JS)
         ->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
         ->resize(390, 844)

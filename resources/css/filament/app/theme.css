@@ -167,7 +167,7 @@
 
 /* Top Navigation Bar */
 .fi-topbar {
-    @apply min-h-14;
+    @apply min-h-16;
 }
 
 .fi-topbar nav {
@@ -175,19 +175,23 @@
 }
 
 .fi-topbar-page-heading {
-    @apply min-w-0 max-w-[50vw] truncate text-sm font-semibold text-gray-950 dark:text-white;
+    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 dark:text-white;
 
-    &:has(.fi-view-switcher) {
-        @apply flex items-center gap-x-3;
-
-        > span {
-            @apply min-w-0 truncate;
-        }
-
-        .fi-view-switcher {
-            @apply hidden shrink-0 md:inline-flex;
-        }
+    .fi-topbar-page-title {
+        @apply min-w-0 truncate;
     }
+
+    .fi-view-switcher {
+        @apply hidden shrink-0 md:inline-flex;
+    }
+}
+
+.fi-header-page-heading-only {
+    display: contents;
+}
+
+.fi-board-header .fi-header-heading {
+    display: none;
 }
 
 body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
@@ -203,6 +207,16 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 @media (width >= 64rem) {
     #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
         margin-inline-end: calc(var(--spacing) * 11);
+    }
+
+    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-top: calc(var(--spacing) * 4);
+        margin-inline-start: calc(var(--spacing) * 1);
+        margin-inline-end: calc(var(--spacing) * 9);
+
+        .fi-tenant-menu-trigger {
+            padding: calc(var(--spacing) * 1);
+        }
     }
 }
 
