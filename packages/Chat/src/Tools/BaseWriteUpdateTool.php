@@ -183,7 +183,7 @@ abstract class BaseWriteUpdateTool implements Tool
                 $displayData['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
             }
 
-            $requestedRows = is_array($displayData['fields'] ?? null) ? $displayData['fields'] : [];
+            $requestedRows = is_array($displayData['fields'] ?? null) ? array_values($displayData['fields']) : [];
             $displayData['fields'] = $this->rowsThatChange($requestedRows);
 
             if ($requestedRows === []) {

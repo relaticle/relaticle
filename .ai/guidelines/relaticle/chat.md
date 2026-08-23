@@ -20,9 +20,16 @@ production: message ordering, approval races, duplicate proposals.
 - Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
   tenant data into the system prompt — add prompt-context injection only when a
   tool round-trip is demonstrably too costly.
-- New write tools must support batch input like the delete path (`ids[]` /
-  multi-record proposals → one `PendingAction`, all-or-nothing) — do not add new
-  scalar-only tools.
+- Every write tool takes batch input: `records[]` on create and update,
+  `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
+  a `_batch` the dock resolves per item. Do not add scalar-only tools.
+- Read tools take `lookup: true` to skip the `display_block`; the prompt tells
+  the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
+  result without that flag renders, so a new read tool must either emit a block
+  or be named in the prompt's no-block list.
+- Replayed proposal tool results are stamped with their decided status
+  (`SupersededAwareConversationStore`) and `<resolved_actions>` carries record
+  titles and urls; never label a proposal by its card heading.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation
   to document.
