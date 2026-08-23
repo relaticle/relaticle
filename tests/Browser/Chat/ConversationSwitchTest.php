@@ -30,7 +30,12 @@ it('places the conversation title in the topbar and the toggle beside the worksp
     $page->wait(0.3);
     $page->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()');
 
-    $chrome = $page->script(<<<'JS'
+    // Geometry probes evaluate once (assertScript/script never retry), and the
+    // teleported heading plus the sidebar transition settle a frame or two later
+    // on a slow runner, so sub-pixel checks flake. Re-read until the layout is
+    // steady, then assert the steady state strictly.
+    $settleChrome = function () use ($page): mixed {
+        return $page->script(<<<'JS'
         (() => {
             const sidebar = document.querySelector('#fi-main-sidebar');
             const workspace = sidebar.querySelector('.fi-tenant-menu');
@@ -61,6 +66,18 @@ it('places the conversation title in the topbar and the toggle beside the worksp
             };
         })();
     JS);
+    };
+
+    $chrome = $settleChrome();
+
+    foreach (range(1, 12) as $attempt) {
+        if (($chrome['chromeCentersAligned'] ?? false) === true && ($chrome['composerInsideViewport'] ?? false) === true) {
+            break;
+        }
+
+        usleep(250_000);
+        $chrome = $settleChrome();
+    }
 
     expect($chrome)->toMatchArray([
         'title' => 'Pipeline review',
@@ -81,8 +98,9 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         ->toBeLessThanOrEqual(8);
 
     $page->click('[data-sidebar-workspace-toggle]')
-        ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
-        ->assertScript(<<<'JS'
+        ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()');
+
+    $collapsedChrome = <<<'JS'
             (() => {
                 const workspace = document.querySelector('#fi-main-sidebar > .fi-tenant-menu');
                 const toggle = document.querySelector('[data-sidebar-workspace-toggle]');
@@ -104,8 +122,22 @@ it('places the conversation title in the topbar and the toggle beside the worksp
                     && !!workspaceHit.closest('.fi-tenant-menu')
                     && !!toggleHit.closest('[data-sidebar-workspace-toggle]');
             })()
-            JS)
-        ->click('[data-sidebar-workspace-toggle]')
+            JS;
+
+    $collapsedSettled = $page->script($collapsedChrome);
+
+    foreach (range(1, 12) as $attempt) {
+        if ($collapsedSettled === true) {
+            break;
+        }
+
+        usleep(250_000);
+        $collapsedSettled = $page->script($collapsedChrome);
+    }
+
+    expect($collapsedSettled)->toBeTrue();
+
+    $page->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
         ->resize(390, 844)
         ->assertVisible('[data-page-heading]')
