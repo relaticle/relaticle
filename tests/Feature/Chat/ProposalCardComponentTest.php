@@ -251,10 +251,10 @@ it('steps between batch records and clamps at the ends', function (): void {
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('cursor', 0)
-        ->call('stepNext')->assertSet('cursor', 1)
-        ->call('stepNext')->assertSet('cursor', 2)
-        ->call('stepNext')->assertSet('cursor', 2)
-        ->call('stepPrev')->assertSet('cursor', 1);
+        ->call('stepNext', (string) $action->getKey())->assertSet('cursor', 1)
+        ->call('stepNext', (string) $action->getKey())->assertSet('cursor', 2)
+        ->call('stepNext', (string) $action->getKey())->assertSet('cursor', 2)
+        ->call('stepPrev', (string) $action->getKey())->assertSet('cursor', 1);
 });
 
 it('starts the cursor at the first unresolved record', function (): void {
@@ -395,7 +395,7 @@ it('drops a decided item from the dock queue and cannot re-decide it', function 
         ->assertSet('cursor', 1);
 
     // The stepper cannot navigate back onto the decided item 0.
-    $component->call('stepPrev')->assertSet('cursor', 1);
+    $component->call('stepPrev', (string) $action->getKey())->assertSet('cursor', 1);
 
     // Even a forced stale cursor onto the resolved index is a no-op snap, not a re-run.
     $component->set('cursor', 0)
@@ -411,7 +411,7 @@ it('does nothing when createCurrent is called while a field edit is open', funct
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->set('editingFieldCode', 'name')
+        ->call('editField', 'name')
         ->call('createCurrent')
         ->assertNotDispatched('proposal:resolved');
 
@@ -450,7 +450,7 @@ it('renders the current record and advances the shown record with the stepper', 
         ->assertSee('Alpha')
         ->assertDontSee('Beta');
 
-    $component->call('stepNext')
+    $component->call('stepNext', (string) $action->getKey())
         ->assertSee('Beta')
         ->assertDontSee('Alpha');
 });
@@ -714,7 +714,7 @@ it('edits a custom field on a batch item without touching sibling records', func
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->call('stepNext')
+        ->call('stepNext', (string) $action->getKey())
         ->assertSet('cursor', 1)
         ->call('editField', $field->code)
         ->assertSet("data.custom_fields.{$field->code}", $optionIds[0])

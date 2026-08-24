@@ -93,6 +93,11 @@
                     $rawTitle = $conversation->title ?: __('Untitled chat');
                 @endphp
                 <li
+                    {{-- Keyed: these rows carry live Alpine state (editing, renamed, saving)
+                         and the list is repainted by refresh-sidebar after a rename or a
+                         delete. Morphing positionally would hand one row's open rename
+                         input to whichever conversation slid into its index. --}}
+                    wire:key="conversation-{{ $conversation->id }}"
                     x-data="{
                         editing: false,
                         renamed: '',

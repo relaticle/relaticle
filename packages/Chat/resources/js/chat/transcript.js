@@ -809,6 +809,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                 isNewResolution = true;
             }
             if (payload.record && !action.record) action.record = payload.record;
+            // Why the step ended, not just that it did: a cascade cancel renders
+            // "Cancelled with the step it depended on." off this field, and
+            // without it the live card says only "Rejected" until a reload.
+            if (payload.cancelledBy) action.cancelled_by = payload.cancelledBy;
         } else {
             // Batch item: the transcript renders per-item status 'approved'/'skipped'.
             const existing = action.itemResults && action.itemResults[payload.index];

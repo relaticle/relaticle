@@ -255,3 +255,53 @@ it('does not touch the editor or send when destroy lands between flushQueuedSend
         ->where('conversation_id', $conversationId)
         ->count())->toBe(0);
 });
+
+/**
+ * The same class of cross-write, one layer up: switchConversation() repaints the
+ * transcript from cache and swaps conversationId without touching the Echo
+ * channel, so between the click and the wire:navigate remount the instance shows
+ * B while still subscribed to A. Resuming after a proposal decision is what makes
+ * a stream start in that window without this tab having sent anything.
+ */
+it('does not paint a stream still arriving for conversation A into the transcript of conversation B', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationA = (string) Str::uuid7();
+    $conversationB = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv a', $conversationA);
+    ChatBrowser::seedConversation($user, $team->getKey(), 'conv b', $conversationB);
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $leaked = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            // Exactly the state switchConversation() leaves behind on a cache hit:
+            // the transcript now shows B, the subscription is still A's.
+            data.messages = [];
+            data.conversationId = '{$conversationB}';
+            data.channelConversationId = '{$conversationA}';
+
+            // A's turn finishes and broadcasts on A's channel, which this tab
+            // is still listening to.
+            data.handleStreamStart({ invocation_id: 'inv-a' });
+            data.handleTextDelta({ invocation_id: 'inv-a', delta: 'LEAKED_FROM_CONVERSATION_A' });
+            data.handleToolCall({ invocation_id: 'inv-a', tool_name: 'list-companies-tool' });
+
+            return {
+                transcript: data.messages.map((m) => m.content ?? '').join(' '),
+                streaming: data.isStreaming,
+                toolStatus: data.currentToolStatus,
+            };
+        })();
+    JS);
+
+    expect($leaked['transcript'])->not->toContain('LEAKED_FROM_CONVERSATION_A')
+        ->and($leaked['transcript'])->toBe('')
+        ->and($leaked['streaming'])->toBeFalse()
+        ->and($leaked['toolStatus'])->toBeNull();
+});

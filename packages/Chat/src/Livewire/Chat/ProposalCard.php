@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -64,8 +65,17 @@ final class ProposalCard extends BaseLivewireComponent
 
     public int $cursor = 0;
 
+    /**
+     * Which field is open for inline editing, and on which step. Both are set
+     * together by editField() and cleared together; neither is ever written from
+     * the client, so they are locked. Unlocked, a payload could name a field
+     * while nulling the step and open the same Filament schema on every step
+     * that owns that field code, giving one statePath several bound inputs.
+     */
+    #[Locked]
     public ?string $editingFieldCode = null;
 
+    #[Locked]
     public ?string $editingStepId = null;
 
     /** @var array<string, mixed> */
@@ -289,28 +299,14 @@ final class ProposalCard extends BaseLivewireComponent
      * Move the per-record controls to another step of the plan. The cursor is
      * per-step, so it re-anchors to that step's first undecided record.
      */
-    public function focusStep(string $stepId): void
+    public function stepNext(string $stepId): void
     {
-        $step = $this->loadStep($stepId);
-
-        if (! $step instanceof PendingAction) {
-            return;
-        }
-
-        $this->editingFieldCode = null;
-        $this->editingStepId = null;
-        $this->activeStepId = (string) $step->getKey();
-        $this->cursor = $this->firstUnresolvedIndex($step);
+        $this->stepWithin($stepId, 1);
     }
 
-    public function stepNext(): void
+    public function stepPrev(string $stepId): void
     {
-        $this->stepWithin(1);
-    }
-
-    public function stepPrev(): void
-    {
-        $this->stepWithin(-1);
+        $this->stepWithin($stepId, -1);
     }
 
     /**
@@ -319,15 +315,24 @@ final class ProposalCard extends BaseLivewireComponent
      * they can never be navigated back to and re-decided — their outcome lives in
      * the transcript audit card above.
      */
-    private function stepWithin(int $direction): void
+    private function stepWithin(string $stepId, int $direction): void
     {
         $this->editingFieldCode = null;
         $this->editingStepId = null;
 
-        $pendingAction = $this->loadStep($this->activeStepId());
+        $pendingAction = $this->loadStep($stepId);
 
         if (! $pendingAction instanceof PendingAction) {
             return;
+        }
+
+        // Paging a step the dock was not focused on focuses it first, so the
+        // pager and the fields under it always describe the same record. Without
+        // this the pager could only be offered for the active step, and every
+        // record after the first of every other step was approved unseen.
+        if ((string) $pendingAction->getKey() !== $this->activeStepId()) {
+            $this->activeStepId = (string) $pendingAction->getKey();
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
         }
 
         $unresolved = $this->unresolvedIndices($pendingAction);
@@ -976,7 +981,17 @@ final class ProposalCard extends BaseLivewireComponent
 
     private function announceResolution(PendingAction $step, string $decision): void
     {
-        $record = $decision === 'approved' ? $this->recordReferenceFor($step->refresh()) : null;
+        $fresh = $step->refresh();
+        $record = $decision === 'approved' ? $this->recordReferenceFor($fresh) : null;
+
+        // A step cancelled because the step it depended on was rejected has to say
+        // so live, not only after a reload. ListConversationMessages sets this on
+        // the way back in; without it here the transcript shows a bare "Rejected"
+        // in the very session where the cascade happened, which is the outcome
+        // PendingActionService::cancelStep() records it to prevent.
+        $cancelledBy = is_array($fresh->result_data)
+            ? ($fresh->result_data['cancelled_by'] ?? null)
+            : null;
 
         $this->dispatch(
             'proposal:resolved',
@@ -985,6 +1000,7 @@ final class ProposalCard extends BaseLivewireComponent
             decision: $decision,
             finalized: true,
             record: $record,
+            cancelledBy: is_string($cancelledBy) ? $cancelledBy : null,
             context: $this->context,
         );
     }

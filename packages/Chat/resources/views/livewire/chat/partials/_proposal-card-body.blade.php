@@ -17,8 +17,12 @@
     $outcomeLabels = ['approved' => __('Approved'), 'rejected' => __('Rejected'), 'expired' => __('Expired'), 'superseded' => __('Replaced')];
     $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from($operationLabels).")[action.operation] ?? action.operation)";
 @endphp
-{{-- COMPACT progress view while the batch is still docked. --}}
-<template x-if="action.status === 'pending'">
+{{-- COMPACT progress view while the batch is still docked. Gated on there being
+     partial progress to show: a pending step nobody has touched has no items and
+     no results, and would render "0 of 0 resolved. Review the rest below." above
+     the still-open dock. The plan card renders as soon as ANY step is decided, so
+     its undecided siblings come through here. --}}
+<template x-if="action.status === 'pending' && action.itemResults && Object.keys(action.itemResults).length > 0">
     <div class="px-4 py-3">
         <div class="space-y-1.5">
             <template x-for="(item, itemIdx) in (action.display?.items || [])" :key="itemIdx">
@@ -40,6 +44,20 @@
                .replace(':total', String(action.display?.items?.length ?? 0))"></p>
     </div>
 </template>
+
+{{-- An undecided step of a part-decided plan. The plan card appears as soon as
+     ANY step is decided, so its siblings need a line that says what they are and
+     that they are still open. It deliberately claims no progress: the branch
+     above owns partial progress, and this one used to fall into it and print
+     "0 of 0 resolved" over a card the user had not answered. --}}
+@if ($inPlan)
+    <template x-if="action.status === 'pending' && !(action.itemResults && Object.keys(action.itemResults).length > 0)">
+        <div class="px-4 py-3 ps-9">
+            <p class="text-xs text-gray-600 dark:text-gray-300" x-text="{{ $summaryExpression }}"></p>
+            <p class="mt-1 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">{{ __('Waiting for your decision below.') }}</p>
+        </div>
+    </template>
+@endif
 
 {{-- Read-only audit card once the proposal is finalized. --}}
 <template x-if="action.status !== 'pending'">

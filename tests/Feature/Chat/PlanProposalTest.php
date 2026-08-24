@@ -352,3 +352,40 @@ it('renders a plan without re-reading the plan or the custom fields once per ste
     expect($planQueries)->toBeLessThanOrEqual(3, "plan re-read per step: {$planQueries} pending_actions queries")
         ->and($customFieldQueries)->toBeLessThanOrEqual(4, "custom fields re-read per step: {$customFieldQueries} custom_fields queries");
 });
+
+it('lets the user page through a step the dock is not focused on before approving the plan', function (): void {
+    ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+        'records' => [['name' => 'Acme Robotics']],
+    ]));
+    $company = ($this->proposalFor)('company');
+
+    // Step 2 proposes three people at once. The dock focuses step 1 on mount, so
+    // without a reachable pager the user approves Ada and Grace sight unseen.
+    ($this->tool)(CreatePersonTool::class)->handle(new Request([
+        'records' => [
+            ['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $company->getKey())],
+            ['name' => 'Ada Lovelace', 'company_id' => PlanReference::to((string) $company->getKey())],
+            ['name' => 'Grace Hopper', 'company_id' => PlanReference::to((string) $company->getKey())],
+        ],
+    ]));
+    $people = ($this->proposalFor)('people');
+
+    $card = Livewire::test(ProposalCard::class, [
+        'pendingActionId' => (string) $company->getKey(),
+        'context' => 'chat',
+    ]);
+
+    $card->assertSee('Jane Doe')
+        ->assertDontSee('Ada Lovelace')
+        // The pager has to be on the page for step 2, not just callable: a step
+        // the dock never focuses would otherwise have no way to reach record 2.
+        ->assertSee("stepNext('".$people->getKey()."')", escape: false);
+
+    $card->call('stepNext', (string) $people->getKey())
+        ->assertSet('activeStepId', (string) $people->getKey())
+        ->assertSee('Ada Lovelace')
+        ->assertSet('cursor', 1);
+
+    $card->call('stepNext', (string) $people->getKey())
+        ->assertSee('Grace Hopper');
+});

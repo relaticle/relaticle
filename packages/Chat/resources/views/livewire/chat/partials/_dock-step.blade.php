@@ -72,13 +72,16 @@
             @endif
         </div>
 
-        {{-- Per-record pager, for a step proposing several records of one type. --}}
-        @if ($step['isBatch'] && $step['remainingCount'] > 1 && $step['isActive'])
+        {{-- Per-record pager, for a step proposing several records of one type.
+             Not gated on the step being active: a plan is approved as one
+             decision, so every step's records have to be reachable before the
+             user commits to them. Paging a step focuses it. --}}
+        @if ($step['isBatch'] && $step['remainingCount'] > 1)
             <div class="flex shrink-0 items-center gap-0.5">
                 <button
                     type="button"
-                    wire:click="stepPrev"
-                    @disabled($step['position_in_batch'] <= 1)
+                    wire:click="stepPrev('{{ $step['id'] }}')"
+                    @disabled($step['isActive'] && $step['position_in_batch'] <= 1)
                     class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
                     aria-label="{{ __('Previous record') }}"
                 >
@@ -93,8 +96,8 @@
 
                 <button
                     type="button"
-                    wire:click="stepNext"
-                    @disabled($step['position_in_batch'] >= $step['remainingCount'])
+                    wire:click="stepNext('{{ $step['id'] }}')"
+                    @disabled($step['isActive'] && $step['position_in_batch'] >= $step['remainingCount'])
                     class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
                     aria-label="{{ __('Next record') }}"
                 >
@@ -149,7 +152,7 @@
                 'row' => $row,
                 'stepId' => $step['id'],
                 'isEditable' => ($row['code'] ?? null) !== null && in_array($row['code'], $step['editableCodes'], true),
-                'isEditing' => $editingFieldCode !== null && $editingFieldCode === ($row['code'] ?? null) && ($editingStepId ?? $step['id']) === $step['id'],
+                'isEditing' => $editingFieldCode !== null && $editingFieldCode === ($row['code'] ?? null) && $editingStepId === $step['id'],
             ])
         @endforeach
     </div>

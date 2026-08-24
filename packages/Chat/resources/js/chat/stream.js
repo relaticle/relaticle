@@ -215,10 +215,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     handleFollowUps(event) {
-        // Same guard handleConversationTitle applies: a cache-first switch repaints the
-        // transcript without unsubscribing, so a turn finishing for the conversation the
-        // user just left would otherwise hang its chips on the newly painted one.
-        if (event?.conversationId && this.conversationId && event.conversationId !== this.conversationId) return;
+        if (!this.isForCurrentConversation()) return;
 
         const chips = Array.isArray(event?.chips) ? event.chips.slice(0, 3) : [];
         // Chips belong to the turn that just COMPLETED. If a queued send
@@ -318,7 +315,33 @@ export const streamModule = ({ texts = {} } = {}) => ({
         }
     },
 
+    /**
+     * Whether events arriving on the subscribed channel still belong to the
+     * conversation on screen.
+     *
+     * switchConversation() repaints the transcript from cache and swaps
+     * conversationId without touching the Echo channel, so between the click and
+     * the wire:navigate remount this instance is showing B while still listening
+     * to A. A turn that finishes for A in that window would write A's tokens into
+     * B's transcript. Resuming after an approval is exactly the case that starts
+     * a stream this tab never sent, so the window is reachable rather than
+     * theoretical.
+     *
+     * channelConversationId is what the subscription is actually for; the event
+     * payloads themselves carry no conversation id. Before the first subscribe,
+     * or before this component knows its own id (a brand new conversation streams
+     * before the id lands), there is nothing to disagree with and the event is
+     * ours.
+     */
+    isForCurrentConversation() {
+        if (!this.channelConversationId || !this.conversationId) return true;
+
+        return this.channelConversationId === this.conversationId;
+    },
+
     handleStreamStart(event) {
+        if (!this.isForCurrentConversation()) return;
+
         this.startStreamTimeout();
         // A turn this tab did not send still has to look like a turn: an
         // approval resumes the assistant server-side (TurnContinuationService),
@@ -331,6 +354,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     handleTextDelta(event) {
+        if (!this.isForCurrentConversation()) return;
         this.startStreamTimeout();
         this.currentToolStatus = null;
         const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
@@ -346,6 +370,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     handleToolCall(event) {
+        if (!this.isForCurrentConversation()) return;
         this.startStreamTimeout();
         this.currentToolStatus = this.friendlyToolStatus(event?.tool_name);
         const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
@@ -356,6 +381,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     handleToolResult(event) {
+        if (!this.isForCurrentConversation()) return;
         this.startStreamTimeout();
         this.currentToolStatus = null;
         const assistantMsg = this.targetBubbleFor(event.invocation_id ?? null);
@@ -423,6 +449,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     async handleStreamEnd(event) {
+        if (!this.isForCurrentConversation()) return;
         this.currentToolStatus = null;
         const inv = event?.invocation_id ?? null;
         let assistantMsg = inv === null
@@ -555,7 +582,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     handleConversationTitle(event) {
         const title = event?.title;
         if (!event?.conversationId || !title) return;
-        if (this.conversationId && event.conversationId !== this.conversationId) return;
+        if (!this.isForCurrentConversation()) return;
 
         this.applyTitle(event.conversationId, title);
     },
