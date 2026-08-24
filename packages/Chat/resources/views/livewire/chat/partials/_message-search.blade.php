@@ -6,10 +6,10 @@
      reason: keydowns inside it must keep bubbling to the root's x-on:keydown. --}}
 <div
     x-show="searchOpen"
-    {-- aria-modal tells assistive tech the background is inert, so Tab must not
+    {{-- aria-modal tells assistive tech the background is inert, so Tab must not
          walk out of the panel into the transcript behind the backdrop. noreturn and
          noautofocus leave focus placement to the component, which already moves it
-         to the input on open and restores it on close. --}
+         to the input on open and restores it on close. --}}
     x-trap.noscroll.noreturn.noautofocus="searchOpen"
     x-cloak
     x-on:click.self="closeMessageSearch()"

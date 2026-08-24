@@ -26,6 +26,13 @@ final readonly class HelpController
 
     private const string DOCS_CATEGORY = 'docs/guides';
 
+    /**
+     * How many blog posts /llms.txt lists. The doc and help sections above it are
+     * bounded by their on-disk manifests; the blog is the only section that grows
+     * with the database, on an uncached route whose whole audience is crawlers.
+     */
+    private const int LLMS_TXT_BLOG_LIMIT = 50;
+
     public function __construct(
         private DocsRepository $repository,
         private RenderDocMarkdown $renderMarkdown,
@@ -225,6 +232,7 @@ final readonly class HelpController
         $posts = Post::query()
             ->published()
             ->latest('published_at')
+            ->limit(self::LLMS_TXT_BLOG_LIMIT)
             ->toBase()
             ->get(['title', 'slug', 'excerpt']);
 

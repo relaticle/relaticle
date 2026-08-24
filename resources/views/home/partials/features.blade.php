@@ -166,7 +166,7 @@
                      anchor, and making one of them one breaks the grid's contract. --}}
                 <a href="{{ route('ai') }}"
                    class="group mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
-                    Meet Rela
+                    Meet {{ config('chat.assistant_name') }}
                     <x-ri-arrow-right-line class="w-3 h-3"/>
                 </a>
             </div>

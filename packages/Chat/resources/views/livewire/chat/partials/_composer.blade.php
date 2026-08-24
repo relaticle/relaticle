@@ -16,7 +16,7 @@
             x-init="$watch('hasPendingProposal', (pending) => { if (pending) $nextTick(() => $el.focus()) })"
             tabindex="-1"
             role="group"
-            :aria-label="hasPendingProposal ? '{{ __('Proposal awaiting your decision') }}' : null"
+            :aria-label="hasPendingProposal ? @js(__('Proposal awaiting your decision')) : null"
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-2 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
