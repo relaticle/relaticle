@@ -17,6 +17,8 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\EmailClassifier;
+use RuntimeException;
 
 mutates(StoreEmailAction::class);
 
@@ -265,6 +267,37 @@ it('stores inline attachment metadata', function (): void {
 
     Storage::disk(EmailAttachment::DISK)
         ->assertExists((string) $attachment->storage_path);
+});
+
+it('cleans up stored inline files when storing the email rolls back', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    app()->bind(EmailClassifier::class, fn (): object => new class
+    {
+        public function classify(FetchedEmailData $data, bool $isInternal): EmailCategory
+        {
+            throw new RuntimeException('Classification failed.');
+        }
+    });
+
+    $data = makeFetchedEmailData([
+        'attachments' => [
+            [
+                'filename' => 'logo.png',
+                'mime_type' => 'image/png',
+                'size' => 1024,
+                'content_id' => 'logo@example.test',
+                'attachment_id' => null,
+                'inline_data' => rtrim(strtr(base64_encode('inline-image-bytes'), '+/', '-_'), '='),
+                'is_inline' => true,
+            ],
+        ],
+    ]);
+
+    expect(fn () => resolve(StoreEmailAction::class)->execute($this->account, $data))
+        ->toThrow(RuntimeException::class, 'Classification failed.');
+
+    expect(Storage::disk(EmailAttachment::DISK)->allFiles('email-inline-attachments'))->toBe([]);
 });
 
 it('marks email as internal when all participants are team members', function (): void {

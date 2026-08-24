@@ -28,102 +28,111 @@ final readonly class StoreEmailAction
      */
     public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
-        return DB::transaction(function () use ($connectedAccount, $data): Email {
-            $email = Email::query()->create([
-                'team_id' => $connectedAccount->team_id,
-                'user_id' => $connectedAccount->user_id,
-                'connected_account_id' => $connectedAccount->getKey(),
-                'rfc_message_id' => $data->rfcMessageId,
-                'provider_message_id' => $data->providerMessageId,
-                'thread_id' => $data->threadId,
-                'in_reply_to' => $data->inReplyTo,
-                'subject' => $data->subject,
-                'snippet' => $data->snippet,
-                'sent_at' => $data->sentAt,
-                'direction' => $data->direction,
-                'folder' => $data->folder,
-                'has_attachments' => $data->hasAttachments,
-            ]);
+        $storedInlinePaths = [];
 
-            // Read state is per-viewer; the provider's "already read" flag reflects
-            // the owner's mailbox, so seed only the owner's read row.
-            if ($data->isRead) {
-                EmailRead::query()->create([
-                    'email_id' => $email->getKey(),
+        try {
+            return DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
+                $email = Email::query()->create([
+                    'team_id' => $connectedAccount->team_id,
                     'user_id' => $connectedAccount->user_id,
-                    'read_at' => $data->sentAt,
+                    'connected_account_id' => $connectedAccount->getKey(),
+                    'rfc_message_id' => $data->rfcMessageId,
+                    'provider_message_id' => $data->providerMessageId,
+                    'thread_id' => $data->threadId,
+                    'in_reply_to' => $data->inReplyTo,
+                    'subject' => $data->subject,
+                    'snippet' => $data->snippet,
+                    'sent_at' => $data->sentAt,
+                    'direction' => $data->direction,
+                    'folder' => $data->folder,
+                    'has_attachments' => $data->hasAttachments,
                 ]);
-            }
 
-            $email->body()->create([
-                'body_text' => $data->bodyText,
-                'body_html' => $data->bodyHtml,
-            ]);
+                // Read state is per-viewer; the provider's "already read" flag reflects
+                // the owner's mailbox, so seed only the owner's read row.
+                if ($data->isRead) {
+                    EmailRead::query()->create([
+                        'email_id' => $email->getKey(),
+                        'user_id' => $connectedAccount->user_id,
+                        'read_at' => $data->sentAt,
+                    ]);
+                }
 
-            foreach ($data->participants as $participant) {
-                EmailParticipant::query()->create([
+                $email->body()->create([
+                    'body_text' => $data->bodyText,
+                    'body_html' => $data->bodyHtml,
+                ]);
+
+                foreach ($data->participants as $participant) {
+                    EmailParticipant::query()->create([
+                        'email_id' => $email->getKey(),
+                        'email_address' => $participant['email_address'],
+                        'name' => $participant['name'] ?? null,
+                        'role' => $participant['role'],
+                    ]);
+                }
+
+                foreach ($data->attachments as $attachment) {
+                    EmailAttachment::query()->create([
+                        'email_id' => $email->getKey(),
+                        'filename' => $attachment['filename'],
+                        'mime_type' => $attachment['mime_type'],
+                        'size' => $attachment['size'],
+                        'content_id' => $attachment['content_id'],
+                        'is_inline' => $attachment['is_inline'] ?? false,
+                        'provider_attachment_id' => $attachment['attachment_id'],
+                        'storage_path' => $this->storeInlineData($email, $attachment, $storedInlinePaths),
+                    ]);
+                }
+
+                // "Internal" means every participant is a member of this workspace.
+                // Membership lives in the team_user pivot (plus the owner) — NOT in
+                // users.current_team_id, which only reflects a user's *active* team and
+                // would misclassify members whose active team is elsewhere.
+                $team = Team::query()->find($connectedAccount->team_id);
+
+                $teamUserEmails = ($team?->allUsers() ?? collect())
+                    ->pluck('email')
+                    ->map(fn (string $e): string => strtolower($e));
+
+                $participantAddresses = $email->participants()
+                    ->pluck('email_address')
+                    ->map(fn (string $e): string => strtolower($e));
+
+                $isInternal = $participantAddresses->isNotEmpty() && $participantAddresses->every(
+                    fn (string $address): bool => $teamUserEmails->contains($address)
+                );
+
+                $email->updateQuietly(['is_internal' => $isInternal]);
+
+                // Deterministic, rule-based categorisation — cheap string heuristics,
+                // no LLM call. Runs inline now that participants/attachments/internal
+                // state are all known.
+                EmailLabel::query()->create([
                     'email_id' => $email->getKey(),
-                    'email_address' => $participant['email_address'],
-                    'name' => $participant['name'] ?? null,
-                    'role' => $participant['role'],
+                    'label' => resolve(EmailClassifier::class)->classify($data, $isInternal)->value,
+                    'source' => 'system',
+                    'created_at' => now(),
                 ]);
-            }
 
-            foreach ($data->attachments as $attachment) {
-                EmailAttachment::query()->create([
-                    'email_id' => $email->getKey(),
-                    'filename' => $attachment['filename'],
-                    'mime_type' => $attachment['mime_type'],
-                    'size' => $attachment['size'],
-                    'content_id' => $attachment['content_id'],
-                    'is_inline' => $attachment['is_inline'] ?? false,
-                    'provider_attachment_id' => $attachment['attachment_id'],
-                    'storage_path' => $this->storeInlineData($email, $attachment),
-                ]);
-            }
+                resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
-            // "Internal" means every participant is a member of this workspace.
-            // Membership lives in the team_user pivot (plus the owner) — NOT in
-            // users.current_team_id, which only reflects a user's *active* team and
-            // would misclassify members whose active team is elsewhere.
-            $team = Team::query()->find($connectedAccount->team_id);
+                resolve(LinkEmailAction::class)->execute($email);
 
-            $teamUserEmails = ($team?->allUsers() ?? collect())
-                ->pluck('email')
-                ->map(fn (string $e): string => strtolower($e));
+                return $email;
+            });
+        } catch (Throwable $exception) {
+            Storage::disk(EmailAttachment::DISK)->delete($storedInlinePaths);
 
-            $participantAddresses = $email->participants()
-                ->pluck('email_address')
-                ->map(fn (string $e): string => strtolower($e));
-
-            $isInternal = $participantAddresses->isNotEmpty() && $participantAddresses->every(
-                fn (string $address): bool => $teamUserEmails->contains($address)
-            );
-
-            $email->updateQuietly(['is_internal' => $isInternal]);
-
-            // Deterministic, rule-based categorisation — cheap string heuristics,
-            // no LLM call. Runs inline now that participants/attachments/internal
-            // state are all known.
-            EmailLabel::query()->create([
-                'email_id' => $email->getKey(),
-                'label' => resolve(EmailClassifier::class)->classify($data, $isInternal)->value,
-                'source' => 'system',
-                'created_at' => now(),
-            ]);
-
-            resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
-
-            resolve(LinkEmailAction::class)->execute($email);
-
-            return $email;
-        });
+            throw $exception;
+        }
     }
 
     /**
      * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     * @param  list<string>  $storedInlinePaths
      */
-    private function storeInlineData(Email $email, array $attachment): ?string
+    private function storeInlineData(Email $email, array $attachment, array &$storedInlinePaths): ?string
     {
         if (($attachment['is_inline'] ?? false) === false) {
             return null;
@@ -142,6 +151,7 @@ final readonly class StoreEmailAction
         $path = "email-inline-attachments/{$email->getKey()}/".Str::ulid();
 
         Storage::disk(EmailAttachment::DISK)->put($path, $binary);
+        $storedInlinePaths[] = $path;
 
         return $path;
     }
