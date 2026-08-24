@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Actions\ListConversationMessages;
@@ -224,4 +227,92 @@ it('hides the resumed turn prompt from the transcript but keeps every other mess
     expect($messages)->toHaveCount(3)
         ->and(array_column($messages, 'role'))->toBe(['user', 'assistant', 'assistant'])
         ->and(collect($messages)->pluck('content')->implode(' '))->not->toContain('their outcome is in');
+});
+
+it('clears the continuation flag when the resumed turn dies before it stores anything', function (): void {
+    $team = $this->user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::response(
+            "data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n",
+            200,
+            ['Content-Type' => 'text/event-stream'],
+        ),
+    ]);
+    Queue::fake();
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        team: $team,
+        message: TurnContinuationService::PROMPT,
+        conversationId: $this->convId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+        isContinuation: true,
+    );
+
+    try {
+        $job->handle(resolve(CreditService::class));
+    } catch (Throwable) {
+        // The turn dying is the premise; the flag it leaves behind is the subject.
+    }
+
+    expect(resolve(ConversationStore::class)->nextUserMessageIsContinuation)->toBeFalse();
+});
+
+it('leaves the next job on the worker to store its own question as the user typed it', function (): void {
+    $team = $this->user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::sequence()
+            ->push("data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n", 200, ['Content-Type' => 'text/event-stream'])
+            ->push(implode("\n\n", [
+                'data: {"type":"message_start","message":{"id":"msg_1","model":"claude-sonnet-4-6","usage":{"input_tokens":5}}}',
+                'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"They agreed to a pilot."}}',
+                'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}',
+                'data: {"type":"message_stop"}',
+            ])."\n\n", 200, ['Content-Type' => 'text/event-stream']),
+    ]);
+    Queue::fake();
+
+    // A resumed turn that never reaches its own write.
+    try {
+        (new ProcessChatMessage(
+            user: $this->user,
+            team: $team,
+            message: TurnContinuationService::PROMPT,
+            conversationId: $this->convId,
+            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+            turnId: (string) Str::ulid(),
+            isContinuation: true,
+        ))->handle(resolve(CreditService::class));
+    } catch (Throwable) {
+        // Premise, not subject.
+    }
+
+    // The very next job the worker picks up, with its own question.
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $team,
+        message: 'What did we agree with Acme?',
+        conversationId: $this->convId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+    ))->handle(resolve(CreditService::class));
+
+    $stored = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $this->convId)
+        ->where('role', 'user')
+        ->orderByDesc('created_at')
+        ->first();
+
+    expect($stored)->not->toBeNull()
+        ->and($stored->content)->toContain('Acme')
+        ->and((string) $stored->meta)->not->toContain(SupersededAwareConversationStore::CONTINUATION_KIND);
+
+    $transcript = resolve(ListConversationMessages::class)->execute($this->user, $this->convId);
+
+    expect(collect($transcript)->pluck('content')->implode(' '))->toContain('What did we agree with Acme?');
 });

@@ -417,6 +417,15 @@ final class ProcessChatMessage implements ShouldQueue
             throw $e;
         } finally {
             $this->releaseAuth();
+
+            // storeUserMessage() consumes this on the happy path, but it only
+            // runs if the stream reaches its then() callback. A turn that dies
+            // first (provider error, release, cancel, failover re-dispatch)
+            // would otherwise leave the flag set on the container singleton,
+            // which queue workers do not rebuild between jobs: the next job on
+            // this worker, any user and any tenant, would have its own question
+            // stored as ours and filtered out of its transcript for good.
+            resolve(ConversationStore::class)->nextUserMessageIsContinuation = false;
         }
     }
 

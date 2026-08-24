@@ -54,8 +54,13 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
 
     /**
      * Set by ProcessChatMessage for the single user message a continuation turn
-     * is about to store. Consumed on write, so a later turn in the same worker
-     * process cannot inherit it.
+     * is about to store, and consumed on write.
+     *
+     * This store is a container singleton and queue workers do not rebuild
+     * singletons between jobs, so consumption alone is not enough: a turn that
+     * dies before the write would hand the flag to the next job on the worker.
+     * ProcessChatMessage therefore also clears it in a finally. Both halves are
+     * required; neither is redundant.
      */
     public bool $nextUserMessageIsContinuation = false;
 

@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Services\ValidationService;
 
 trait ResolvesEntitySchema
 {
@@ -54,13 +55,12 @@ trait ResolvesEntitySchema
         $result = [];
 
         foreach ($fields as $field) {
-            // validation_rules is cast to a key-value collection (['required' => true]),
-            // so contains('name', 'required') did data_get(true, 'name') and was always
-            // false: the schema told every agent no custom field was ever required.
-            // data_get, not a direct read: the package's @property says Collection but
-            // the cast yields null for a null column, which is why the package itself
-            // reaches for ?-> here.
-            $required = (bool) data_get($field->validation_rules, 'required', false);
+            // The package owns this predicate. Three hand-rolled copies of it
+            // existed and only some were right: validation_rules casts to a
+            // key-value collection (['required' => true]), so the older
+            // ['name' => 'required'] scan matched nothing and told every agent
+            // no custom field was ever required.
+            $required = resolve(ValidationService::class)->isRequired($field);
 
             $entry = [
                 'name' => $field->name,

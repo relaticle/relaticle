@@ -110,7 +110,7 @@ it('updates each approved item and leaves skipped ones untouched, per item', fun
     $service = resolve(PendingActionService::class);
 
     $service->approveItem($pending, $this->user, 0);
-    $service->rejectItem($pending->fresh(), 1);
+    $service->rejectItem($pending->fresh(), $this->user, 1);
     $last = $service->approveItem($pending->fresh(), $this->user, 2);
 
     expect($last['finalized'])->toBeTrue()

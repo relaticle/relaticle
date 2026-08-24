@@ -36,6 +36,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -139,27 +140,9 @@ final readonly class PendingActionService
         ]);
     }
 
-    /**
-     * A proposal is a one-click CRM write, so the team that owns it is the security
-     * boundary. The Livewire dock already scopes its lookup by team and user, but the
-     * invariant belongs at the service: a future caller (an API route, a job, an MCP
-     * tool) must not be able to resolve another tenant's proposal. Without it the
-     * executed action would stamp team_id from the actor's current team while the
-     * custom-field values landed under the proposal's, splitting one record across
-     * two tenants.
-     */
-    private function assertActorOwns(PendingAction $pendingAction, User $user): void
-    {
-        throw_unless(
-            (string) ($user->currentTeam?->getKey() ?? '') === (string) $pendingAction->team_id,
-            RuntimeException::class,
-            'This action belongs to another workspace.',
-        );
-    }
-
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
-        $this->assertActorOwns($pendingAction, $user);
+        ProposalOwnership::assert($pendingAction, $user);
 
         // The action executes the underlying CRM write, which may persist custom-field
         // values. When approve() runs there may be no resolvable custom-fields tenant
@@ -214,8 +197,10 @@ final readonly class PendingActionService
         return $resolved;
     }
 
-    public function reject(PendingAction $pendingAction): PendingAction
+    public function reject(PendingAction $pendingAction, User $user): PendingAction
     {
+        ProposalOwnership::assert($pendingAction, $user);
+
         $resolved = DB::transaction(function () use ($pendingAction): PendingAction {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()
@@ -242,8 +227,10 @@ final readonly class PendingActionService
      * superseded: the user's decision caused it, and the card says which step it
      * followed so the outcome never reads as unexplained.
      */
-    public function cancelStep(PendingAction $pendingAction, string $causedByPendingActionId): PendingAction
+    public function cancelStep(PendingAction $pendingAction, User $user, string $causedByPendingActionId): PendingAction
     {
+        ProposalOwnership::assert($pendingAction, $user);
+
         $resolved = DB::transaction(function () use ($pendingAction, $causedByPendingActionId): PendingAction {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()
@@ -279,7 +266,7 @@ final readonly class PendingActionService
      */
     public function approveItem(PendingAction $pendingAction, User $user, int $index): array
     {
-        $this->assertActorOwns($pendingAction, $user);
+        ProposalOwnership::assert($pendingAction, $user);
 
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
@@ -331,8 +318,10 @@ final readonly class PendingActionService
      *
      * @return array{finalized: bool}
      */
-    public function rejectItem(PendingAction $pendingAction, int $index): array
+    public function rejectItem(PendingAction $pendingAction, User $user, int $index): array
     {
+        ProposalOwnership::assert($pendingAction, $user);
+
         [$finalized, $itemStatus] = DB::transaction(function () use ($pendingAction, $index): array {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());

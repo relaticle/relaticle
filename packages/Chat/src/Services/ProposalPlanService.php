@@ -80,12 +80,18 @@ final readonly class ProposalPlanService
     }
 
     /**
-     * Dependencies that have not produced their record yet, so this step cannot be
-     * approved on its own. Empty means the step is ready.
+     * The dependencies of $step that are not yet approved.
      *
+     * The caller passes the plan's steps rather than having this reload them:
+     * the dock asks once per step while rendering, and re-reading the whole plan
+     * inside the loop put one full plan SELECT per step on every round trip.
+     * Pass steps(), not pendingSteps(): an approved dependency has to be visible
+     * here to count as met.
+     *
+     * @param  list<PendingAction>  $siblings
      * @return list<PendingAction>
      */
-    public function unmetDependencies(PendingAction $step): array
+    public function unmetDependencies(PendingAction $step, array $siblings): array
     {
         $dependencyIds = $this->dependencyIds($step);
 
@@ -95,7 +101,7 @@ final readonly class ProposalPlanService
 
         $byId = [];
 
-        foreach ($this->steps($step) as $sibling) {
+        foreach ($siblings as $sibling) {
             $byId[(string) $sibling->getKey()] = $sibling;
         }
 
@@ -187,11 +193,11 @@ final readonly class ProposalPlanService
      *
      * @return list<PendingAction> The cancelled dependents, not including $step.
      */
-    public function reject(PendingAction $step): array
+    public function reject(PendingAction $step, User $user): array
     {
-        $this->pendingActions->reject($step);
+        $this->pendingActions->reject($step, $user);
 
-        return $this->cancelDependentsOf($step);
+        return $this->cancelDependentsOf($step, $user);
     }
 
     /**
@@ -217,7 +223,7 @@ final readonly class ProposalPlanService
     /**
      * @return list<PendingAction>
      */
-    private function cancelDependentsOf(PendingAction $step): array
+    private function cancelDependentsOf(PendingAction $step, User $user): array
     {
         $cancelled = [];
         $rejectedIds = [(string) $step->getKey()];
@@ -234,7 +240,7 @@ final readonly class ProposalPlanService
                     continue;
                 }
 
-                $this->pendingActions->cancelStep($candidate, (string) $step->getKey());
+                $this->pendingActions->cancelStep($candidate, $user, (string) $step->getKey());
 
                 $cancelled[] = $candidate;
                 $rejectedIds[] = (string) $candidate->getKey();

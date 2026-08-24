@@ -14,6 +14,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
@@ -43,6 +44,11 @@ final readonly class ProposalEditor
      */
     public function applyEdit(PendingAction $pendingAction, User $user, array $input, ?int $index = null): PendingAction
     {
+        // Before the pin below, not after: this method validates core fields
+        // against the actor's team while writing custom fields under the
+        // proposal's, so a cross-tenant caller would split one record in two.
+        ProposalOwnership::assert($pendingAction, $user);
+
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 

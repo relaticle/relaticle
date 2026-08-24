@@ -52,10 +52,38 @@ final readonly class RecordNameResolver
             return '';
         }
 
+        // One query for the stored ids, not one per id. This runs inside the
+        // streaming job while each proposal card is built, so with batch writes
+        // (chat.max_batch_size records, each linking several others) a per-id
+        // lookup put hundreds of SELECTs on the turn before anything rendered.
+        // References are the exception: they name a record no earlier step has
+        // created yet, so there is nothing to batch and each is resolved alone.
+        $storedIds = array_values(array_filter(
+            $ids,
+            static fn (mixed $id): bool => ! PlanReference::is($id) && is_string($id) && $id !== '',
+        ));
+
+        $resolved = [];
+
+        if ($storedIds !== []) {
+            $query = $modelClass::query()->whereKey($storedIds);
+
+            if ($team instanceof Team) {
+                $query->where('team_id', $team->getKey());
+            }
+
+            $resolved = $query
+                ->pluck($nameAttribute, (new $modelClass)->getKeyName())
+                ->mapWithKeys(static fn (mixed $name, mixed $key): array => [(string) $key => (string) $name])
+                ->all();
+        }
+
         $names = [];
 
         foreach ($ids as $id) {
-            $name = $this->name($id, $modelClass, $team, $nameAttribute);
+            $name = PlanReference::is($id)
+                ? $this->pendingName($id, $team)
+                : ($resolved[(string) (is_string($id) ? $id : '')] ?? '');
 
             if ($name !== '') {
                 $names[] = $name;

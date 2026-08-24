@@ -18,6 +18,8 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\ProposalEditor;
+use RuntimeException;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -110,7 +112,7 @@ it('finalizes the batch without dispatching a continuation after the last item r
     $service = resolve(PendingActionService::class);
 
     $service->approveItem($action, $this->user, 0);
-    $service->rejectItem($action, 1);
+    $service->rejectItem($action, $this->user, 1);
 
     $last = $service->approveItem($action, $this->user, 2);
 
@@ -129,8 +131,8 @@ it('marks the batch rejected when every item is skipped', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [['title' => 'X'], ['title' => 'Y']]);
     $service = resolve(PendingActionService::class);
 
-    $service->rejectItem($action, 0);
-    $service->rejectItem($action, 1);
+    $service->rejectItem($action, $this->user, 0);
+    $service->rejectItem($action, $this->user, 1);
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
@@ -181,7 +183,7 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
     $service->approveItem($action, $this->user, 0);
     $service->approveItem($action, $this->user, 1);
 
-    $last = $service->rejectItem($action, 2);
+    $last = $service->rejectItem($action, $this->user, 2);
 
     expect($last['finalized'])->toBeTrue();
     $fresh = $action->fresh();
@@ -206,7 +208,7 @@ it('dispatches no continuation on a single approve and persists the record', fun
 it('dispatches no continuation on a single reject and creates nothing', function (): void {
     $action = makeSingleProposal($this->convId, $this->user, 'Single Reject');
 
-    $resolved = resolve(PendingActionService::class)->reject($action);
+    $resolved = resolve(PendingActionService::class)->reject($action, $this->user);
 
     expect($resolved->status)->toBe(PendingActionStatus::Rejected)
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Reject')->count())->toBe(0);
@@ -216,9 +218,9 @@ it('rejecting an already-resolved action throws', function (): void {
     $action = makeSingleProposal($this->convId, $this->user, 'Reject Once');
     $service = resolve(PendingActionService::class);
 
-    $service->reject($action);
+    $service->reject($action, $this->user);
 
-    expect(fn () => $service->reject($action->refresh()))->toThrow(RuntimeException::class);
+    expect(fn () => $service->reject($action->refresh(), $this->user))->toThrow(RuntimeException::class);
 });
 
 it('approving an expired action throws and creates nothing', function (): void {
@@ -288,7 +290,7 @@ it('broadcasts pending_action.resolved on a single reject', function (): void {
     Event::fake([PendingActionResolved::class]);
     $action = makeSingleProposal($this->convId, $this->user, 'Broadcast Reject');
 
-    resolve(PendingActionService::class)->reject($action);
+    resolve(PendingActionService::class)->reject($action, $this->user);
 
     Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
         && $event->pendingActionId === $action->getKey()
@@ -335,7 +337,7 @@ it('broadcasts pending_action.resolved with status rejected on a batch rejectIte
     Event::fake([PendingActionResolved::class]);
     $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
 
-    resolve(PendingActionService::class)->rejectItem($action, 0);
+    resolve(PendingActionService::class)->rejectItem($action, $this->user, 0);
 
     Event::assertDispatched(fn (PendingActionResolved $event): bool => $event->conversationId === $this->convId
         && $event->pendingActionId === $action->getKey()
@@ -351,7 +353,7 @@ it('reports the item\'s real stored status when approveItem is called again on a
     $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Item A'], ['title' => 'Item B']]);
     $service = resolve(PendingActionService::class);
 
-    $service->rejectItem($action, 0);
+    $service->rejectItem($action, $this->user, 0);
     $service->approveItem($action, $this->user, 0);
 
     // The idempotent no-op path must report the item's REAL status ('rejected',
@@ -426,4 +428,31 @@ it('approves a single proposal twice without writing the record twice', function
         ->toThrow(RuntimeException::class);
 
     expect(Task::query()->where('title', 'Only once please')->count())->toBe(1);
+});
+
+it('refuses every mutating entry point when the actor belongs to another workspace', function (): void {
+    $action = makeBatchProposal($this->convId, $this->user, [
+        ['name' => 'Task A'],
+        ['name' => 'Task B'],
+    ]);
+
+    $outsider = User::factory()->withPersonalTeam()->create();
+    $service = resolve(PendingActionService::class);
+
+    $calls = [
+        'approve' => fn (): mixed => $service->approve($action, $outsider),
+        'approveItem' => fn (): mixed => $service->approveItem($action, $outsider, 0),
+        'reject' => fn (): mixed => $service->reject($action, $outsider),
+        'rejectItem' => fn (): mixed => $service->rejectItem($action, $outsider, 0),
+        'cancelStep' => fn (): mixed => $service->cancelStep($action, $outsider, (string) $action->getKey()),
+        'applyEdit' => fn (): mixed => resolve(ProposalEditor::class)
+            ->applyEdit($action, $outsider, ['name' => 'Renamed'], 0),
+    ];
+
+    foreach ($calls as $name => $call) {
+        expect($call)->toThrow(RuntimeException::class, 'This action belongs to another workspace.', "{$name}() let an outsider through");
+    }
+
+    expect($action->refresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and(Task::query()->count())->toBe(0);
 });

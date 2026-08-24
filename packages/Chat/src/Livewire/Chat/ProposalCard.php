@@ -439,22 +439,55 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * The plan's steps that still need a decision, in order. The dock only ever
-     * presents undecided work: a step resolved a moment ago lives in the
-     * transcript audit card above.
-     *
-     * @return list<PendingAction>
-     */
-    /**
-     * Per-request memo for planSteps(). stepViews() walks every step and each walk
-     * previously re-read the whole plan (once for unmetDependencies, once more per
+     * Per-request memo for the plan's steps. stepViews() walks every step and each
+     * walk re-read the whole plan (once for unmetDependencies, once more per
      * dependency through stepPosition), so a three-step plan issued the plan query
      * roughly a dozen times per dock render. Livewire builds a fresh component per
-     * request, so this never outlives one round trip.
+     * request, so this never outlives one round trip, but it does have to be
+     * dropped after a resolve inside the same request: render() runs after
+     * approveAll()/discardAll() and would otherwise paint the pre-decision list.
      *
      * @var list<PendingAction>|null
      */
-    private ?array $planStepsCache = null;
+    private ?array $planAllStepsCache = null;
+
+    /**
+     * Per-request memo for editableCodes(), keyed by entity type.
+     *
+     * @var array<string, list<string>>
+     */
+    private array $editableCodesCache = [];
+
+    /**
+     * Every step of the plan, decided or not, in order. Approved steps have to
+     * stay visible here: unmetDependencies() reads this list to tell an approved
+     * dependency from a missing one.
+     *
+     * @return list<PendingAction>
+     */
+    public function planAllSteps(): array
+    {
+        if ($this->planAllStepsCache !== null) {
+            return $this->planAllStepsCache;
+        }
+
+        $anchor = $this->loadStep($this->pendingActionId);
+
+        if (! $anchor instanceof PendingAction) {
+            return $this->planAllStepsCache = [];
+        }
+
+        return $this->planAllStepsCache = resolve(ProposalPlanService::class)->steps($anchor);
+    }
+
+    /**
+     * Drop the memo after anything resolves a step, so a later read in the same
+     * request sees the decision rather than the list as it was on mount.
+     */
+    private function forgetPlanSteps(): void
+    {
+        $this->planAllStepsCache = null;
+    }
 
     /**
      * The plan's steps that still need a decision, in order. The dock only ever
@@ -465,17 +498,10 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function planSteps(): array
     {
-        if ($this->planStepsCache !== null) {
-            return $this->planStepsCache;
-        }
-
-        $anchor = $this->loadStep($this->pendingActionId);
-
-        if (! $anchor instanceof PendingAction) {
-            return $this->planStepsCache = [];
-        }
-
-        return $this->planStepsCache = resolve(ProposalPlanService::class)->pendingSteps($anchor);
+        return array_values(array_filter(
+            $this->planAllSteps(),
+            static fn (PendingAction $step): bool => $step->status === PendingActionStatus::Pending && ! $step->isExpired(),
+        ));
     }
 
     /**
@@ -488,10 +514,11 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $plan = resolve(ProposalPlanService::class);
         $activeStepId = $this->activeStepId();
+        $siblings = $this->planAllSteps();
         $views = [];
 
         foreach ($this->planSteps() as $position => $step) {
-            $blockedBy = $plan->unmetDependencies($step);
+            $blockedBy = $plan->unmetDependencies($step, $siblings);
 
             $views[] = [
                 'id' => (string) $step->getKey(),
@@ -607,6 +634,8 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveAll(ProposalPlanService $plan): void
     {
+        $this->forgetPlanSteps();
+
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -660,6 +689,8 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveStep(string $stepId, ProposalPlanService $plan): void
     {
+        $this->forgetPlanSteps();
+
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -670,7 +701,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        if ($plan->unmetDependencies($step) !== []) {
+        if ($plan->unmetDependencies($step, $plan->steps($step)) !== []) {
             $this->reportResolveFailure($step, __('Approve the earlier step this one links to first.'));
 
             return;
@@ -699,6 +730,8 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function rejectStep(string $stepId, ProposalPlanService $plan): void
     {
+        $this->forgetPlanSteps();
+
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -710,7 +743,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         try {
-            $cancelled = $plan->reject($step);
+            $cancelled = $plan->reject($step, $this->authUser());
         } catch (QueryException $exception) {
             $this->reportDatabaseFailure($step, $exception);
 
@@ -735,6 +768,8 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function discardAll(ProposalPlanService $plan): void
     {
+        $this->forgetPlanSteps();
+
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -753,7 +788,7 @@ final class ProposalCard extends BaseLivewireComponent
             }
 
             try {
-                $plan->reject($fresh);
+                $plan->reject($fresh, $this->authUser());
             } catch (QueryException $exception) {
                 $this->reportDatabaseFailure($fresh, $exception);
 
@@ -871,10 +906,10 @@ final class ProposalCard extends BaseLivewireComponent
 
         try {
             if ($isBatch) {
-                $result = $service->rejectItem($pendingAction, $this->cursor);
+                $result = $service->rejectItem($pendingAction, $this->authUser(), $this->cursor);
                 $finalized = $result['finalized'];
             } else {
-                resolve(ProposalPlanService::class)->reject($pendingAction);
+                resolve(ProposalPlanService::class)->reject($pendingAction, $this->authUser());
                 $finalized = true;
             }
         } catch (QueryException $exception) {
@@ -1169,12 +1204,27 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
+        $entityType = $pendingAction->entity_type;
+
+        // Which codes are editable is a property of the entity, not of the record:
+        // the describer lists the entity's core keys plus its active, non-deferred
+        // custom fields, and defers by field type rather than by value. stepViews()
+        // asks once per step, so without this memo a plan whose steps share an
+        // entity type (the usual shape: one company, then its four contacts) re-ran
+        // the same CustomField query for every step on every dock round trip.
+        if (array_key_exists($entityType, $this->editableCodesCache)) {
+            return $this->editableCodesCache[$entityType];
+        }
+
         $this->ensureTenantContext();
 
         $schema = resolve(ProposalFieldSchemaDescriber::class)
-            ->describe($this->authUser(), $pendingAction->entity_type, $this->currentRecord($pendingAction));
+            ->describe($this->authUser(), $entityType, $this->currentRecord($pendingAction));
 
-        return array_map(static fn (array $field): string => (string) $field['code'], $schema);
+        return $this->editableCodesCache[$entityType] = array_map(
+            static fn (array $field): string => (string) $field['code'],
+            $schema,
+        );
     }
 
     /**
@@ -1192,6 +1242,11 @@ final class ProposalCard extends BaseLivewireComponent
 
     public function render(): View
     {
+        // An action ran earlier in this same request may have resolved a step, so
+        // the memo is dropped here rather than trusted: stepViews() repopulates it
+        // once and the rest of the render reads that.
+        $this->forgetPlanSteps();
+
         $proposal = $this->loadStep($this->activeStepId());
         $steps = $this->stepViews();
 

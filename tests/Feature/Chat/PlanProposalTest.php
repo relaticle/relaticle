@@ -10,7 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
+use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\PlanReferenceResolver;
@@ -76,7 +78,7 @@ it('groups the writes of one turn into a single plan and links them by reference
     expect($plan->steps($company))->toHaveCount(2)
         ->and($plan->isPlan($person))->toBeTrue()
         ->and($plan->dependencyIds($person))->toBe([(string) $company->getKey()])
-        ->and($plan->unmetDependencies($person))->toHaveCount(1);
+        ->and($plan->unmetDependencies($person, $plan->steps($person)))->toHaveCount(1);
 });
 
 it('shows the referenced record on the card instead of dropping the row', function (): void {
@@ -141,7 +143,7 @@ it('cancels the steps that depended on a rejected one', function (): void {
         'records' => [['title' => 'Call Jane', 'people_ids' => [PlanReference::to((string) $person->getKey())]]],
     ]));
 
-    $cancelled = resolve(ProposalPlanService::class)->reject($company);
+    $cancelled = resolve(ProposalPlanService::class)->reject($company, $this->user);
 
     expect($cancelled)->toHaveCount(2)
         ->and($company->refresh()->status)->toBe(PendingActionStatus::Rejected)
@@ -164,7 +166,7 @@ it('refuses to approve a step whose reference was never approved', function (): 
 
     $person = ($this->proposalFor)('people');
 
-    resolve(PendingActionService::class)->reject($company);
+    resolve(PendingActionService::class)->reject($company, $this->user);
 
     expect(fn () => resolve(PendingActionService::class)->approve($person->refresh(), $this->user))
         ->toThrow(RuntimeException::class);
@@ -205,7 +207,7 @@ it('treats a lone proposal as a plan of one', function (): void {
 
     expect($plan->isPlan($company))->toBeFalse()
         ->and($plan->steps($company))->toHaveCount(1)
-        ->and($plan->unmetDependencies($company))->toBe([]);
+        ->and($plan->unmetDependencies($company, $plan->steps($company)))->toBe([]);
 
     $result = $plan->approveAll($company, $this->user);
 
@@ -313,4 +315,40 @@ it('does not surface driver detail when a plan step hits a database error', func
         ->and($result['failed']['message'])->not->toContain($secret)
         ->and($result['failed']['message'])->not->toContain('SQLSTATE')
         ->and($result['failed']['message'])->not->toContain('pgsql');
+});
+
+it('renders a plan without re-reading the plan or the custom fields once per step', function (): void {
+    ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+        'records' => [['name' => 'Acme Robotics']],
+    ]));
+    $company = ($this->proposalFor)('company');
+
+    // Four people steps: the same entity type repeated, which is what a chained
+    // "create the company, then its contacts" request actually produces.
+    foreach (['Jane Doe', 'John Roe', 'Ada Lovelace', 'Grace Hopper'] as $name) {
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => $name, 'company_id' => PlanReference::to((string) $company->getKey())]],
+        ]));
+    }
+
+    $card = Livewire::test(ProposalCard::class, [
+        'pendingActionId' => (string) $company->getKey(),
+        'context' => 'chat',
+    ]);
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $card->call('$refresh');
+
+    $queries = collect(DB::getQueryLog())->pluck('query');
+    DB::disableQueryLog();
+
+    $planQueries = $queries->filter(fn (string $q): bool => str_contains($q, 'from "pending_actions"'))->count();
+    $customFieldQueries = $queries->filter(fn (string $q): bool => str_contains($q, 'from "custom_fields"'))->count();
+
+    // Five steps over two entity types. One plan read, and one custom-field read
+    // per distinct entity type (plus its options eager load), not per step.
+    expect($planQueries)->toBeLessThanOrEqual(3, "plan re-read per step: {$planQueries} pending_actions queries")
+        ->and($customFieldQueries)->toBeLessThanOrEqual(4, "custom fields re-read per step: {$customFieldQueries} custom_fields queries");
 });
