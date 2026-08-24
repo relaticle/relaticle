@@ -6,19 +6,18 @@ namespace App\Livewire\App\Onboarding;
 
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Data\ActivationStepData;
-use App\Enums\CreationSource;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\PeopleResource;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
+use Spatie\Onboard\OnboardingStep;
 
 /**
  * First-run guide on the dashboard. Each step is a fact about the workspace, not a
@@ -30,21 +29,6 @@ use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
  */
 final class ActivationChecklist extends Component
 {
-    /**
-     * The record types a workspace can hold. Mirrors what the importer writes, so
-     * any of them ticks the import step.
-     *
-     * @var list<string>
-     */
-    private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
-
-    /**
-     * Request-scoped cache for {@see self::creationSources()}.
-     *
-     * @var list<string>|null
-     */
-    private ?array $creationSources = null;
-
     public function dismiss(): void
     {
         $team = $this->team();
@@ -101,40 +85,26 @@ final class ActivationChecklist extends Component
             return [];
         }
 
-        return [
-            new ActivationStepData(
-                key: 'first_record',
-                label: __('filament/pages/dashboard.activation.steps.first_record.label'),
-                description: __('filament/pages/dashboard.activation.steps.first_record.description'),
-                url: PeopleResource::getUrl('index'),
-                icon: 'heroicon-o-user-plus',
-                complete: $this->hasOwnRecord($team),
-            ),
-            new ActivationStepData(
-                key: 'import',
-                label: __('filament/pages/dashboard.activation.steps.import.label'),
-                description: __('filament/pages/dashboard.activation.steps.import.description'),
-                url: ImportPeople::getUrl(),
-                icon: 'heroicon-o-arrow-up-tray',
-                complete: $this->hasImportedRecord($team),
-            ),
-            new ActivationStepData(
-                key: 'invite',
-                label: __('filament/pages/dashboard.activation.steps.invite.label'),
-                description: __('filament/pages/dashboard.activation.steps.invite.description'),
-                url: Members::getUrl(),
-                icon: 'heroicon-o-user-group',
-                complete: $this->hasTeammate($team),
-            ),
-            new ActivationStepData(
-                key: 'ask_rela',
-                label: __('filament/pages/dashboard.activation.steps.ask_rela.label'),
-                description: __('filament/pages/dashboard.activation.steps.ask_rela.description'),
-                url: ChatConversation::getUrl(),
-                icon: 'heroicon-o-sparkles',
-                complete: $this->hasConversation($team),
-            ),
-        ];
+        return array_values($team->onboarding()->steps()
+            ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
+                key: (string) $step->attribute('key'),
+                label: __((string) $step->attribute('label_key')),
+                description: __((string) $step->attribute('description_key')),
+                url: $this->stepUrl((string) $step->attribute('key')),
+                icon: (string) $step->attribute('icon'),
+                complete: $step->complete(),
+            ))
+            ->all());
+    }
+
+    private function stepUrl(string $key): string
+    {
+        return match ($key) {
+            'import' => ImportPeople::getUrl(),
+            'invite' => Members::getUrl(),
+            'ask_rela' => ChatConversation::getUrl(),
+            default => PeopleResource::getUrl('index'),
+        };
     }
 
     #[Computed]
@@ -155,70 +125,7 @@ final class ActivationChecklist extends Component
     {
         $team = $this->team();
 
-        if (! $team instanceof Team) {
-            return false;
-        }
-
-        return in_array(CreationSource::SYSTEM->value, $this->creationSources($team), true);
-    }
-
-    private function hasOwnRecord(Team $team): bool
-    {
-        return array_any(
-            $this->creationSources($team),
-            fn (string $source): bool => $source !== CreationSource::SYSTEM->value,
-        );
-    }
-
-    private function hasImportedRecord(Team $team): bool
-    {
-        return in_array(CreationSource::IMPORT->value, $this->creationSources($team), true);
-    }
-
-    private function hasTeammate(Team $team): bool
-    {
-        return $team->users()->exists() || $team->teamInvitations()->exists();
-    }
-
-    private function hasConversation(Team $team): bool
-    {
-        return DB::table('agent_conversations')
-            ->where('team_id', $team->getKey())
-            ->exists();
-    }
-
-    /**
-     * Every distinct creation source present in the workspace, in one round trip.
-     * Three of the four steps are answered from this list, so asking per step would
-     * mean fifteen queries on a page that renders before the user has any data.
-     *
-     * @return list<string>
-     */
-    private function creationSources(Team $team): array
-    {
-        if ($this->creationSources !== null) {
-            return $this->creationSources;
-        }
-
-        $query = null;
-
-        foreach (self::ENTITY_TABLES as $table) {
-            $branch = DB::table($table)
-                ->select('creation_source')
-                ->where('team_id', $team->getKey())
-                ->whereNull('deleted_at')
-                ->distinct();
-
-            $query = $query instanceof QueryBuilder ? $query->union($branch) : $branch;
-        }
-
-        /** @var QueryBuilder $query */
-        $sources = array_map(
-            fn (mixed $source): string => (string) $source,
-            $query->pluck('creation_source')->all(),
-        );
-
-        return $this->creationSources = array_values(array_unique($sources));
+        return $team instanceof Team && resolve(WorkspaceActivationFacts::class)->hasSampleData($team);
     }
 
     private function team(): ?Team

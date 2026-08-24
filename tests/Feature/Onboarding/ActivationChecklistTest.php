@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -85,13 +86,32 @@ it('completes the invite step while an invitation is pending', function (): void
         ->assertSeeHtml(stepState('invite', true));
 });
 
-it('completes the assistant step once the workspace has a conversation', function (): void {
+it('completes the assistant step once the user has sent a chat message', function (): void {
+    $conversationId = (string) Str::ulid();
+
     DB::table('agent_conversations')->insert([
-        'id' => (string) Str::ulid(),
+        'id' => $conversationId,
         'team_id' => $this->team->getKey(),
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => $this->owner->getKey(),
         'title' => 'Pipeline check',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'user',
+        'content' => 'hi',
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -135,12 +155,31 @@ it('disappears once every step is done', function (): void {
         'role' => TeamRole::Editor->value,
     ]);
 
+    $conversationId = (string) Str::ulid();
+
     DB::table('agent_conversations')->insert([
-        'id' => (string) Str::ulid(),
+        'id' => $conversationId,
         'team_id' => $this->team->getKey(),
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => $this->owner->getKey(),
         'title' => 'Pipeline check',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'user',
+        'content' => 'hi',
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -179,6 +218,8 @@ it('mentions sample data only while seeded records remain', function (): void {
         'team_id' => $this->team->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($this->team);
 
     livewire(ActivationChecklist::class)
         ->assertSee(__('filament/pages/dashboard.activation.sample_data'));
