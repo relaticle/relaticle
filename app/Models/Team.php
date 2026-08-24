@@ -162,6 +162,7 @@ final class Team extends JetstreamTeam implements HasAvatar
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
+            'activation_checklist_dismissed_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'trial_ends_at' => 'datetime',

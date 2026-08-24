@@ -1,0 +1,202 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Actions\Onboarding\DismissActivationChecklist;
+use App\Enums\CreationSource;
+use App\Enums\TeamRole;
+use App\Filament\Pages\Dashboard;
+use App\Livewire\App\Onboarding\ActivationChecklist;
+use App\Models\People;
+use App\Models\Team;
+use App\Models\TeamInvitation;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+mutates(ActivationChecklist::class, DismissActivationChecklist::class);
+
+beforeEach(function (): void {
+    $this->owner = User::factory()->withPersonalTeam()->create();
+    $this->team = $this->owner->currentTeam;
+
+    $this->actingAs($this->owner);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->team);
+});
+
+function stepState(string $key, bool $complete): string
+{
+    return sprintf('data-step="%s" data-complete="%s"', $key, $complete ? 'true' : 'false');
+}
+
+it('starts every step incomplete in a fresh workspace', function (): void {
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('first_record', false))
+        ->assertSeeHtml(stepState('import', false))
+        ->assertSeeHtml(stepState('invite', false))
+        ->assertSeeHtml(stepState('ask_rela', false))
+        ->assertSee('0 of 4');
+});
+
+it('completes the first-record step once the workspace holds a record the team made', function (): void {
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('first_record', true))
+        ->assertSee('1 of 4');
+});
+
+it('leaves the first-record step incomplete while only seeded demo records exist', function (): void {
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('first_record', false))
+        ->assertSee('0 of 4');
+});
+
+it('completes the import step for an imported record', function (): void {
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creation_source' => CreationSource::IMPORT,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('import', true))
+        ->assertSeeHtml(stepState('first_record', true));
+});
+
+it('completes the invite step while an invitation is pending', function (): void {
+    TeamInvitation::query()->create([
+        'team_id' => $this->team->getKey(),
+        'email' => 'teammate@example.com',
+        'role' => TeamRole::Editor->value,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('invite', true));
+});
+
+it('completes the assistant step once the workspace has a conversation', function (): void {
+    DB::table('agent_conversations')->insert([
+        'id' => (string) Str::ulid(),
+        'team_id' => $this->team->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => $this->owner->getKey(),
+        'title' => 'Pipeline check',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('ask_rela', true));
+});
+
+it('ignores records and conversations belonging to another workspace', function (): void {
+    $otherTeam = Team::factory()->create();
+
+    People::factory()->create([
+        'team_id' => $otherTeam->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => (string) Str::ulid(),
+        'team_id' => $otherTeam->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => $this->owner->getKey(),
+        'title' => 'Elsewhere',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('first_record', false))
+        ->assertSeeHtml(stepState('ask_rela', false));
+});
+
+it('disappears once every step is done', function (): void {
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creation_source' => CreationSource::IMPORT,
+    ]);
+
+    TeamInvitation::query()->create([
+        'team_id' => $this->team->getKey(),
+        'email' => 'teammate@example.com',
+        'role' => TeamRole::Editor->value,
+    ]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => (string) Str::ulid(),
+        'team_id' => $this->team->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => $this->owner->getKey(),
+        'title' => 'Pipeline check',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertDontSeeHtml('data-testid="activation-step"');
+});
+
+it('stays hidden after the owner dismisses it', function (): void {
+    livewire(ActivationChecklist::class)
+        ->call('dismiss')
+        ->assertDontSeeHtml('data-testid="activation-step"');
+
+    expect($this->team->refresh()->activation_checklist_dismissed_at)->not->toBeNull();
+
+    livewire(ActivationChecklist::class)
+        ->assertDontSeeHtml('data-testid="activation-step"');
+});
+
+it('stays hidden for a member who cannot manage the workspace', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($member);
+    Filament::setTenant($this->team);
+
+    livewire(ActivationChecklist::class)
+        ->assertDontSeeHtml('data-testid="activation-step"');
+});
+
+it('mentions sample data only while seeded records remain', function (): void {
+    livewire(ActivationChecklist::class)
+        ->assertDontSee(__('filament/pages/dashboard.activation.sample_data'));
+
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSee(__('filament/pages/dashboard.activation.sample_data'));
+});
+
+it('answers all four steps without repeating a query', function (): void {
+    DB::enableQueryLog();
+
+    livewire(ActivationChecklist::class);
+
+    $log = collect(DB::getQueryLog())->map(fn (array $entry): string => (string) $entry['query']);
+
+    expect($log->filter(fn (string $sql): bool => str_contains($sql, 'creation_source')))->toHaveCount(1)
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(1)
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'team_invitations')))->toHaveCount(1);
+});
+
+it('renders on the dashboard', function (): void {
+    livewire(Dashboard::class)
+        ->assertSeeHtml('data-testid="activation-step"');
+});
