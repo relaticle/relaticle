@@ -71,3 +71,22 @@ half the transcript the first time it was written.
 Prompt and UI follow from this: the assistant must never ask the user to say "continue"
 or "next", and a decided proposal card collapses to one line (pending stays fully
 expanded — you may not approve what you were not shown).
+
+## The sidebar chat list cannot repaint itself
+`ChatSidebarNav` is mounted through a Filament render hook, so it is a Livewire
+component nested inside `Filament\Livewire\Sidebar`. A nested component's own
+re-render never reaches the DOM here: the server renders it and Livewire drops
+the html, leaving whatever the page loaded with. Only the parent's render paints
+it, which Filament exposes as the `refresh-sidebar` event. Everything that
+changes the list therefore dispatches that: `send.js` on conversation creation,
+`stream.js applyTitle()` when a generated title arrives, the row's rename, and
+`ChatSidebarNav::deleteConversation`. The component itself listens to nothing;
+`$listeners => '$refresh'` there is worse than dead, because a self-refresh
+batched with the parent's refresh takes the parent's paint down with it.
+Dispatch `refresh-sidebar` in its own tick when another Livewire event fires
+alongside it (`setTimeout(..., 0)`).
+Two traps behind this one. A row's title cannot be patched by hand: it lives in
+an `x-if` template Alpine tears down while renaming, so the write lands on a
+detached node and the stale title returns with the template. And the all-chats
+panel is nested the same way and has the same defect, still unfixed: it shows
+the list as of its last full page load.

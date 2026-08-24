@@ -436,9 +436,18 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                 url.hash = '';
                 history.replaceState(null, '', url.toString());
 
+                // Three audiences, deliberately: the side panel keeps its own
+                // list and listens on the window; the all-chats panel is a
+                // Livewire component whose $listeners only see Livewire events;
+                // and the sidebar's list is nested inside Filament's sidebar,
+                // where only a parent repaint reaches the DOM (see applyTitle).
+                // Firing fewer than all three leaves part of the UI without the
+                // new chat until a reload.
                 window.dispatchEvent(new CustomEvent('chat:conversation-created', {
                     detail: { id: newId },
                 }));
+                window.Livewire?.dispatch('chat:conversation-created', { id: newId });
+                window.Livewire?.dispatch('refresh-sidebar');
 
                 // Step 4: trigger the AI by hitting the existing send endpoint.
                 // It reserves a credit, dispatches ProcessChatMessage, and the

@@ -567,6 +567,14 @@ export const streamModule = ({ texts = {} } = {}) => ({
 
         if (window.Livewire?.dispatch) {
             window.Livewire.dispatch('chat:conversation-renamed', { conversationId, title });
+            // The sidebar's chat list is a Livewire component nested inside
+            // Filament's sidebar, and a nested component's own re-render is not
+            // painted -- the server renders it, the DOM keeps the old rows. Only
+            // the parent repaints it, so ask Filament for that through the hook
+            // it provides. Without this the sidebar row keeps the raw first
+            // message until the next page load, while the heading and tab title
+            // (plain DOM writes) already show the generated one.
+            window.Livewire.dispatch('refresh-sidebar');
         }
     },
 });

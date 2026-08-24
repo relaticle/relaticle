@@ -13,13 +13,21 @@ use Relaticle\Chat\Actions\ListConversations;
 
 final class ChatSidebarNav extends BaseLivewireComponent
 {
-    /** @var array<string, string> */
-    protected $listeners = [
-        'chat:conversation-created' => '$refresh',
-        'chat:conversation-deleted' => '$refresh',
-        'chat:conversation-renamed' => '$refresh',
-    ];
-
+    /**
+     * Deliberately listens to nothing.
+     *
+     * This component is nested inside Filament's sidebar, and a nested
+     * component's own re-render never reaches the DOM here: the server renders
+     * it and Livewire discards the html, so the list keeps whatever it showed
+     * at page load. Only the parent's render paints it, which Filament exposes
+     * as the `refresh-sidebar` event (Filament\Livewire\Sidebar::refresh).
+     *
+     * Worse than useless: a self-refresh in the SAME batch as a parent refresh
+     * loses the parent's paint too, so a chat list that listened here stayed
+     * stale even once the right event was dispatched alongside it. Everything
+     * that changes this list therefore dispatches `refresh-sidebar` and nothing
+     * else — see ChatSidebarNav::deleteConversation and the chat JS.
+     */
     public function deleteConversation(string $conversationId): void
     {
         $user = Filament::auth()->user();
@@ -31,6 +39,10 @@ final class ChatSidebarNav extends BaseLivewireComponent
         (new DeleteConversation)->execute($user, $conversationId);
 
         $this->dispatch('chat:conversation-deleted');
+        // This component cannot repaint itself: it is nested inside Filament's
+        // sidebar, so its own re-render is discarded and only the parent's
+        // reaches the DOM. Filament exposes that repaint as `refresh-sidebar`.
+        $this->dispatch('refresh-sidebar');
     }
 
     private const int SIDEBAR_LIMIT = 7;

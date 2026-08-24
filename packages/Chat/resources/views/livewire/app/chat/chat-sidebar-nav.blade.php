@@ -117,8 +117,6 @@
                                 });
                                 if (res.ok) {
                                     const body = await res.json();
-                                    const titleEl = $el.querySelector('[data-title]');
-                                    if (titleEl) titleEl.textContent = body.title;
 
                                     // Notify the conversation page H1 (Alpine listener).
                                     window.dispatchEvent(new CustomEvent('chat:renamed', {
@@ -128,12 +126,25 @@
                                         },
                                     }));
 
-                                    // Notify the Livewire parent so its $refresh sees fresh state on the next render.
                                     if (window.Livewire?.dispatch) {
+                                        {{-- This row cannot be rewritten by hand: it lives
+                                             in an `x-if` template that Alpine tears down
+                                             while editing, so a write lands on a detached
+                                             node and the old title comes back with the
+                                             template. And this list cannot repaint itself
+                                             either (see ChatSidebarNav) -- only Filament's
+                                             sidebar can, via refresh-sidebar.
+
+                                             The two events go in separate ticks on purpose:
+                                             Livewire batches same-tick dispatches into one
+                                             request, and in that batch the all-chats panel's
+                                             own (never painted) re-render takes the sidebar's
+                                             paint down with it. --}}
                                         window.Livewire.dispatch('chat:conversation-renamed', {
                                             conversationId: body.conversation_id,
                                             title: body.title,
                                         });
+                                        setTimeout(() => window.Livewire.dispatch('refresh-sidebar'), 0);
                                     }
                                 }
                             } catch (_) { /* network errors silently abort */ }

@@ -14,31 +14,26 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentTeam);
 });
 
-it('registers chat:conversation-created listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
+/**
+ * The three listener-registration tests this replaces asserted wiring that
+ * provably did nothing: this component is nested inside Filament's sidebar, so
+ * its own re-render is discarded and only the parent's paints. What has to hold
+ * now is that anything changing the list asks Filament for that parent repaint.
+ */
+it('asks filament to repaint the sidebar when a conversation is deleted', function (): void {
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-repaint',
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'team_id' => $this->user->current_team_id,
+        'title' => 'Delete me',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-created', '$refresh');
-});
-
-it('registers chat:conversation-deleted listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
-
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-deleted', '$refresh');
-});
-
-it('registers chat:conversation-renamed listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
-
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-renamed', '$refresh');
+    Livewire::test(ChatSidebarNav::class)
+        ->call('deleteConversation', 'c-repaint')
+        ->assertDispatched('refresh-sidebar');
 });
 
 it('deletes a conversation via livewire action', function (): void {
