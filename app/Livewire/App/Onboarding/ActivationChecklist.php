@@ -6,6 +6,7 @@ namespace App\Livewire\App\Onboarding;
 
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Data\ActivationStepData;
+use App\Enums\ActivationStep;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\PeopleResource;
@@ -87,23 +88,35 @@ final class ActivationChecklist extends Component
 
         return array_values($team->onboarding()->steps()
             ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
-                key: (string) $step->attribute('key'),
+                key: $this->stepKey($step)->value,
                 label: __((string) $step->attribute('label_key')),
                 description: __((string) $step->attribute('description_key')),
-                url: $this->stepUrl((string) $step->attribute('key')),
+                url: $this->stepUrl($this->stepKey($step)),
                 icon: (string) $step->attribute('icon'),
                 complete: $step->complete(),
             ))
             ->all());
     }
 
-    private function stepUrl(string $key): string
+    private function stepKey(OnboardingStep $step): ActivationStep
     {
-        return match ($key) {
-            'import' => ImportPeople::getUrl(),
-            'invite' => Members::getUrl(),
-            'ask_rela' => ChatConversation::getUrl(),
-            default => PeopleResource::getUrl('index'),
+        $key = $step->attribute('key');
+
+        return $key instanceof ActivationStep ? $key : ActivationStep::from((string) $key);
+    }
+
+    /**
+     * Every registered step needs a destination. Matching the key exhaustively
+     * means a step added to ActivationSteps without one fails here rather than
+     * quietly rendering a row that links to the People list.
+     */
+    private function stepUrl(ActivationStep $step): string
+    {
+        return match ($step) {
+            ActivationStep::FirstRecord => PeopleResource::getUrl('index'),
+            ActivationStep::Import => ImportPeople::getUrl(),
+            ActivationStep::Invite => Members::getUrl(),
+            ActivationStep::AskRela => ChatConversation::getUrl(),
         };
     }
 

@@ -13,6 +13,12 @@ that touches two workspaces. Verified against 2.6.3; unreported upstream.
 Because a fresh registry starts empty, step registration lives inside that
 binding (`ActivationSteps::registerOn($steps)`), not in `boot()`.
 
+**Never register steps through the `Spatie\Onboard\Facades\Onboard` facade**
+(what the package README shows). A facade caches its resolved instance, so with
+a non-singleton binding it holds an orphan registry no `$team->onboarding()`
+call ever reads: `Onboard::addStep()` would silently register a step that never
+appears. Add steps in `ActivationSteps::registerOn()` only.
+
 Completion truth comes from `App\Services\WorkspaceActivationFacts`, which caches
 per team id and is `scoped` (reset per request/job). Call `forget($team)` after
 writing records inside one request/test before re-reading a step.

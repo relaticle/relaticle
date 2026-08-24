@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Onboarding;
 
+use App\Enums\ActivationStep;
 use App\Models\Team;
 use App\Services\WorkspaceActivationFacts;
 use Spatie\Onboard\OnboardingSteps;
@@ -26,36 +27,36 @@ final readonly class ActivationSteps
 {
     public static function registerOn(OnboardingSteps $steps): void
     {
-        $steps->addStep('first_record', Team::class)
+        $steps->addStep(ActivationStep::FirstRecord->value, Team::class)
             ->attributes([
-                'key' => 'first_record',
+                'key' => ActivationStep::FirstRecord,
                 'label_key' => 'filament/pages/dashboard.activation.steps.first_record.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.first_record.description',
                 'icon' => 'heroicon-o-user-plus',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasOwnRecord($model));
 
-        $steps->addStep('import', Team::class)
+        $steps->addStep(ActivationStep::Import->value, Team::class)
             ->attributes([
-                'key' => 'import',
+                'key' => ActivationStep::Import,
                 'label_key' => 'filament/pages/dashboard.activation.steps.import.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.import.description',
                 'icon' => 'heroicon-o-arrow-up-tray',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasImportedRecord($model));
 
-        $steps->addStep('invite', Team::class)
+        $steps->addStep(ActivationStep::Invite->value, Team::class)
             ->attributes([
-                'key' => 'invite',
+                'key' => ActivationStep::Invite,
                 'label_key' => 'filament/pages/dashboard.activation.steps.invite.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.invite.description',
                 'icon' => 'heroicon-o-user-group',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasTeammate($model));
 
-        $steps->addStep('ask_rela', Team::class)
+        $steps->addStep(ActivationStep::AskRela->value, Team::class)
             ->attributes([
-                'key' => 'ask_rela',
+                'key' => ActivationStep::AskRela,
                 'label_key' => 'filament/pages/dashboard.activation.steps.ask_rela.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.ask_rela.description',
                 'icon' => 'heroicon-o-sparkles',

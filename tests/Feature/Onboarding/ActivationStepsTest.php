@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ActivationStep;
 use App\Enums\CreationSource;
 use App\Enums\TeamRole;
 use App\Models\People;
@@ -32,7 +33,7 @@ function stepByKey(Team $team, string $key): OnboardingStep
     resolve(WorkspaceActivationFacts::class)->forget($team);
 
     return $team->onboarding()->steps()
-        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === $key);
+        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === ActivationStep::from($key));
 }
 
 it('registers exactly four steps for a team', function (): void {
@@ -162,10 +163,10 @@ it('does not leak one workspace\'s step state onto another', function (): void {
     ]);
 
     expect($this->team->onboarding()->steps()
-        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === 'first_record')
+        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === ActivationStep::FirstRecord)
         ->complete())->toBeFalse();
 
     expect($otherTeam->onboarding()->steps()
-        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === 'first_record')
+        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === ActivationStep::FirstRecord)
         ->complete())->toBeTrue();
 });

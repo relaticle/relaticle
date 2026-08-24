@@ -1,6 +1,7 @@
 ---
 paths:
   - 'app/Models/**'
+  - 'packages/*/src/Models/**'
 ---
 
 ### Model Creation

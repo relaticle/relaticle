@@ -1,7 +1,9 @@
 ---
 paths:
   - 'app/Livewire/**'
+  - 'packages/*/src/Livewire/**'
   - 'resources/views/**'
+  - 'packages/*/resources/views/**'
 ---
 
 # Livewire
