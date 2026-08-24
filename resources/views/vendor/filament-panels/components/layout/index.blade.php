@@ -204,4 +204,47 @@
             {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::LAYOUT_END, scopes: $renderHookScopes) }}
         </div>
     @endif
+
+    {{-- Keeps the topbar showing exactly the heading the current page rendered.
+
+         The heading is teleported into the Topbar Livewire component (see
+         filament.app.topbar-page-heading), whose morph removes any child it did
+         not itself render, so without this a topbar re-render leaves the page
+         with no heading at all. It reads the current page's template on every
+         pass rather than remembering the node: a remembered node survives the
+         cleanup Alpine does on navigation and follows you onto the next page. --}}
+    <script>
+        (() => {
+            const sync = () => {
+                const target = document.querySelector('.fi-topbar-start');
+
+                if (! target) {
+                    return;
+                }
+
+                const source = document.querySelector('template[data-page-heading-source]');
+                const heading = source?._x_teleport ?? null;
+
+                // Drop anything the current page did not render, which is how a
+                // previous page's title stops following you around.
+                target.querySelectorAll('[data-page-heading]').forEach((node) => {
+                    if (node !== heading) {
+                        node.remove();
+                    }
+                });
+
+                if (heading && heading.parentElement !== target) {
+                    target.append(heading);
+                }
+            };
+
+            document.addEventListener('livewire:navigated', sync);
+
+            // livewire:init, not a bare call: this script is in the layout, which
+            // parses before Livewire has defined its hook API.
+            document.addEventListener('livewire:init', () => {
+                window.Livewire.hook('morphed', () => queueMicrotask(sync));
+            });
+        })();
+    </script>
 </x-filament-panels::layout.base>

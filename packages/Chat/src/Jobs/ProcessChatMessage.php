@@ -414,6 +414,28 @@ final class ProcessChatMessage implements ShouldQueue
                 }
             }
 
+            // Settle here rather than leaving it to failed(): the queue never calls
+            // failed() on the object that ran handle(). CallQueuedHandler::failed()
+            // rebuilds the command from the ORIGINAL dispatch payload, so by then
+            // every private flag is back at its dispatch-time value and
+            // $streamedAnything is false however much the turn streamed. Left to
+            // failed(), a turn that reached the provider and emitted tokens was
+            // refunded while the provider had already billed us for it.
+            //
+            // Both paths write under the same resolution key and recordResolution()
+            // is insertOrIgnore, so this settle wins and failed()'s later refund is
+            // a no-op. That is what makes the refund there safe to leave
+            // unconditional.
+            if ($this->streamedAnything) {
+                $creditService->settleReservedMinimum(
+                    team: $this->team,
+                    user: $this->user,
+                    conversationId: $this->conversationId,
+                    resolutionKey: $this->resolutionKey(),
+                    reason: 'stream_failed',
+                );
+            }
+
             throw $e;
         } finally {
             $this->releaseAuth();
@@ -478,28 +500,22 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        // A turn that never streamed never reached a provider, so it cost nothing and
-        // must not be charged. The commonest case is a queue backlog: retryUntil() is
-        // stamped at dispatch, so the worker can fail the job at pickup before
-        // handle() is ever entered, and this instance is the freshly unserialized one
-        // whose $streamedAnything is still false.
-        $credits = resolve(CreditService::class);
-
-        if ($this->streamedAnything) {
-            $credits->settleReservedMinimum(
-                team: $this->team,
-                user: $this->user,
-                conversationId: $this->conversationId,
-                resolutionKey: $this->resolutionKey(),
-                reason: 'job_failed',
-            );
-        } else {
-            $credits->refundReservation(
-                $this->team,
-                resolutionKey: $this->resolutionKey(),
-                conversationId: $this->conversationId,
-            );
-        }
+        // Unconditional, because this instance can never answer the question the
+        // charge depends on: the queue rebuilds the command from the original
+        // dispatch payload before calling failed(), so $streamedAnything is false
+        // here no matter what the turn did. A turn that DID stream has already
+        // settled its minimum in handle(), under this same resolution key, and
+        // recordResolution() is insertOrIgnore, so that settle stands and this
+        // refund is dropped.
+        //
+        // What is left for this to cover is the turn that never ran at all: a queue
+        // backlog past retryUntil() fails the job at pickup, before handle() is
+        // entered, and nothing was ever sent to a provider to pay for.
+        resolve(CreditService::class)->refundReservation(
+            $this->team,
+            resolutionKey: $this->resolutionKey(),
+            conversationId: $this->conversationId,
+        );
 
         ChatTelemetry::breadcrumb('job.failed', [
             'exception' => $exception?->getMessage(),
