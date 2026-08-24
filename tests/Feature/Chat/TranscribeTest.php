@@ -6,6 +6,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
@@ -125,4 +126,51 @@ it('throttles after 60 requests a day even when they are spread across minutes',
     }
 
     $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
+});
+
+/**
+ * The workspace ceiling, which the two per-user limiters above cannot express:
+ * they are keyed per user, so an N-seat team multiplies the daily allowance by N
+ * against a provider the team reserves no credit with. Seeded rather than driven
+ * with 240 uploads, so the test states the ceiling instead of spending three
+ * minutes rediscovering it.
+ */
+it('throttles a whole workspace once its shared daily allowance is spent', function (): void {
+    Transcription::fake(['ok']);
+    Cache::flush();
+
+    // The same key ThrottleRequests derives for a named limiter (see
+    // handleRequestUsingNamedLimiter): md5 of the limiter name plus the key the
+    // limiter returned.
+    $teamKey = md5('transcribe-team-daily'.'transcribe-team:'.$this->user->currentTeam->getKey());
+
+    for ($i = 0; $i < 240; $i++) {
+        RateLimiter::hit($teamKey, 1440 * 60);
+    }
+
+    $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
+});
+
+it('bills that allowance to the workspace, not to each member of it', function (): void {
+    Transcription::fake(['ok']);
+    Cache::flush();
+
+    // The same key ThrottleRequests derives for a named limiter (see
+    // handleRequestUsingNamedLimiter): md5 of the limiter name plus the key the
+    // limiter returned.
+    $teamKey = md5('transcribe-team-daily'.'transcribe-team:'.$this->user->currentTeam->getKey());
+
+    for ($i = 0; $i < 240; $i++) {
+        RateLimiter::hit($teamKey, 1440 * 60);
+    }
+
+    // A teammate with an untouched per-user allowance still finds the workspace
+    // ceiling spent. Keyed per user instead, this request would go through.
+    $teammate = User::factory()->create();
+    $this->user->currentTeam->users()->attach($teammate, ['role' => 'editor']);
+    $teammate->forceFill(['current_team_id' => $this->user->currentTeam->getKey()])->save();
+
+    $this->actingAs($teammate)
+        ->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
+        ->assertStatus(429);
 });
