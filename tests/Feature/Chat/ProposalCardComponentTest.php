@@ -1142,3 +1142,49 @@ it('refuses a client-set editing target, so one payload cannot open the same fie
     expect(fn () => $component->set('editingStepId', null))->toThrow(Exception::class)
         ->and(fn () => $component->set('editingFieldCode', 'name'))->toThrow(Exception::class);
 });
+
+it('never resolves a dock read from a client-supplied id, so another tenant cannot be read through it', function (): void {
+    $stranger = User::factory()->withPersonalTeam()->create();
+    $foreign = proposalCardPa(
+        $stranger,
+        ['name' => 'Contoso Holdings', 'account_owner_id' => (string) $stranger->getKey()],
+        [
+            'title' => 'Create Company',
+            'summary' => 'Contoso Holdings',
+            'fields' => [['label' => 'Name', 'code' => 'name', 'value' => 'Contoso Holdings']],
+        ],
+    );
+
+    $own = proposalCardPa(
+        $this->user,
+        ['name' => 'Acme Corp', 'account_owner_id' => (string) $this->user->getKey()],
+        [
+            'title' => 'Create Company',
+            'summary' => 'Acme Corp',
+            'fields' => [['label' => 'Name', 'code' => 'name', 'value' => 'Acme Corp']],
+        ],
+    );
+
+    // Livewire hands every client-invoked method through implicit route-model
+    // binding, so a public method typed PendingAction would resolve this id with a
+    // bare where(id)->first(). Each read below is called the way the browser calls
+    // it, with the stranger's id in argument position.
+    foreach (['currentRecordFields', 'editableCodes', 'recordCount', 'remainingCount', 'currentPosition'] as $method) {
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $own->getKey(), context: 'conversation')
+            ->call($method, $foreign->getKey())
+            ->assertReturned(fn (mixed $returned): bool => ! str_contains(
+                (string) json_encode($returned),
+                'Contoso',
+            ));
+    }
+
+    // The reads answer for the caller's own active step rather than returning
+    // nothing, so the guard cannot be mistaken for the dock simply being broken.
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $own->getKey(), context: 'conversation')
+        ->call('currentRecordFields', $foreign->getKey())
+        ->assertReturned(fn (array $fields): bool => collect($fields)->contains(
+            fn (array $row): bool => ($row['value'] ?? null) === 'Acme Corp',
+        ));
+});

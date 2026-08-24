@@ -15,6 +15,9 @@ use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\PersonalAccessToken;
 use App\Rules\ArrayExistsForTeam;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
+use Livewire\Component;
 
 arch()->preset()->php();
 
@@ -300,3 +303,95 @@ arch('must not use custom-fields package models directly')
         'App\Models\CustomFieldSection',
         'App\Models\CustomFieldValue',
     ]);
+
+// Livewire hands every client-invoked method through implicit route-model binding
+// (Wrapped::__call -> ImplicitlyBoundMethod), and Eloquent's resolveRouteBinding is
+// a bare where(key)->first(). A public method typed against a model therefore reads
+// whatever id the browser sends, ignoring team, owner and status. That is the shape
+// let ProposalCard's dock reads return another tenant's proposal. Take the id as a
+// string and resolve it through a scoped query instead.
+//
+// Lifecycle methods are exempt: Livewire's SupportLifecycleHooks throws
+// DirectlyCallingLifecycleHooksNotAllowedException before the call allowlist runs,
+// so mount() and friends are not client-callable.
+it('keeps Eloquent models off the client-callable surface of Livewire components', function (): void {
+    // Verified safe (2026-08-25): each passes the client-supplied team straight to an
+    // action that authorizes the ACTING user against THAT team, and returns void.
+    $grandfathered = [
+        'App\Livewire\App\Teams\AddTeamMember::addTeamMember',
+        'App\Livewire\App\Teams\DeleteTeam::cancelTeamDeletion',
+        'App\Livewire\App\Teams\DeleteTeam::deleteTeam',
+        'App\Livewire\App\Teams\TeamMembers::leaveTeam',
+        'App\Livewire\App\Teams\TeamMembers::removeTeamMember',
+        'App\Livewire\App\Teams\TeamMembers::updateTeamRole',
+        'App\Livewire\App\Teams\UpdateTeamName::updateTeamName',
+    ];
+
+    $lifecycle = ['mount', 'boot', 'booted', 'exception', 'rendering', 'rendered', 'scriptSrc', 'hydrate', 'dehydrate', 'updating', 'updated', 'render'];
+
+    // The Arch suite runs without a booted application, so base_path() is unavailable.
+    $root = dirname(__DIR__, 2);
+
+    $roots = [[$root.'/app', 'App\\']];
+
+    foreach (glob($root.'/packages/*/src', GLOB_ONLYDIR) ?: [] as $src) {
+        $roots[] = [$src, 'Relaticle\\'.basename(dirname($src)).'\\'];
+    }
+
+    $offenders = [];
+
+    foreach ($roots as [$dir, $namespace]) {
+        /** @var iterable<SplFileInfo> $files */
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+
+        foreach ($files as $file) {
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            $class = $namespace.str_replace(['/', '.php'], ['\\', ''], substr($file->getPathname(), strlen($dir) + 1));
+
+            if (! class_exists($class) || ! is_subclass_of($class, Component::class)) {
+                continue;
+            }
+
+            $reflection = new ReflectionClass($class);
+
+            if ($reflection->isAbstract()) {
+                continue;
+            }
+
+            foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                if ($method->class !== $class || $method->isStatic()) {
+                    continue;
+                }
+
+                if (Str::startsWith($method->getName(), $lifecycle)) {
+                    continue;
+                }
+
+                foreach ($method->getParameters() as $parameter) {
+                    $type = $parameter->getType();
+
+                    if (! $type instanceof ReflectionNamedType || $type->isBuiltin()) {
+                        continue;
+                    }
+
+                    if (! is_subclass_of($type->getName(), Model::class)) {
+                        continue;
+                    }
+
+                    $signature = $class.'::'.$method->getName();
+
+                    if (in_array($signature, $grandfathered, true)) {
+                        continue;
+                    }
+
+                    $offenders[] = $signature.'('.class_basename($type->getName()).' $'.$parameter->getName().')';
+                }
+            }
+        }
+    }
+
+    expect(array_values(array_unique($offenders)))->toBe([]);
+});

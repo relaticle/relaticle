@@ -358,10 +358,25 @@ final class ProposalCard extends BaseLivewireComponent
         $this->cursor = $unresolved[$target];
     }
 
-    public function recordCount(?PendingAction $pendingAction = null): int
+    /**
+     * The five *Of() helpers below take the step to read; their public callers take
+     * nothing and resolve it through loadStep().
+     *
+     * Livewire runs every client-invoked method through implicit route-model
+     * binding, so a public method typed `PendingAction` accepts a bare
+     * `where(id)->first()` on whatever id the browser sends, with no team, no
+     * user, no status and no expiry. PendingAction rows carry another tenant's
+     * proposed record fields and old→new diffs, so the parameter has to stay off
+     * the public surface: internal callers pass a step that loadStep() or
+     * planAllSteps() already scoped, and the client can reach only the active step.
+     */
+    public function recordCount(): int
     {
-        $pendingAction ??= $this->loadStep($this->activeStepId());
+        return $this->recordCountOf($this->loadStep($this->activeStepId()));
+    }
 
+    private function recordCountOf(?PendingAction $pendingAction): int
+    {
         if (! $pendingAction instanceof PendingAction) {
             return 1;
         }
@@ -373,10 +388,13 @@ final class ProposalCard extends BaseLivewireComponent
      * How many records still await a decision — the dock stepper's denominator.
      * Resolved items have left the queue, so this shrinks as the user decides.
      */
-    public function remainingCount(?PendingAction $pendingAction = null): int
+    public function remainingCount(): int
     {
-        $pendingAction ??= $this->loadStep($this->activeStepId());
+        return $this->remainingCountOf($this->loadStep($this->activeStepId()));
+    }
 
+    private function remainingCountOf(?PendingAction $pendingAction): int
+    {
         if (! $pendingAction instanceof PendingAction) {
             return 0;
         }
@@ -387,10 +405,13 @@ final class ProposalCard extends BaseLivewireComponent
     /**
      * 1-based position of the current record within the unresolved queue.
      */
-    public function currentPosition(?PendingAction $pendingAction = null): int
+    public function currentPosition(): int
     {
-        $pendingAction ??= $this->loadStep($this->activeStepId());
+        return $this->currentPositionOf($this->loadStep($this->activeStepId()));
+    }
 
+    private function currentPositionOf(?PendingAction $pendingAction): int
+    {
         if (! $pendingAction instanceof PendingAction) {
             return 1;
         }
@@ -530,14 +551,14 @@ final class ProposalCard extends BaseLivewireComponent
                 'operation' => $step->operation->value,
                 'entity_type' => $step->entity_type,
                 'summary' => $this->stepSummary($step),
-                'fields' => $this->currentRecordFields($step),
-                'editableCodes' => $this->editableCodes($step),
+                'fields' => $this->recordFieldsOf($step),
+                'editableCodes' => $this->editableCodesOf($step),
                 'duplicateWarning' => $step->display_data['duplicate_warning'] ?? null,
                 'isActive' => (string) $step->getKey() === $activeStepId,
                 'isBatch' => ProposalPayload::from($step)->isBatch,
-                'recordCount' => $this->recordCount($step),
-                'remainingCount' => $this->remainingCount($step),
-                'position_in_batch' => $this->currentPosition($step),
+                'recordCount' => $this->recordCountOf($step),
+                'remainingCount' => $this->remainingCountOf($step),
+                'position_in_batch' => $this->currentPositionOf($step),
                 'blockedBy' => $this->sortedPositions($blockedBy),
             ];
         }
@@ -1161,6 +1182,14 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function currentRecordFields(): array
+    {
+        return $this->recordFieldsOf($this->loadStep($this->activeStepId()));
+    }
+
+    /**
      * The current record's display rows, rebuilt through ProposalDisplayBuilder
      * from the record's clean action_data so each owned/editable row carries a
      * `code`. Carried-forward relationship rows stay code-less (read-only). The
@@ -1169,10 +1198,8 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<array<string, mixed>>
      */
-    public function currentRecordFields(?PendingAction $pendingAction = null): array
+    private function recordFieldsOf(?PendingAction $pendingAction): array
     {
-        $pendingAction ??= $this->loadStep($this->activeStepId());
-
         if (! $pendingAction instanceof PendingAction) {
             return [];
         }
@@ -1196,6 +1223,14 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
+     * @return list<string>
+     */
+    public function editableCodes(): array
+    {
+        return $this->editableCodesOf($this->loadStep($this->activeStepId()));
+    }
+
+    /**
      * The set of field codes the dock allows inline editing for the current
      * entity: core keys plus the active, non-deferred custom field codes. Derived
      * from ProposalFieldSchemaDescriber so the deferred-field exclusion (FILE_UPLOAD,
@@ -1203,10 +1238,8 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<string>
      */
-    public function editableCodes(?PendingAction $pendingAction = null): array
+    private function editableCodesOf(?PendingAction $pendingAction): array
     {
-        $pendingAction ??= $this->loadStep($this->activeStepId());
-
         if (! $pendingAction instanceof PendingAction) {
             return [];
         }
@@ -1271,9 +1304,9 @@ final class ProposalCard extends BaseLivewireComponent
             'proposal' => $proposal,
             'steps' => $steps,
             'isPlan' => count($steps) > 1,
-            'recordCount' => $proposal instanceof PendingAction ? $this->recordCount($proposal) : 0,
-            'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCount($proposal) : 0,
-            'position' => $proposal instanceof PendingAction ? $this->currentPosition($proposal) : 1,
+            'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
+            'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
+            'position' => $proposal instanceof PendingAction ? $this->currentPositionOf($proposal) : 1,
         ]);
     }
 }
