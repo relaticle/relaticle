@@ -233,8 +233,9 @@ abstract class BaseReadListTool implements Tool
 
         $citationType = $this->citationType();
         $resolver = resolve(RecordReferenceResolver::class);
+        $linkable = in_array($citationType, RecordReferenceResolver::CHIP_TYPES, true);
 
-        $items = array_map(function (mixed $item, int $index) use ($citationType, $resolver, $models, $requestedIncludes): mixed {
+        $items = array_map(function (mixed $item, int $index) use ($citationType, $resolver, $linkable, $models, $requestedIncludes): mixed {
             if (! is_array($item)) {
                 return $item;
             }
@@ -243,11 +244,13 @@ abstract class BaseReadListTool implements Tool
                 ? (string) $item['id']
                 : null;
 
-            $item['url'] = null;
-
-            if ($id !== null && $resolver->resolve($citationType, $id) !== null) {
-                $item['url'] = $resolver->referenceUrl($citationType, $id);
-            }
+            // resolve() was called here purely as a null check while referenceUrl()
+            // supplied the value, and resolve() issues a label query per call. At
+            // per_page 50 that was 50 discarded SELECTs per list call. Whether a type
+            // is linkable is a constant, so it is decided once outside the loop.
+            $item['url'] = $id !== null && $linkable
+                ? $resolver->referenceUrl($citationType, $id)
+                : null;
 
             if ($requestedIncludes !== [] && isset($models[$index]) && $models[$index] instanceof Model) {
                 $item['included'] = $this->includedFor($models[$index], $requestedIncludes, $resolver);

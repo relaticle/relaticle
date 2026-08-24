@@ -434,15 +434,30 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<PendingAction>
      */
+    /**
+     * Per-request memo for planSteps(). stepViews() walks every step and each walk
+     * previously re-read the whole plan (once for unmetDependencies, once more per
+     * dependency through stepPosition), so a three-step plan issued the plan query
+     * roughly a dozen times per dock render. Livewire builds a fresh component per
+     * request, so this never outlives one round trip.
+     *
+     * @var list<PendingAction>|null
+     */
+    private ?array $planStepsCache = null;
+
     public function planSteps(): array
     {
+        if ($this->planStepsCache !== null) {
+            return $this->planStepsCache;
+        }
+
         $anchor = $this->loadStep($this->pendingActionId);
 
         if (! $anchor instanceof PendingAction) {
-            return [];
+            return $this->planStepsCache = [];
         }
 
-        return resolve(ProposalPlanService::class)->pendingSteps($anchor);
+        return $this->planStepsCache = resolve(ProposalPlanService::class)->pendingSteps($anchor);
     }
 
     /**
@@ -1172,13 +1187,15 @@ final class ProposalCard extends BaseLivewireComponent
         $proposal = $this->loadStep($this->activeStepId());
         $steps = $this->stepViews();
 
+        // recordFields and editableCodes are dropped: no partial reads them, and each
+        // ran its own CustomField query (editableCodes two more for team members) on
+        // every dock round trip, only to be discarded. stepViews() already carries
+        // both per step. The counters below stay: they are cheap array reads and the
+        // batch stepper's behaviour is asserted through them.
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
             'steps' => $steps,
             'isPlan' => count($steps) > 1,
-            'record' => $proposal instanceof PendingAction ? $this->currentRecordDisplay($proposal) : [],
-            'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields($proposal) : [],
-            'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes($proposal) : [],
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCount($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCount($proposal) : 0,
             'position' => $proposal instanceof PendingAction ? $this->currentPosition($proposal) : 1,
