@@ -87,9 +87,40 @@ const wrapTables = (html) => {
         .replaceAll('</table>', '</table></div>')
 }
 
+// The server renders the same markdown with CommonMark's `html_input => 'strip'`,
+// so raw HTML in a reply must not survive here either. DOMPurify's default profile
+// is far wider than that: it keeps <form>, <input>, <button> and <style>, which is
+// enough to paint a working credential-phishing form inside a trusted surface that
+// then vanishes on reload. This allowlist is exactly what MarkdownRenderer can emit
+// (CommonMark core + TableExtension + the record chip), and nothing else.
+const MARKDOWN_ALLOWED_TAGS = [
+    'p', 'br', 'hr', 'blockquote', 'pre', 'code',
+    'em', 'strong', 'a', 'img',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'ul', 'ol', 'li',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'div', 'span', 'svg', 'path',
+]
+
+const MARKDOWN_ALLOWED_ATTR = [
+    'href', 'title', 'src', 'alt', 'align', 'class',
+    'data-record-type', 'tabindex', 'role', 'aria-hidden',
+    'viewbox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd',
+]
+
+const sanitizeMarkdown = (html) => DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: MARKDOWN_ALLOWED_TAGS,
+    ALLOWED_ATTR: MARKDOWN_ALLOWED_ATTR,
+    FORBID_TAGS: ['form', 'input', 'button', 'select', 'textarea', 'style', 'video', 'audio', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['style', 'action', 'formaction', 'srcset', 'ping'],
+})
+
 window.renderMarkdown = (text) => {
     if (!text) return ''
-    return wrapTables(applyRecordChips(DOMPurify.sanitize(marked.parse(normalizeChatMarkdown(text)))))
+    // Chips are applied before the final sanitize, so the serialize/re-parse round
+    // trip DOMPurify warns about cannot reintroduce anything: whatever comes out of
+    // applyRecordChips is sanitized once more before it reaches the DOM.
+    return wrapTables(sanitizeMarkdown(applyRecordChips(sanitizeMarkdown(marked.parse(normalizeChatMarkdown(text))))))
 }
 
 import '../css/chat-editor.css';
