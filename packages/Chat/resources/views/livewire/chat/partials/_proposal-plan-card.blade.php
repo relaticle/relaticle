@@ -34,17 +34,20 @@
 
     <div class="divide-y divide-gray-100 dark:divide-white/5">
         <template x-for="(action, stepIdx) in group.actions" :key="action.pending_action_id">
-            <div class="relative ps-9">
+            <div class="relative">
                 {{-- The step's number and the connector between steps: the order the
-                     writes ran in is the one fact a flat list of cards loses. --}}
+                     writes ran in is the one fact a flat list of cards loses. The
+                     rail is drawn over the step rather than beside it, and ignores
+                     the pointer, so the row's own hover and click cover its gutter
+                     instead of stopping at it. --}}
                 <span
-                    class="absolute start-3.5 top-3 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[length:var(--text-pico)] font-semibold tabular-nums text-gray-500 ring-2 ring-white dark:bg-white/10 dark:text-gray-400 dark:ring-gray-900"
+                    class="pointer-events-none absolute start-3.5 top-3 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[length:var(--text-pico)] font-semibold tabular-nums text-gray-500 dark:bg-white/10 dark:text-gray-400"
                     aria-hidden="true"
                     x-text="stepIdx + 1"
                 ></span>
 
                 <span
-                    class="absolute bottom-0 start-[1.45rem] top-8 w-px bg-gray-200 dark:bg-white/10"
+                    class="pointer-events-none absolute bottom-0 start-[1.45rem] top-8 z-10 w-px bg-gray-200 dark:bg-white/10"
                     :class="stepIdx === group.actions.length - 1 ? 'hidden' : ''"
                     aria-hidden="true"
                 ></span>
@@ -54,7 +57,7 @@
                 {{-- A step cancelled by a rejection above it explains itself, rather
                      than reading as an unexplained "Rejected". --}}
                 <template x-if="action.cancelled_by">
-                    <p class="px-4 pb-3 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
+                    <p class="ps-9 pe-4 pb-3 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
                         {{ __('Cancelled with the step it depended on.') }}
                     </p>
                 </template>

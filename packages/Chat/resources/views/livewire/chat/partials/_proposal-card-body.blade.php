@@ -8,9 +8,9 @@
      because you may not approve what you were not shown; once you have decided,
      the fields are an audit trail, not a decision, and five expanded steps of
      them bury the reply they belong to. The line keeps what a reader scans for
-     (what it was, what happened to it, where the record is) and the disclosure
-     keeps the rest one click away. $inPlan drops the entity glyph, because the
-     plan card already draws a numbered rail down the left. --}}
+     (what it was, what happened to it, and a link to the record) and the whole
+     line opens the fields. $inPlan drops the entity glyph, because the plan card
+     already draws a numbered rail down the left. --}}
 @php
     $inPlan = $inPlan ?? false;
     $operationLabels = ['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')];
@@ -44,18 +44,37 @@
 {{-- Read-only audit card once the proposal is finalized. --}}
 <template x-if="action.status !== 'pending'">
     <div x-data="{ open: false }">
-        {{-- The one line. The record's own glyph in the operation's colour (same
-             glyph set as the chips in the reply above and the docked card),
-             the human summary, how it was resolved, and the disclosure.
+        {{-- The one line. The whole line is the disclosure, because expanding is
+             the safe, reversible read and it deserves the row-sized target;
+             leaving the transcript for the record is deliberate, so it gets its
+             own small icon at the end of the title.
 
-             The summary is the record's link when there is one, so reaching the
-             record costs no expand and no second "View" row. It is a sibling of
-             the toggle rather than a child: an anchor inside a button is neither
-             valid nor operable. --}}
-        <div class="flex items-center gap-2.5 px-4 py-2.5">
+             The toggle is a real <button> stretched over the row rather than a
+             clickable wrapper: an anchor inside a button is neither valid nor
+             operable. The row's contents sit above it and ignore the pointer, so
+             a click anywhere lands on the toggle; only the record link takes the
+             pointer back.
+
+             In a plan the row carries the numbered rail's gutter itself, so the
+             hover and the click cover the step number rather than stopping at
+             it. --}}
+        <div @class([
+            'group relative flex items-center gap-2.5 py-2.5 transition hover:bg-gray-50 dark:hover:bg-white/5',
+            'ps-9 pe-4' => $inPlan,
+            'px-4' => ! $inPlan,
+        ])>
+            <button
+                type="button"
+                data-proposal-row
+                x-on:click="open = !open"
+                :aria-expanded="open ? 'true' : 'false'"
+                :aria-label="open ? @js(__('Hide details')) : @js(__('Show details'))"
+                class="absolute inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+            ></button>
+
             @unless ($inPlan)
                 <span
-                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                    class="pointer-events-none relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
                     :class="{
                         'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
                         'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
@@ -85,23 +104,30 @@
                 </span>
             @endunless
 
-            <template x-if="action.status === 'approved' && action.record && action.record.url">
-                <a
-                    :href="action.record.url"
-                    wire:navigate
-                    class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline dark:text-white dark:hover:text-primary-400"
-                    x-text="{{ $summaryExpression }}"
-                ></a>
-            </template>
+            <span class="pointer-events-none relative flex min-w-0 flex-1 items-center gap-1.5">
+                <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
 
-            <template x-if="!(action.status === 'approved' && action.record && action.record.url)">
-                <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
-            </template>
+                {{-- The record, one click away and never in the row's own click
+                     path: opening the page you just wrote to should not be
+                     something you do by aiming at a line you meant to expand. --}}
+                <template x-if="action.status === 'approved' && action.record && action.record.url">
+                    <a
+                        :href="action.record.url"
+                        wire:navigate
+                        data-proposal-record-link
+                        :aria-label="action.record.label ? @js(__('View :label')).replace(':label', action.record.label) : @js(__('View'))"
+                        :title="action.record.label ? @js(__('View :label')).replace(':label', action.record.label) : @js(__('View'))"
+                        class="pointer-events-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-white/10 dark:hover:text-primary-400"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                    </a>
+                </template>
+            </span>
 
             {{-- Translated label map, not charAt-capitalized enum values:
                  'superseded' also reads as jargon, so it shows as Replaced. --}}
             <span
-                class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
+                class="pointer-events-none relative inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
                 :class="{
                     'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
                     'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
@@ -110,19 +136,21 @@
                 x-text="(@js($outcomeLabels))[action.status] ?? action.status"
             ></span>
 
-            <button
-                type="button"
-                x-on:click="open = !open"
-                :aria-expanded="open ? 'true' : 'false'"
-                :aria-label="open ? @js(__('Hide details')) : @js(__('Show details'))"
-                :title="open ? @js(__('Hide details')) : @js(__('Show details'))"
-                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            {{-- The affordance is labelled rather than a bare chevron: on touch
+                 there is no hover to reveal that the row does anything at all. --}}
+            <span
+                class="pointer-events-none relative inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-400 transition group-hover:bg-gray-100 group-hover:text-gray-600 dark:group-hover:bg-white/10 dark:group-hover:text-gray-300"
+                aria-hidden="true"
             >
-                <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform" ::class="open ? 'rotate-180' : ''" aria-hidden="true" />
-            </button>
+                <span>{{ __('Details') }}</span>
+                <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform" ::class="open ? 'rotate-180' : ''" />
+            </span>
         </div>
 
-        <div x-show="open" x-cloak class="border-t border-gray-100 dark:border-white/5">
+        <div x-show="open" x-cloak data-proposal-details @class([
+            'border-t border-gray-100 dark:border-white/5',
+            'ps-5' => $inPlan,
+        ])>
             <template x-if="action.display?.duplicate_warning">
                 <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
                     <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
