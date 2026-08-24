@@ -24,6 +24,7 @@ use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
+use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
@@ -52,6 +53,14 @@ final class ProposalCard extends BaseLivewireComponent
     public ?string $pendingActionId = null;
 
     public ?string $activeStepId = null;
+
+    /**
+     * The composer's current model pick, mirrored from the client so a turn
+     * resumed by an approval runs on the same model the user was talking to.
+     * Client-writable, and deliberately so: AiModelResolver re-checks the plan
+     * and availability, so the worst a forged value can do is fall back to auto.
+     */
+    public ?string $model = null;
 
     public int $cursor = 0;
 
@@ -245,11 +254,13 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     #[On('proposal:set-active')]
-    public function setActive(?string $id = null, string $context = 'conversation'): void
+    public function setActive(?string $id = null, string $context = 'conversation', ?string $model = null): void
     {
         if ($context !== $this->context) {
             return;
         }
+
+        $this->model = $model;
 
         $this->editingFieldCode = null;
         $this->editingStepId = null;
@@ -641,8 +652,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->pendingActionId = null;
-        $this->activeStepId = null;
+        $this->settleAfterResolution($anchor);
     }
 
     /**
@@ -681,7 +691,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $this->announceResolution($step, 'approved');
-        $this->settleAfterResolution();
+        $this->settleAfterResolution($step);
     }
 
     /**
@@ -717,7 +727,7 @@ final class ProposalCard extends BaseLivewireComponent
             $this->announceResolution($cancelledStep, 'rejected');
         }
 
-        $this->settleAfterResolution();
+        $this->settleAfterResolution($step);
     }
 
     /**
@@ -729,7 +739,13 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        foreach ($this->planSteps() as $step) {
+        $steps = $this->planSteps();
+
+        if ($steps === []) {
+            return;
+        }
+
+        foreach ($steps as $step) {
             $fresh = $this->loadStep((string) $step->getKey());
 
             if (! $fresh instanceof PendingAction) {
@@ -751,7 +767,7 @@ final class ProposalCard extends BaseLivewireComponent
             $this->announceResolution($fresh, 'rejected');
         }
 
-        $this->settleAfterResolution();
+        $this->settleAfterResolution($steps[0]);
     }
 
     public function createCurrent(PendingActionService $service): void
@@ -828,7 +844,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $this->settleAfterResolution();
+        $this->settleAfterResolution($pendingAction);
     }
 
     public function discardCurrent(PendingActionService $service): void
@@ -893,7 +909,7 @@ final class ProposalCard extends BaseLivewireComponent
             $this->announceResolution($cancelled, 'rejected');
         }
 
-        $this->settleAfterResolution();
+        $this->settleAfterResolution($pendingAction);
     }
 
     /**
@@ -940,9 +956,10 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * After a step resolves, the dock either moves to the plan's next undecided
-     * step or closes when there is none left.
+     * step or closes when there is none left — and when there is none left, the
+     * decision itself becomes the next turn.
      */
-    private function settleAfterResolution(): void
+    private function settleAfterResolution(PendingAction $resolved): void
     {
         $anchor = $this->loadStep($this->pendingActionId);
 
@@ -963,6 +980,35 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->pendingActionId = null;
         $this->activeStepId = null;
+
+        $this->resumeAssistant($resolved);
+    }
+
+    /**
+     * Hand the decision back to the assistant so the user never has to type
+     * "next" to hear what happened or to get the rest of a chained request.
+     * The service owns every gate (nothing else pending, once per turn, one
+     * credit); this only supplies the turn that was decided.
+     */
+    private function resumeAssistant(PendingAction $resolved): void
+    {
+        $conversationId = $resolved->conversation_id;
+        $turnId = $resolved->turn_id;
+
+        if ($conversationId === null || $turnId === null) {
+            return;
+        }
+
+        $queued = resolve(TurnContinuationService::class)->resume(
+            $this->authUser(),
+            $conversationId,
+            $turnId,
+            $this->model,
+        );
+
+        if ($queued) {
+            $this->dispatch('chat:resuming', context: $this->context);
+        }
     }
 
     /**

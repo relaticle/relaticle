@@ -2,7 +2,21 @@
 
      Rendered on its own inside the bordered card below (a single proposal), and
      stacked inside one shared card for a plan, where the surface belongs to the
-     plan rather than to each of its steps. Expects the Alpine scope var `action`. --}}
+     plan rather than to each of its steps. Expects the Alpine scope var `action`.
+
+     A DECIDED proposal collapses to one line. The pending dock shows every field
+     because you may not approve what you were not shown; once you have decided,
+     the fields are an audit trail, not a decision, and five expanded steps of
+     them bury the reply they belong to. The line keeps what a reader scans for
+     (what it was, what happened to it, where the record is) and the disclosure
+     keeps the rest one click away. $inPlan drops the entity glyph, because the
+     plan card already draws a numbered rail down the left. --}}
+@php
+    $inPlan = $inPlan ?? false;
+    $operationLabels = ['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')];
+    $outcomeLabels = ['approved' => __('Approved'), 'rejected' => __('Rejected'), 'expired' => __('Expired'), 'superseded' => __('Replaced')];
+    $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from($operationLabels).")[action.operation] ?? action.operation)";
+@endphp
 {{-- COMPACT progress view while the batch is still docked. --}}
 <template x-if="action.status === 'pending'">
     <div class="px-4 py-3">
@@ -27,51 +41,62 @@
     </div>
 </template>
 
-{{-- Full read-only audit card once the proposal is finalized. --}}
+{{-- Read-only audit card once the proposal is finalized. --}}
 <template x-if="action.status !== 'pending'">
-    <div>
-        {{-- Header strip: the record's own glyph in the operation's colour, the
-             human summary, and how it was resolved. Same glyph set as the chips in
-             the reply above and the docked card, so one record reads as one thing
-             wherever chat draws it. --}}
-        <div class="flex items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
-            <span
-                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-                :class="{
-                    'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
-                    'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
-                    'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400': action.operation === 'delete',
-                }"
-                aria-hidden="true"
-            >
-                <template x-if="window.ChatModules.recordChipIcon(action.entity_type)">
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
-                    </svg>
-                </template>
+    <div x-data="{ open: false }">
+        {{-- The one line. The record's own glyph in the operation's colour (same
+             glyph set as the chips in the reply above and the docked card),
+             the human summary, how it was resolved, and the disclosure.
 
-                <template x-if="!window.ChatModules.recordChipIcon(action.entity_type)">
-                    <span>
-                        <template x-if="action.operation === 'update'">
-                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-                        </template>
-                        <template x-if="action.operation === 'delete'">
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
-                        </template>
-                        <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                        </template>
-                    </span>
-                </template>
-            </span>
+             The summary is the record's link when there is one, so reaching the
+             record costs no expand and no second "View" row. It is a sibling of
+             the toggle rather than a child: an anchor inside a button is neither
+             valid nor operable. --}}
+        <div class="flex items-center gap-2.5 px-4 py-2.5">
+            @unless ($inPlan)
+                <span
+                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                    :class="{
+                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
+                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
+                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400': action.operation === 'delete',
+                    }"
+                    aria-hidden="true"
+                >
+                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type)">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
+                        </svg>
+                    </template>
 
-            <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? ((@js([
-                    'create' => __('Create'),
-                    'update' => __('Update'),
-                    'delete' => __('Delete'),
-                ]))[action.operation] ?? action.operation)"></p>
-            </div>
+                    <template x-if="!window.ChatModules.recordChipIcon(action.entity_type)">
+                        <span>
+                            <template x-if="action.operation === 'update'">
+                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                            </template>
+                            <template x-if="action.operation === 'delete'">
+                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            </template>
+                            <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
+                                <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            </template>
+                        </span>
+                    </template>
+                </span>
+            @endunless
+
+            <template x-if="action.status === 'approved' && action.record && action.record.url">
+                <a
+                    :href="action.record.url"
+                    wire:navigate
+                    class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 hover:text-primary-600 hover:underline dark:text-white dark:hover:text-primary-400"
+                    x-text="{{ $summaryExpression }}"
+                ></a>
+            </template>
+
+            <template x-if="!(action.status === 'approved' && action.record && action.record.url)">
+                <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
+            </template>
 
             {{-- Translated label map, not charAt-capitalized enum values:
                  'superseded' also reads as jargon, so it shows as Replaced. --}}
@@ -82,68 +107,67 @@
                     'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
                     'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
                 }"
-                x-text="(@js([
-                    'approved' => __('Approved'),
-                    'rejected' => __('Rejected'),
-                    'expired' => __('Expired'),
-                    'superseded' => __('Replaced'),
-                ]))[action.status] ?? action.status"
+                x-text="(@js($outcomeLabels))[action.status] ?? action.status"
             ></span>
+
+            <button
+                type="button"
+                x-on:click="open = !open"
+                :aria-expanded="open ? 'true' : 'false'"
+                :aria-label="open ? @js(__('Hide details')) : @js(__('Show details'))"
+                :title="open ? @js(__('Hide details')) : @js(__('Show details'))"
+                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+            >
+                <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform" ::class="open ? 'rotate-180' : ''" aria-hidden="true" />
+            </button>
         </div>
 
-        <template x-if="action.display?.duplicate_warning">
-            <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
-                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span x-text="action.display.duplicate_warning"></span>
-            </div>
-        </template>
+        <div x-show="open" x-cloak class="border-t border-gray-100 dark:border-white/5">
+            <template x-if="action.display?.duplicate_warning">
+                <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span x-text="action.display.duplicate_warning"></span>
+                </div>
+            </template>
 
-        <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-            <div class="space-y-2.5 px-4 py-3">
-                <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                    @include('chat::livewire.chat.partials._proposal-field')
-                </template>
-            </div>
-        </template>
+            <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
+                <div class="space-y-2.5 px-4 py-3">
+                    <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
+                        @include('chat::livewire.chat.partials._proposal-field')
+                    </template>
+                </div>
+            </template>
 
-        {{-- Batch items (records[] proposals): per-item summary, fields, and resolved chip. --}}
-        <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-            <div class="divide-y divide-gray-100 px-4 dark:divide-white/5">
-                <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
-                    <div class="py-3">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
+            {{-- Batch items (records[] proposals): per-item summary, fields, and resolved chip. --}}
+            <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
+                <div class="divide-y divide-gray-100 px-4 dark:divide-white/5">
+                    <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
+                        <div class="py-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
 
-                            {{-- Per-item resolved chip (Created / Skipped). --}}
-                            <template x-if="itemResult(action, itemIdx)">
-                                <span class="flex shrink-0 items-center gap-2 text-xs">
-                                    @include('chat::livewire.chat.partials._proposal-item-chips')
-                                </span>
-                            </template>
-                        </div>
-                        <div class="mt-1.5 space-y-1.5">
-                            <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                @include('chat::livewire.chat.partials._proposal-field')
-                            </template>
-                        </div>
-
-                        <template x-if="itemResult(action, itemIdx) && itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
-                            <div class="mt-1.5 text-xs">
-                                @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'itemResult(action, itemIdx).record'])
+                                {{-- Per-item resolved chip (Created / Skipped). --}}
+                                <template x-if="itemResult(action, itemIdx)">
+                                    <span class="flex shrink-0 items-center gap-2 text-xs">
+                                        @include('chat::livewire.chat.partials._proposal-item-chips')
+                                    </span>
+                                </template>
                             </div>
-                        </template>
-                    </div>
-                </template>
-            </div>
-        </template>
+                            <div class="mt-1.5 space-y-1.5">
+                                <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
+                                    @include('chat::livewire.chat.partials._proposal-field')
+                                </template>
+                            </div>
 
-        {{-- Record link — SINGLE proposals only. Batch items each carry their own
-             View link above, and the outcome summary sits below the card, so a
-             batch-level link row here would just repeat the same links. --}}
-        <template x-if="!(Array.isArray(action.display?.items) && action.display.items.length > 0) && action.status === 'approved' && action.record && action.record.url">
-            <div class="px-4 pb-3 text-xs">
-                @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'action.record'])
-            </div>
-        </template>
+                            <template x-if="itemResult(action, itemIdx) && itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
+                                <div class="mt-1.5 text-xs">
+                                    @include('chat::livewire.chat.partials._proposal-record-link', ['record' => 'itemResult(action, itemIdx).record'])
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
     </div>
 </template>

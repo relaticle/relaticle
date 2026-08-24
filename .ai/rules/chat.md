@@ -44,3 +44,30 @@ write: replayed proposal tool results embed `action_data` verbatim (rewriting on
 invalidates the Anthropic prompt-cache prefix from that turn on), and
 `PendingActionService::createProposal` dedupes job retries by strict array equality
 against rows already in the database.
+
+## Deciding a proposal starts the next turn; it is not the user typing
+`TurnContinuationService::resume()` runs from the dock (`ProposalCard::settleAfterResolution`)
+and queues `ProcessChatMessage(isContinuation: true)`. Without it the user had to type
+"next" after every card just to hear what happened or to get the rest of a chained
+request. Four invariants keep it bounded, and all four are load-bearing:
+- It fires only from a human decision, never from a turn ending, so the loop cannot
+  drive itself.
+- It fires only when the conversation has NOTHING pending, and that is re-checked
+  inside the job. `handle()` supersedes every pending proposal at the top, and a
+  chained turn is briefly pending-free between two steps streaming in, so a
+  dispatch-time check alone would cancel steps the user never saw. `WithoutOverlapping`
+  delays the job, it does not un-fire it.
+- `Cache::add("chat:continued:{turnId}")` makes it once per decided turn across tabs
+  and double clicks. `CreditService::reserveCredit` is idempotent by key and cannot
+  stand in for this.
+- It costs a credit like any other turn. Out of credits means no resume, not a queued
+  one — the user can still type.
+The turn runs on a synthetic user message (the provider needs a final user turn). It is
+stamped `meta->kind = "continuation"` by `SupersededAwareConversationStore` and excluded
+in `TranscriptScope`, so the model sees it and the transcript does not. Compare that
+exclusion with `coalesce(...)`, not a bare `meta->>'kind'`: on every other row the
+comparison is NULL, the enclosing AND is NULL, and `NOT NULL` drops the row — which hid
+half the transcript the first time it was written.
+Prompt and UI follow from this: the assistant must never ask the user to say "continue"
+or "next", and a decided proposal card collapses to one line (pending stays fully
+expanded — you may not approve what you were not shown).

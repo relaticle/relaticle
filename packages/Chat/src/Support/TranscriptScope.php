@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use App\Models\User;
 use Illuminate\Database\Query\Builder;
+use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 
 /**
  * The single definition of "messages this participant can see in this
@@ -42,6 +43,20 @@ final readonly class TranscriptScope
             // history", stranding every older message behind it.
             ->whereNot(function (Builder $inner): void {
                 $inner->where('m.role', 'user')->where('m.content', 'like', '[approval]%');
+            })
+            // Same reasoning for the prompt a resumed turn runs on: the model
+            // needs a final user turn, so one is stored, but the user never
+            // typed it (see TurnContinuationService).
+            //
+            // coalesce, not a plain `meta->kind` comparison: every other row
+            // has no `kind`, so the comparison is NULL there, the enclosing
+            // AND is NULL, and NOT NULL is NULL - which drops the row. That
+            // silently hid half the transcript when first written this way.
+            ->whereNot(function (Builder $inner): void {
+                $inner->where('m.role', 'user')
+                    ->whereRaw("coalesce(m.meta->>'kind', '') = ?", [
+                        SupersededAwareConversationStore::CONTINUATION_KIND,
+                    ]);
             });
     }
 }

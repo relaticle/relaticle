@@ -152,7 +152,10 @@ it('system prompt chains the writes of one request and stops after the last', fu
         // The old contract was one write per turn, with the user typing "continue"
         // between steps. Plans replaced it, and the prompt must not reinstate it.
         ->not->toContain('continue from <resolved_actions> when they say')
-        ->toContain('never ask them to say "continue"');
+        // Deciding the card resumes the assistant (TurnContinuationService), so
+        // asking the user to type "continue" is now wrong twice over.
+        ->toContain('Never ask them to say "continue" or "next"')
+        ->toContain('deciding the card resumes you by itself');
 });
 
 it('bounds how many steps one turn may chain into a single card', function (): void {

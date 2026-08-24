@@ -320,6 +320,13 @@ export const streamModule = ({ texts = {} } = {}) => ({
 
     handleStreamStart(event) {
         this.startStreamTimeout();
+        // A turn this tab did not send still has to look like a turn: an
+        // approval resumes the assistant server-side (TurnContinuationService),
+        // and without this the user watches a silent, idle-looking composer
+        // until the first delta lands. Already true for a turn we sent, so this
+        // only ever flips for a resumed one. Cleared by stream_end, stream
+        // failure, and the watchdog, exactly as a sent turn is.
+        this.isStreaming = true;
         this.targetBubbleFor(event.invocation_id ?? null);
     },
 

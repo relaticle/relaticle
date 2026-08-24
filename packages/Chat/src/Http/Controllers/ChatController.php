@@ -35,6 +35,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -43,13 +44,6 @@ use Relaticle\Chat\Support\TranscriptScope;
 
 final readonly class ChatController
 {
-    /**
-     * How many of a conversation's opening user messages may trigger a titling
-     * attempt. More than one because an opener like "hey" carries no topic to
-     * name — the titler declines it and the next message gets a turn.
-     */
-    private const int TITLE_ATTEMPT_TURNS = 3;
-
     /**
      * Cap on in-conversation search hits. Deliberately small: the overlay is a
      * jump-to affordance, not a results page.
@@ -195,8 +189,9 @@ final readonly class ChatController
         });
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
+        $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
 
-        $this->maybeTitleConversation($conversation, (string) $existing->title, $parsed['text'], $resolved['provider']);
+        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
 
         dispatch(new ProcessChatMessage(
             user: $user,
@@ -206,7 +201,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
-            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
+            pageContext: $pageContext,
             turnId: $turnId,
         ));
 
@@ -221,29 +216,21 @@ final readonly class ChatController
      * rather than waiting for it — a chat that streams for a minute should not sit
      * in the sidebar under a truncated sentence for that whole minute.
      *
-     * The dispatch is gated on the stored title still being the provisional one
-     * (the opening message, sanitized). That single condition carries two rules:
-     * a chat the user has named is never re-titled — renaming BEFORE the first
-     * turn used to lose the name, because the current title was passed as the
-     * "provisional" and then matched its own compare-and-swap — and a chat whose
-     * opener carried no topic stays eligible, so the next few messages get a
-     * chance to name it instead of it being stuck on "hey" forever.
+     * ConversationTitleGate decides whether there is anything to do: it returns
+     * the provisional title (the opening message, sanitized) only while the
+     * stored title still IS that, and only for the conversation's first few typed
+     * messages. That single condition carries two rules — a chat the user has
+     * named is never re-titled, and a chat whose opener carried no topic stays
+     * eligible, so the next few messages get a chance to name it instead of it
+     * being stuck on "hey" forever.
+     *
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
-    private function maybeTitleConversation(string $conversationId, string $currentTitle, string $message, ?string $provider): void
+    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext): void
     {
-        $userMessages = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'user')
-            ->orderBy('id')
-            ->pluck('content');
+        $provisional = ConversationTitleGate::beforeTurn($conversationId, $message);
 
-        if ($userMessages->count() >= self::TITLE_ATTEMPT_TURNS) {
-            return;
-        }
-
-        $provisional = TitleSanitizer::clean((string) ($userMessages->first() ?? $message));
-
-        if ($currentTitle !== $provisional) {
+        if ($provisional === null) {
             return;
         }
 
@@ -252,6 +239,7 @@ final readonly class ChatController
             provisionalTitle: $provisional,
             message: $message,
             provider: $provider,
+            pageContext: $pageContext,
         ));
     }
 

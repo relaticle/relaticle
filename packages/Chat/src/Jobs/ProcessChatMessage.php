@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
@@ -42,8 +43,10 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
@@ -78,6 +81,8 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
         public readonly int $failoverDepth = 0,
+        public readonly bool $isContinuation = false,
+        public readonly ?string $resumesTurnId = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -148,6 +153,31 @@ final class ProcessChatMessage implements ShouldQueue
         ChatTelemetry::breadcrumb('job.started', ['message_length' => strlen($this->message)]);
 
         $pendingActions = resolve(PendingActionService::class);
+
+        // A continuation is dispatched the moment the conversation runs out of
+        // pending proposals, and during a chained turn that is briefly true
+        // between two steps streaming in. WithoutOverlapping only delays this
+        // job until the stream ends, so the check has to run again here, where
+        // the later steps already exist: continuing now would supersede them.
+        if ($this->isContinuation && resolve(TurnContinuationService::class)->hasPendingProposals($this->conversationId)) {
+            ChatTelemetry::breadcrumb('continuation.aborted', ['reason' => 'pending_proposals']);
+
+            // Hand the resume back, or deciding the step that blocked it would
+            // find the once-per-turn guard already spent and resume nothing.
+            if ($this->resumesTurnId !== null) {
+                resolve(TurnContinuationService::class)->release($this->resumesTurnId);
+            }
+
+            $creditService->refundReservation(
+                $this->team,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+            $this->releaseAuth();
+
+            return;
+        }
+
         $superseded = $pendingActions->supersedePendingForConversation($this->conversationId);
 
         if ($superseded !== []) {
@@ -212,6 +242,15 @@ final class ProcessChatMessage implements ShouldQueue
             $this->release(random_int(1, 4));
 
             return;
+        }
+
+        // The prompt a resumed turn runs on is ours, not the user's, so the row
+        // it lands in is marked and the transcript leaves it out. Resolved
+        // through the contract because that is what ChatServiceProvider binds
+        // the single shared store instance to; the concrete class would build a
+        // second one and this flag would land on the wrong object.
+        if ($this->isContinuation) {
+            resolve(ConversationStore::class)->nextUserMessageIsContinuation = true;
         }
 
         try {
@@ -301,6 +340,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->persistUserDocument();
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->broadcastFollowUps($streamedResponse);
+                $this->maybeTitleFromTurn($streamedResponse);
             });
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
@@ -366,6 +406,8 @@ final class ProcessChatMessage implements ShouldQueue
                         pageContext: $this->pageContext,
                         turnId: $this->turnId,
                         failoverDepth: $this->failoverDepth + 1,
+                        isContinuation: $this->isContinuation,
+                        resumesTurnId: $this->resumesTurnId,
                     ));
 
                     return;
@@ -798,6 +840,50 @@ final class ProcessChatMessage implements ShouldQueue
         $this->broadcastSafely(new FollowUpsSuggested(
             conversationId: $conversationId,
             chips: $chips,
+        ));
+    }
+
+    /**
+     * Last chance to name a conversation the opening dispatch could not.
+     *
+     * ChatController fires a titling attempt as the message arrives, off the
+     * message alone. When that message had no subject to name — "hey", "do it",
+     * "what about the other one?" — the titler declines and the chat keeps
+     * sitting under its own opening words. By the time the turn ends there IS
+     * something to name it from: the assistant just answered, and its reply
+     * names the records the turn was actually about.
+     *
+     * Runs only while ConversationTitleGate still returns a provisional, so a
+     * conversation the first attempt named (the usual case) never reaches the
+     * model a second time, and a chat the user renamed is never touched. The two
+     * dispatches can overlap on a fast turn; both write through the same
+     * compare-and-swap, so one of them applies and the other stops.
+     *
+     * The message comes from the gate, not from $this->message: a turn resumed
+     * by a proposal decision runs on a synthetic prompt, and naming a chat after
+     * that would be naming it after machinery the user never saw.
+     */
+    private function maybeTitleFromTurn(StreamedAgentResponse $streamedResponse): void
+    {
+        $attempt = ConversationTitleGate::afterTurn($this->conversationId);
+
+        if ($attempt === null) {
+            return;
+        }
+
+        $reply = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
+
+        if (trim($reply) === '') {
+            return;
+        }
+
+        dispatch(new GenerateConversationTitle(
+            conversationId: $this->conversationId,
+            provisionalTitle: $attempt['provisional'],
+            message: $attempt['latest'],
+            provider: $this->resolved['provider'],
+            pageContext: $this->pageContext,
+            reply: $reply,
         ));
     }
 

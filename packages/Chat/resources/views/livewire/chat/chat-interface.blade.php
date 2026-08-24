@@ -364,6 +364,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 if ((payload?.context ?? 'conversation') !== this.context) return;
                 this.applyProposalResolution(payload);
             }),
+            // The dock queued a resumed turn (TurnContinuationService). Nothing
+            // streams for a second or two while the job picks it up, and without
+            // this the composer sits there looking like the approval ended the
+            // exchange. Only ever dispatched when a turn really was queued, and
+            // the same three exits a sent turn has clear it: stream_end, stream
+            // failure, and the watchdog below.
+            window.Livewire.on('chat:resuming', (payload) => {
+                if ((payload?.context ?? 'conversation') !== this.context) return;
+                this.isStreaming = true;
+                this.currentToolStatus = null;
+                this.startStreamTimeout();
+            }),
         ];
 
     },

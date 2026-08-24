@@ -769,7 +769,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         this._lastActiveProposalId = id;
 
         if (window.Livewire?.dispatch) {
-            window.Livewire.dispatch('proposal:set-active', { id, context: this.context });
+            window.Livewire.dispatch('proposal:set-active', { id, context: this.context, model: this.selectedModel ?? null });
         }
     },
 

@@ -27,6 +27,13 @@ use Throwable;
  * which is the whole point of titling from the first message rather than
  * waiting for the reply.
  *
+ * Dispatched twice per conversation at most, and it writes at most once. The
+ * first dispatch races the turn on the message alone; the second runs only if
+ * that one produced nothing, and adds the assistant's reply as context (see
+ * ProcessChatMessage::maybeTitleFromTurn). Whichever gets there first wins the
+ * compare-and-swap; the other reads a title that is no longer the provisional
+ * one and stops, so the user never watches the title rewrite itself.
+ *
  * Failure is never fatal: the provisional title is already a usable label, so
  * anything that goes wrong leaves the conversation exactly as it was.
  */
@@ -38,11 +45,18 @@ final class GenerateConversationTitle implements ShouldQueue
 
     private const int MAX_PROMPT_CHARS = 500;
 
+    private const int MAX_REPLY_CHARS = 400;
+
+    /**
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
+     */
     public function __construct(
         public readonly string $conversationId,
         public readonly string $provisionalTitle,
         public readonly string $message,
         private readonly ?string $provider,
+        public readonly ?array $pageContext = null,
+        public readonly ?string $reply = null,
     ) {
         $this->afterCommit = true;
     }
@@ -50,6 +64,17 @@ final class GenerateConversationTitle implements ShouldQueue
     public function handle(): void
     {
         if (! (bool) config('chat.title_generation.enabled', true)) {
+            return;
+        }
+
+        // Checked before the model is called as well as after (the write below
+        // is a compare-and-swap on the same value). The CAS alone is enough for
+        // correctness; this only avoids paying for a title that could no longer
+        // be applied -- the common case for the turn-end dispatch, which fires
+        // on conversations the first attempt has usually already named.
+        if (! $this->stillProvisional()) {
+            ChatTelemetry::breadcrumb('title.superseded', ['conversation_id' => $this->conversationId]);
+
             return;
         }
 
@@ -87,11 +112,19 @@ final class GenerateConversationTitle implements ShouldQueue
         }
     }
 
+    private function stillProvisional(): bool
+    {
+        return DB::table('agent_conversations')
+            ->where('id', $this->conversationId)
+            ->where('title', $this->provisionalTitle)
+            ->exists();
+    }
+
     private function generate(): ?string
     {
         try {
             $response = (new ConversationTitler)->prompt(
-                Str::limit($this->message, self::MAX_PROMPT_CHARS),
+                $this->buildPrompt(),
                 provider: $this->provider,
             );
 
@@ -117,5 +150,28 @@ final class GenerateConversationTitle implements ShouldQueue
 
             return null;
         }
+    }
+
+    /**
+     * The message, plus whatever context this dispatch was given.
+     *
+     * A mention chip's label is already inlined into the message text by
+     * TipTapDocumentParser, so mentions need no block of their own. The record
+     * the user was VIEWING is not -- without it "add a note here" names nothing
+     * and the titler rightly declines.
+     */
+    private function buildPrompt(): string
+    {
+        $blocks = ['<message>'.Str::limit($this->message, self::MAX_PROMPT_CHARS).'</message>'];
+
+        if ($this->pageContext !== null && $this->pageContext['label'] !== '') {
+            $blocks[] = '<viewing>'.$this->pageContext['label'].' ('.$this->pageContext['type'].')</viewing>';
+        }
+
+        if ($this->reply !== null && trim($this->reply) !== '') {
+            $blocks[] = '<reply>'.Str::limit(trim($this->reply), self::MAX_REPLY_CHARS).'</reply>';
+        }
+
+        return implode("\n\n", $blocks);
     }
 }

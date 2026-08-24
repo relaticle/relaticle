@@ -46,6 +46,20 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
     /**
+     * `meta->kind` marking the synthetic user message a resumed turn runs on
+     * (see TurnContinuationService). The provider needs a final user turn, so
+     * one is stored; the transcript hides it, because the user did not type it.
+     */
+    public const string CONTINUATION_KIND = 'continuation';
+
+    /**
+     * Set by ProcessChatMessage for the single user message a continuation turn
+     * is about to store. Consumed on write, so a later turn in the same worker
+     * process cannot inherit it.
+     */
+    public bool $nextUserMessageIsContinuation = false;
+
+    /**
      * Drop presentation-only display blocks from the history replayed to the model.
      *
      * Read tools persist a `display_block` envelope next to their model-facing
@@ -111,6 +125,16 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
     public function storeUserMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt): string
     {
         $messageId = parent::storeUserMessage($conversationId, $participantType, $participantId, $prompt);
+
+        if ($this->nextUserMessageIsContinuation) {
+            $this->nextUserMessageIsContinuation = false;
+
+            $this->table($this->messagesTable())
+                ->where('id', $messageId)
+                ->update(['meta' => json_encode(['kind' => self::CONTINUATION_KIND], JSON_THROW_ON_ERROR)]);
+
+            return $messageId;
+        }
 
         FirstChatUsageTagger::tagIfFirstMessage($messageId);
 
