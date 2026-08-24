@@ -58,8 +58,20 @@ final readonly class ProposalPlanService
      */
     public function pendingSteps(PendingAction $action): array
     {
+        return $this->pendingAmong($this->steps($action));
+    }
+
+    /**
+     * The same predicate over a plan the caller already holds, so the dock can
+     * filter its memo instead of keeping a second copy of what "undecided" means.
+     *
+     * @param  list<PendingAction>  $steps
+     * @return list<PendingAction>
+     */
+    public function pendingAmong(array $steps): array
+    {
         return array_values(array_filter(
-            $this->steps($action),
+            $steps,
             static fn (PendingAction $step): bool => $step->status === PendingActionStatus::Pending && ! $step->isExpired(),
         ));
     }
@@ -240,9 +252,10 @@ final readonly class ProposalPlanService
                     continue;
                 }
 
-                $this->pendingActions->cancelStep($candidate, $user, (string) $step->getKey());
-
-                $cancelled[] = $candidate;
+                // The saved model, not the stale candidate: it already carries the
+                // Rejected status and the `cancelled_by` the card renders, so the
+                // announcement does not have to re-read the row it just wrote.
+                $cancelled[] = $this->pendingActions->cancelStep($candidate, $user, (string) $step->getKey());
                 $rejectedIds[] = (string) $candidate->getKey();
                 $cancelledThisPass++;
             }

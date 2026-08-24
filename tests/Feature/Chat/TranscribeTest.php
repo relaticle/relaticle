@@ -27,6 +27,28 @@ function audioUpload(string $fixture = 'recording.webm'): UploadedFile
     return new UploadedFile(base_path("tests/fixtures/audio/{$fixture}"), $fixture, null, null, true);
 }
 
+/**
+ * Burn the workspace's whole daily transcription allowance, so the next request
+ * meets the ceiling. Seeded rather than driven with 240 uploads: the test states
+ * the ceiling instead of spending three minutes rediscovering it.
+ *
+ * The key is the one ThrottleRequests derives for a named limiter (see
+ * handleRequestUsingNamedLimiter): md5 of the limiter name plus the key the
+ * limiter returned. Name, key prefix and both numbers are defined together in
+ * AppServiceProvider's `transcribe-team-daily` limiter.
+ */
+function spendWorkspaceTranscriptionAllowance(User $user): void
+{
+    Transcription::fake(['ok']);
+    Cache::flush();
+
+    $teamKey = md5('transcribe-team-daily'.'transcribe-team:'.$user->currentTeam->getKey());
+
+    for ($i = 0; $i < 240; $i++) {
+        RateLimiter::hit($teamKey, 1440 * 60);
+    }
+}
+
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($this->user);
@@ -131,38 +153,16 @@ it('throttles after 60 requests a day even when they are spread across minutes',
 /**
  * The workspace ceiling, which the two per-user limiters above cannot express:
  * they are keyed per user, so an N-seat team multiplies the daily allowance by N
- * against a provider the team reserves no credit with. Seeded rather than driven
- * with 240 uploads, so the test states the ceiling instead of spending three
- * minutes rediscovering it.
+ * against a provider the team reserves no credit with.
  */
 it('throttles a whole workspace once its shared daily allowance is spent', function (): void {
-    Transcription::fake(['ok']);
-    Cache::flush();
-
-    // The same key ThrottleRequests derives for a named limiter (see
-    // handleRequestUsingNamedLimiter): md5 of the limiter name plus the key the
-    // limiter returned.
-    $teamKey = md5('transcribe-team-daily'.'transcribe-team:'.$this->user->currentTeam->getKey());
-
-    for ($i = 0; $i < 240; $i++) {
-        RateLimiter::hit($teamKey, 1440 * 60);
-    }
+    spendWorkspaceTranscriptionAllowance($this->user);
 
     $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])->assertStatus(429);
 });
 
 it('bills that allowance to the workspace, not to each member of it', function (): void {
-    Transcription::fake(['ok']);
-    Cache::flush();
-
-    // The same key ThrottleRequests derives for a named limiter (see
-    // handleRequestUsingNamedLimiter): md5 of the limiter name plus the key the
-    // limiter returned.
-    $teamKey = md5('transcribe-team-daily'.'transcribe-team:'.$this->user->currentTeam->getKey());
-
-    for ($i = 0; $i < 240; $i++) {
-        RateLimiter::hit($teamKey, 1440 * 60);
-    }
+    spendWorkspaceTranscriptionAllowance($this->user);
 
     // A teammate with an untouched per-user allowance still finds the workspace
     // ceiling spent. Keyed per user instead, this request would go through.

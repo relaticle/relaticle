@@ -519,7 +519,7 @@
                                 <template x-if="!isPlanGroup(group)">
                                     <template x-for="action in group.actions" :key="action.pending_action_id">
                                         <div class="space-y-2">
-                                            <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                            <template x-if="action.status !== 'pending' || hasItemResults(action)">
                                                 @include('chat::livewire.chat.partials._proposal-card')
                                             </template>
 

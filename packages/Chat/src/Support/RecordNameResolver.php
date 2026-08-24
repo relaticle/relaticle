@@ -25,21 +25,7 @@ final readonly class RecordNameResolver
      */
     public function name(mixed $id, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
     {
-        if (PlanReference::is($id)) {
-            return $this->pendingName($id, $team);
-        }
-
-        if (! is_string($id) || $id === '') {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
+        return $this->names([$id], $modelClass, $team, $nameAttribute);
     }
 
     /**

@@ -470,7 +470,7 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<PendingAction>
      */
-    public function planAllSteps(): array
+    private function planAllSteps(): array
     {
         if ($this->planAllStepsCache !== null) {
             return $this->planAllStepsCache;
@@ -486,8 +486,10 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Drop the memo after anything resolves a step, so a later read in the same
-     * request sees the decision rather than the list as it was on mount.
+     * Drop the memo so a read after a resolve sees the decision rather than the
+     * list as it was on mount. render() is the only caller it needs: every read
+     * that happens after a mutation (focusFirstPendingStep, loadStep, refresh)
+     * goes to the database directly, so nothing else can observe a stale memo.
      */
     private function forgetPlanSteps(): void
     {
@@ -503,10 +505,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function planSteps(): array
     {
-        return array_values(array_filter(
-            $this->planAllSteps(),
-            static fn (PendingAction $step): bool => $step->status === PendingActionStatus::Pending && ! $step->isExpired(),
-        ));
+        return resolve(ProposalPlanService::class)->pendingAmong($this->planAllSteps());
     }
 
     /**
@@ -639,8 +638,6 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveAll(ProposalPlanService $plan): void
     {
-        $this->forgetPlanSteps();
-
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -694,8 +691,6 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function approveStep(string $stepId, ProposalPlanService $plan): void
     {
-        $this->forgetPlanSteps();
-
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -735,8 +730,6 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function rejectStep(string $stepId, ProposalPlanService $plan): void
     {
-        $this->forgetPlanSteps();
-
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -773,8 +766,6 @@ final class ProposalCard extends BaseLivewireComponent
      */
     public function discardAll(ProposalPlanService $plan): void
     {
-        $this->forgetPlanSteps();
-
         if ($this->editingFieldCode !== null) {
             return;
         }
@@ -981,17 +972,22 @@ final class ProposalCard extends BaseLivewireComponent
 
     private function announceResolution(PendingAction $step, string $decision): void
     {
-        $fresh = $step->refresh();
-        $record = $decision === 'approved' ? $this->recordReferenceFor($fresh) : null;
+        $record = null;
+
+        // Only an approval needs the reload: it is the executed write that stamps
+        // the created record onto result_data. A cancelled step arrives here
+        // already carrying its outcome, from cancelStep()'s saved model.
+        if ($decision === 'approved') {
+            $step = $step->refresh();
+            $record = $this->recordReferenceFor($step);
+        }
 
         // A step cancelled because the step it depended on was rejected has to say
         // so live, not only after a reload. ListConversationMessages sets this on
         // the way back in; without it here the transcript shows a bare "Rejected"
         // in the very session where the cascade happened, which is the outcome
         // PendingActionService::cancelStep() records it to prevent.
-        $cancelledBy = is_array($fresh->result_data)
-            ? ($fresh->result_data['cancelled_by'] ?? null)
-            : null;
+        $cancelledBy = $step->result_data['cancelled_by'] ?? null;
 
         $this->dispatch(
             'proposal:resolved',

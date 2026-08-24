@@ -28,6 +28,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
+use Tests\Helpers\AnthropicSse;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -233,13 +234,7 @@ it('clears the continuation flag when the resumed turn dies before it stores any
     $team = $this->user->currentTeam;
     $team->forceFill(['plan' => Plan::Pro])->save();
 
-    Http::fake([
-        'api.anthropic.com/*' => Http::response(
-            "data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n",
-            200,
-            ['Content-Type' => 'text/event-stream'],
-        ),
-    ]);
+    AnthropicSse::fake(AnthropicSse::TERMINAL_ERROR);
     Queue::fake();
 
     $job = new ProcessChatMessage(
@@ -267,7 +262,7 @@ it('leaves the next job on the worker to store its own question as the user type
 
     Http::fake([
         'api.anthropic.com/*' => Http::sequence()
-            ->push("data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n", 200, ['Content-Type' => 'text/event-stream'])
+            ->push(AnthropicSse::TERMINAL_ERROR, 200, ['Content-Type' => 'text/event-stream'])
             ->push(implode("\n\n", [
                 'data: {"type":"message_start","message":{"id":"msg_1","model":"claude-sonnet-4-6","usage":{"input_tokens":5}}}',
                 'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"They agreed to a pilot."}}',

@@ -136,11 +136,11 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
 
     // Step 3 is cancelled because step 1 was rejected: the dock announces it
     // through the same bridge a live decision uses.
-    $page->script(<<<'JS'
+    $page->script(<<<JS
         (() => {
-            const hosts = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
-            const host = hosts.find((el) => el.offsetParent !== null) ?? hosts[0];
-            Alpine.$data(host).applyProposalResolution({
+            {$resolveInterface}
+
+            data.applyProposalResolution({
                 pendingActionId: 'pa-3',
                 index: null,
                 decision: 'rejected',

@@ -22,7 +22,7 @@
      no results, and would render "0 of 0 resolved. Review the rest below." above
      the still-open dock. The plan card renders as soon as ANY step is decided, so
      its undecided siblings come through here. --}}
-<template x-if="action.status === 'pending' && action.itemResults && Object.keys(action.itemResults).length > 0">
+<template x-if="action.status === 'pending' && hasItemResults(action)">
     <div class="px-4 py-3">
         <div class="space-y-1.5">
             <template x-for="(item, itemIdx) in (action.display?.items || [])" :key="itemIdx">
@@ -51,7 +51,7 @@
      above owns partial progress, and this one used to fall into it and print
      "0 of 0 resolved" over a card the user had not answered. --}}
 @if ($inPlan)
-    <template x-if="action.status === 'pending' && !(action.itemResults && Object.keys(action.itemResults).length > 0)">
+    <template x-if="action.status === 'pending' && ! hasItemResults(action)">
         <div class="px-4 py-3 ps-9">
             <p class="text-xs text-gray-600 dark:text-gray-300" x-text="{{ $summaryExpression }}"></p>
             <p class="mt-1 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">{{ __('Waiting for your decision below.') }}</p>

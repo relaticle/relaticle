@@ -1053,6 +1053,15 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return (action.itemResults && action.itemResults[index]) || null;
     },
 
+    // Whether any item of a batch has been decided. Read by the card's
+    // compact-while-pending branch and by its exact complement, the
+    // still-undecided-step branch; they must stay complements or a pending step
+    // renders both or neither, which is how "0 of 0 resolved" reached a card
+    // nobody had answered.
+    hasItemResults(action) {
+        return Object.keys(action?.itemResults || {}).length > 0;
+    },
+
     // Past-tense verb for a resolved item's chip, by operation.
     itemVerb(action) {
         const op = action?.operation;

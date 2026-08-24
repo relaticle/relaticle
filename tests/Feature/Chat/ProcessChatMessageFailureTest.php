@@ -11,7 +11,6 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -22,6 +21,7 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
+use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class);
 
@@ -262,23 +262,6 @@ function seedFailoverConversation(User $user, string $conversationId): void
     ]);
 }
 
-/**
- * Fake the raw Anthropic SSE transport so the real streaming pipeline (agent,
- * gateway, ProcessChatMessage::handle()) runs for real and only the network
- * response is canned. `data:` lines are all `parseServerSentEvents()` reads;
- * `event:` lines are ignored by the parser, so they are omitted here.
- */
-function fakeAnthropicSse(string $body): void
-{
-    Http::fake([
-        'api.anthropic.com/*' => Http::response($body, 200, ['Content-Type' => 'text/event-stream']),
-    ]);
-}
-
-const SSE_TERMINAL_ERROR = "data: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n";
-
-const SSE_STREAM_STARTED_THEN_ERROR = "data: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-4-6\",\"usage\":{\"input_tokens\":5}}}\n\ndata: {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"bad request\"}}\n\n";
-
 it('redispatches once on a terminal pre-stream failure when resolution was auto', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
@@ -299,7 +282,7 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
         userId: (string) $user->getKey(),
     ))->toBeTrue();
 
-    fakeAnthropicSse(SSE_TERMINAL_ERROR);
+    AnthropicSse::fake(AnthropicSse::TERMINAL_ERROR);
     Queue::fake();
     Event::fake([ChatStreamRetrying::class]);
 
@@ -348,7 +331,7 @@ it('does not fail over for an explicit model pick', function (): void {
     $credits = resolve(CreditService::class);
     $credits->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
 
-    fakeAnthropicSse(SSE_TERMINAL_ERROR);
+    AnthropicSse::fake(AnthropicSse::TERMINAL_ERROR);
     Queue::fake();
 
     $job = new ProcessChatMessage(
@@ -384,7 +367,7 @@ it('does not fail over once the stream has already broadcast an event', function
     $credits = resolve(CreditService::class);
     $credits->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
 
-    fakeAnthropicSse(SSE_STREAM_STARTED_THEN_ERROR);
+    AnthropicSse::fake(AnthropicSse::STREAM_STARTED_THEN_ERROR);
     Queue::fake();
 
     $job = new ProcessChatMessage(
