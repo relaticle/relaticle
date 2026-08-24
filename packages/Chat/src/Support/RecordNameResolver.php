@@ -83,7 +83,7 @@ final readonly class RecordNameResolver
         foreach ($ids as $id) {
             $name = PlanReference::is($id)
                 ? $this->pendingName($id, $team)
-                : ($resolved[(string) (is_string($id) ? $id : '')] ?? '');
+                : ($resolved[is_string($id) ? $id : ''] ?? '');
 
             if ($name !== '') {
                 $names[] = $name;

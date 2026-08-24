@@ -19,7 +19,6 @@ use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
-use RuntimeException;
 
 uses(LazilyRefreshDatabase::class);
 
