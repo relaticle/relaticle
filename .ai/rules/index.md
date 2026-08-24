@@ -9,3 +9,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/** | .ai/rules/boost/models.md |
 | tests/** | .ai/rules/boost/tests.md |
 | packages/Chat/** | .ai/rules/chat.md |
+| app/Onboarding/**, app/Services/WorkspaceActivationFacts.php | .ai/rules/onboarding.md |
