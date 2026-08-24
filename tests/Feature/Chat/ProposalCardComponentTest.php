@@ -1128,3 +1128,17 @@ describe('plan card', function (): void {
             ->and(Company::query()->count())->toBe(0);
     });
 });
+
+it('refuses a client-set editing target, so one payload cannot open the same field on every step', function (): void {
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    // editField() sets both together and clearing resets both; neither is ever
+    // written from the browser. Unlocked, a payload could name a field while
+    // nulling the step, and every step owning that code would render the same
+    // Filament schema against one state path.
+    expect(fn () => $component->set('editingStepId', null))->toThrow(Exception::class)
+        ->and(fn () => $component->set('editingFieldCode', 'name'))->toThrow(Exception::class);
+});

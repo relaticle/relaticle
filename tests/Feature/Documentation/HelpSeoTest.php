@@ -12,6 +12,7 @@ use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
+use Relaticle\Ink\Models\Post;
 
 mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class);
 
@@ -235,4 +236,18 @@ it('busts the cached search index on a front-matter-only title edit', function (
 
     expect($firstRecord['title'])->toBe('Original title')
         ->and($secondRecord['title'])->toBe('Updated title');
+});
+
+it('caps the blog section of llms.txt instead of listing every post ever published', function (): void {
+    Post::factory()->count(55)->published()->create();
+
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    $blogLinks = preg_match_all('#\- \[[^\]]*\]\('.preg_quote(route('blog.index'), '#').'/[^)]+\)#', (string) $body);
+
+    // /llms.txt is public, uncached, and written for crawlers, so the one section
+    // that grows with the database needs a ceiling. The docs and help sections
+    // above it are already bounded by their on-disk manifests.
+    expect($blogLinks)->toBeLessThanOrEqual(50)
+        ->and($blogLinks)->toBeGreaterThan(0);
 });
