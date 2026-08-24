@@ -48,7 +48,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
     });
 });
 
-it('settles the reserved minimum (not refund) when the job fails', function (): void {
+it('refunds the reservation when the job fails without ever streaming', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     seedConversation($user, 'conv-123');
@@ -72,8 +72,10 @@ it('settles the reserved minimum (not refund) when the job fails', function (): 
     $job->failed(new RuntimeException('boom'));
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
-    expect($balance->credits_used)->toBe(1)
-        ->and($balance->credits_remaining)->toBe(99);
+
+    // handle() never ran, so the reservation goes back rather than being charged.
+    expect($balance->credits_used)->toBe(0)
+        ->and($balance->credits_remaining)->toBe(100);
 });
 
 it('binds auth context so tool classes can resolve the current user', function (): void {

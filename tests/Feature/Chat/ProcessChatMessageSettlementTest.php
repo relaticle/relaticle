@@ -11,7 +11,7 @@ use Relaticle\Chat\Services\CreditService;
 
 uses(LazilyRefreshDatabase::class);
 
-it('settles the reserved minimum (does not refund) when the job fails', function (): void {
+it('refunds the reservation when a job fails without ever streaming', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     AiCreditBalance::query()->where('team_id', $team->getKey())
@@ -36,5 +36,43 @@ it('settles the reserved minimum (does not refund) when the job fails', function
     $job->failed(new RuntimeException('timeout'));
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
-    expect($balance->credits_used)->toBe(1); // charged the minimum, NOT refunded
+
+    // Nothing streamed, so no provider was ever called and the turn cost nothing.
+    expect($balance->credits_used)->toBe(0)
+        ->and($balance->credits_remaining)->toBe(100);
+});
+
+it('settles the reserved minimum when the turn already streamed before failing', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-2',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    resolve(CreditService::class)->reserveCredit($team); // used 1
+
+    $job = new ProcessChatMessage(
+        user: $user, team: $team, message: 'hi', conversationId: 'c-2',
+        resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNSTREAMEDAAAAAAAAAAAA',
+    );
+
+    // The half of the contract that has no public setter: a turn that reached the
+    // provider and emitted tokens before dying is still billed the minimum.
+    $streamed = new ReflectionProperty($job, 'streamedAnything');
+    $streamed->setValue($job, true);
+
+    $job->failed(new RuntimeException('died mid-stream'));
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    expect($balance->credits_used)->toBe(1)
+        ->and($balance->credits_remaining)->toBe(99);
 });

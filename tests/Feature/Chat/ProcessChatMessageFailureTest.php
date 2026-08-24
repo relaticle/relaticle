@@ -6,6 +6,7 @@ use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -397,4 +398,45 @@ it('does not fail over once the stream has already broadcast an event', function
     expect(fn (): mixed => $job->handle($credits))->toThrow(RuntimeException::class);
 
     Queue::assertNothingPushed();
+});
+
+it('refunds the reservation when the job dies before it ever runs', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    resolve(CreditService::class)->reserveCredit(
+        $team,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: $conversationId,
+        userId: (string) $user->getKey(),
+    );
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining'))->toBe(99);
+
+    // A queue backlog past retryUntil() fails the job at pickup, so handle() never
+    // runs and nothing streamed. The user must not pay for a turn that never
+    // reached a provider.
+    $job = new ProcessChatMessage(
+        user: $user,
+        team: $team,
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        turnId: $turnId,
+    );
+
+    $job->failed(new MaxAttemptsExceededException('job expired'));
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+
+    expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0);
 });

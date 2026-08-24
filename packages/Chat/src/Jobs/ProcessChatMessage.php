@@ -423,13 +423,28 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(CreditService::class)->settleReservedMinimum(
-            team: $this->team,
-            user: $this->user,
-            conversationId: $this->conversationId,
-            resolutionKey: $this->resolutionKey(),
-            reason: 'job_failed',
-        );
+        // A turn that never streamed never reached a provider, so it cost nothing and
+        // must not be charged. The commonest case is a queue backlog: retryUntil() is
+        // stamped at dispatch, so the worker can fail the job at pickup before
+        // handle() is ever entered, and this instance is the freshly unserialized one
+        // whose $streamedAnything is still false.
+        $credits = resolve(CreditService::class);
+
+        if ($this->streamedAnything) {
+            $credits->settleReservedMinimum(
+                team: $this->team,
+                user: $this->user,
+                conversationId: $this->conversationId,
+                resolutionKey: $this->resolutionKey(),
+                reason: 'job_failed',
+            );
+        } else {
+            $credits->refundReservation(
+                $this->team,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+        }
 
         ChatTelemetry::breadcrumb('job.failed', [
             'exception' => $exception?->getMessage(),
