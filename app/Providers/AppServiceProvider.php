@@ -340,6 +340,19 @@ final class AppServiceProvider extends ServiceProvider
             fn (Request $request) => Limit::perMinute(20)->by($request->ip()),
         );
 
+        // Transcription reserves no credit, so the limiters are the only ceiling on
+        // provider spend. The per-minute and per-day buckets on the route are keyed
+        // per user and stay that way; this one is the ACCOUNT ceiling that was
+        // missing, because billing and credits are per team and an N-seat workspace
+        // otherwise multiplied the daily allowance by N with nothing to notice.
+        RateLimiter::for('transcribe-team-daily', function (Request $request): Limit {
+            /** @var User|null $user */
+            $user = $request->user();
+            $team = $user?->currentTeam;
+
+            return Limit::perMinutes(1440, 240)->by('transcribe-team:'.($team?->getKey() ?? $request->ip()));
+        });
+
         RateLimiter::for('chat-send', function (Request $request) {
             /** @var User|null $user */
             $user = $request->user();

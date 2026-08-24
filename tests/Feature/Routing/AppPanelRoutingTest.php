@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\NotificationPreferences;
+use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use App\Providers\MacroServiceProvider;
 use Filament\Facades\Filament;
@@ -211,12 +212,45 @@ describe('chat record permalinks - domain mode', function () use ($recordPermali
 });
 
 it('gives every chat route throttle its own bucket so limiters cannot starve each other', function (): void {
-    $unprefixed = collect(app('router')->getRoutes())
+    $throttles = collect(app('router')->getRoutes())
         ->filter(fn ($route): bool => str_starts_with((string) $route->getName(), 'chat.'))
         ->flatMap(fn ($route) => collect($route->gatherMiddleware())
-            ->filter(fn ($m): bool => is_string($m) && preg_match('/^throttle:\d+,\d+$/', $m) === 1)
-            ->map(fn (string $m): string => $route->getName().' '.$m))
+            ->filter(fn ($m): bool => is_string($m) && str_starts_with($m, 'throttle:'))
+            ->map(fn (string $m): array => ['route' => (string) $route->getName(), 'middleware' => $m]))
+        ->values();
+
+    // Positive control first. Without it this test passes vacuously: rename the
+    // route prefix, move the throttles into a group, or change how gatherMiddleware
+    // stringifies them, and the collection is empty and the assertion below is green
+    // while the protection it guards is gone.
+    expect($throttles->count())->toBeGreaterThanOrEqual(10);
+
+    // An inline throttle must carry a key prefix (the third argument). The default
+    // signature is just the user id, so two unprefixed limiters on different routes
+    // share one bucket and starve each other.
+    $unprefixed = $throttles
+        ->filter(fn (array $t): bool => preg_match('/^throttle:\d+,\d+(,\s*)?$/', $t['middleware']) === 1)
+        ->map(fn (array $t): string => $t['route'].' '.$t['middleware'])
         ->values();
 
     expect($unprefixed->all())->toBe([]);
+});
+
+it('does not let one chat route consume another route\'s rate limit allowance', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    // Exhaust the mentions bucket (60/min).
+    foreach (range(1, 61) as $ignored) {
+        $response = $this->get(route('chat.mentions', ['q' => 'a']));
+    }
+
+    expect($response->status())->toBe(429);
+
+    // A different route with its own bucket must be unaffected. This is the exact
+    // regression the routes file documents: unprefixed limiters shared one bucket,
+    // so mention autocompletes consumed the transcribe allowance.
+    $conversations = $this->get(route('chat.conversations'));
+
+    expect($conversations->status())->not->toBe(429);
 });

@@ -5,6 +5,11 @@
      listener, which is what drives arrow-key navigation and Esc-to-close. --}}
 <div
     x-show="switcherOpen"
+    {-- aria-modal tells assistive tech the background is inert, so Tab must not
+         walk out of the panel into the transcript behind the backdrop. noreturn and
+         noautofocus leave focus placement to the component, which already moves it
+         to the input on open and restores it on close. --}
+    x-trap.noscroll.noreturn.noautofocus="switcherOpen"
     x-cloak
     x-on:click.self="closeSwitcher()"
     class="fixed inset-0 z-[60] flex items-start justify-center bg-gray-500/40 px-4 pt-[15vh] backdrop-blur-sm dark:bg-gray-950/60"

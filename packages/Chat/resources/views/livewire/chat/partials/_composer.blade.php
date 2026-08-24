@@ -4,9 +4,19 @@
         {{-- Docked pending proposal: a nested Livewire component hosts the active proposal so it can
              render real Filament field editors in place (Phase C). Alpine stays the source of truth for
              whether a proposal is pending and pushes the active id to the card via `proposal:set-active`. --}}
+        {{-- The composer below is hidden while a proposal is docked, and its editor
+             holds focus at that moment, so focus would otherwise fall to <body>: a
+             keyboard user lands at the top of the document with no idea a decision is
+             waiting. tabindex plus the focus on show moves them onto the dock, and
+             role=status announces it to a screen reader (the transcript's own log
+             region is a sibling and does not cover this). --}}
         <div
             x-show="hasPendingProposal"
             x-effect="syncActiveProposal()"
+            x-init="$watch('hasPendingProposal', (pending) => { if (pending) $nextTick(() => $el.focus()) })"
+            tabindex="-1"
+            role="group"
+            :aria-label="hasPendingProposal ? '{{ __('Proposal awaiting your decision') }}' : null"
             x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
             x-transition:enter-start="motion-safe:translate-y-2 motion-safe:opacity-0"
             x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
@@ -15,7 +25,7 @@
             x-transition:leave-end="motion-safe:translate-y-1 motion-safe:opacity-0"
             class="mb-3"
         >
-            <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+            <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400" role="status">
                 <x-heroicon-o-sparkles class="h-3.5 w-3.5 text-primary-500 dark:text-primary-400" aria-hidden="true" />
                 <span>{{ __('Review before continuing') }}</span>
             </div>

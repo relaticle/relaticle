@@ -20,8 +20,12 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     Route::post('/chat/conversations', [ChatController::class, 'createConversation'])
         ->middleware('throttle:chat-send')
         ->name('chat.conversations.create');
-    Route::get('/chat/conversations', [ChatController::class, 'conversations'])->name('chat.conversations');
-    Route::delete('/chat/conversations/{conversation}', [ChatController::class, 'destroyConversation'])->name('chat.conversations.destroy');
+    Route::get('/chat/conversations', [ChatController::class, 'conversations'])
+        ->middleware('throttle:60,1,chat-conversations')
+        ->name('chat.conversations');
+    Route::delete('/chat/conversations/{conversation}', [ChatController::class, 'destroyConversation'])
+        ->middleware('throttle:30,1,chat-conversation-delete')
+        ->name('chat.conversations.destroy');
 
     Route::get('/chat/conversations/{conversationId}/search', [ChatController::class, 'searchMessages'])
         ->middleware('throttle:60,1,chat-search')
@@ -47,7 +51,7 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     // limiters on different routes share one bucket and starve each other
     // (e.g. 10 mention autocompletes used to consume the transcribe allowance).
     Route::post('/chat/transcribe', TranscribeController::class)
-        ->middleware(['throttle:10,1,transcribe-minute', 'throttle:60,1440,transcribe-daily'])
+        ->middleware(['throttle:10,1,transcribe-minute', 'throttle:60,1440,transcribe-daily', 'throttle:transcribe-team-daily'])
         ->name('chat.transcribe');
 
     Route::post('/chat/messages/{messageId}/feedback', [MessageFeedbackController::class, 'store'])
