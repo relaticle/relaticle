@@ -117,6 +117,10 @@ arch('avoid mutation')
         // Request-scoped batch_uuid holder — mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
+        // Request/job-scoped creation-source cache, same shape as
+        // RequestActivityBatch above — mutable by design, reset per request/job
+        // via the scoped container binding in AppServiceProvider.
+        'App\Services\WorkspaceActivationFacts',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',

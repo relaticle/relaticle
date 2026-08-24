@@ -33,9 +33,11 @@ use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use App\Onboarding\ActivationSteps;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
+use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\Markdown\TableAwareLeagueDriver;
@@ -107,6 +109,10 @@ final class AppServiceProvider extends ServiceProvider
         // them — the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
 
+        // Caches creation-source facts per team for the lifetime of a
+        // request/job — scoped so a queue worker resets it between jobs.
+        $this->app->scoped(WorkspaceActivationFacts::class);
+
         // Spatie's LeagueDriver never registers TableConverter, so <table>
         // markup collapses to a run-on line in the markdown-response channel.
         // Our provider registers after the package's, so this binding wins.
@@ -136,6 +142,8 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
+
+        ActivationSteps::register();
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
