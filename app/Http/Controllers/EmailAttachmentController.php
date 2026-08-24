@@ -18,17 +18,19 @@ final readonly class EmailAttachmentController
         private MailServiceFactoryInterface $mailServiceFactory,
     ) {}
 
-    public function __invoke(Request $request, string $attachmentId): StreamedResponse
+    public function __invoke(Request $request, string $attachmentId): Response|StreamedResponse
     {
         $attachment = $this->authorizedAttachment($request, $attachmentId);
+
+        if ($request->routeIs('email-attachments.inline')) {
+            return $this->inlineResponse($attachment);
+        }
 
         return $this->stream($this->attachmentBinary($attachment), $attachment->filename ?? 'attachment');
     }
 
-    public function inline(Request $request, string $attachmentId): Response
+    private function inlineResponse(EmailAttachment $attachment): Response
     {
-        $attachment = $this->authorizedAttachment($request, $attachmentId);
-
         abort_unless($attachment->is_inline, 404);
         abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
 
