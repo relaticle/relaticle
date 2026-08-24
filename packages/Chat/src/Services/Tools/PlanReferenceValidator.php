@@ -11,6 +11,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PlanReference;
+use Relaticle\Chat\Support\ProposalPayload;
 
 /**
  * Decides whether a `$ref:<pending_action_id>` a write tool was handed may stand
@@ -66,7 +67,7 @@ final readonly class PlanReferenceValidator
             return "Step reference `{$value}` points at a proposal that is already {$referenced->status->value}. Use the record's real id instead.";
         }
 
-        if (($referenced->action_data['_batch'] ?? false) === true) {
+        if (ProposalPayload::from($referenced)->isBatch) {
             return "Step reference `{$value}` points at a multi-record proposal, so it is ambiguous. Propose that record in its own tool call to reference it.";
         }
 

@@ -27,3 +27,20 @@ of real CRM writes, not a transaction.
 The dock re-docks on the WHOLE pending set (`syncActiveProposal` keys on a signature
 of all pending ids): keying on the first id alone leaves the card rendering the plan
 as it looked when only step one had streamed in.
+
+## ProposalPayload is the only decoder for `pending_actions.action_data`
+That column is a four-arm union of marker keys: a single create is the record itself,
+a single update adds `_record_id`/`_model_class`, a single delete is `_record_ids`, and
+any multi-record proposal is `_batch` + `records`. Read it through
+`Support\ProposalPayload` (and `ProposalProgress` for `result_data.items`), never
+re-derive `($data['_batch'] ?? false) === true` inline. Fifteen inline copies used to
+disagree: the dock counted a malformed batch as one record while approval threw.
+Reading is split by consequence on purpose. `recordAtOrEmpty()`/`displayAt()` are
+lenient because they feed a render, where a throw blanks the dock; `batchRecords()`/
+`batchRecordAt()`/`recordIds()` are strict because they feed a real CRM write, where a
+silently emptied record creates a blank one.
+The stored shape is frozen and the payload class only ever reads. Do not normalize on
+write: replayed proposal tool results embed `action_data` verbatim (rewriting one
+invalidates the Anthropic prompt-cache prefix from that turn on), and
+`PendingActionService::createProposal` dedupes job retries by strict array equality
+against rows already in the database.

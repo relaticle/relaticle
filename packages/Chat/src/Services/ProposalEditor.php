@@ -14,6 +14,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -299,17 +300,9 @@ final readonly class ProposalEditor
      */
     private function currentDisplayFields(PendingAction $pendingAction, ?int $index): array
     {
-        $display = $pendingAction->display_data;
+        $display = ProposalPayload::from($pendingAction)->displayAt($index ?? 0);
 
-        if ($index === null) {
-            $fields = $display['fields'] ?? [];
-
-            return is_array($fields) ? array_values($fields) : [];
-        }
-
-        $items = is_array($display['items'] ?? null) ? array_values($display['items']) : [];
-        $item = $items[$index] ?? null;
-        $fields = is_array($item) ? ($item['fields'] ?? []) : [];
+        $fields = $display['fields'] ?? [];
 
         return is_array($fields) ? array_values($fields) : [];
     }
@@ -350,25 +343,15 @@ final readonly class ProposalEditor
      */
     private function resolveRecord(PendingAction $pendingAction, ?int $index): array
     {
-        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
+        $payload = ProposalPayload::from($pendingAction);
+
+        if (! $payload->isBatch) {
             return $pendingAction->action_data;
         }
 
         throw_if($index === null, RuntimeException::class, 'A batch item index is required');
 
-        $records = $pendingAction->action_data['records'] ?? null;
-
-        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
-
-        $records = array_values($records);
-
-        throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
-
-        $record = $records[$index];
-
-        throw_if(! is_array($record), RuntimeException::class, 'Batch record data is malformed');
-
-        return $record;
+        return $payload->batchRecordAt($index);
     }
 
     private function assertEditable(PendingAction $pendingAction): void

@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PlanReference;
+use Relaticle\Chat\Support\ProposalPayload;
 use RuntimeException;
 
 /**
@@ -200,15 +201,15 @@ final readonly class ProposalPlanService
      */
     public function approveStep(PendingAction $step, User $user): void
     {
-        if (($step->action_data['_batch'] ?? false) !== true) {
+        $payload = ProposalPayload::from($step);
+
+        if (! $payload->isBatch) {
             $this->pendingActions->approve($step, $user);
 
             return;
         }
 
-        $records = is_array($step->action_data['records'] ?? null) ? $step->action_data['records'] : [];
-
-        foreach (array_keys(array_values($records)) as $index) {
+        foreach (array_keys($payload->batchRecords()) as $index) {
             $this->pendingActions->approveItem($step->refresh(), $user, $index);
         }
     }

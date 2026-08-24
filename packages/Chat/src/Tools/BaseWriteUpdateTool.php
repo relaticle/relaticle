@@ -15,6 +15,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ResolvesRecordNames;
@@ -224,10 +225,7 @@ abstract class BaseWriteUpdateTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        $publicRecords = array_map(
-            static fn (array $record): array => array_diff_key($record, array_flip(['_record_id', '_model_class'])),
-            $actionRecords,
-        );
+        $publicRecords = array_map(ProposalPayload::withoutMarkers(...), $actionRecords);
 
         return (string) json_encode([
             'type' => 'pending_action',

@@ -36,6 +36,8 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ProposalPayload;
+use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -184,7 +186,7 @@ final readonly class PendingActionService
                 // the dock has no whole-batch control. Refuse a whole-batch approve so no
                 // caller can bypass the per-item review and commit every record at once.
                 throw_if(
-                    ($pendingAction->action_data['_batch'] ?? false) === true,
+                    ProposalPayload::from($pendingAction)->isBatch,
                     RuntimeException::class,
                     'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
                 );
@@ -288,25 +290,23 @@ final readonly class PendingActionService
                 $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
                 $this->validateResolvable($locked);
-                $records = $this->batchRecords($locked);
+                $records = ProposalPayload::from($locked)->batchRecords();
                 $this->assertItemIndex($records, $index);
 
                 $resultData = is_array($locked->result_data) ? $locked->result_data : [];
                 $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+                $progress = ProposalProgress::of($items, count($records));
 
                 // Idempotent: an already-resolved item is a no-op (no re-execute). Report
                 // the item's REAL stored status, not an assumed 'approved': it may have
                 // been rejected by an earlier call.
-                if (isset($items[(string) $index])) {
-                    $existing = $items[(string) $index];
-                    $existingStatus = is_array($existing) ? (string) ($existing['status'] ?? 'approved') : 'approved';
-
-                    return [$this->isComplete($items, $records), null, $existingStatus];
+                if ($progress->isResolved($index)) {
+                    return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
                 }
 
                 $model = $this->executeBatchItem($locked, $user, $records[$index]);
 
-                $items[(string) $index] = ['status' => 'approved', 'id' => $model->getKey()];
+                $items[$index] = ['status' => 'approved', 'id' => $model->getKey()];
                 $resultData['items'] = $items;
                 $resultData['type'] ??= $model->getMorphClass();
                 $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
@@ -338,22 +338,20 @@ final readonly class PendingActionService
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
             $this->validateResolvable($locked);
-            $records = $this->batchRecords($locked);
+            $records = ProposalPayload::from($locked)->batchRecords();
             $this->assertItemIndex($records, $index);
 
             $resultData = is_array($locked->result_data) ? $locked->result_data : [];
             $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+            $progress = ProposalProgress::of($items, count($records));
 
             // Idempotent: an already-resolved item is a no-op. Report the item's REAL
             // stored status, not an assumed 'rejected': it may have been approved.
-            if (isset($items[(string) $index])) {
-                $existing = $items[(string) $index];
-                $existingStatus = is_array($existing) ? (string) ($existing['status'] ?? 'rejected') : 'rejected';
-
-                return [$this->isComplete($items, $records), $existingStatus];
+            if ($progress->isResolved($index)) {
+                return [$progress->isComplete(), $progress->statusOf($index, 'rejected')];
             }
 
-            $items[(string) $index] = ['status' => 'rejected'];
+            $items[$index] = ['status' => 'rejected'];
             $resultData['items'] = $items;
 
             return [$this->finalizeBatchIfComplete($locked, $items, $records, $resultData), 'rejected'];
@@ -397,7 +395,7 @@ final readonly class PendingActionService
      */
     private function finalizeBatchIfComplete(PendingAction $pendingAction, array $items, array $records, array $resultData): bool
     {
-        if (! $this->isComplete($items, $records)) {
+        if (! ProposalProgress::of($items, count($records))->isComplete()) {
             $pendingAction->update(['result_data' => $resultData]);
 
             return false;
@@ -413,37 +411,6 @@ final readonly class PendingActionService
         ]);
 
         return true;
-    }
-
-    /**
-     * @param  array<string, mixed>  $items
-     * @param  array<int, mixed>  $records
-     */
-    private function isComplete(array $items, array $records): bool
-    {
-        return count($items) >= count($records);
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function batchRecords(PendingAction $pendingAction): array
-    {
-        $data = $pendingAction->action_data;
-
-        throw_if(($data['_batch'] ?? false) !== true, RuntimeException::class, 'Per-item resolution applies only to batch proposals');
-
-        $records = $data['records'] ?? null;
-
-        throw_if(! is_array($records) || $records === [], RuntimeException::class, 'Missing or invalid records in batch action data');
-
-        throw_if(
-            array_filter($records, static fn (mixed $r): bool => ! is_array($r)) !== [],
-            RuntimeException::class,
-            'Batch record data is malformed',
-        );
-
-        return array_values($records);
     }
 
     /**
@@ -479,11 +446,10 @@ final readonly class PendingActionService
         $record = $this->resolvePlanReferences($record, $pendingAction);
 
         if ($pendingAction->operation === PendingActionOperation::Update) {
-            $model = $this->resolveModel($this->resolveModelClass($record), $pendingAction, $record['_record_id'] ?? null);
-            unset($record['_record_id'], $record['_model_class']);
+            $model = $this->resolveModel($this->resolveModelClass($record), $pendingAction, ProposalPayload::recordIdOf($record));
 
             /** @var Model */
-            return $action->execute($user, $model, $record);
+            return $action->execute($user, $model, ProposalPayload::withoutMarkers($record));
         }
 
         /** @var Model */
@@ -507,9 +473,7 @@ final readonly class PendingActionService
     private function resolveBatchDeleteModel(PendingAction $pendingAction, array $record): Model
     {
         $modelClass = $this->resolveModelClass($record);
-        $recordId = $record['_record_id'] ?? null;
-
-        throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in delete batch item');
+        $recordId = ProposalPayload::recordIdOf($record, 'delete batch item');
 
         $model = $modelClass::query()
             ->with(['team'])
@@ -666,7 +630,7 @@ final readonly class PendingActionService
     {
         $labels = array_values(array_filter(array_map(
             fn (array $item): ?string => $this->recordLabel($item['data'], $item['display']),
-            $this->proposalItems($action),
+            ProposalPayload::from($action)->items(),
         )));
 
         return $labels === [] ? null : implode(', ', $labels);
@@ -693,8 +657,9 @@ final readonly class PendingActionService
         }
 
         $resolver = resolve(RecordReferenceResolver::class);
+        $payload = ProposalPayload::from($action);
 
-        if (($action->action_data['_batch'] ?? false) !== true) {
+        if (! $payload->isBatch) {
             $id = $this->resolveResultRecordId($action);
 
             return $id === null ? [] : [[
@@ -704,7 +669,7 @@ final readonly class PendingActionService
             ]];
         }
 
-        $items = $this->proposalItems($action);
+        $items = $payload->items();
         $resultData = is_array($action->result_data) ? $action->result_data : [];
         $resultItems = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
         $records = [];
@@ -725,35 +690,6 @@ final readonly class PendingActionService
         }
 
         return $records;
-    }
-
-    /**
-     * One (data, display) pair per record the proposal covers: a batch yields one
-     * per item, anything else yields the proposal itself.
-     *
-     * @return list<array{data: array<string, mixed>, display: array<string, mixed>}>
-     */
-    private function proposalItems(PendingAction $action): array
-    {
-        $data = $action->action_data;
-        $display = $action->display_data;
-
-        if (($data['_batch'] ?? false) !== true) {
-            return [['data' => $data, 'display' => $display]];
-        }
-
-        $records = is_array($data['records'] ?? null) ? array_values($data['records']) : [];
-        $items = is_array($display['items'] ?? null) ? array_values($display['items']) : [];
-        $count = max(count($records), count($items));
-
-        if ($count === 0) {
-            return [];
-        }
-
-        return array_map(static fn (int $index): array => [
-            'data' => is_array($records[$index] ?? null) ? $records[$index] : [],
-            'display' => is_array($items[$index] ?? null) ? $items[$index] : [],
-        ], range(0, $count - 1));
     }
 
     /**
@@ -870,15 +806,13 @@ final readonly class PendingActionService
         $data = $this->resolvePlanReferences($pendingAction->action_data, $pendingAction);
         $modelClass = $this->resolveModelClass($data);
 
-        unset($data['_record_id'], $data['_model_class']);
-
-        $model = $this->resolveModel($modelClass, $pendingAction, $pendingAction->action_data['_record_id'] ?? null);
+        $model = $this->resolveModel($modelClass, $pendingAction, ProposalPayload::recordIdOf($pendingAction->action_data));
 
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
         }
 
-        return $action->execute($user, $model, $data);
+        return $action->execute($user, $model, ProposalPayload::withoutMarkers($data));
     }
 
     private function executeDelete(object $action, User $user, PendingAction $pendingAction): mixed
@@ -907,10 +841,8 @@ final readonly class PendingActionService
         return $modelClass;
     }
 
-    private function resolveModel(string $modelClass, PendingAction $pendingAction, mixed $recordId): Model
+    private function resolveModel(string $modelClass, PendingAction $pendingAction, string $recordId): Model
     {
-        throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, 'Missing or invalid _record_id in action data');
-
         // CustomField uses tenant_id (from the custom-fields package) rather than the
         // team_id column used by all other CRM models. Scope the lookup accordingly.
         $tenantColumn = $modelClass === CustomField::class
@@ -934,9 +866,7 @@ final readonly class PendingActionService
     private function resolveDeleteModels(PendingAction $pendingAction): array
     {
         $modelClass = $this->resolveModelClass($pendingAction->action_data);
-        $ids = $pendingAction->action_data['_record_ids'] ?? null;
-
-        throw_if(! is_array($ids) || $ids === [], RuntimeException::class, 'Missing or invalid _record_ids in action data');
+        $ids = ProposalPayload::from($pendingAction)->recordIds();
 
         return array_values(
             $modelClass::query()
@@ -996,16 +926,11 @@ final readonly class PendingActionService
      */
     private function proposedTitleMap(array $actionData): array
     {
-        $records = ($actionData['_batch'] ?? false) === true && is_array($actionData['records'] ?? null)
-            ? $actionData['records']
-            : [$actionData];
-
         $map = [];
 
-        foreach ($records as $record) {
-            if (! is_array($record)) {
-                continue;
-            }
+        foreach (ProposalPayload::of($actionData, [])->items() as $item) {
+            $record = $item['data'];
+
             foreach (['name', 'title'] as $field) {
                 if (is_string($record[$field] ?? null) && $record[$field] !== '') {
                     $lower = mb_strtolower(trim($record[$field]));

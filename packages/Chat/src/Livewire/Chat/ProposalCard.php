@@ -25,6 +25,8 @@ use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ProposalPayload;
+use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -101,7 +103,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $input = $this->flattenFormState($this->form->getState());
-        $index = ($pendingAction->action_data['_batch'] ?? false) === true ? $this->cursorFor($pendingAction) : null;
+        $index = ProposalPayload::from($pendingAction)->isBatch ? $this->cursorFor($pendingAction) : null;
 
         // $cursor is a public property, so it is client-writable, and a partially
         // resolved batch is still Pending: without this an edit could rewrite the
@@ -219,16 +221,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function currentRecord(PendingAction $pendingAction): array
     {
-        $data = $pendingAction->action_data;
-
-        if (($data['_batch'] ?? false) !== true) {
-            return $data;
-        }
-
-        $records = is_array($data['records'] ?? null) ? array_values($data['records']) : [];
-        $record = $records[$this->cursorFor($pendingAction)] ?? [];
-
-        return is_array($record) ? $record : [];
+        return ProposalPayload::from($pendingAction)->recordAtOrEmpty($this->cursorFor($pendingAction));
     }
 
     /**
@@ -357,7 +350,7 @@ final class ProposalCard extends BaseLivewireComponent
             return 1;
         }
 
-        return $this->resolveRecordCount($pendingAction);
+        return ProposalPayload::from($pendingAction)->count();
     }
 
     /**
@@ -391,24 +384,22 @@ final class ProposalCard extends BaseLivewireComponent
         return $position === false ? 1 : $position + 1;
     }
 
-    private function resolveRecordCount(PendingAction $pendingAction): int
-    {
-        $data = $pendingAction->action_data;
-
-        if (($data['_batch'] ?? false) !== true || ! is_array($data['records'] ?? null)) {
-            return 1;
-        }
-
-        return max(1, count($data['records']));
-    }
-
     /**
      * The cursor belongs to the active step. Any other step of the plan renders at
      * its own first undecided record, so a card never shows a record the stepper
      * cannot reach.
+     *
+     * Only a multi-record step has a cursor at all. A single-record proposal always
+     * renders its one record, whatever the client-writable $cursor holds: a plan
+     * whose earlier batch step left the cursor past zero must not blank the next
+     * step's fields.
      */
     private function cursorFor(PendingAction $pendingAction): int
     {
+        if (! ProposalPayload::from($pendingAction)->isBatch) {
+            return 0;
+        }
+
         return (string) $pendingAction->getKey() === $this->activeStepId()
             ? $this->cursor
             : $this->firstUnresolvedIndex($pendingAction);
@@ -501,8 +492,8 @@ final class ProposalCard extends BaseLivewireComponent
                 'editableCodes' => $this->editableCodes($step),
                 'duplicateWarning' => $step->display_data['duplicate_warning'] ?? null,
                 'isActive' => (string) $step->getKey() === $activeStepId,
-                'isBatch' => ($step->action_data['_batch'] ?? false) === true,
-                'recordCount' => $this->resolveRecordCount($step),
+                'isBatch' => ProposalPayload::from($step)->isBatch,
+                'recordCount' => $this->recordCount($step),
                 'remainingCount' => $this->remainingCount($step),
                 'position_in_batch' => $this->currentPosition($step),
                 'blockedBy' => $this->sortedPositions($blockedBy),
@@ -553,29 +544,9 @@ final class ProposalCard extends BaseLivewireComponent
         return is_string($summary) ? $summary : '';
     }
 
-    /**
-     * @return array<array-key, mixed>
-     */
-    private function resolvedItems(PendingAction $pendingAction): array
-    {
-        $resultData = $pendingAction->result_data;
-
-        return is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
-    }
-
     private function firstUnresolvedIndex(PendingAction $pendingAction): int
     {
-        $count = $this->resolveRecordCount($pendingAction);
-
-        $items = $this->resolvedItems($pendingAction);
-
-        for ($index = 0; $index < $count; $index++) {
-            if (! isset($items[(string) $index])) {
-                return $index;
-            }
-        }
-
-        return $count - 1;
+        return ProposalProgress::for($pendingAction)->firstUnresolvedIndex();
     }
 
     /**
@@ -586,18 +557,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function unresolvedIndices(PendingAction $pendingAction): array
     {
-        $count = $this->resolveRecordCount($pendingAction);
-        $items = $this->resolvedItems($pendingAction);
-
-        $indices = [];
-
-        for ($index = 0; $index < $count; $index++) {
-            if (! isset($items[(string) $index])) {
-                $indices[] = $index;
-            }
-        }
-
-        return $indices;
+        return ProposalProgress::for($pendingAction)->unresolvedIndices();
     }
 
     /**
@@ -806,7 +766,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+        $isBatch = ProposalPayload::from($pendingAction)->isBatch;
 
         // A decided item is no longer in the dock queue — snap to the next undecided
         // one rather than re-running an already-resolved index.
@@ -883,7 +843,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+        $isBatch = ProposalPayload::from($pendingAction)->isBatch;
 
         // A decided item is no longer in the dock queue — snap to the next undecided
         // one rather than re-running an already-resolved index.
@@ -1104,21 +1064,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function currentRecordDisplay(PendingAction $pendingAction): array
     {
-        $display = $pendingAction->display_data;
-
-        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
-            return $display;
-        }
-
-        $items = is_array($display['items'] ?? null) ? $display['items'] : [];
-
-        if ($items === []) {
-            return [];
-        }
-
-        $current = $items[$this->cursorFor($pendingAction)] ?? reset($items);
-
-        return is_array($current) ? $current : [];
+        return ProposalPayload::from($pendingAction)->displayAt($this->cursorFor($pendingAction));
     }
 
     /**

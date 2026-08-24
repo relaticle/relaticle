@@ -14,6 +14,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
@@ -171,10 +172,7 @@ final class UpdateCustomFieldTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        $publicRecords = array_map(
-            static fn (array $record): array => array_diff_key($record, array_flip(['_record_id', '_model_class'])),
-            $actionRecords,
-        );
+        $publicRecords = array_map(ProposalPayload::withoutMarkers(...), $actionRecords);
 
         return (string) json_encode([
             'type' => 'pending_action',
