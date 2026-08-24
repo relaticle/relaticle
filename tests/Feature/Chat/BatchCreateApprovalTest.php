@@ -392,3 +392,38 @@ it('does not broadcast when the pending action has no conversation_id', function
 
     Event::assertNotDispatched(PendingActionResolved::class);
 });
+
+it('refuses to approve a proposal belonging to another team', function (): void {
+    $proposal = makeSingleProposal($this->convId, $this->user, 'Owned by my team');
+
+    $outsider = User::factory()->withPersonalTeam()->create();
+
+    expect(fn (): PendingAction => resolve(PendingActionService::class)->approve($proposal, $outsider))
+        ->toThrow(RuntimeException::class);
+
+    expect(Task::query()->where('title', 'Owned by my team')->exists())->toBeFalse()
+        ->and($proposal->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('refuses to approve a batch item belonging to another team', function (): void {
+    $proposal = makeBatchProposal($this->convId, $this->user, [['title' => 'Batch item A']]);
+
+    $outsider = User::factory()->withPersonalTeam()->create();
+
+    expect(fn (): array => resolve(PendingActionService::class)->approveItem($proposal, $outsider, 0))
+        ->toThrow(RuntimeException::class);
+
+    expect(Task::query()->where('title', 'Batch item A')->exists())->toBeFalse();
+});
+
+it('approves a single proposal twice without writing the record twice', function (): void {
+    $proposal = makeSingleProposal($this->convId, $this->user, 'Only once please');
+    $service = resolve(PendingActionService::class);
+
+    $service->approve($proposal, $this->user);
+
+    expect(fn (): PendingAction => $service->approve($proposal->fresh(), $this->user))
+        ->toThrow(RuntimeException::class);
+
+    expect(Task::query()->where('title', 'Only once please')->count())->toBe(1);
+});

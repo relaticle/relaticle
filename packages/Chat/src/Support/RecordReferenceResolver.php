@@ -158,17 +158,30 @@ final readonly class RecordReferenceResolver
 
     private function resolveLabel(string $entityType, string $recordId): ?string
     {
+        // The CRM models carry no global team scope (only SoftDeletingScope), so an
+        // unscoped whereKey() turns any id into a real name regardless of who owns it.
+        // This method exists purely to render a label, which makes it the cheapest
+        // possible cross-tenant disclosure if a foreign id ever reaches it.
+        $team = auth()->user()?->currentTeam;
+
+        if (! $team instanceof Team) {
+            return null;
+        }
+
+        $teamId = $team->getKey();
+
         try {
             $label = match ($entityType) {
                 'custom_field' => CustomField::query()
                     ->withoutGlobalScopes()
+                    ->where('tenant_id', $teamId)
                     ->whereKey($recordId)
                     ->value('name'),
-                'company' => Company::query()->whereKey($recordId)->value('name'),
-                'people' => People::query()->whereKey($recordId)->value('name'),
-                'opportunity' => Opportunity::query()->whereKey($recordId)->value('name'),
-                'task' => Task::query()->whereKey($recordId)->value('title'),
-                'note' => Note::query()->whereKey($recordId)->value('title'),
+                'company' => Company::query()->where('team_id', $teamId)->whereKey($recordId)->value('name'),
+                'people' => People::query()->where('team_id', $teamId)->whereKey($recordId)->value('name'),
+                'opportunity' => Opportunity::query()->where('team_id', $teamId)->whereKey($recordId)->value('name'),
+                'task' => Task::query()->where('team_id', $teamId)->whereKey($recordId)->value('title'),
+                'note' => Note::query()->where('team_id', $teamId)->whereKey($recordId)->value('title'),
                 default => null,
             };
         } catch (Throwable) {

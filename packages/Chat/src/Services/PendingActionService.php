@@ -137,8 +137,28 @@ final readonly class PendingActionService
         ]);
     }
 
+    /**
+     * A proposal is a one-click CRM write, so the team that owns it is the security
+     * boundary. The Livewire dock already scopes its lookup by team and user, but the
+     * invariant belongs at the service: a future caller (an API route, a job, an MCP
+     * tool) must not be able to resolve another tenant's proposal. Without it the
+     * executed action would stamp team_id from the actor's current team while the
+     * custom-field values landed under the proposal's, splitting one record across
+     * two tenants.
+     */
+    private function assertActorOwns(PendingAction $pendingAction, User $user): void
+    {
+        throw_unless(
+            (string) ($user->currentTeam?->getKey() ?? '') === (string) $pendingAction->team_id,
+            RuntimeException::class,
+            'This action belongs to another workspace.',
+        );
+    }
+
     public function approve(PendingAction $pendingAction, User $user): PendingAction
     {
+        $this->assertActorOwns($pendingAction, $user);
+
         // The action executes the underlying CRM write, which may persist custom-field
         // values. When approve() runs there may be no resolvable custom-fields tenant
         // context (the Livewire dock sets the Filament tenant but not necessarily the
@@ -257,6 +277,8 @@ final readonly class PendingActionService
      */
     public function approveItem(PendingAction $pendingAction, User $user, int $index): array
     {
+        $this->assertActorOwns($pendingAction, $user);
+
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 
@@ -659,6 +681,14 @@ final readonly class PendingActionService
     private function resolvedRecords(PendingAction $action): array
     {
         if ($action->status !== PendingActionStatus::Approved) {
+            return [];
+        }
+
+        // A delete leaves no record to cite. The single-record path is safe by
+        // accident (executeDelete returns null, so there is no result id), but a batch
+        // stores the deleted models' keys, which would hand the model /r/ links to
+        // rows it just removed.
+        if ($action->operation === PendingActionOperation::Delete) {
             return [];
         }
 
