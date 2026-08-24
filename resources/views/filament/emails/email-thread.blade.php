@@ -1,6 +1,5 @@
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
-    use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
     $authUser    = auth()->user();
     $firstEmail  = $emails->first();
@@ -39,11 +38,8 @@
             $canViewBody    = $authUser->can('viewBody', $email);
             $isOutbound     = $email->direction === EmailDirection::OUTBOUND;
 
-            $inlineAttachments = $email->attachments->where('is_inline', true);
-            $downloadAttachments = $email->attachments->where('is_inline', false);
-            $safeHtml = $canViewBody && $email->body?->body_html
-                ? EmailHtmlSanitizer::sanitize($email->body->body_html, $inlineAttachments)
-                : null;
+            $downloadAttachments = $email->downloadAttachments();
+            $safeHtml = $canViewBody ? $email->sanitizedBodyHtml() : null;
         @endphp
 
         <div class="{{ !$loop->last ? 'border-b border-gray-100 dark:border-gray-800' : '' }}">

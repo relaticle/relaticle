@@ -178,6 +178,26 @@ it('rewrites cid image references to authorized inline attachment urls', functio
         ->not->toContain('cid:logo@example.test');
 });
 
+it('splits inline attachments and sanitizes body html from the email model', function (): void {
+    $email = makeEmailWithBody('<p><img src="cid:logo@example.test"></p>');
+    $inlineAttachment = EmailAttachment::factory()->inline()->create([
+        'email_id' => $email->getKey(),
+        'content_id' => 'logo@example.test',
+    ]);
+    EmailAttachment::factory()->create([
+        'email_id' => $email->getKey(),
+        'filename' => 'invoice.pdf',
+    ]);
+
+    $email->load('attachments');
+
+    expect($email->inlineAttachments())->toHaveCount(1)
+        ->and($email->downloadAttachments())->toHaveCount(1)
+        ->and($email->sanitizedBodyHtml())
+        ->toContain(route('email-attachments.inline', ['attachment' => $inlineAttachment->getKey()]))
+        ->not->toContain('cid:logo@example.test');
+});
+
 it('renders the email view iframe without a same-origin sandbox', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
