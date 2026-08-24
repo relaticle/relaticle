@@ -7,13 +7,21 @@ use App\Actions\Task\UpdateTask;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
+use Relaticle\Chat\Tools\Company\ListCompaniesTool;
+use Relaticle\Chat\Tools\Opportunity\ListOpportunitiesTool;
+use Relaticle\Chat\Tools\People\ListPeopleTool;
 
 mutates(GetCompanyTool::class);
+mutates(ListCompaniesTool::class);
+mutates(ListPeopleTool::class);
+mutates(ListOpportunitiesTool::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -62,6 +70,23 @@ it('caps included items at ten while reporting the true total', function (): voi
     expect($payload['included']['notes']['total'])->toBe(14)
         ->and($payload['included']['notes']['showing'])->toBe(10)
         ->and($payload['included']['notes']['items'])->toHaveCount(10);
+});
+
+it('clamps the page size when includes are requested and leaves it alone when they are not', function (): void {
+    Company::factory()->count(30)->for($this->team)->create();
+
+    $withIncludes = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
+        'per_page' => 50,
+        'include' => ['people'],
+    ])), true);
+
+    $withoutIncludes = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
+        'per_page' => 50,
+    ])), true);
+
+    expect($withIncludes['total'])->toBe(30)
+        ->and($withIncludes['showing'])->toBe(25)
+        ->and($withoutIncludes['showing'])->toBe(30);
 });
 
 it('returns an error naming the valid includes when given an unknown one', function (): void {
@@ -131,7 +156,11 @@ it('excludes a related record that belongs to another team, even when attached v
         'include' => ['notes'],
     ])), true);
 
+    // `total` as well as `showing`: an unscoped loadCount would report the
+    // cross-team note the items list omits, so one relation would state two
+    // different totals here and in the list tool's row.
     expect($payload['included']['notes']['showing'])->toBe(1)
+        ->and($payload['included']['notes']['total'])->toBe(1)
         ->and(array_column(array_column($payload['included']['notes']['items'], 'attributes'), 'title'))
         ->toBe(['Discovery call']);
 });
@@ -188,4 +217,103 @@ it('does not strip or truncate a non-text custom field value on an included item
             'id' => (string) $highOption->getKey(),
             'label' => 'High',
         ]);
+});
+
+// --- list tool: `include` attaches related records per row and a chip column ---
+
+it('lists companies with included opportunities and a chip column', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    Opportunity::factory()->count(4)->for($this->team)->create(['company_id' => $acme->getKey()]);
+
+    // A second row with its own, smaller set of opportunities: proves the
+    // per-row cap is applied per row, not once across the whole page (an
+    // eager-load `->limit()` spanning every row in the page would starve
+    // whichever row's related records did not sort first).
+    $globex = Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    Opportunity::factory()->count(1)->for($this->team)->create(['company_id' => $globex->getKey()]);
+
+    $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['opportunities']])), true);
+
+    $acmeRow = collect($payload['data'])->firstWhere('id', (string) $acme->getKey());
+    $globexRow = collect($payload['data'])->firstWhere('id', (string) $globex->getKey());
+
+    expect($acmeRow['included']['opportunities']['total'])->toBe(4)
+        ->and($acmeRow['included']['opportunities']['showing'])->toBe(3)
+        ->and($acmeRow['included']['opportunities']['items'])->toHaveCount(3)
+        ->and($acmeRow['included']['opportunities']['items'][0])->toHaveKeys(['id', 'name', 'url'])
+        ->and($globexRow['included']['opportunities']['total'])->toBe(1)
+        ->and($globexRow['included']['opportunities']['showing'])->toBe(1);
+
+    $column = collect($payload['display_block']['columns'])->firstWhere('key', '_include_opportunities');
+    expect($column)->not->toBeNull();
+
+    $cell = collect($payload['display_block']['rows'])->firstWhere('id', (string) $acme->getKey())['cells']['_include_opportunities'];
+    expect($cell)->toBeArray()->and($cell)->toHaveCount(3)
+        ->and($cell[0])->toHaveKeys(['label', 'url', 'type'])
+        ->and($cell[0]['type'])->toBe('opportunity');
+});
+
+it('rejects an unknown include on a list tool with the standard error envelope', function (): void {
+    Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['bogus']])), true);
+
+    expect($payload)->toHaveKey('error')
+        ->and($payload['error'])->toContain('bogus')
+        ->and($payload['error'])->toContain('opportunities');
+});
+
+it('returns no included key on a list row when include is omitted', function (): void {
+    Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['data'][0])->not->toHaveKey('included');
+});
+
+it('excludes an included note that belongs to another team from a list row', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+
+    $otherTeam = User::factory()->withPersonalTeam()->create()->currentTeam;
+    $crossTeamNote = Note::factory()->for($otherTeam)->create(['title' => 'Not yours']);
+    $acme->notes()->attach($crossTeamNote);
+
+    $ownNote = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $acme->notes()->attach($ownNote);
+
+    $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['notes']])), true);
+
+    $row = collect($payload['data'])->firstWhere('id', (string) $acme->getKey());
+
+    expect($row['included']['notes']['total'])->toBe(1)
+        ->and($row['included']['notes']['showing'])->toBe(1)
+        ->and($row['included']['notes']['items'][0]['name'])->toBe('Discovery call');
+});
+
+it('lists people with included tasks, truncated past the per-row limit', function (): void {
+    $jane = People::factory()->for($this->team)->create(['name' => 'Jane']);
+    $jane->tasks()->attach(Task::factory()->count(5)->for($this->team)->create());
+
+    $payload = json_decode(resolve(ListPeopleTool::class)->handle(new Request(['include' => ['tasks']])), true);
+
+    $row = collect($payload['data'])->firstWhere('id', (string) $jane->getKey());
+
+    expect($row['included']['tasks']['total'])->toBe(5)
+        ->and($row['included']['tasks']['showing'])->toBe(3)
+        ->and($row['included']['tasks']['items'])->toHaveCount(3)
+        ->and($row['included']['tasks']['items'][0])->toHaveKeys(['id', 'name', 'url']);
+});
+
+it('lists opportunities with included notes', function (): void {
+    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Big deal']);
+    $opportunity->notes()->attach(Note::factory()->count(2)->for($this->team)->create());
+
+    $payload = json_decode(resolve(ListOpportunitiesTool::class)->handle(new Request(['include' => ['notes']])), true);
+
+    $row = collect($payload['data'])->firstWhere('id', (string) $opportunity->getKey());
+
+    expect($row['included']['notes']['total'])->toBe(2)
+        ->and($row['included']['notes']['showing'])->toBe(2)
+        ->and($row['included']['notes']['items'])->toHaveCount(2)
+        ->and($row['included']['notes']['items'][0])->toHaveKeys(['id', 'name', 'url']);
 });

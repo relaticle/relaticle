@@ -40,7 +40,6 @@ it('sends the follow-up prompt as a user message when a chip is clicked', functi
                 prerendered: false,
                 editing: false,
                 editText: '',
-                copiedAt: 0,
                 follow_ups: [{ label: 'Filter by industry', prompt: 'Filter these companies by industry' }],
             });
 

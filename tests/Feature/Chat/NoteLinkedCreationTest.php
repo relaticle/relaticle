@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Note\CreateNote;
+use App\Actions\People\CreatePeople;
 use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Note;
@@ -12,9 +13,13 @@ use App\Models\User;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\RecordNameResolver;
 use Relaticle\Chat\Tools\Note\CreateNoteTool;
 
 mutates(CreateNoteTool::class);
@@ -160,4 +165,52 @@ it('coerces a scalar people_ids into a list instead of dropping it', function ()
         ->firstOrFail();
 
     expect($pending->action_data)->toHaveKey('people_ids', [(string) $angel->id]);
+});
+
+it('resolves a whole list of linked names in one query, in the order given', function (): void {
+    $people = collect(['Ada', 'Grace', 'Katherine', 'Dorothy'])
+        ->map(fn (string $name): People => People::factory()->for($this->team)->create(['name' => $name]));
+
+    $resolver = resolve(RecordNameResolver::class);
+    $ids = $people->map(fn (People $p): string => (string) $p->id)->all();
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $names = $resolver->names($ids, People::class, $this->team);
+
+    $queries = DB::getQueryLog();
+    DB::disableQueryLog();
+
+    expect($names)->toBe('Ada, Grace, Katherine, Dorothy')
+        ->and($queries)->toHaveCount(1, 'one lookup per id is an N+1 on every proposal card');
+});
+
+it('still labels a plan reference while batching the stored ids beside it', function (): void {
+    $ada = People::factory()->for($this->team)->create(['name' => 'Ada']);
+    $grace = People::factory()->for($this->team)->create(['name' => 'Grace']);
+
+    $referenced = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => '019df800-4444-7000-8000-000000000001',
+        'action_class' => CreatePeople::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['name' => 'Katherine'],
+        'display_data' => ['title' => 'Create person', 'summary' => 'Create Katherine'],
+        'status' => PendingActionStatus::Pending,
+        'turn_id' => (string) Str::ulid(),
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $names = resolve(RecordNameResolver::class)->names(
+        [(string) $ada->id, '$ref:'.$referenced->getKey(), (string) $grace->id],
+        People::class,
+        $this->team,
+    );
+
+    expect($names)->toStartWith('Ada, Katherine')
+        ->and($names)->toEndWith('Grace')
+        ->and($names)->toContain('step 1');
 });

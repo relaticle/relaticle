@@ -13,7 +13,7 @@ it('serializes ProcessChatMessage per conversation via WithoutOverlapping', func
     $user = User::factory()->withPersonalTeam()->create();
     $job = new ProcessChatMessage(
         user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'conv-xyz',
-        resolved: ['provider' => null, 'model' => 'auto'], turnId: '01T',
+        resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01T',
     );
 
     $middleware = $job->middleware();

@@ -170,6 +170,7 @@ it('rejects registration when the honeypot field is filled', function (): void {
 
 it('rejects a registration submitted faster than a human could', function (): void {
     config(['honeypot.enabled' => true]);
+    $this->freezeTime();
 
     livewire(Register::class)
         ->fillForm([

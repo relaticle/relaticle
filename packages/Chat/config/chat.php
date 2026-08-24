@@ -29,6 +29,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Max Plan Steps
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of write tool calls one turn may chain into a single plan
+    | proposal. Enforced server-side in the tool layer, and stated in the prompt
+    | so the assistant splits a longer request instead of being cut off.
+    */
+
+    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 6),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tool Call Credit Bonus
     |--------------------------------------------------------------------------
     */
@@ -101,6 +113,20 @@ return [
     'title_generation' => [
         'enabled' => (bool) env('CHAT_TITLE_GENERATION', true),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Voice Input
+    |--------------------------------------------------------------------------
+    |
+    | Push-to-talk dictation in the composer. A recording is transcribed by the
+    | provider named in `ai.default_for_transcription` and the text is inserted
+    | at the cursor for the user to review. It is never sent on their behalf.
+    | The mic button additionally requires that provider to have a key, so an
+    | install without one shows no button at all (ModelRegistry::voiceInputAvailable()).
+    */
+
+    'voice_enabled' => (bool) env('CHAT_VOICE_ENABLED', true),
 
     /*
     |--------------------------------------------------------------------------

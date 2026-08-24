@@ -59,7 +59,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
-use Laravel\Ai\AiManager;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -88,8 +87,6 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
-
-        $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
 
         // Ink registers its public routes from packageBooted(), which runs after every
         // provider's register(). Read the config key App\Features\Blog resolves from
@@ -343,6 +340,19 @@ final class AppServiceProvider extends ServiceProvider
             'mcp-oauth',
             fn (Request $request) => Limit::perMinute(20)->by($request->ip()),
         );
+
+        // Transcription reserves no credit, so the limiters are the only ceiling on
+        // provider spend. The per-minute and per-day buckets on the route are keyed
+        // per user and stay that way; this one is the ACCOUNT ceiling that was
+        // missing, because billing and credits are per team and an N-seat workspace
+        // otherwise multiplied the daily allowance by N with nothing to notice.
+        RateLimiter::for('transcribe-team-daily', function (Request $request): Limit {
+            /** @var User|null $user */
+            $user = $request->user();
+            $team = $user?->currentTeam;
+
+            return Limit::perMinutes(1440, 240)->by('transcribe-team:'.($team?->getKey() ?? $request->ip()));
+        });
 
         RateLimiter::for('chat-send', function (Request $request) {
             /** @var User|null $user */

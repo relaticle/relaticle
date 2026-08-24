@@ -151,7 +151,7 @@ it('persists the bound record as a page_context row on the user message', functi
         team: $this->team,
         message: 'summarize this',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
         pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
     ))->handle(resolve(CreditService::class));
@@ -190,7 +190,7 @@ it('carries no page_context row on a second message in the same conversation onc
         team: $this->team,
         message: 'summarize this',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
         pageContext: ['type' => 'company', 'id' => (string) $company->getKey(), 'label' => 'Acme'],
         turnId: 'turn-1',
@@ -204,7 +204,7 @@ it('carries no page_context row on a second message in the same conversation onc
         team: $this->team,
         message: 'and what else can you tell me',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
         pageContext: null,
         turnId: 'turn-2',
@@ -253,7 +253,7 @@ it('writes both a mention row and a page_context row when a message has each', f
         team: $this->team,
         message: 'Tell me about @Widgets_Inc',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [['type' => 'company', 'id' => (string) $mentioned->getKey(), 'label' => 'Widgets Inc']],
         pageContext: ['type' => 'company', 'id' => (string) $viewed->getKey(), 'label' => 'Acme'],
     ))->handle(resolve(CreditService::class));
@@ -283,7 +283,7 @@ it('writes no page_context row when no record is bound', function (): void {
         team: $this->team,
         message: 'hello',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
         pageContext: null,
     ))->handle(resolve(CreditService::class));
@@ -409,7 +409,7 @@ it('collapses a record referenced across multiple prior turns into a single ledg
         team: $this->team,
         message: 'what else can you tell me',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $ledger = runAndCaptureLedger($job);
@@ -448,7 +448,7 @@ it('caps the ledger at 10 distinct records without duplicate rows wasting a slot
         team: $this->team,
         message: 'anything',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $ledger = runAndCaptureLedger($job);
@@ -493,7 +493,7 @@ it('exempts the conversation\'s oldest page_context record from ledger eviction'
         team: $this->team,
         message: 'anything',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $ledger = runAndCaptureLedger($job);
@@ -520,7 +520,7 @@ it('includes a record that was only ever bound as page context, never a typed me
         team: $this->team,
         message: 'anything',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $ledger = runAndCaptureLedger($job);
@@ -560,7 +560,7 @@ it('scopes the ledger to its own conversation and excludes records referenced in
         team: $this->team,
         message: 'anything',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
     );
 
     $ledger = runAndCaptureLedger($job);

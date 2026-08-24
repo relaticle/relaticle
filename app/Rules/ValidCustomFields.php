@@ -154,14 +154,14 @@ final readonly class ValidCustomFields implements ValidationRule
 
         if ($submittedCodes === []) {
             return $baseQuery
-                ->whereJsonContains('validation_rules', [['name' => 'required']])
+                ->where('validation_rules->required', true)
                 ->get();
         }
 
         return $baseQuery
             ->where(function (Builder $query) use ($submittedCodes): void {
                 $query->whereIn('code', $submittedCodes)
-                    ->orWhereJsonContains('validation_rules', [['name' => 'required']]);
+                    ->orWhere('validation_rules->required', true);
             })
             ->get();
     }

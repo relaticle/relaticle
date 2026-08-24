@@ -98,7 +98,7 @@ it('deletes each approved item and leaves skipped ones, per-item', function (): 
 
     $service = app(PendingActionService::class);
     $service->approveItem($pending, $this->user, 0); // delete item 0
-    $service->rejectItem($pending, 1);               // skip item 1
+    $service->rejectItem($pending, $this->user, 1);               // skip item 1
     $result = $service->approveItem($pending, $this->user, 2); // delete item 2 -> finalizes
 
     expect($result['finalized'])->toBeTrue()

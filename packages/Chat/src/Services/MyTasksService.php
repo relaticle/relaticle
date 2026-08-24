@@ -98,6 +98,17 @@ final readonly class MyTasksService
     }
 
     /**
+     * Whether the tenant still has a `Done` status option to complete a task into.
+     *
+     * Reuses the same memoized lookup as the list query, so the dashboard can hide
+     * a completion control that would fail on every click.
+     */
+    public function hasDoneOption(Team $team): bool
+    {
+        return $this->resolveFieldMetadata($team)->doneOptionId !== null;
+    }
+
+    /**
      * Resolves the per-tenant custom-field IDs the main query needs.
      *
      * One round-trip pulls both the `due_date` and `status` field IDs plus the

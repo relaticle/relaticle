@@ -1,4 +1,4 @@
-{{-- Transcript audit card for a batch/single proposal.
+{{-- Transcript audit card for a single proposal (a plan of one).
 
      Two render modes, both gated by the transcript x-for in chat-interface.blade.php:
        1. status === 'pending' (a partially-resolved batch still docked at the
@@ -7,155 +7,13 @@
           deliberately omit the header, fields, and final badge to avoid a
           confusing duplicate.
        2. status !== 'pending' (finalized / single resolved): the full read-only
-          audit card. --}}
-<div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-    {{-- COMPACT progress view while the batch is still docked. --}}
-    <template x-if="action.status === 'pending'">
-        <div>
-            <div class="space-y-1.5">
-                <template x-for="(item, itemIdx) in (action.display?.items || [])" :key="itemIdx">
-                    <template x-if="itemResult(action, itemIdx)">
-                        <div class="flex items-center gap-2 text-xs">
-                            <span class="text-gray-600 dark:text-gray-300" x-text="item.summary"></span>
-                            <template x-if="itemResult(action, itemIdx).status === 'approved'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 px-1.5 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                                    <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
-                                </span>
-                            </template>
-                            <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-gray-100 px-1.5 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                    Skipped
-                                </span>
-                            </template>
-                            <template x-if="itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
-                                <a :href="itemResult(action, itemIdx).record.url" wire:navigate class="inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                    <span x-text="itemResult(action, itemIdx).record.label ? 'View ' + itemResult(action, itemIdx).record.label : 'View'"></span>
-                                    <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                </a>
-                            </template>
-                        </div>
-                    </template>
-                </template>
-            </div>
+          audit card.
 
-            <p class="mt-2 text-xs text-gray-400 dark:text-gray-500"
-               x-text="`${Object.keys(action.itemResults || {}).length} of ${(action.display?.items?.length ?? 0)} resolved — review the rest below`"></p>
-        </div>
-    </template>
+     A multi-step plan wraps the same body in one shared card: see
+     _proposal-plan-card.blade.php.
 
-    {{-- Full read-only audit card once the proposal is finalized. --}}
-    <template x-if="action.status !== 'pending'">
-        <div>
-            {{-- Header: operation icon tile + human summary + resolution pill --}}
-            <div class="flex items-start gap-3">
-                <div
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                    :class="{
-                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
-                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
-                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400': action.operation === 'delete',
-                    }"
-                    aria-hidden="true"
-                >
-                    <template x-if="action.operation === 'update'">
-                        <x-heroicon-o-pencil-square class="h-4 w-4" />
-                    </template>
-                    <template x-if="action.operation === 'delete'">
-                        <x-heroicon-o-trash class="h-4 w-4" />
-                    </template>
-                    <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                    </template>
-                </div>
-
-                <div class="min-w-0 flex-1 pt-1">
-                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="action.display?.summary ?? (action.operation.charAt(0).toUpperCase() + action.operation.slice(1))"></p>
-                </div>
-
-                <span
-                    class="mt-0.5 inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
-                    :class="{
-                        'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
-                        'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
-                        'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                    }"
-                    x-text="action.status.charAt(0).toUpperCase() + action.status.slice(1)"
-                ></span>
-            </div>
-
-            <template x-if="action.display?.duplicate_warning">
-                <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
-                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span x-text="action.display.duplicate_warning"></span>
-                </div>
-            </template>
-
-            <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-                <div class="mt-3 space-y-1.5 ps-11">
-                    <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                        @include('chat::livewire.chat.partials._proposal-field')
-                    </template>
-                </div>
-            </template>
-
-            {{-- Batch items (records[] proposals): per-item summary, fields, and resolved chip. --}}
-            <template x-if="Array.isArray(action.display?.items) && action.display.items.length > 0">
-                <div class="mt-3 divide-y divide-gray-100 ps-11 dark:divide-white/5">
-                    <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
-                        <div class="py-2.5 first:pt-0 last:pb-0">
-                            <div class="flex items-center justify-between gap-2">
-                                <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
-
-                                {{-- Per-item resolved chip (Created / Skipped). --}}
-                                <template x-if="itemResult(action, itemIdx)">
-                                    <span class="flex shrink-0 items-center gap-2 text-xs">
-                                        <template x-if="itemResult(action, itemIdx).status === 'approved'">
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                                                <x-heroicon-o-check class="h-3 w-3" aria-hidden="true" /> <span x-text="itemVerb(action)"></span>
-                                            </span>
-                                        </template>
-                                        <template x-if="itemResult(action, itemIdx).status === 'skipped'">
-                                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">
-                                                Skipped
-                                            </span>
-                                        </template>
-                                    </span>
-                                </template>
-                            </div>
-                            <div class="mt-1.5 space-y-1">
-                                <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                    @include('chat::livewire.chat.partials._proposal-field')
-                                </template>
-                            </div>
-
-                            <template x-if="itemResult(action, itemIdx) && itemResult(action, itemIdx).record && itemResult(action, itemIdx).record.url">
-                                <div class="mt-1.5 text-xs">
-                                    <a :href="itemResult(action, itemIdx).record.url" wire:navigate class="inline-flex items-center gap-1 font-medium text-primary-600 hover:underline dark:text-primary-400">
-                                        <span x-text="itemResult(action, itemIdx).record.label ? 'View ' + itemResult(action, itemIdx).record.label : 'View'"></span>
-                                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                                    </a>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-                </div>
-            </template>
-
-            {{-- Record link — SINGLE proposals only. Batch items each carry their own
-                 View link above, and the outcome summary sits below the card, so a
-                 batch-level link row here would just repeat the same links. --}}
-            <template x-if="!(Array.isArray(action.display?.items) && action.display.items.length > 0) && action.status === 'approved' && action.record && action.record.url">
-                <div class="mt-3 ps-11">
-                    <a
-                        :href="action.record.url"
-                        wire:navigate
-                        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
-                    >
-                        <span x-text="action.record.label ? 'View ' + action.record.label : 'View'"></span>
-                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
-                    </a>
-                </div>
-            </template>
-        </div>
-    </template>
+     Surface: the solid data-block tier (crisp hairline card, no shadow),
+     matching the docked card and the read-result blocks. --}}
+<div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
+    @include('chat::livewire.chat.partials._proposal-card-body')
 </div>

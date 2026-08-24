@@ -103,9 +103,30 @@ production: message ordering, approval races, duplicate proposals.
 - Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
   tenant data into the system prompt — add prompt-context injection only when a
   tool round-trip is demonstrably too costly.
-- New write tools must support batch input like the delete path (`ids[]` /
-  multi-record proposals → one `PendingAction`, all-or-nothing) — do not add new
-  scalar-only tools.
+- Every write tool takes batch input: `records[]` on create and update,
+  `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
+  a `_batch` the dock resolves per item. Do not add scalar-only tools.
+- A request needing several writes is ONE turn: the assistant chains the write
+  tools and links them with `$ref:<pending_action_id>` where a record it just
+  proposed would go. Proposals sharing a `turn_id` are one plan, presented as a
+  single card and approved once (`ProposalPlanService`). A new foreign key on a
+  write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
+  it will accept neither reference validation nor ownership checks.
+- Resolve a reference only at approval time (`PlanReferenceResolver`), never at
+  proposal time, and never let a `$ref` fall out of a card's display: a plan card
+  that hides the link being approved is the failure this design exists to
+  prevent (`RecordNameResolver` renders it as "Name (step N)").
+- Read tools take `lookup: true` to skip the `display_block`; the prompt tells
+  the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
+  result without that flag renders, so a new read tool must either emit a block
+  or be named in the prompt's no-block list.
+- A new list tool needs `availableIncludes()` (copy its sibling `Get*Tool`'s
+  allowlist) or the prompt's related-records rule has nothing to call for it.
+- Replayed proposal tool results are NEVER rewritten: mutating an earlier
+  message invalidates the Anthropic prompt-cache prefix from that turn on.
+  Decided status travels only in `<resolved_actions>`, auto-cancelled status in
+  `<superseded_proposals>`, both re-queried per turn. Never label a proposal by
+  its card heading.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation
   to document.
@@ -451,35 +472,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-### Model Creation
-
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
-
-## APIs & Eloquent Resources
-
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
 ## URL Generation
 
 - When generating links to other pages, prefer named routes and the `route()` function.
 
-## Testing
-
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-
 ## Vite Error
 
 - If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
-
-=== livewire/core rules ===
-
-# Livewire
-
-- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
-- You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
-- Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
 
 === pint/core rules ===
 
@@ -487,15 +486,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
 - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
-
-=== pest/core rules ===
-
-## Pest
-
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
 
 === filament/filament/core rules ===
 

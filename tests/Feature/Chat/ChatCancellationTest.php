@@ -138,7 +138,7 @@ it('settles the reserved minimum (not refund) when a stream is cancelled mid-fli
         team: $team,
         message: 'Show me my deals',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         turnId: '01TURNCANCELAAAAAAAAAAAAAA',
     )->handle(resolve(CreditService::class));
 

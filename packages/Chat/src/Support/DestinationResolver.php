@@ -6,6 +6,11 @@ namespace Relaticle\Chat\Support;
 
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Team;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
@@ -24,8 +29,24 @@ final readonly class DestinationResolver
         'import_opportunities',
         'import_tasks',
         'import_notes',
+        'export_companies',
+        'export_people',
+        'export_opportunities',
+        'export_tasks',
+        'export_notes',
         'team_members',
     ];
+
+    /**
+     * Query parameters that open the record list's export modal on page load.
+     *
+     * Filament binds `?action=` to `InteractsWithActions::$defaultAction`, so this
+     * lands the user in the export dialog itself rather than on the list page with
+     * the export button still hidden inside the "Import / Export" dropdown.
+     *
+     * @var array<string, string>
+     */
+    private const array EXPORT_ACTION = ['action' => 'export'];
 
     /**
      * Resolve a destination key to an absolute app-panel URL for the given team.
@@ -44,6 +65,11 @@ final readonly class DestinationResolver
                 'import_opportunities' => ImportOpportunities::getUrl(panel: 'app', tenant: $team),
                 'import_tasks' => ImportTasks::getUrl(panel: 'app', tenant: $team),
                 'import_notes' => ImportNotes::getUrl(panel: 'app', tenant: $team),
+                'export_companies' => ListCompanies::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $team),
+                'export_people' => ListPeople::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $team),
+                'export_opportunities' => ListOpportunities::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $team),
+                'export_tasks' => ManageTasks::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $team),
+                'export_notes' => ManageNotes::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $team),
                 'team_members' => Members::getUrl(panel: 'app', tenant: $team),
                 default => null,
             };

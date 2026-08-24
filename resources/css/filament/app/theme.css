@@ -167,11 +167,63 @@
 
 /* Top Navigation Bar */
 .fi-topbar {
-    @apply min-h-14;
+    @apply min-h-16;
 }
 
 .fi-topbar nav {
     @apply px-4 lg:px-6;
+}
+
+.fi-topbar-page-heading {
+    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 dark:text-white;
+
+    .fi-topbar-page-title {
+        @apply min-w-0 truncate;
+    }
+
+    /* Below md the labels drop and the switcher stays as an icon pair, so
+       phones keep a way to reach the board; the links carry aria-labels. */
+    .fi-view-switcher {
+        @apply inline-flex shrink-0;
+    }
+
+    .fi-view-switcher-label {
+        @apply hidden md:inline;
+    }
+}
+
+.fi-header-page-heading-only {
+    display: contents;
+}
+
+.fi-board-header .fi-header-heading {
+    display: none;
+}
+
+body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
+    display: none;
+}
+
+@media (width < 64rem) {
+    body:has([data-page-heading]) .fi-topbar-start {
+        @apply flex min-w-0 flex-1;
+    }
+}
+
+@media (width >= 64rem) {
+    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-inline-end: calc(var(--spacing) * 11);
+    }
+
+    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-top: calc(var(--spacing) * 4);
+        margin-inline-start: calc(var(--spacing) * 1);
+        margin-inline-end: calc(var(--spacing) * 9);
+
+        .fi-tenant-menu-trigger {
+            padding: calc(var(--spacing) * 1);
+        }
+    }
 }
 
 /* Button Enhancements */
@@ -644,4 +696,48 @@
     .dark [data-chat-loading-label] {
         color: #9ca3af;
     }
+}
+
+/* Chat record chips: a `[Label](/r/{type}/{id})` citation inside an assistant
+   reply. Both render pipelines emit the same markup (RecordChipRenderer on the
+   server, applyRecordChips in chat.js on the client), so this single rule
+   dresses the streamed reply and the reloaded one alike. Same surface tokens
+   as the follow-up chips in _transcript.blade.php, at the density of an
+   @mention chip: the transcript carries two chip families, not three. */
+.chat-chip {
+    @apply inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 no-underline transition;
+
+    /* Prose gives the surrounding text a 14px line box; middle keeps the
+       shorter pill optically centred on it (an inline-flex box takes its
+       baseline from its first item, which here is the icon, and would ride
+       high). */
+    vertical-align: middle;
+}
+
+.chat-chip:hover {
+    @apply border-primary-300 bg-primary-50 text-primary-700;
+}
+
+.chat-chip:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-500;
+}
+
+.dark .chat-chip {
+    @apply text-gray-200;
+}
+
+.dark .chat-chip:hover {
+    @apply border-primary-700 bg-primary-900/20 text-primary-300;
+}
+
+.chat-chip > svg {
+    @apply h-3 w-3 shrink-0 text-gray-400;
+}
+
+.dark .chat-chip > svg {
+    @apply text-gray-500;
+}
+
+.chat-chip-label {
+    @apply max-w-[24ch] truncate;
 }

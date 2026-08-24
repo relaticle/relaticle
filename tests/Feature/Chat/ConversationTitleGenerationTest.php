@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -12,12 +13,15 @@ use Relaticle\Chat\Agents\ConversationTitler;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Events\ConversationTitleGenerated;
 use Relaticle\Chat\Jobs\GenerateConversationTitle;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Tests\Helpers\ChatDocument;
 
-mutates(GenerateConversationTitle::class, TitleSanitizer::class);
+mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -50,7 +54,10 @@ function seedTitlingConversation(string $title): string
     return $id;
 }
 
-function seedTitlingMessage(string $conversationId, string $role, string $content): void
+/**
+ * @param  array<string, string>  $meta
+ */
+function seedTitlingMessage(string $conversationId, string $role, string $content, array $meta = []): void
 {
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),
@@ -64,7 +71,7 @@ function seedTitlingMessage(string $conversationId, string $role, string $conten
         'tool_calls' => '[]',
         'tool_results' => '[]',
         'usage' => '[]',
-        'meta' => '[]',
+        'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -282,4 +289,148 @@ it('stops attempting to title after the opening few messages', function (): void
     ])->assertOk();
 
     Queue::assertNotPushed(GenerateConversationTitle::class);
+});
+
+it('gives the titler the record the user was viewing', function (): void {
+    Queue::fake();
+
+    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+
+    $conversationId = $this->postJson(route('chat.conversations.create'), [
+        'document' => ChatDocument::fromText('add a note here'),
+    ])->assertOk()->json('conversation_id');
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('add a note here'),
+        'page_context' => ['type' => 'company', 'id' => (string) $company->getKey()],
+    ])->assertOk();
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->pageContext !== null
+            && $job->pageContext['label'] === 'Acme Corp'
+            && $job->pageContext['type'] === 'company',
+    );
+});
+
+it('names a record-less message from the record the user was viewing', function (): void {
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Note On Acme Corp']]);
+
+    $conversationId = seedTitlingConversation('add a note here');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'add a note here',
+        message: 'add a note here',
+        provider: 'anthropic',
+        pageContext: ['type' => 'company', 'id' => '1', 'label' => 'Acme Corp'],
+    ))->handle();
+
+    ConversationTitler::assertPrompted(
+        fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '<viewing>Acme Corp (company)</viewing>')
+            && str_contains($prompt->prompt, '<message>add a note here</message>'),
+    );
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('Note On Acme Corp');
+});
+
+it('never pays for a title it could no longer apply', function (): void {
+    Event::fake([ConversationTitleGenerated::class]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
+
+    $conversationId = seedTitlingConversation('A title the first attempt already wrote');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme',
+        message: 'Create a follow-up task for Sarah at Acme',
+        provider: 'anthropic',
+    ))->handle();
+
+    ConversationTitler::assertNeverPrompted();
+    Event::assertNotDispatched(ConversationTitleGenerated::class);
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('A title the first attempt already wrote');
+});
+
+it('titles from the assistant reply when the opening message named nothing', function (): void {
+    Queue::fake();
+    CrmAssistant::fake(['Globex has three open opportunities worth $45,000.']);
+
+    $conversationId = seedTitlingConversation('hey');
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'hey',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+    ))->handle(resolve(CreditService::class));
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->conversationId === $conversationId
+            && $job->provisionalTitle === 'hey'
+            && $job->reply === 'Globex has three open opportunities worth $45,000.',
+    );
+});
+
+it('does not re-title at turn end when the conversation already has a generated title', function (): void {
+    Queue::fake();
+    CrmAssistant::fake(['Globex has three open opportunities.']);
+
+    $conversationId = seedTitlingConversation('Globex Opportunity Review');
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'how is globex doing',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+    ))->handle(resolve(CreditService::class));
+
+    Queue::assertNotPushed(GenerateConversationTitle::class);
+});
+
+it('does not let approval echoes and resumed turns burn the titling window', function (): void {
+    Queue::fake();
+
+    $conversationId = seedTitlingConversation('hey');
+    seedTitlingMessage($conversationId, 'user', 'hey');
+    seedTitlingMessage($conversationId, 'assistant', 'Hi! How can I help?');
+    seedTitlingMessage($conversationId, 'user', '[approval] approved');
+    seedTitlingMessage($conversationId, 'user', 'The proposals from your last turn have just been decided.', ['kind' => 'continuation']);
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('Draft a renewal proposal for Globex'),
+    ])->assertOk();
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->provisionalTitle === 'hey',
+    );
+});
+
+it('titles at turn end from what the user typed, not from the rows the system wrote', function (): void {
+    Queue::fake();
+    CrmAssistant::fake(['Globex has three open opportunities.']);
+
+    $conversationId = seedTitlingConversation('hey');
+    seedTitlingMessage($conversationId, 'user', 'hey');
+    seedTitlingMessage($conversationId, 'assistant', 'Hi! How can I help?');
+    seedTitlingMessage($conversationId, 'user', '[approval] approved');
+    seedTitlingMessage($conversationId, 'user', 'The proposals from your last turn have just been decided.', ['kind' => 'continuation']);
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'how is globex doing',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+    ))->handle(resolve(CreditService::class));
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->provisionalTitle === 'hey'
+            && $job->message === 'how is globex doing',
+    );
 });

@@ -14,11 +14,18 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
-use Relaticle\Chat\Support\PromptText;
+use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
+use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\ResolvesRecordNames;
+use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteCreateTool implements Tool
 {
+    use GuardsRecordNames;
+    use LimitsPlanSteps;
+    use ResolvesRecordNames;
+    use ValidatesOwnedForeignKeys;
     use WithConversationContext;
 
     /** @return class-string */
@@ -76,11 +83,6 @@ abstract class BaseWriteCreateTool implements Tool
                     .' or up to '.config('chat.max_batch_size').' items to create them all in ONE proposal'
                     .' (never loop one call per record).',
                 ),
-            'plan' => $schema->object([
-                'original_request' => $schema->string()->description("The user's original multi-step request, verbatim."),
-                'position' => $schema->integer()->description('Which step this proposal is (1-based).'),
-                'total' => $schema->integer()->description('Total steps in the request.'),
-            ])->description('OPTIONAL — only when this proposal is one step of a multi-step request that records[] cannot cover in one call (e.g. mixed entity types).'),
         ];
     }
 
@@ -89,16 +91,22 @@ abstract class BaseWriteCreateTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
+        $planLimitError = $this->planStepLimitError();
+
+        if ($planLimitError !== null) {
+            return (string) json_encode(['error' => $planLimitError], JSON_UNESCAPED_SLASHES);
+        }
+
         $records = $request['records'] ?? null;
 
         if (! is_array($records) || $records === []) {
-            return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.']);
+            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of records to create.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($records) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         $validator = resolve(CustomFieldsRequestValidator::class);
@@ -109,22 +117,34 @@ abstract class BaseWriteCreateTool implements Tool
 
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
-                return (string) json_encode(['error' => "records[{$index}] must be an object."]);
+                return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null);
+            $nameError = $this->nameError($record, required: true);
+
+            if ($nameError !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
+            }
+
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false);
 
             if ($validation->error !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
             }
 
             $recordError = $this->validateRecord($record, $user);
 
             if ($recordError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"]);
+                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"], JSON_UNESCAPED_SLASHES);
             }
 
             $data = $this->extractRecordData($record);
+            $foreignKeyError = $this->foreignKeyError($user, $data);
+
+            if ($foreignKeyError !== null) {
+                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"], JSON_UNESCAPED_SLASHES);
+            }
+
             if ($validation->cleanFields !== []) {
                 $data['custom_fields'] = $validation->cleanFields;
             }
@@ -148,25 +168,11 @@ abstract class BaseWriteCreateTool implements Tool
 
         $displayData = $isBatch
             ? [
-                'title' => 'Create '.Str::plural(Str::headline($this->entityType()), count($items)),
+                'title' => __('Create :entities', ['entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
                 'summary' => sprintf('Create %d %s', count($items), Str::plural($this->entityType(), count($items))),
                 'items' => $items,
             ]
             : $items[0];
-
-        $plan = $request['plan'] ?? null;
-        if (is_array($plan)
-            && is_string($plan['original_request'] ?? null)
-            && is_numeric($plan['position'] ?? null) && is_numeric($plan['total'] ?? null)) {
-            $sanitized = $this->sanitizePlanText($plan['original_request']);
-            if ($sanitized !== '') {
-                $displayData['plan'] = [
-                    'original_request' => $sanitized,
-                    'position' => (int) $plan['position'],
-                    'total' => (int) $plan['total'],
-                ];
-            }
-        }
 
         $pending = resolve(PendingActionService::class)->createProposal(
             user: $user,
@@ -176,22 +182,19 @@ abstract class BaseWriteCreateTool implements Tool
             entityType: $this->entityType(),
             actionData: $actionData,
             displayData: $displayData,
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => class_basename($this->actionClass()),
             'entity_type' => $this->entityType(),
             'operation' => 'create',
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
-    }
-
-    private function sanitizePlanText(string $text): string
-    {
-        return PromptText::sanitize($text, 300);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

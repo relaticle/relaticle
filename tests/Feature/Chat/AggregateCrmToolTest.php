@@ -4,18 +4,35 @@ declare(strict_types=1);
 
 use App\Actions\Opportunity\AggregateOpportunities;
 use App\Actions\Opportunity\CreateOpportunity;
+use App\Actions\Task\CreateTask;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Tools\AggregateCrmTool;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(AggregateCrmTool::class, AggregateOpportunities::class);
+
+function resolveTaskOptionId(string $teamId, string $code, string $label): string
+{
+    $field = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $teamId)
+        ->where('entity_type', 'task')
+        ->where('code', $code)
+        ->with('options')
+        ->firstOrFail();
+
+    return (string) $field->options->firstWhere('name', $label)->getKey();
+}
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -211,4 +228,237 @@ it('respects tenant scope and does not leak cross-tenant data', function (): voi
     $data = json_decode($response, true);
     expect($data['total_count'])->toBe(0)
         ->and((float) $data['total_amount'])->toBe(0.0);
+});
+
+it('aggregates people per company', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    People::factory()->count(3)->for($this->team)->create(['company_id' => $acme->getKey()]);
+    People::factory()->for($this->team)->create(['company_id' => null]);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'people_per_company']));
+
+    $data = json_decode($response, true);
+    $rows = collect($data['rows']);
+
+    expect($data['group_by'])->toBe('people_per_company')
+        ->and($data)->not->toHaveKey('total_amount')
+        ->and($rows->firstWhere('label', 'Acme')['count'])->toBe(3)
+        ->and($rows->firstWhere('label', 'No company')['count'])->toBe(1)
+        ->and($data['total_count'])->toBe(4)
+        ->and($data['truncated'])->toBeFalse();
+});
+
+it('reports a company with no contacts as a zero row', function (): void {
+    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    Company::factory()->for($this->team)->create(['name' => 'Empty Co']);
+    People::factory()->count(2)->for($this->team)->create(['company_id' => $acme->getKey()]);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $data = json_decode($tool->handle(new Request(['group_by' => 'people_per_company'])), true);
+    $rows = collect($data['rows']);
+
+    expect($rows->firstWhere('label', 'Empty Co')['count'])->toBe(0)
+        ->and($rows->firstWhere('label', 'Acme')['count'])->toBe(2)
+        ->and($data['total_count'])->toBe(2);
+});
+
+it('keeps same-named companies as separate people_per_company rows', function (): void {
+    $first = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $second = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    People::factory()->count(3)->for($this->team)->create(['company_id' => $first->getKey()]);
+    People::factory()->for($this->team)->create(['company_id' => $second->getKey()]);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $data = json_decode($tool->handle(new Request(['group_by' => 'people_per_company'])), true);
+
+    $acmeRows = collect($data['rows'])->where('label', 'Acme')->values();
+
+    expect($acmeRows)->toHaveCount(2)
+        ->and($acmeRows->pluck('count')->sort()->values()->all())->toBe([1, 3])
+        ->and($data['total_count'])->toBe(4);
+});
+
+it('does not leak another team\'s people into people_per_company counts', function (): void {
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+    $otherCompany = Company::factory()->for($otherTeam)->create(['name' => 'Other Co']);
+    People::factory()->count(5)->for($otherTeam)->create(['company_id' => $otherCompany->getKey()]);
+
+    People::factory()->for($this->team)->create(['company_id' => null]);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'people_per_company']));
+
+    $data = json_decode($response, true);
+    $rows = collect($data['rows']);
+
+    expect($data['total_count'])->toBe(1)
+        ->and($rows->firstWhere('label', 'Other Co'))->toBeNull();
+});
+
+it('aggregates tasks by status option label', function (): void {
+    $todoId = resolveTaskOptionId((string) $this->team->getKey(), 'status', 'To do');
+    $doneId = resolveTaskOptionId((string) $this->team->getKey(), 'status', 'Done');
+
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Task 1',
+        'custom_fields' => ['status' => $todoId],
+    ]);
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Task 2',
+        'custom_fields' => ['status' => $todoId],
+    ]);
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Task 3',
+        'custom_fields' => ['status' => $doneId],
+    ]);
+
+    // A task with other custom fields set but status left unset must still land in "Unset".
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Task 4',
+        'custom_fields' => ['priority' => resolveTaskOptionId((string) $this->team->getKey(), 'priority', 'High')],
+    ]);
+
+    // A task with no custom_fields payload at all must also land in "Unset".
+    Task::factory()->for($this->team)->create(['title' => 'Task 5']);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'task_status']));
+
+    $data = json_decode($response, true);
+    $rows = collect($data['rows']);
+
+    expect($data['group_by'])->toBe('task_status')
+        ->and($data)->not->toHaveKey('total_amount')
+        ->and($rows->pluck('label'))->toContain('To do')
+        ->and($rows->firstWhere('label', 'To do')['count'])->toBe(2)
+        ->and($rows->firstWhere('label', 'Done')['count'])->toBe(1)
+        ->and($rows->firstWhere('label', 'Unset')['count'])->toBe(2)
+        ->and($data['total_count'])->toBe(5)
+        ->and($data['truncated'])->toBeFalse();
+});
+
+it('refuses task_status when the status field is inactive instead of counting every task as unset', function (): void {
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Task 1',
+        'custom_fields' => ['status' => resolveTaskOptionId((string) $this->team->getKey(), 'status', 'To do')],
+    ]);
+
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->update(['active' => false]);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $data = json_decode($tool->handle(new Request(['group_by' => 'task_status'])), true);
+
+    expect($data)->toHaveKey('error')
+        ->and($data['error'])->toContain('status')
+        ->and($data)->not->toHaveKey('rows');
+});
+
+it('aggregates tasks by priority option label', function (): void {
+    $highId = resolveTaskOptionId((string) $this->team->getKey(), 'priority', 'High');
+    $lowId = resolveTaskOptionId((string) $this->team->getKey(), 'priority', 'Low');
+
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Urgent task',
+        'custom_fields' => ['priority' => $highId],
+    ]);
+    resolve(CreateTask::class)->execute($this->user, [
+        'title' => 'Low priority task',
+        'custom_fields' => ['priority' => $lowId],
+    ]);
+    Task::factory()->for($this->team)->create(['title' => 'No priority task']);
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'task_priority']));
+
+    $data = json_decode($response, true);
+    $rows = collect($data['rows']);
+
+    expect($data['group_by'])->toBe('task_priority')
+        ->and($rows->firstWhere('label', 'High')['count'])->toBe(1)
+        ->and($rows->firstWhere('label', 'Low')['count'])->toBe(1)
+        ->and($rows->firstWhere('label', 'Unset')['count'])->toBe(1)
+        ->and($data['total_count'])->toBe(3);
+});
+
+it('does not leak another team\'s tasks into task_status counts', function (): void {
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherUser->currentTeam;
+
+    Auth::guard('web')->setUser($otherUser);
+    TenantContextService::setTenantId($otherTeam->getKey());
+
+    $otherTodoId = resolveTaskOptionId((string) $otherTeam->getKey(), 'status', 'To do');
+    resolve(CreateTask::class)->execute($otherUser, [
+        'title' => 'Other team task',
+        'custom_fields' => ['status' => $otherTodoId],
+    ]);
+
+    Auth::guard('web')->setUser($this->user);
+    TenantContextService::setTenantId($this->team->getKey());
+
+    $tool = resolve(AggregateCrmTool::class);
+    $response = $tool->handle(new Request(['group_by' => 'task_status']));
+
+    $data = json_decode($response, true);
+    expect($data['total_count'])->toBe(0);
+});
+
+it('reports the true people total when the company group list is capped', function (): void {
+    // Regression: total_count used to sum the capped rows, so a team with more
+    // companies than MAX_COMPANY_GROUPS silently under-reported its own headcount,
+    // which is the invented-number failure this tool exists to prevent.
+    $companies = Company::factory()->count(52)->for($this->team)->create();
+
+    foreach ($companies as $company) {
+        People::factory()->for($this->team)->create(['company_id' => $company->getKey()]);
+    }
+
+    $tool = resolve(AggregateCrmTool::class);
+    $data = json_decode($tool->handle(new Request(['group_by' => 'people_per_company'])), true);
+
+    expect($data['rows'])->toHaveCount(50)
+        ->and($data['truncated'])->toBeTrue()
+        ->and($data['total_count'])->toBe(52)
+        ->and(array_sum(array_column($data['rows'], 'count')))->toBe(50);
+});
+
+it('refuses people_per_company for a user who may not view contacts', function (): void {
+    $unverified = User::factory()->unverified()->withPersonalTeam()->create();
+    Auth::guard('web')->setUser($unverified);
+
+    expect(fn (): string => resolve(AggregateCrmTool::class)->handle(new Request(['group_by' => 'people_per_company'])))
+        ->toThrow(fn (HttpException $e) => expect($e->getStatusCode())->toBe(403));
+});
+
+it('refuses task_status for a user who may not view tasks', function (): void {
+    $unverified = User::factory()->unverified()->withPersonalTeam()->create();
+    Auth::guard('web')->setUser($unverified);
+
+    expect(fn (): string => resolve(AggregateCrmTool::class)->handle(new Request(['group_by' => 'task_status'])))
+        ->toThrow(fn (HttpException $e) => expect($e->getStatusCode())->toBe(403));
+});
+
+it('refuses a date range on the count-only groupings instead of ignoring it', function (): void {
+    $tool = resolve(AggregateCrmTool::class);
+
+    foreach (['people_per_company', 'task_status', 'task_priority'] as $groupBy) {
+        $data = json_decode($tool->handle(new Request([
+            'group_by' => $groupBy,
+            'date_from' => '2026-01-01',
+        ])), true);
+
+        expect($data)->toHaveKey('error')
+            ->and($data)->not->toHaveKey('rows');
+    }
+
+    $data = json_decode($tool->handle(new Request(['group_by' => 'stage', 'date_from' => '2026-01-01'])), true);
+
+    expect($data)->not->toHaveKey('error');
 });

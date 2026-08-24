@@ -19,12 +19,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Exceptions\StreamErrorException;
 use Laravel\Ai\Responses\Data\ToolResult;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
+use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\Streaming\Events\ToolCall;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Events\ChatStreamFailed;
@@ -33,12 +38,15 @@ use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\FollowUpsSuggested;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
@@ -57,7 +65,7 @@ final class ProcessChatMessage implements ShouldQueue
     private const int CONTEXT_LEDGER_CAP = 10;
 
     /**
-     * @param  array{provider: string|null, model: string|null}  $resolved
+     * @param  array{provider: string|null, model: string|null, id: string|null, source: string}  $resolved
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
      * @param  array{type: string, id: string, label: string}|null  $pageContext
@@ -72,10 +80,26 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly array $document = ['type' => 'doc', 'content' => []],
         public readonly ?array $pageContext = null,
         public readonly string $turnId = '',
+        public readonly int $failoverDepth = 0,
+        public readonly bool $isContinuation = false,
+        public readonly ?string $resumesTurnId = null,
     ) {
+        $this->onConnection('redis-chat');
         $this->onQueue('chat');
         $this->afterCommit = true;
     }
+
+    private string $textAfterLastToolCall = '';
+
+    private bool $sawToolCall = false;
+
+    /**
+     * Whether any stream event has actually reached the broadcaster. Failover
+     * to the next auto-chain model is only safe before this turns true: once
+     * the client has seen partial output, a fresh model would either repeat
+     * or contradict it.
+     */
+    private bool $streamedAnything = false;
 
     public function retryUntil(): \DateTimeInterface
     {
@@ -101,6 +125,8 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
+        $startedAt = microtime(true);
+
         $this->team->refresh();
 
         if (resolve(HostedWorkspaceAccess::class)->isPaused($this->team)) {
@@ -127,6 +153,31 @@ final class ProcessChatMessage implements ShouldQueue
         ChatTelemetry::breadcrumb('job.started', ['message_length' => strlen($this->message)]);
 
         $pendingActions = resolve(PendingActionService::class);
+
+        // A continuation is dispatched the moment the conversation runs out of
+        // pending proposals, and during a chained turn that is briefly true
+        // between two steps streaming in. WithoutOverlapping only delays this
+        // job until the stream ends, so the check has to run again here, where
+        // the later steps already exist: continuing now would supersede them.
+        if ($this->isContinuation && resolve(TurnContinuationService::class)->hasPendingProposals($this->conversationId)) {
+            ChatTelemetry::breadcrumb('continuation.aborted', ['reason' => 'pending_proposals']);
+
+            // Hand the resume back, or deciding the step that blocked it would
+            // find the once-per-turn guard already spent and resume nothing.
+            if ($this->resumesTurnId !== null) {
+                resolve(TurnContinuationService::class)->release($this->resumesTurnId);
+            }
+
+            $creditService->refundReservation(
+                $this->team,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+            $this->releaseAuth();
+
+            return;
+        }
+
         $superseded = $pendingActions->supersedePendingForConversation($this->conversationId);
 
         if ($superseded !== []) {
@@ -145,12 +196,20 @@ final class ProcessChatMessage implements ShouldQueue
         try {
             $agent = resolve(CrmAssistant::class);
             $agent->withConversationId($this->conversationId);
+            $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
+            $agent->withCurrentUser([
+                'name' => $this->user->name,
+                'id' => (string) $this->user->getKey(),
+                'role' => $this->user->ownsTeam($this->team) ? 'owner' : 'member',
+            ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
-            $agent->withSupersededProposals($this->summarizeSuperseded($superseded));
+            $agent->withSupersededProposals(
+                $pendingActions->supersededForConversation($this->conversationId),
+            );
             $agent->withResolvedActions(
                 $pendingActions->resolvedForConversation($this->conversationId),
             );
@@ -163,6 +222,10 @@ final class ProcessChatMessage implements ShouldQueue
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
+            // The job returns normally from here, so a breadcrumb alone would never
+            // reach Sentry: breadcrumbs only ship attached to a captured event. Without
+            // report() a broken deploy fails every turn for every tenant in silence.
+            report($e);
             ChatTelemetry::breadcrumb('stream.pre_model_failed', ['exception' => $e->getMessage()]);
             $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
@@ -181,6 +244,15 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
+        // The prompt a resumed turn runs on is ours, not the user's, so the row
+        // it lands in is marked and the transcript leaves it out. Resolved
+        // through the contract because that is what ChatServiceProvider binds
+        // the single shared store instance to; the concrete class would build a
+        // second one and this flag would land on the wrong object.
+        if ($this->isContinuation) {
+            resolve(ConversationStore::class)->nextUserMessageIsContinuation = true;
+        }
+
         try {
             $response = $agent->stream(
                 prompt: $this->message,
@@ -190,10 +262,19 @@ final class ProcessChatMessage implements ShouldQueue
 
             $cancelled = false;
             $cacheKey = "chat:cancel:{$this->conversationId}";
+            $this->textAfterLastToolCall = '';
+            $this->sawToolCall = false;
 
             $response->each(function (StreamEvent $event) use ($broadcaster, $cacheKey, &$cancelled): void {
                 if ($event instanceof Error) {
                     throw ProviderStreamError::toException($event);
+                }
+
+                if ($event instanceof ToolCall) {
+                    $this->sawToolCall = true;
+                    $this->textAfterLastToolCall = '';
+                } elseif ($event instanceof TextDelta) {
+                    $this->textAfterLastToolCall .= $event->delta;
                 }
 
                 if (! $cancelled && Cache::pull($cacheKey) !== null) {
@@ -206,6 +287,7 @@ final class ProcessChatMessage implements ShouldQueue
                     return;
                 }
 
+                $this->streamedAnything = true;
                 $broadcaster->broadcast($event);
             });
 
@@ -226,7 +308,10 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
-            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService): void {
+            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
+                // promptTokens is the UNCACHED remainder only, so it understates the
+                // real prompt on a cached turn. Record the cache legs next to it;
+                // credits are still priced on model + tool calls, not tokens.
                 ChatTelemetry::breadcrumb('stream.completed', [
                     'input_tokens' => $streamedResponse->usage->promptTokens,
                     'output_tokens' => $streamedResponse->usage->completionTokens,
@@ -253,16 +338,18 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions();
                 $this->persistUserDocument();
-                $this->materializeAssistantDocument($streamedResponse);
+                $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->broadcastFollowUps($streamedResponse);
+                $this->maybeTitleFromTurn($streamedResponse);
             });
         } catch (Throwable $e) {
-            // Rate-limit / overloaded errors are transient -> release with backoff.
+            // Rate-limit, overloaded, dropped-connection and provider stream errors are
+            // transient -> release with backoff.
             // release() does not count against MaxExceptions(1); attempts() increments
             // each retry. Bounded by this cap AND the job's retryUntil() (now+3min).
             // Anything else rethrows and fails fast, exactly as before.
-            if ($this->isRateLimited($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
-                ChatTelemetry::breadcrumb('stream.rate_limited_retry', ['attempt' => $this->attempts()]);
+            if ($this->isTransient($e) && $this->attempts() < self::MAX_RATE_LIMIT_RETRIES) {
+                ChatTelemetry::breadcrumb('stream.transient_retry', ['attempt' => $this->attempts(), 'exception' => $e::class]);
                 // Honor the provider's Retry-After when present; jitter spreads
                 // the re-dispatch so concurrent 429ed jobs don't stampede back.
                 $delay = $this->retryDelaySeconds($this->attempts(), $e) + random_int(0, 3);
@@ -277,9 +364,90 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
+            // The user's model choice was 'auto' and nothing has streamed yet: fail
+            // over to the next plan-allowed chain entry instead of failing the turn.
+            // An explicit pick never lands here (source stays 'explicit'), so a user
+            // who chose a model deliberately always sees today's error, never a
+            // silent swap to a different (differently priced) model. Bounded to one
+            // hop by failoverDepth so a chain of bad providers still terminates.
+            // The credit reservation is untouched here, exactly like the transient
+            // retry above: it stays open under the same resolutionKey (keyed on
+            // turnId, which the re-dispatched job keeps), and whichever attempt
+            // finally finishes the turn settles it exactly once.
+            if ($this->resolved['source'] === 'auto'
+                && $this->failoverDepth === 0
+                && ! $this->streamedAnything) {
+                $next = resolve(AiModelResolver::class)->failoverNext($this->user, (string) ($this->resolved['id'] ?? ''));
+
+                if ($next !== null) {
+                    ChatTelemetry::breadcrumb('stream.failover', [
+                        'from' => $this->resolved['id'] ?? null,
+                        'to' => $next['id'],
+                        'exception' => $e::class,
+                    ]);
+                    // Same signal the transient path sends, for the same reason: the
+                    // turn is still alive but nothing will stream for a moment, and a
+                    // silent gap here lets the client's watchdog call the turn dead.
+                    // Which model takes over stays unsaid - the user never picked one.
+                    $this->broadcastSafely(new ChatStreamRetrying(
+                        conversationId: $this->conversationId,
+                        attempt: $this->attempts() + 1,
+                        maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
+                        delaySeconds: 0,
+                    ));
+                    dispatch(new self(
+                        user: $this->user,
+                        team: $this->team,
+                        message: $this->message,
+                        conversationId: $this->conversationId,
+                        resolved: $next,
+                        mentions: $this->mentions,
+                        document: $this->document,
+                        pageContext: $this->pageContext,
+                        turnId: $this->turnId,
+                        failoverDepth: $this->failoverDepth + 1,
+                        isContinuation: $this->isContinuation,
+                        resumesTurnId: $this->resumesTurnId,
+                    ));
+
+                    return;
+                }
+            }
+
+            // Settle here rather than leaving it to failed(): the queue never calls
+            // failed() on the object that ran handle(). CallQueuedHandler::failed()
+            // rebuilds the command from the ORIGINAL dispatch payload, so by then
+            // every private flag is back at its dispatch-time value and
+            // $streamedAnything is false however much the turn streamed. Left to
+            // failed(), a turn that reached the provider and emitted tokens was
+            // refunded while the provider had already billed us for it.
+            //
+            // Both paths write under the same resolution key and recordResolution()
+            // is insertOrIgnore, so this settle wins and failed()'s later refund is
+            // a no-op. That is what makes the refund there safe to leave
+            // unconditional.
+            if ($this->streamedAnything) {
+                $creditService->settleReservedMinimum(
+                    team: $this->team,
+                    user: $this->user,
+                    conversationId: $this->conversationId,
+                    resolutionKey: $this->resolutionKey(),
+                    reason: 'stream_failed',
+                );
+            }
+
             throw $e;
         } finally {
             $this->releaseAuth();
+
+            // storeUserMessage() consumes this on the happy path, but it only
+            // runs if the stream reaches its then() callback. A turn that dies
+            // first (provider error, release, cancel, failover re-dispatch)
+            // would otherwise leave the flag set on the container singleton,
+            // which queue workers do not rebuild between jobs: the next job on
+            // this worker, any user and any tenant, would have its own question
+            // stored as ours and filtered out of its transcript for good.
+            resolve(ConversationStore::class)->nextUserMessageIsContinuation = false;
         }
     }
 
@@ -292,6 +460,27 @@ final class ProcessChatMessage implements ShouldQueue
             : 0;
 
         return max($base, min($retryAfter, 60));
+    }
+
+    /**
+     * Every provider failure worth releasing the job for rather than failing the turn.
+     *
+     * Wider than isRateLimited(), which stays scoped to real throttling because it
+     * also picks the user-facing failure copy. A dropped connection and a provider
+     * error reported inside the stream body are equally transient, but telling the
+     * user they were rate-limited would be a lie.
+     */
+    public function isTransient(?Throwable $e): bool
+    {
+        if ($e instanceof ProviderConnectionException) {
+            return true;
+        }
+
+        if ($e instanceof StreamErrorException) {
+            return ProviderStreamError::isRetryable($e->error);
+        }
+
+        return $this->isRateLimited($e);
     }
 
     /**
@@ -311,12 +500,21 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        resolve(CreditService::class)->settleReservedMinimum(
-            team: $this->team,
-            user: $this->user,
-            conversationId: $this->conversationId,
+        // Unconditional, because this instance can never answer the question the
+        // charge depends on: the queue rebuilds the command from the original
+        // dispatch payload before calling failed(), so $streamedAnything is false
+        // here no matter what the turn did. A turn that DID stream has already
+        // settled its minimum in handle(), under this same resolution key, and
+        // recordResolution() is insertOrIgnore, so that settle stands and this
+        // refund is dropped.
+        //
+        // What is left for this to cover is the turn that never ran at all: a queue
+        // backlog past retryUntil() fails the job at pickup, before handle() is
+        // entered, and nothing was ever sent to a provider to pay for.
+        resolve(CreditService::class)->refundReservation(
+            $this->team,
             resolutionKey: $this->resolutionKey(),
-            reason: 'job_failed',
+            conversationId: $this->conversationId,
         );
 
         ChatTelemetry::breadcrumb('job.failed', [
@@ -329,6 +527,7 @@ final class ProcessChatMessage implements ShouldQueue
         try {
             $this->persistFailedTurn($exception);
         } catch (Throwable $e) {
+            report($e);
             ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
         }
 
@@ -455,36 +654,6 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     /**
-     * @param  list<PendingAction>  $superseded
-     * @return list<array{operation: string, entity_type: string, label: string|null}>
-     */
-    private function summarizeSuperseded(array $superseded): array
-    {
-        return array_map(static function (PendingAction $action): array {
-            $data = $action->action_data;
-            $display = $action->display_data;
-
-            $label = null;
-            foreach (['name', 'title'] as $field) {
-                if (isset($display[$field]) && is_string($display[$field]) && $display[$field] !== '') {
-                    $label = $display[$field];
-                    break;
-                }
-                if (isset($data[$field]) && is_string($data[$field]) && $data[$field] !== '') {
-                    $label = $data[$field];
-                    break;
-                }
-            }
-
-            return [
-                'operation' => $action->operation->value,
-                'entity_type' => $action->entity_type,
-                'label' => $label,
-            ];
-        }, $superseded);
-    }
-
-    /**
      * Distinct records referenced earlier in this conversation, most recent first.
      *
      * Unlike a typed @mention, a page-context record's name never enters the message
@@ -556,18 +725,25 @@ final class ProcessChatMessage implements ShouldQueue
         return $ledger;
     }
 
+    private function latestMessageId(string $role): ?string
+    {
+        $id = DB::table('agent_conversation_messages')
+            ->where('conversation_id', $this->conversationId)
+            ->where('role', $role)
+            ->latest()
+            ->orderByDesc('id')
+            ->value('id');
+
+        return is_string($id) ? $id : null;
+    }
+
     private function persistMentions(): void
     {
         if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
 
-        $userMessageId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'user')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $userMessageId = $this->latestMessageId('user');
 
         if ($userMessageId === null) {
             return;
@@ -610,12 +786,7 @@ final class ProcessChatMessage implements ShouldQueue
      */
     private function persistUserDocument(): void
     {
-        $latestId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'user')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $latestId = $this->latestMessageId('user');
 
         if ($latestId === null) {
             return;
@@ -634,12 +805,12 @@ final class ProcessChatMessage implements ShouldQueue
      * v1 emits no mention chips in assistant prose — future work can extract
      * structured entity references from tool results.
      */
-    private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse): void
+    private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse, float $startedAt): void
     {
-        // Collapse here too so the `document` column owns its own correctness — the
-        // store fixes `content`, but the document is built independently. Idempotent
-        // if the store already collapsed the shared response instance.
-        $assistantContent = AssistantText::collapseRepeated($streamedResponse->text);
+        // The store persisted the full concatenated text; the row is rewritten here
+        // with the reply the user should keep (see AssistantText::finalReply), and
+        // the document is built from that same text so both columns agree.
+        $assistantContent = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
 
         if ($assistantContent === '') {
             return;
@@ -647,20 +818,23 @@ final class ProcessChatMessage implements ShouldQueue
 
         $document = $this->getParser()->buildFromText($assistantContent, [], $this->team);
 
-        $latestId = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', 'assistant')
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
+        $latestId = $this->latestMessageId('assistant');
 
         if ($latestId === null) {
             return;
         }
 
+        $existingMeta = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $meta = is_array($existingMeta) ? $existingMeta : [];
+        $meta['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
+
         DB::table('agent_conversation_messages')
             ->where('id', $latestId)
-            ->update(['document' => json_encode($document, JSON_THROW_ON_ERROR)]);
+            ->update([
+                'content' => $assistantContent,
+                'document' => json_encode($document, JSON_THROW_ON_ERROR),
+                'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
+            ]);
     }
 
     private function getParser(): TipTapDocumentParser
@@ -694,11 +868,57 @@ final class ProcessChatMessage implements ShouldQueue
         ));
     }
 
+    /**
+     * Last chance to name a conversation the opening dispatch could not.
+     *
+     * ChatController fires a titling attempt as the message arrives, off the
+     * message alone. When that message had no subject to name, "hey", "do it",
+     * "what about the other one?", the titler declines and the chat keeps
+     * sitting under its own opening words. By the time the turn ends there IS
+     * something to name it from: the assistant just answered, and its reply
+     * names the records the turn was actually about.
+     *
+     * Runs only while ConversationTitleGate still returns a provisional, so a
+     * conversation the first attempt named (the usual case) never reaches the
+     * model a second time, and a chat the user renamed is never touched. The two
+     * dispatches can overlap on a fast turn; both write through the same
+     * compare-and-swap, so one of them applies and the other stops.
+     *
+     * The message comes from the gate, not from $this->message: a turn resumed
+     * by a proposal decision runs on a synthetic prompt, and naming a chat after
+     * that would be naming it after machinery the user never saw.
+     */
+    private function maybeTitleFromTurn(StreamedAgentResponse $streamedResponse): void
+    {
+        $attempt = ConversationTitleGate::afterTurn($this->conversationId);
+
+        if ($attempt === null) {
+            return;
+        }
+
+        $reply = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
+
+        if (trim($reply) === '') {
+            return;
+        }
+
+        dispatch(new GenerateConversationTitle(
+            conversationId: $this->conversationId,
+            provisionalTitle: $attempt['provisional'],
+            message: $attempt['latest'],
+            provider: $this->resolved['provider'],
+            pageContext: $this->pageContext,
+            reply: $reply,
+        ));
+    }
+
     private function broadcastSafely(object $event): void
     {
         try {
             broadcast($event);
         } catch (Throwable $e) {
+            // A Reverb outage drops every stream event and is otherwise invisible.
+            report($e);
             ChatTelemetry::breadcrumb('broadcast.dropped', ['event' => $event::class, 'reason' => $e->getMessage()]);
         }
     }

@@ -147,11 +147,11 @@ it('UpdateOpportunityTool renders linked names in the update proposal display da
     $tool = resolve(UpdateOpportunityTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $opportunity->id,
         'company_id' => (string) $newCompany->id,
         'contact_id' => (string) $newContact->id,
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())

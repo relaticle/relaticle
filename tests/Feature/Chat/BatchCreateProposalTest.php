@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -81,4 +82,24 @@ it('collapses an identical re-proposed batch (job retry idempotency)', function 
         ->where('conversation_id', $this->convId)
         ->where('status', PendingActionStatus::Pending)
         ->count())->toBe(1);
+});
+
+it('rejects a linked record from another workspace at proposal time', function (): void {
+    $foreign = Company::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+
+    $result = json_decode(proposeTasks($this->convId, [['title' => 'Call', 'company_ids' => [(string) $foreign->getKey()]]]), true);
+
+    expect($result['error'])->toContain('records[0]')->toContain('company_ids')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('rejects a missing, blank, or over-length title at proposal time instead of after approval', function (): void {
+    $missing = json_decode(proposeTasks($this->convId, [['custom_fields' => []]]), true);
+    $blank = json_decode(proposeTasks($this->convId, [['title' => '  ']]), true);
+    $tooLong = json_decode(proposeTasks($this->convId, [['title' => str_repeat('x', 256)]]), true);
+
+    expect($missing['error'])->toContain('records[0]')->toContain('title is required')
+        ->and($blank['error'])->toContain('title is required')
+        ->and($tooLong['error'])->toContain('longer than 255')
+        ->and(PendingAction::query()->count())->toBe(0);
 });

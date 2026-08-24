@@ -8,10 +8,11 @@
         ['type' => 'comment', 'text' => __('Download the compose file')],
         ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/relaticle/relaticle/main/compose.yml'],
         ['type' => 'blank'],
-        ['type' => 'comment', 'text' => __('Add the two required secrets')],
+        ['type' => 'comment', 'text' => __('Add the two secrets and your public URL')],
         ['type' => 'command', 'text' => 'cat > .env << EOF'],
         ['type' => 'command', 'text' => 'APP_KEY=base64:$(openssl rand -base64 32)', 'continuation' => true],
         ['type' => 'command', 'text' => 'DB_PASSWORD=$(openssl rand -hex 24)', 'continuation' => true],
+        ['type' => 'command', 'text' => 'APP_URL=https://crm.example.com', 'continuation' => true],
         ['type' => 'command', 'text' => 'EOF', 'continuation' => true],
         ['type' => 'blank'],
         ['type' => 'comment', 'text' => __('Start Relaticle')],
@@ -199,7 +200,7 @@
 
             <ol class="space-y-4">
                 @foreach([
-                    [__('Get the compose file'), __('Download the published compose.yml and set the two variables it requires: :appKey and :dbPassword.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD'])],
+                    [__('Get the compose file'), __('Download the published compose.yml, set the two secrets it requires (:appKey and :dbPassword), and point :appUrl at the address you will serve from. Invitation and password-reset links are signed against that host, so they break if it is wrong.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD', 'appUrl' => 'APP_URL'])],
                     [__('Start the stack'), __('Run :command and Docker pulls five containers: the app, a queue worker, a scheduler, PostgreSQL, and Redis. Database migrations run automatically on startup.', ['command' => 'docker compose up -d'])],
                     [__('Create your admin account'), __('Run :command, choose the app panel, and sign in with the account you just created.', ['command' => 'docker compose exec app php artisan make:filament-user'])],
                 ] as $index => [$stepTitle, $stepDesc])

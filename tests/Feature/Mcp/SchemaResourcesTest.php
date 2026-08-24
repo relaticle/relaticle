@@ -92,3 +92,46 @@ it('includes custom fields in schema when they exist', function (): void {
         ->assertSee('test_field')
         ->assertSee('Test Field');
 });
+
+it('reports a required custom field as required in the schema', function (): void {
+    $team = $this->user->personalTeam();
+
+    $section = CustomFieldSection::create([
+        'tenant_id' => $team->id,
+        'entity_type' => 'company',
+        'name' => 'Required Section',
+        'code' => 'required_section',
+        'type' => 'section',
+        'sort_order' => 1,
+        'active' => true,
+    ]);
+
+    CustomField::create([
+        'tenant_id' => $team->id,
+        'custom_field_section_id' => $section->id,
+        'entity_type' => 'company',
+        'code' => 'must_have',
+        'name' => 'Must Have',
+        'type' => 'text',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => ['required' => true],
+    ]);
+
+    // The old predicate read the pre-migration array-of-objects shape, so every field
+    // reported required:false and an agent could not tell what it had to supply.
+    // Asserted on this field's own entry. A bare '"required": true' scan is vacuous:
+    // the CORE `name` field is always required, so it matches even when every custom
+    // field reports false, which is exactly the defect this pins.
+    $expected = implode("\n", [
+        '        "must_have": {',
+        '            "name": "Must Have",',
+        '            "type": "text",',
+        '            "required": true',
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(CompanySchemaResource::class)
+        ->assertOk()
+        ->assertSee($expected);
+});

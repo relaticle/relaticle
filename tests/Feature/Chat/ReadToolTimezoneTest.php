@@ -40,9 +40,9 @@ it('emits chat list datetimes with the user offset rather than bare utc', functi
 
     $payload = (new ListTasksTool)->handle(new Request([]));
 
-    /** @var list<array{attributes: array{created_at: string}}> $rows */
-    $rows = json_decode($payload, true);
-    $row = collect($rows)->firstWhere('id', $task->getKey());
+    /** @var array{data: list<array{attributes: array{created_at: string}}>} $decoded */
+    $decoded = json_decode($payload, true);
+    $row = collect($decoded['data'])->firstWhere('id', $task->getKey());
 
     // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo.
     expect($row['attributes']['created_at'])->toBe('2026-08-19T08:30:00+09:00');
@@ -88,9 +88,9 @@ it('converts custom-field datetimes in chat tool output', function (): void {
 
     $payload = (new ListTasksTool)->handle(new Request([]));
 
-    /** @var list<array{id: string, attributes: array{custom_fields: array{due_date: string}}}> $rows */
-    $rows = json_decode($payload, true);
-    $row = collect($rows)->firstWhere('id', $task->getKey());
+    /** @var array{data: list<array{id: string, attributes: array{custom_fields: array{due_date: string}}}>} $decoded */
+    $decoded = json_decode($payload, true);
+    $row = collect($decoded['data'])->firstWhere('id', $task->getKey());
 
     expect($row['attributes']['custom_fields']['due_date'])->toBe('2026-08-19T08:30:00+09:00');
 });

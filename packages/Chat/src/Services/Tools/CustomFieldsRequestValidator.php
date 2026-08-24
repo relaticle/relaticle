@@ -25,9 +25,13 @@ final readonly class CustomFieldsRequestValidator
      * with either a clean payload (keys by code, values normalized for the
      * action layer) or an error string suitable for tool output.
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields): CustomFieldsValidationResult
+    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true): CustomFieldsValidationResult
     {
-        if (! is_array($rawCustomFields) || $rawCustomFields === []) {
+        $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
+
+        // An update touches only the submitted codes; a create must also satisfy
+        // every required field, so it runs the rules even with an empty payload.
+        if ($rawCustomFields === [] && $isUpdate) {
             return new CustomFieldsValidationResult(cleanFields: [], error: null);
         }
 
@@ -41,7 +45,7 @@ final readonly class CustomFieldsRequestValidator
             return $translated;
         }
 
-        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: true)
+        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate)
             ->toRules($translated->cleanFields);
 
         $validator = Validator::make(['custom_fields' => $translated->cleanFields], $rules);
@@ -87,6 +91,16 @@ final readonly class CustomFieldsRequestValidator
 
             if (! $field instanceof CustomField) {
                 $clean[$code] = $value;
+
+                continue;
+            }
+
+            // Clearing is a null write, so null must reach the rule set rather than
+            // being rejected here as a malformed option label. A field that really is
+            // required then fails on its own `required` rule with a truthful message,
+            // instead of the model being told the value can never be unset.
+            if ($value === null) {
+                $clean[$code] = null;
 
                 continue;
             }
