@@ -111,3 +111,52 @@ it('enforces required custom fields on create but not on update', function (): v
         ->and($validator->validate($user, 'task', null, isUpdate: true)->error)->toBeNull()
         ->and($validator->validate($user, 'task', ['description' => 'x'], isUpdate: true)->error)->toBeNull();
 });
+
+it('passes null through for a single-choice field so the value can be cleared', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', ['priority' => null]);
+
+    expect($result->error)->toBeNull()
+        ->and($result->cleanFields)->toBe(['priority' => null]);
+});
+
+it('passes null through for a multi-choice field so the value can be cleared', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $multi = CustomField::query()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', 'company')
+        ->whereIn('type', ['multi-select', 'tags-input'])
+        ->first();
+
+    if (! $multi instanceof CustomField) {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'company', [$multi->code => null]);
+
+    expect($result->error)->toBeNull()
+        ->and($result->cleanFields)->toBe([$multi->code => null]);
+});
+
+it('rejects clearing a required choice field with a truthful validation error', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    CustomField::query()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->firstOrFail()
+        ->update(['validation_rules' => ['required' => true]]);
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', ['priority' => null]);
+
+    expect($result->error)->toContain('custom_fields validation failed')
+        ->and($result->error)->not->toContain('option label string');
+});

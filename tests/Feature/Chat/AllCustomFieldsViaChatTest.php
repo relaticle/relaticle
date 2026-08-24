@@ -163,12 +163,12 @@ it('returns a tool error for an unknown option label on a choice field', functio
  * @param  class-string  $toolClass
  * @param  array<string, mixed>  $customFields
  */
-function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array $customFields): void
+function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array $customFields): string
 {
     $tool = resolve($toolClass);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $tool->handle(new Request(['records' => [[
+    return $tool->handle(new Request(['records' => [[
         'id' => (string) $model->getKey(),
         'custom_fields' => $customFields,
     ]]]));
@@ -176,9 +176,39 @@ function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array
 
 function latestPendingForCustomFieldsTest(): PendingAction
 {
+    // Ordered by key, not created_at: two writes inside the same second tie on
+    // the timestamp and `latest()` then returns an arbitrary one of them.
     /** @var PendingAction */
-    return PendingAction::query()->latest()->firstOrFail();
+    return PendingAction::query()->orderByDesc('id')->firstOrFail();
 }
+
+it('clears a single-choice custom field when chat passes null', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => 'High']);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'priority', 'string_value'))->not->toBeNull();
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => null]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'priority', 'string_value'))->toBeNull();
+});
+
+it('clears a text custom field when chat passes null', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => 'Long body text']);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'description', 'text_value'))->toContain('Long body text');
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => null]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'description', 'text_value'))->toBeNull();
+});
 
 function rawValueForCustomFieldsTest(Model $model, string $code, string $column): mixed
 {

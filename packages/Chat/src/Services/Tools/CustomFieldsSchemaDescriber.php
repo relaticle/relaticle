@@ -41,7 +41,10 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         $lines[] = '';
-        $lines[] = 'Only include codes you want to set. Omit fields you do not want to change.';
+        $lines[] = 'Only include codes you want to set. Omit fields you do not want to change. '
+            .'To clear a value, pass null (for a multi-value field, null or []). '
+            .'If a field is required the write is rejected with a validation error naming it, '
+            .'so never claim a field cannot be cleared without attempting it.';
 
         return implode("\n", $lines);
     }

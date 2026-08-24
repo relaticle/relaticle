@@ -95,6 +95,16 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
+            // Clearing is a null write, so null must reach the rule set rather than
+            // being rejected here as a malformed option label. A field that really is
+            // required then fails on its own `required` rule with a truthful message,
+            // instead of the model being told the value can never be unset.
+            if ($value === null) {
+                $clean[$code] = null;
+
+                continue;
+            }
+
             $typeData = CustomFieldsType::getFieldType($field->type);
             $dataType = $typeData?->dataType;
 
