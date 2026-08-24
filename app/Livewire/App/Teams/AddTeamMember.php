@@ -21,12 +21,14 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Attributes\Locked;
 
 final class AddTeamMember extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void

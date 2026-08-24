@@ -18,12 +18,14 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 
 final class UpdateTeamName extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    #[Locked]
     public Team $team;
 
     public bool $slugManuallyEdited = false;

@@ -54,3 +54,16 @@ test('the members table skips a membership row whose user no longer exists', fun
         ->assertCanNotSeeTableRecords([$orphanedMembership])
         ->assertSee($member->email);
 });
+
+test('the bound workspace is locked, so a payload cannot repoint the roster at another team', function (): void {
+    $stranger = User::factory()->withTeam()->create();
+    $strangerMember = User::factory()->create();
+    $stranger->currentTeam->users()->attach($strangerMember->id, ['role' => 'editor']);
+
+    $component = livewire(TeamMembers::class, ['team' => $this->team]);
+
+    expect(fn () => $component->set('team', $stranger->currentTeam->getKey()))
+        ->toThrow(Exception::class);
+
+    $component->assertDontSee($strangerMember->email);
+});
