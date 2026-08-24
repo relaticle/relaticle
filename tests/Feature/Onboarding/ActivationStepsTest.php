@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Onboarding\ActivationSteps;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Once;
 use Illuminate\Support\Str;
 use Spatie\Onboard\OnboardingStep;
 
@@ -23,17 +22,13 @@ beforeEach(function (): void {
 });
 
 /**
- * spatie/laravel-onboard reuses the same OnboardingStep instance (from the
- * OnboardingSteps singleton) for every model, and OnboardingStep::complete()
- * memoizes its result via Laravel's once() helper — keyed on the step
- * object, not the model. Within a single test that mutates state between
- * assertions, the memoized boolean goes stale unless both caches are
- * cleared before each read: the package's once() cache, and our own
- * per-team WorkspaceActivationFacts cache.
+ * Each read re-resolves the registry (fresh step objects, so the package's
+ * per-object once() memoization cannot go stale) and drops our own per-team
+ * fact cache, which is request-scoped by design and would otherwise survive
+ * a mid-test insert.
  */
 function stepByKey(Team $team, string $key): OnboardingStep
 {
-    Once::flush();
     resolve(WorkspaceActivationFacts::class)->forget($team);
 
     return $team->onboarding()->steps()
@@ -148,4 +143,29 @@ it('answers all creation-source facts in one query per team', function (): void 
         ->filter(fn (array $entry): bool => str_contains((string) $entry['query'], 'creation_source'));
 
     expect($sourceQueries)->toHaveCount(1);
+});
+
+/**
+ * Regression guard for the reason AppServiceProvider rebinds OnboardingSteps
+ * away from the package's singleton: shared step objects memoize the first
+ * team's answer through once() and hand it to every later team in the process.
+ * Evaluating a workspace with no records first must not make a workspace that
+ * has records read as incomplete.
+ */
+it('does not leak one workspace\'s step state onto another', function (): void {
+    $otherOwner = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherOwner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $otherTeam->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    expect($this->team->onboarding()->steps()
+        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === 'first_record')
+        ->complete())->toBeFalse();
+
+    expect($otherTeam->onboarding()->steps()
+        ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === 'first_record')
+        ->complete())->toBeTrue();
 });

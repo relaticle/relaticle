@@ -79,6 +79,7 @@ use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
+use Spatie\Onboard\OnboardingSteps;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -113,6 +114,22 @@ final class AppServiceProvider extends ServiceProvider
         // request/job — scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
 
+        // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
+        // makes every team share one OnboardingStep instance. Its complete()
+        // memoizes through once(), keyed on that shared object rather than the
+        // model, so the first team evaluated in a process poisons the answer for
+        // every later one — wrong onboarding state in any request or Horizon
+        // worker that touches two workspaces. Rebinding per resolve gives each
+        // lookup its own step objects, so once() memoizes within one lookup as
+        // intended. Registration lives here because a fresh registry starts empty.
+        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+            $steps = new OnboardingSteps;
+
+            ActivationSteps::registerOn($steps);
+
+            return $steps;
+        });
+
         // Spatie's LeagueDriver never registers TableConverter, so <table>
         // markup collapses to a run-on line in the markdown-response channel.
         // Our provider registers after the package's, so this binding wins.
@@ -142,8 +159,6 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
-
-        ActivationSteps::register();
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 

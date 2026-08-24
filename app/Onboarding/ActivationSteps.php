@@ -6,22 +6,27 @@ namespace App\Onboarding;
 
 use App\Models\Team;
 use App\Services\WorkspaceActivationFacts;
-use Spatie\Onboard\Facades\Onboard;
+use Spatie\Onboard\OnboardingSteps;
 
 /**
  * The four activation steps every consumer reads: dashboard checklist,
  * welcome-message job, and the chat agent's workspace-state block.
  *
  * Titles and descriptions live in lang files and are resolved by the
- * consumers via the `label_key`/`description_key` attributes — `addStep()`
- * titles are evaluated at boot, before any user locale is known, so the
+ * consumers via the `label_key`/`description_key` attributes — step titles
+ * are evaluated at registration, before any user locale is known, so the
  * title given here is only a fallback identifier.
+ *
+ * Registration takes the registry as an argument rather than going through
+ * the Onboard facade: AppServiceProvider rebinds OnboardingSteps as a
+ * non-singleton, so every resolve builds a fresh registry (see the binding
+ * for why that is load-bearing) and each build must re-register these steps.
  */
 final readonly class ActivationSteps
 {
-    public static function register(): void
+    public static function registerOn(OnboardingSteps $steps): void
     {
-        Onboard::addStep('first_record', Team::class)
+        $steps->addStep('first_record', Team::class)
             ->attributes([
                 'key' => 'first_record',
                 'label_key' => 'filament/pages/dashboard.activation.steps.first_record.label',
@@ -30,7 +35,7 @@ final readonly class ActivationSteps
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasOwnRecord($model));
 
-        Onboard::addStep('import', Team::class)
+        $steps->addStep('import', Team::class)
             ->attributes([
                 'key' => 'import',
                 'label_key' => 'filament/pages/dashboard.activation.steps.import.label',
@@ -39,7 +44,7 @@ final readonly class ActivationSteps
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasImportedRecord($model));
 
-        Onboard::addStep('invite', Team::class)
+        $steps->addStep('invite', Team::class)
             ->attributes([
                 'key' => 'invite',
                 'label_key' => 'filament/pages/dashboard.activation.steps.invite.label',
@@ -48,7 +53,7 @@ final readonly class ActivationSteps
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasTeammate($model));
 
-        Onboard::addStep('ask_rela', Team::class)
+        $steps->addStep('ask_rela', Team::class)
             ->attributes([
                 'key' => 'ask_rela',
                 'label_key' => 'filament/pages/dashboard.activation.steps.ask_rela.label',
