@@ -57,7 +57,10 @@ trait ResolvesEntitySchema
             // validation_rules is cast to a key-value collection (['required' => true]),
             // so contains('name', 'required') did data_get(true, 'name') and was always
             // false: the schema told every agent no custom field was ever required.
-            $required = (bool) ($field->validation_rules?->get('required', false));
+            // data_get, not a direct read: the package's @property says Collection but
+            // the cast yields null for a null column, which is why the package itself
+            // reaches for ?-> here.
+            $required = (bool) data_get($field->validation_rules, 'required', false);
 
             $entry = [
                 'name' => $field->name,

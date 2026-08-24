@@ -162,7 +162,13 @@ final readonly class RecordReferenceResolver
         // unscoped whereKey() turns any id into a real name regardless of who owns it.
         // This method exists purely to render a label, which makes it the cheapest
         // possible cross-tenant disclosure if a foreign id ever reaches it.
-        $team = auth()->user()?->currentTeam;
+        $authUser = auth()->user();
+
+        if (! $authUser instanceof User) {
+            return null;
+        }
+
+        $team = $authUser->currentTeam;
 
         if (! $team instanceof Team) {
             return null;

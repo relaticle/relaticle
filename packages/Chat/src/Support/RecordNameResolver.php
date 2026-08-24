@@ -81,9 +81,13 @@ final readonly class RecordNameResolver
         // buildDisplayData runs: that call ordering is the only thing standing between
         // a hallucinated $ref and another tenant's proposed record name on the card, and
         // this resolver should not depend on its caller getting the order right.
-        $action = PendingAction::query()
-            ->when($team instanceof Team, fn ($query) => $query->where('team_id', $team->getKey()))
-            ->find($target);
+        $query = PendingAction::query();
+
+        if ($team instanceof Team) {
+            $query->where('team_id', $team->getKey());
+        }
+
+        $action = $query->find($target);
 
         if (! $action instanceof PendingAction) {
             return '';

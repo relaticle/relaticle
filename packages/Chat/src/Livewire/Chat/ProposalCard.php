@@ -454,6 +454,13 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private ?array $planStepsCache = null;
 
+    /**
+     * The plan's steps that still need a decision, in order. The dock only ever
+     * presents undecided work: a step resolved a moment ago lives in the
+     * transcript audit card above.
+     *
+     * @return list<PendingAction>
+     */
     public function planSteps(): array
     {
         if ($this->planStepsCache !== null) {
