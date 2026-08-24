@@ -103,6 +103,15 @@ final class ProposalCard extends BaseLivewireComponent
         $input = $this->flattenFormState($this->form->getState());
         $index = ($pendingAction->action_data['_batch'] ?? false) === true ? $this->cursorFor($pendingAction) : null;
 
+        // $cursor is a public property, so it is client-writable, and a partially
+        // resolved batch is still Pending: without this an edit could rewrite the
+        // action and display data of an item that was already created, leaving the
+        // transcript's audit card showing values the record never had. createCurrent()
+        // and discardCurrent() already snap away from a resolved index.
+        if ($index !== null && ! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
+            return;
+        }
+
         try {
             resolve(ProposalEditor::class)->applyEdit($pendingAction, $this->authUser(), $input, $index);
         } catch (RuntimeException) {

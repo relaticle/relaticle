@@ -54,7 +54,10 @@ final class SearchCrmTool implements Tool
     public function handle(Request $request): string
     {
         $query = LikePattern::escape((string) $request->string('query'));
-        $limit = min((int) ($request['limit'] ?? 5), 10);
+        // Clamped at both ends like BaseReadListTool's per_page: limit 0 fetched one
+        // row, sliced it away and then reported truncated=true, telling the model there
+        // were more matches while handing it none.
+        $limit = max(1, min((int) ($request['limit'] ?? 5), 10));
         /** @var User $user */
         $user = auth()->user();
         $team = $user->currentTeam;

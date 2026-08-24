@@ -146,7 +146,7 @@ final class UpdateCustomFieldTool implements Tool
 
             $actionRecords[] = $actionData;
             $items[] = [
-                'title' => 'Update Custom Field',
+                'title' => __('Update Custom Field'),
                 'summary' => "Update custom field \"{$field->name}\"",
                 'fields' => $displayFields,
             ];

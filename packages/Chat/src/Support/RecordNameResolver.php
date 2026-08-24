@@ -26,7 +26,7 @@ final readonly class RecordNameResolver
     public function name(mixed $id, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
     {
         if (PlanReference::is($id)) {
-            return $this->pendingName($id);
+            return $this->pendingName($id, $team);
         }
 
         if (! is_string($id) || $id === '') {
@@ -69,7 +69,7 @@ final readonly class RecordNameResolver
      * The proposed name of a record an earlier step of this turn will create,
      * labelled with that step's position so the card says where it comes from.
      */
-    private function pendingName(mixed $reference): string
+    private function pendingName(mixed $reference, ?Team $team): string
     {
         $target = PlanReference::target($reference);
 
@@ -77,7 +77,13 @@ final readonly class RecordNameResolver
             return '';
         }
 
-        $action = PendingAction::query()->find($target);
+        // Scoped by team even though the write tools validate the reference before
+        // buildDisplayData runs: that call ordering is the only thing standing between
+        // a hallucinated $ref and another tenant's proposed record name on the card, and
+        // this resolver should not depend on its caller getting the order right.
+        $action = PendingAction::query()
+            ->when($team instanceof Team, fn ($query) => $query->where('team_id', $team->getKey()))
+            ->find($target);
 
         if (! $action instanceof PendingAction) {
             return '';
@@ -109,6 +115,7 @@ final readonly class RecordNameResolver
         // Keys are ULIDs, so they sort in creation order: counting the turn's
         // proposals up to and including this one gives its step number.
         return PendingAction::query()
+            ->where('team_id', $action->team_id)
             ->where('turn_id', $action->turn_id)
             ->where('id', '<=', $action->getKey())
             ->count();

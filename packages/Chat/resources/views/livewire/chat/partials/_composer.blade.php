@@ -80,14 +80,19 @@
                             'note' => __('Note'),
                         ]),
                     },
-                    onSubmit: () => $root.dispatchEvent(new CustomEvent('chat:editor-submit', { bubbles: true })),
+                    onSubmit: () => $root.dispatchEvent(new CustomEvent('chat:editor-submit', { bubbles: true, detail: { context: @js($context ?? 'conversation') } })),
                     onChange: ({ document, text }) => {
-                        $root.dispatchEvent(new CustomEvent('chat:editor-change', { bubbles: true, detail: { document, text } }));
+                        $root.dispatchEvent(new CustomEvent('chat:editor-change', { bubbles: true, detail: { document, text, context: @js($context ?? 'conversation') } }));
                     },
                     onArrowUp: () => $root.dispatchEvent(new CustomEvent('chat:editor-arrow-up', { bubbles: true, detail: { context: @js($context ?? 'conversation') } })),
                 })"
-                x-on:chat:editor-submit.window="sendMessage()"
-                x-on:chat:editor-change.window="input = $event.detail.text; saveDraft()"
+                {{-- Context-guarded like chat:editor-arrow-up already is. Both listeners are
+                     on .window and the full page and the side panel are mounted together, so
+                     without the guard a keystroke in one composer overwrote the other's
+                     `input` (silently disabling its Cmd+Enter approval shortcut) and ran its
+                     draft debounce against the wrong conversation key. --}}
+                x-on:chat:editor-submit.window="if ($event.detail?.context === @js($context ?? 'conversation')) sendMessage()"
+                x-on:chat:editor-change.window="if ($event.detail?.context === @js($context ?? 'conversation')) { input = $event.detail.text; saveDraft() }"
                 {{-- No global setter needed — chatInterface uses localEditor() to scope-resolve. --}}
                 data-chat-context="{{ $context ?? 'conversation' }}"
             >

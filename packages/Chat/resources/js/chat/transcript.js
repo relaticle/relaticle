@@ -7,6 +7,7 @@
 
 import { MENTION_CHIP_CLASS } from './mention-chip';
 
+const CONVERSATION_CACHE_MAX_MESSAGES = 200;
 const CONVERSATION_CACHE_LIMIT = 5;
 
 // In-conversation search (Cmd+F). The endpoint enforces min:2, so anything
@@ -60,6 +61,14 @@ function conversationCacheEntries(userId) {
 
 function cacheConversationMessages(userId, conversationId, messages) {
     if (!conversationId) return;
+
+    // Capped by size as well as count. A transcript walked back through
+    // MAX_SEARCH_JUMP_PAGES carries rendered HTML, display blocks and pending
+    // actions for hundreds of messages, and five of those live on `window` across
+    // every wire:navigate. Skipping the outsized ones costs one cache miss; keeping
+    // them costs the tab.
+    if (Array.isArray(messages) && messages.length > CONVERSATION_CACHE_MAX_MESSAGES) return;
+
     const entries = conversationCacheEntries(userId);
     entries.delete(conversationId);
     entries.set(conversationId, messages);
@@ -382,9 +391,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     blockFooter(block) {
         const showing = (block?.rows || []).length;
+        const from = Number(block?.from ?? 0);
+
+        // On any page past the first the rows are a window into the middle of the
+        // result set, so a bare count would claim they are the leading N.
+        const label = from > 1 && showing > 0
+            ? `${from}-${from + showing - 1}`
+            : String(showing);
 
         return blockFooterTemplate
-            .replace(':showing', String(showing))
+            .replace(':showing', label)
             .replace(':total', String(block?.total ?? showing));
     },
 
@@ -684,9 +700,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     isSafeUrl(url) {
         if (typeof url !== 'string' || url === '') return false;
-        // Root-relative ("/app/...") URLs are same-origin and safe; reject the
-        // protocol-relative "//host" form which would point off-origin.
-        if (url.startsWith('//')) return false;
+        // Root-relative ("/app/...") URLs are same-origin and safe. Both off-origin
+        // authority forms are rejected: per the URL spec a special scheme treats "\\"
+        // like "/" in path-or-authority state, so "/\\evil.com" resolves to
+        // https://evil.com/ and must not take the same-origin fast path.
+        if (url.startsWith('//') || url.startsWith('/\\')) return false;
         if (url.startsWith('/')) return true;
         try {
             const parsed = new URL(url, window.location.origin);

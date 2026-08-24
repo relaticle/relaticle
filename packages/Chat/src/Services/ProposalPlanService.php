@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -120,23 +119,30 @@ final readonly class ProposalPlanService
      * and undoing the earlier ones would be a second set of writes the user never
      * approved.
      *
-     * @return array{approved: int, failed: array{step: int, message: string}|null, records: list<array<string, mixed>>}
+     * @return array{approved: int, failed: array{step: int, message: string}|null}
      */
     public function approveAll(PendingAction $action, User $user): array
     {
         $approved = 0;
-        $records = [];
         $steps = $this->steps($action);
 
-        foreach ($steps as $index => $step) {
+        // Counted over the steps actually attempted, i.e. the still-pending ones, which
+        // is the same basis the card numbers its rail on. Counting over every proposal
+        // of the turn made "Step 3 could not be completed" appear on a card whose steps
+        // were labelled 1 and 2 once an earlier step had been approved on its own.
+        $position = 0;
+
+        foreach ($steps as $step) {
             $step->refresh();
 
             if ($step->status !== PendingActionStatus::Pending) {
                 continue;
             }
 
+            $position++;
+
             try {
-                $records = [...$records, ...$this->approveStep($step, $user)];
+                $this->approveStep($step, $user);
             } catch (QueryException $exception) {
                 // Must precede the RuntimeException arm: QueryException extends
                 // PDOException extends RuntimeException, so without this the driver
@@ -146,21 +152,19 @@ final readonly class ProposalPlanService
 
                 return [
                     'approved' => $approved,
-                    'failed' => ['step' => $index + 1, 'message' => $this->databaseFailureMessage($exception)],
-                    'records' => $records,
+                    'failed' => ['step' => $position, 'message' => $this->databaseFailureMessage($exception)],
                 ];
             } catch (RuntimeException $exception) {
                 return [
                     'approved' => $approved,
-                    'failed' => ['step' => $index + 1, 'message' => $exception->getMessage()],
-                    'records' => $records,
+                    'failed' => ['step' => $position, 'message' => $exception->getMessage()],
                 ];
             }
 
             $approved++;
         }
 
-        return ['approved' => $approved, 'failed' => null, 'records' => $records];
+        return ['approved' => $approved, 'failed' => null];
     }
 
     /**
@@ -193,43 +197,20 @@ final readonly class ProposalPlanService
      * Approve a single step. A step is the unit the card presents, so a step that
      * proposes several records of one type approves all of them: leaving half a
      * step done would be a state the card cannot describe.
-     *
-     * @return list<array<string, mixed>>
      */
-    public function approveStep(PendingAction $step, User $user): array
+    public function approveStep(PendingAction $step, User $user): void
     {
         if (($step->action_data['_batch'] ?? false) !== true) {
-            $resolved = $this->pendingActions->approve($step, $user);
+            $this->pendingActions->approve($step, $user);
 
-            return $this->recordReferences($resolved);
+            return;
         }
 
         $records = is_array($step->action_data['records'] ?? null) ? $step->action_data['records'] : [];
-        $created = [];
 
         foreach (array_keys(array_values($records)) as $index) {
-            $result = $this->pendingActions->approveItem($step->refresh(), $user, $index);
-
-            if ($result['record'] instanceof Model) {
-                $created[] = ['id' => (string) $result['record']->getKey(), 'type' => $step->entity_type];
-            }
+            $this->pendingActions->approveItem($step->refresh(), $user, $index);
         }
-
-        return $created;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function recordReferences(PendingAction $resolved): array
-    {
-        $recordId = is_array($resolved->result_data) ? ($resolved->result_data['id'] ?? null) : null;
-
-        if (! is_string($recordId) && ! is_int($recordId)) {
-            return [];
-        }
-
-        return [['id' => (string) $recordId, 'type' => $resolved->entity_type]];
     }
 
     /**

@@ -39,6 +39,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     // window opens. Cancel drops the auto-resend; the failed bubble stays put
     // with its own resend control.
     rateLimit: null,
+    rateLimitResendTimer: null,
 
     // Documents stashed in Alpine state come back as reactive Proxies, and
     // TipTap's setDocument structuredClones its input — Proxies cannot be
@@ -319,6 +320,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     // 429 handling popped the bubble and a later sendMessage() call minted a
     // fresh one, which could transiently render as a duplicate.
     async resendMessage(msg) {
+        if (this.destroyed) return;
         if (this.isStreaming) return;
         if (this.hasPendingProposal) return;
         if (msg.sendState === 'sending') return;
@@ -347,6 +349,12 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     // generic message otherwise) and marks the user turn failed.
     async failSend(res, userMsg) {
         const body = await res.json().catch(() => ({}));
+
+        // A wire:navigate landing while the request was in flight tears this instance
+        // down. localEditor() resolves by data-chat-context, not by instance, so a dead
+        // component would steal focus into (and write error text against) the newly
+        // mounted one's composer.
+        if (this.destroyed) return;
 
         if (res.status === 429 && body?.error === 'rate_limited') {
             this.handleSendRateLimit(userMsg, body);
@@ -496,8 +504,8 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         try {
             if (!this.channel) {
                 await this.subscribeToConversation(this.conversationId);
-            } else if (this.channel.readyPromise) {
-                await this.channel.readyPromise;
+            } else if (this.channelReady) {
+                await this.channelReady;
             }
 
             this.mintAssistantStub();
@@ -647,13 +655,20 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             // setTimeout, NOT $nextTick: an exception in any effect sharing
             // Alpine's flush queue (e.g. the banner tearing down) would drop a
             // queued nextTick callback — observed live. A macrotask is isolated.
-            setTimeout(() => this.resendMessage(target), 50);
+            this.rateLimitResendTimer = setTimeout(() => this.resendMessage(target), 50);
         }, 1000);
     },
 
     clearRateLimit() {
         if (this.rateLimit?.timerId) {
             clearInterval(this.rateLimit.timerId);
+        }
+        // The macrotask above outlives the interval, so destroy() could only clear the
+        // countdown and not the pending resend: a teardown inside that 50ms window
+        // POSTed a send for a conversation the user had already left.
+        if (this.rateLimitResendTimer) {
+            clearTimeout(this.rateLimitResendTimer);
+            this.rateLimitResendTimer = null;
         }
         this.rateLimit = null;
     },

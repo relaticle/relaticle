@@ -9,7 +9,7 @@
      Surface: the solid data-block tier (see _block-records-table). --}}
 <div
     :data-block="block.block"
-    class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
+    class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]"
 >
     <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
         {{-- Only when the heading is plain text: a linked heading renders as a chip,

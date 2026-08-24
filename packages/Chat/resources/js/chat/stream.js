@@ -6,6 +6,12 @@
 // an object spread.
 export const streamModule = ({ texts = {} } = {}) => ({
     channel: null,
+    // Per-instance view of the shared (memoised) Echo channel. Never written onto the
+    // channel object itself: siblings on the same conversation share one.
+    channelName: null,
+    channelConversationId: null,
+    channelReady: null,
+    channelSubscribed: false,
     streamTimeoutId: null,
     // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
     // same pattern voice.js uses); the defaults keep the module standalone.
@@ -122,25 +128,51 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     unsubscribe() {
-        if (this.channel && window.Echo) {
-            window.Echo.leave(this.channel.name);
-            this.channel = null;
+        if (!this.channel || !window.Echo) return;
+
+        // laravel-echo memoises channels by name, so the full-page and side-panel
+        // instances on the same conversation hold ONE object. A bare Echo.leave() here
+        // therefore killed the sibling's subscription too, and its own this.channel
+        // stayed non-null, so the early return below made its next subscribe a no-op
+        // and the turn streamed nothing until the watchdog fired. Refcount the name and
+        // only leave on the last release.
+        const refs = (window.__chatChannelRefs ??= new Map());
+        const name = this.channelName;
+        const next = (refs.get(name) ?? 1) - 1;
+
+        if (next <= 0) {
+            refs.delete(name);
+            window.Echo.leave(name);
+        } else {
+            refs.set(name, next);
         }
+
+        this.channel = null;
+        this.channelName = null;
+        this.channelConversationId = null;
+        this.channelReady = null;
+        this.channelSubscribed = false;
     },
 
     subscribeToConversation(conversationId) {
         if (!window.Echo) return Promise.resolve();
-        if (this.channel && this.channel.conversationId === conversationId) {
-            return this.channel.subscribed ? Promise.resolve() : (this.channel.readyPromise || Promise.resolve());
+        // Read from the component, not the shared channel object: two instances writing
+        // their own name/conversationId/subscribed onto one memoised channel clobbered
+        // each other's view of what they were subscribed to.
+        if (this.channel && this.channelConversationId === conversationId) {
+            return this.channelSubscribed ? Promise.resolve() : (this.channelReady || Promise.resolve());
         }
 
         this.unsubscribe();
 
         const channelName = `chat.conversation.${conversationId}`;
+        const refs = (window.__chatChannelRefs ??= new Map());
+        refs.set(channelName, (refs.get(channelName) ?? 0) + 1);
+
         this.channel = window.Echo.private(channelName);
-        this.channel.name = channelName;
-        this.channel.conversationId = conversationId;
-        this.channel.subscribed = false;
+        this.channelName = channelName;
+        this.channelConversationId = conversationId;
+        this.channelSubscribed = false;
 
         const readyPromise = new Promise((resolve) => {
             const pusherChannel = this.channel.subscription ?? this.channel;
@@ -148,7 +180,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
             const finish = (confirmed) => {
                 if (settled) return;
                 settled = true;
-                this.channel.subscribed = confirmed;
+                this.channelSubscribed = confirmed;
                 resolve(confirmed);
             };
             if (typeof pusherChannel.bind === 'function') {
@@ -163,7 +195,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
             }
         });
 
-        this.channel.readyPromise = readyPromise;
+        this.channelReady = readyPromise;
 
         this.channel
             .listen('.stream_start', (e) => this.handleStreamStart(e))
@@ -183,6 +215,11 @@ export const streamModule = ({ texts = {} } = {}) => ({
     },
 
     handleFollowUps(event) {
+        // Same guard handleConversationTitle applies: a cache-first switch repaints the
+        // transcript without unsubscribing, so a turn finishing for the conversation the
+        // user just left would otherwise hang its chips on the newly painted one.
+        if (event?.conversationId && this.conversationId && event.conversationId !== this.conversationId) return;
+
         const chips = Array.isArray(event?.chips) ? event.chips.slice(0, 3) : [];
         // Chips belong to the turn that just COMPLETED. If a queued send
         // already minted a fresh stub, the last assistant bubble is the wrong

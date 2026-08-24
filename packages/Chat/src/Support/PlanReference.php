@@ -12,7 +12,7 @@ namespace Relaticle\Chat\Support;
  * real id: the company is still an unapproved proposal. It holds
  * `$ref:<pending_action_id>` instead, which is resolved to the created record's
  * id at execution time (PlanReferenceResolver) and to the proposed record's name
- * at display time (PlanReferenceDisplay).
+ * at display time (RecordNameResolver).
  */
 final readonly class PlanReference
 {

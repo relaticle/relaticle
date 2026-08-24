@@ -14,6 +14,6 @@
 
      Surface: the solid data-block tier (crisp hairline card, no shadow),
      matching the docked card and the read-result blocks. --}}
-<div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
+<div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
     @include('chat::livewire.chat.partials._proposal-card-body')
 </div>

@@ -45,6 +45,11 @@
     --surface-card-bg: rgb(249 250 251 / 0.8);            /* gray-50/80 */
     --surface-card-border: rgb(229 231 235 / 0.8);        /* gray-200/80 */
     --surface-canvas-bg: rgb(249 250 251 / 0.6);          /* chat canvas wash: lifts solid blocks off the page */
+    /* Solid data-block tier: proposal cards and rendered read-tool blocks. Kept
+       deliberately distinct from the translucent card/pill tier above, and named
+       so the six partials that use it can be retuned in one place. */
+    --surface-block-bg: rgb(255 255 255);                 /* white */
+    --surface-block-border: rgb(229 231 235);             /* gray-200 */
     --surface-shell-bg: rgb(249 250 251 / 0.6);           /* gray-50/60 */
     --surface-shell-divider: rgb(229 231 235 / 0.6);      /* gray-200/60 */
     --surface-input-bg: rgb(249 250 251 / 0.8);           /* gray-50/80 */
@@ -54,6 +59,8 @@
 .dark {
     --surface-card-bg: rgb(255 255 255 / 0.02);
     --surface-canvas-bg: transparent;                      /* dark canvas: blocks lift on gray-900 already */
+    --surface-block-bg: rgb(17 24 39);                     /* gray-900 */
+    --surface-block-border: rgb(255 255 255 / 0.1);        /* white/10 */
     --surface-card-border: rgb(255 255 255 / 0.06);
     --surface-shell-bg: rgb(255 255 255 / 0.015);
     --surface-shell-divider: rgb(255 255 255 / 0.06);

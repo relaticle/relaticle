@@ -88,7 +88,6 @@ arch('avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
-        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
@@ -133,7 +132,6 @@ arch('avoid inheritance')
     ->classes()
     ->toExtendNothing()
     ->ignoring([
-        'App\Ai',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',

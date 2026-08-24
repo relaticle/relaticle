@@ -477,8 +477,8 @@ final readonly class ListActivityTool implements Tool
         return match ($entry['event']) {
             // A creation logs every initial value and a deletion logs none, so
             // neither reads as a diff. The record column already names them.
-            'created' => 'Created',
-            'deleted' => 'Deleted',
+            'created' => __('Created'),
+            'deleted' => __('Deleted'),
             default => Str::limit(implode('; ', array_map(
                 static fn (array $change): string => sprintf(
                     '%s: %s → %s',

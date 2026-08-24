@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\CustomField;
 use App\Models\Team;
+use Relaticle\Chat\Support\PromptText;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -57,8 +58,13 @@ final readonly class CustomFieldsSchemaDescriber
         $base = "{$field->code} (".$this->humanType($dataType, $field->type);
 
         if ($dataType?->isChoiceField() && $field->options->isNotEmpty()) {
+            // Option names are tenant-authored free text and land inside the tool
+            // definition, which is the one prompt region NOT wrapped in the untrusted-data
+            // framing the system prompt applies. Newlines and quotes would let a label
+            // forge extra schema lines, so they go through the same sanitizer every
+            // label in the system prompt already uses.
             $labels = $field->options
-                ->map(fn (CustomFieldOption $opt): string => '"'.$opt->name.'"')
+                ->map(fn (CustomFieldOption $opt): string => '"'.PromptText::sanitize($opt->name, 120).'"')
                 ->implode(', ');
             $base .= ", one of: {$labels}";
         }

@@ -18,7 +18,7 @@
         {{-- Surface: the solid data-block tier (crisp hairline card, no shadow)
              shared with the read-result blocks, so a proposal reads as the same
              kind of object as the data around it. --}}
-        <div class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
+        <div class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
             @if ($isPlan)
                 {{-- Plan header: the card is one decision over several writes, so it
                      says how many and in what order they run. --}}

@@ -54,8 +54,10 @@ trait ResolvesEntitySchema
         $result = [];
 
         foreach ($fields as $field) {
-            $required = ($field->validation_rules ?? collect())
-                ->contains('name', 'required');
+            // validation_rules is cast to a key-value collection (['required' => true]),
+            // so contains('name', 'required') did data_get(true, 'name') and was always
+            // false: the schema told every agent no custom field was ever required.
+            $required = (bool) ($field->validation_rules?->get('required', false));
 
             $entry = [
                 'name' => $field->name,

@@ -101,7 +101,19 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
             }
 
             const chunks = [];
-            const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
+            let recorder;
+            try {
+                // isTypeSupported above validates the mimeType but not its pairing with
+                // the bitrate, so this can still throw. Nothing references the live
+                // stream at that point (onstop is not wired and this._recorder is null),
+                // which would leave the mic open and the recording indicator lit until
+                // the page closed.
+                recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
+            } catch {
+                stream.getTracks().forEach((track) => track.stop());
+                this.voiceError = failedText;
+                return;
+            }
 
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) chunks.push(event.data);
@@ -123,7 +135,19 @@ export function voiceRecorder({ transcribeUrl, unsupportedText, deniedText, fail
             this._recorder = recorder;
             this.recording = true;
             this.recordingSeconds = 0;
-            recorder.start();
+
+            try {
+                recorder.start();
+            } catch {
+                // recording was already true, so without this the button stays stuck in
+                // its recording state and the next toggle calls stop() on a recorder
+                // that never started.
+                stream.getTracks().forEach((track) => track.stop());
+                this._recorder = null;
+                this.recording = false;
+                this.voiceError = failedText;
+                return;
+            }
 
             this._elapsedTimer = setInterval(() => { this.recordingSeconds++; }, 1000);
             this._stopTimer = setTimeout(() => this._recorder?.stop(), MAX_RECORDING_MS);

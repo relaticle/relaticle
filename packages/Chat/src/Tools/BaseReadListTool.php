@@ -455,8 +455,15 @@ abstract class BaseReadListTool implements Tool
 
         // The core column always survives the cap, so the promoted half is
         // trimmed first and the derived half fills whatever is left.
-        $promoted = array_slice($promoted, 0, self::BLOCK_COLUMN_LIMIT - 1);
-        $derived = array_slice($derived, 0, self::BLOCK_COLUMN_LIMIT - 1 - count($promoted));
+        // Include (chip) columns count against the same budget as the field columns:
+        // they were previously spread in unbounded, so a tool allowing four includes
+        // could emit ten columns in a chat bubble the constant exists to keep narrow.
+        $includeBudget = min(count($includes), max(0, self::BLOCK_COLUMN_LIMIT - 1));
+        $fieldBudget = max(0, self::BLOCK_COLUMN_LIMIT - 1 - $includeBudget);
+
+        $promoted = array_slice($promoted, 0, $fieldBudget);
+        $derived = array_slice($derived, 0, $fieldBudget - count($promoted));
+        $includes = array_slice($includes, 0, $includeBudget);
 
         return [
             'block' => 'records_table',
@@ -474,6 +481,9 @@ abstract class BaseReadListTool implements Tool
             ],
             'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey, $includes),
             'total' => $results->total(),
+            // The rows are this PAGE's first ten, not the result set's. Without the
+            // offset the footer renders "Showing 10 of 200" over records 101-110.
+            'from' => $results->firstItem() ?? 0,
         ];
     }
 

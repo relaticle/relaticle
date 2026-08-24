@@ -170,9 +170,9 @@ abstract class BaseWriteDeleteTool implements Tool
             $name = (string) $models->first()->{$this->nameAttribute()};
 
             return [
-                'title' => "Delete {$this->entityLabel()}",
-                'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
-                'fields' => [['label' => 'Name', 'value' => $name]],
+                'title' => __('Delete :entity', ['entity' => $this->entityLabel()]),
+                'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                'fields' => [['label' => __('Name'), 'value' => $name]],
             ];
         }
 
@@ -181,8 +181,8 @@ abstract class BaseWriteDeleteTool implements Tool
                 $name = (string) $model->{$this->nameAttribute()};
 
                 return [
-                    'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
-                    'fields' => [['label' => 'Name', 'value' => $name]],
+                    'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                    'fields' => [['label' => __('Name'), 'value' => $name]],
                 ];
             })
             ->all();
@@ -190,8 +190,11 @@ abstract class BaseWriteDeleteTool implements Tool
         $titleNoun = Str::plural(Str::headline($this->entityLabel()), $count);
 
         return [
-            'title' => "Delete {$count} {$titleNoun}",
-            'summary' => sprintf('Delete %d %s', $count, Str::plural(strtolower($this->entityLabel()), $count)),
+            'title' => __('Delete :count :entities', ['count' => $count, 'entities' => $titleNoun]),
+            'summary' => __('Delete :count :entities', [
+                'count' => $count,
+                'entities' => Str::plural(strtolower($this->entityLabel()), $count),
+            ]),
             'items' => $items,
         ];
     }
