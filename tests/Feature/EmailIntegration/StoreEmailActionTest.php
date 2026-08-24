@@ -18,7 +18,6 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
-use RuntimeException;
 
 mutates(StoreEmailAction::class);
 
