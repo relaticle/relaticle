@@ -192,6 +192,10 @@ final class ProcessChatMessage implements ShouldQueue
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
+            // The job returns normally from here, so a breadcrumb alone would never
+            // reach Sentry: breadcrumbs only ship attached to a captured event. Without
+            // report() a broken deploy fails every turn for every tenant in silence.
+            report($e);
             ChatTelemetry::breadcrumb('stream.pre_model_failed', ['exception' => $e->getMessage()]);
             $this->broadcastSafely(new ChatStreamFailed(
                 conversationId: $this->conversationId,
@@ -456,6 +460,7 @@ final class ProcessChatMessage implements ShouldQueue
         try {
             $this->persistFailedTurn($exception);
         } catch (Throwable $e) {
+            report($e);
             ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
         }
 
@@ -801,6 +806,8 @@ final class ProcessChatMessage implements ShouldQueue
         try {
             broadcast($event);
         } catch (Throwable $e) {
+            // A Reverb outage drops every stream event and is otherwise invisible.
+            report($e);
             ChatTelemetry::breadcrumb('broadcast.dropped', ['event' => $event::class, 'reason' => $e->getMessage()]);
         }
     }

@@ -10,6 +10,7 @@ use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -439,4 +440,36 @@ it('refunds the reservation when the job dies before it ever runs', function ():
 
     expect($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);
+});
+
+it('reports a pre-model failure to the exception handler instead of only a breadcrumb', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    // Break agent construction the way a bad deploy would.
+    app()->bind(CrmAssistant::class, function (): never {
+        throw new RuntimeException('agent construction exploded');
+    });
+
+    Exceptions::fake();
+
+    $job = new ProcessChatMessage(
+        user: $user,
+        team: $team,
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+    );
+
+    $job->handle(resolve(CreditService::class));
+
+    Exceptions::assertReported(RuntimeException::class);
 });
