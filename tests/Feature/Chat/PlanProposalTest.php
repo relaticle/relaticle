@@ -292,3 +292,25 @@ describe('reference validation', function (): void {
             ->and(PendingAction::query()->where('entity_type', 'company')->count())->toBe(2);
     });
 });
+
+it('does not surface driver detail when a plan step hits a database error', function (): void {
+    ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+        'records' => [['name' => 'Acme Robotics']],
+    ]));
+
+    $step = ($this->proposalFor)('company');
+
+    // A real driver error, not a stubbed one: companies.name is varchar(255), so
+    // this insert fails inside the approval transaction with SQLSTATE 22001 and a
+    // message carrying the SQL, the bound value and the connection name.
+    $secret = str_repeat('SecretCorp', 40);
+    $step->update(['action_data' => [...$step->action_data, 'name' => $secret]]);
+
+    $result = resolve(ProposalPlanService::class)->approveAll($step->fresh(), $this->user);
+
+    expect($result['failed'])->not->toBeNull()
+        ->and($result['failed']['message'])->not->toContain('insert into')
+        ->and($result['failed']['message'])->not->toContain($secret)
+        ->and($result['failed']['message'])->not->toContain('SQLSTATE')
+        ->and($result['failed']['message'])->not->toContain('pgsql');
+});

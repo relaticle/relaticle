@@ -710,6 +710,10 @@ final class ProposalCard extends BaseLivewireComponent
 
         try {
             $cancelled = $plan->reject($step);
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($step, $exception);
+
+            return;
         } catch (RuntimeException $exception) {
             $this->reportResolveFailure($step, $exception->getMessage());
 
@@ -743,6 +747,10 @@ final class ProposalCard extends BaseLivewireComponent
 
             try {
                 $plan->reject($fresh);
+            } catch (QueryException $exception) {
+                $this->reportDatabaseFailure($fresh, $exception);
+
+                return;
             } catch (RuntimeException $exception) {
                 $this->reportResolveFailure($fresh, $exception->getMessage());
 

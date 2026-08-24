@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Services;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PlanReference;
@@ -136,6 +137,18 @@ final readonly class ProposalPlanService
 
             try {
                 $records = [...$records, ...$this->approveStep($step, $user)];
+            } catch (QueryException $exception) {
+                // Must precede the RuntimeException arm: QueryException extends
+                // PDOException extends RuntimeException, so without this the driver
+                // message (the SQL, its bindings and the connection) is what the card
+                // renders.
+                report($exception);
+
+                return [
+                    'approved' => $approved,
+                    'failed' => ['step' => $index + 1, 'message' => $this->databaseFailureMessage($exception)],
+                    'records' => $records,
+                ];
             } catch (RuntimeException $exception) {
                 return [
                     'approved' => $approved,
@@ -148,6 +161,18 @@ final readonly class ProposalPlanService
         }
 
         return ['approved' => $approved, 'failed' => null, 'records' => $records];
+    }
+
+    /**
+     * The user-facing stand-in for a driver error. Mirrors what
+     * ProposalCard::reportDatabaseFailure() renders for a single proposal, so the
+     * plan path and the single-proposal path say the same thing.
+     */
+    public function databaseFailureMessage(QueryException $exception): string
+    {
+        return $exception->getCode() === '23505'
+            ? __('Someone else just made a conflicting change. Reload the page and try again.')
+            : __('This change could not be saved. Please try again.');
     }
 
     /**
