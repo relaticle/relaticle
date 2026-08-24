@@ -33,9 +33,16 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
 
     /**
      * Authorize that the user can remove the team member.
+     *
+     * The self-removal branch below is what lets someone leave a team without
+     * holding the removeTeamMember permission, so it has to be paired with the
+     * membership check: on its own it authorizes against *any* team, and the
+     * removal notification then names a workspace the caller was never part of.
      */
     private function authorize(User $user, Team $team, User $teamMember): void
     {
+        throw_unless($teamMember->belongsToTeam($team), AuthorizationException::class);
+
         throw_if(! Gate::forUser($user)->check('removeTeamMember', $team) &&
             $user->id !== $teamMember->id, AuthorizationException::class);
     }
