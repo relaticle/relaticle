@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
@@ -116,8 +117,31 @@ final class ActivationChecklist extends Component
             ActivationStep::FirstRecord => PeopleResource::getUrl('index'),
             ActivationStep::Import => ImportPeople::getUrl(),
             ActivationStep::Invite => Members::getUrl(),
-            ActivationStep::AskRela => ChatConversation::getUrl(),
+            ActivationStep::AskRela => $this->askRelaUrl(),
         };
+    }
+
+    /**
+     * Links straight to Rela's seeded welcome conversation when one exists,
+     * so the step opens onto the guided setup message rather than a blank
+     * composer. Falls back to the generic chat page for a workspace created
+     * before this shipped, or whose welcome job never ran.
+     */
+    private function askRelaUrl(): string
+    {
+        $team = $this->team();
+
+        $conversationId = $team instanceof Team
+            ? DB::table('agent_conversation_messages as m')
+                ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
+                ->where('c.team_id', $team->getKey())
+                ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
+                ->value('m.conversation_id')
+            : null;
+
+        return is_string($conversationId)
+            ? ChatConversation::getUrl(['conversationId' => $conversationId])
+            : ChatConversation::getUrl();
     }
 
     #[Computed]

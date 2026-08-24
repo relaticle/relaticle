@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Enums\CreationSource;
 use App\Enums\TeamRole;
+use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Livewire\App\Onboarding\ActivationChecklist;
 use App\Models\People;
@@ -232,12 +233,83 @@ it('answers all four steps without repeating a query', function (): void {
 
     $log = collect(DB::getQueryLog())->map(fn (array $entry): string => (string) $entry['query']);
 
+    // Two `agent_conversations`-joining queries are expected: one answers the
+    // ask_rela fact (hasUserChatMessage), the other resolves the step's deep
+    // link to Rela's seeded welcome conversation (askRelaUrl). Neither repeats.
     expect($log->filter(fn (string $sql): bool => str_contains($sql, 'creation_source')))->toHaveCount(1)
-        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(1)
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(2)
         ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'team_invitations')))->toHaveCount(1);
 });
 
 it('renders on the dashboard', function (): void {
     livewire(Dashboard::class)
         ->assertSeeHtml('data-testid="activation-step"');
+});
+
+it('links the ask_rela step to the seeded welcome conversation when one exists', function (): void {
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'team_id' => $this->team->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'title' => __('chat-welcome.title'),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'assistant',
+        'content' => 'Welcome!',
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => json_encode(['welcome' => true]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml('href="'.ChatConversation::getUrl(['conversationId' => $conversationId]).'"');
+});
+
+it('falls back to the generic chat page for ask_rela when no welcome conversation exists', function (): void {
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'team_id' => $this->team->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'title' => 'Pipeline check',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'user',
+        'content' => 'hi',
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml('href="'.ChatConversation::getUrl().'"');
 });
