@@ -13,9 +13,20 @@ on:
   release:
     types: [published]
 
+env:
+  # Pinned, not `latest`: this job holds the DNS key for the whole
+  # com.relaticle/crm namespace, and `latest` would hand any upstream release
+  # (or a swapped asset) arbitrary code next to that key. To bump, set both
+  # lines together:
+  #   gh release download <tag> -R modelcontextprotocol/registry \
+  #     -p mcp-publisher_linux_amd64.tar.gz -O - | shasum -a 256
+  MCP_PUBLISHER_VERSION: v1.8.1
+  MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+
 jobs:
   publish:
-    if: github.repository == 'relaticle/relaticle'
+    # A pre-release must not become the listing every MCP client discovers.
+    if: ${{ github.repository == 'relaticle/relaticle' && !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     environment: mcp-registry-publish
     permissions:
@@ -26,20 +37,36 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install mcp-publisher
+        shell: bash
         run: |
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          set -euo pipefail
+          asset="mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL -o "$asset" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${asset}"
+          echo "${MCP_PUBLISHER_SHA256}  ${asset}" | sha256sum --check --strict -
+          tar xzf "$asset" mcp-publisher
 
       - name: Set version from release tag
+        shell: bash
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
+          set -euo pipefail
           VERSION="${TAG_NAME#v}"
           jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
-          jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+")' server.json > /dev/null
+          # Anchored at both ends: an unanchored pattern matches the prefix of
+          # 3.5.0-rc.1 and would publish a candidate as the live version.
+          jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")' server.json > /dev/null
           echo "Publishing version ${VERSION}"
 
       - name: Authenticate to MCP Registry
-        run: ./mcp-publisher login dns --domain relaticle.com --private-key "${{ secrets.MCP_PRIVATE_KEY }}"
+        shell: bash
+        env:
+          # Via env, not the command line: an argv secret is readable by any
+          # co-resident process and lands in the runner's generated script.
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: ./mcp-publisher login dns --domain relaticle.com --private-key "$MCP_PRIVATE_KEY"
 
       - name: Publish to MCP Registry
+        shell: bash
         run: ./mcp-publisher publish
