@@ -7,10 +7,8 @@ namespace Relaticle\Chat\Tools\Opportunity;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class CreateOpportunityTool extends BaseWriteCreateTool
@@ -67,14 +65,14 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
 
         $companyId = $record['company_id'] ?? null;
         $companyId = is_string($companyId) && $companyId !== '' ? $companyId : null;
-        $companyName = $this->nameForId($companyId, Company::class, 'name', $team);
+        $companyName = $this->recordNames()->name($companyId, Company::class, $team);
         if ($companyName !== '') {
             $fields[] = ['label' => 'Company', 'value' => $companyName];
         }
 
         $contactId = $record['contact_id'] ?? null;
         $contactId = is_string($contactId) && $contactId !== '' ? $contactId : null;
-        $contactName = $this->nameForId($contactId, People::class, 'name', $team);
+        $contactName = $this->recordNames()->name($contactId, People::class, $team);
         if ($contactName !== '') {
             $fields[] = ['label' => 'Contact', 'value' => $contactName];
         }
@@ -84,22 +82,5 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
             'summary' => "Create opportunity \"{$name}\"",
             'fields' => $fields,
         ];
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function nameForId(?string $id, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($id === null) {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
     }
 }

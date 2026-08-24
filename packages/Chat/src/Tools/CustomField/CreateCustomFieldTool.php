@@ -122,11 +122,13 @@ final class CreateCustomFieldTool implements Tool
             entityType: 'custom_field',
             actionData: $actionData,
             displayData: $displayData,
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => 'CreateCustomField',
             'entity_type' => 'custom_field',
             'operation' => 'create',

@@ -89,6 +89,7 @@ final readonly class PendingActionService
         array $actionData,
         array $displayData,
         ?string $messageId = null,
+        ?string $turnId = null,
     ): PendingAction {
         $expiryMinutes = (int) config('chat.pending_action_expiry_minutes', 15);
 
@@ -124,6 +125,7 @@ final readonly class PendingActionService
             'team_id' => $user->currentTeam->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => $conversationId,
+            'turn_id' => $turnId,
             'message_id' => $messageId,
             'action_class' => $actionClass,
             'operation' => $operation,
@@ -203,6 +205,38 @@ final readonly class PendingActionService
             $locked->update([
                 'status' => PendingActionStatus::Rejected,
                 'resolved_at' => now(),
+            ]);
+
+            return $locked->refresh();
+        });
+
+        $this->broadcastResolution($resolved, PendingActionStatus::Rejected->value, null, true);
+
+        return $resolved;
+    }
+
+    /**
+     * Cancel a step because a step it depends on was rejected. Rejected, not
+     * superseded: the user's decision caused it, and the card says which step it
+     * followed so the outcome never reads as unexplained.
+     */
+    public function cancelStep(PendingAction $pendingAction, string $causedByPendingActionId): PendingAction
+    {
+        $resolved = DB::transaction(function () use ($pendingAction, $causedByPendingActionId): PendingAction {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()
+                ->lockForUpdate()
+                ->findOrFail($pendingAction->getKey());
+
+            $this->validateResolvable($locked);
+
+            $locked->update([
+                'status' => PendingActionStatus::Rejected,
+                'resolved_at' => now(),
+                'result_data' => [
+                    ...(is_array($locked->result_data) ? $locked->result_data : []),
+                    'cancelled_by' => $causedByPendingActionId,
+                ],
             ]);
 
             return $locked->refresh();
@@ -419,6 +453,8 @@ final readonly class PendingActionService
 
             return $model;
         }
+
+        $record = $this->resolvePlanReferences($record, $pendingAction);
 
         if ($pendingAction->operation === PendingActionOperation::Update) {
             $model = $this->resolveModel($this->resolveModelClass($record), $pendingAction, $record['_record_id'] ?? null);
@@ -757,6 +793,19 @@ final readonly class PendingActionService
         throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
     }
 
+    /**
+     * Swap every `$ref:<pending_action_id>` for the id its step created. Runs inside
+     * the approving transaction, so a dependency approved a moment earlier is
+     * already visible here.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    private function resolvePlanReferences(array $data, PendingAction $pendingAction): array
+    {
+        return resolve(PlanReferenceResolver::class)->resolve($data, $pendingAction);
+    }
+
     private function executeAction(PendingAction $pendingAction, User $user): mixed
     {
         $actionClass = $pendingAction->action_class;
@@ -783,12 +832,12 @@ final readonly class PendingActionService
         }
 
         /** @var Model */
-        return $action->execute($user, $pendingAction->action_data, CreationSource::CHAT);
+        return $action->execute($user, $this->resolvePlanReferences($pendingAction->action_data, $pendingAction), CreationSource::CHAT);
     }
 
     private function executeUpdate(object $action, User $user, PendingAction $pendingAction): mixed
     {
-        $data = $pendingAction->action_data;
+        $data = $this->resolvePlanReferences($pendingAction->action_data, $pendingAction);
         $modelClass = $this->resolveModelClass($data);
 
         unset($data['_record_id'], $data['_model_class']);

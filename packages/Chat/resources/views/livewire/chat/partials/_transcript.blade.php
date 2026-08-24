@@ -496,23 +496,47 @@
                      input area). A fully-unresolved proposal is dock-only. --}}
                 <template x-if="msg.pending_actions && msg.pending_actions.length > 0">
                     <div class="mt-3 space-y-3">
-                        <template x-for="action in msg.pending_actions" :key="action.pending_action_id">
+                        <template x-for="group in proposalGroups(msg)" :key="group.key">
                             <div class="space-y-2">
-                                <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
-                                    @include('chat::livewire.chat.partials._proposal-card')
+                                {{-- A plan: one card for the whole decision, its steps in order. --}}
+                                <template x-if="isPlanGroup(group)">
+                                    <div class="space-y-2">
+                                        <template x-if="group.actions.some((a) => a.status !== 'pending')">
+                                            @include('chat::livewire.chat.partials._proposal-plan-card')
+                                        </template>
+
+                                        <template x-if="planOutcome(group)">
+                                            <div class="flex justify-start">
+                                                <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
+                                                    <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
+                                                    <span x-text="planOutcome(group)"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
                                 </template>
 
-                                {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
-                                     derived from the persisted action by proposalOutcome(), not a stored message. --}}
-                                {{-- Flat status line, matching the flattened assistant text
-                                     it follows; the sparkles icon marks it as the agent's note. --}}
-                                <template x-if="action.status !== 'pending' && proposalOutcome(action)">
-                                    <div class="flex justify-start">
-                                        <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
-                                            <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
-                                            <span x-text="proposalOutcome(action)"></span>
+                                <template x-if="!isPlanGroup(group)">
+                                    <template x-for="action in group.actions" :key="action.pending_action_id">
+                                        <div class="space-y-2">
+                                            <template x-if="action.status !== 'pending' || (action.itemResults && Object.keys(action.itemResults).length > 0)">
+                                                @include('chat::livewire.chat.partials._proposal-card')
+                                            </template>
+
+                                            {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
+                                                 derived from the persisted action by proposalOutcome(), not a stored message. --}}
+                                            {{-- Flat status line, matching the flattened assistant text
+                                                 it follows; the sparkles icon marks it as the agent's note. --}}
+                                            <template x-if="action.status !== 'pending' && proposalOutcome(action)">
+                                                <div class="flex justify-start">
+                                                    <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
+                                                        <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
+                                                        <span x-text="proposalOutcome(action)"></span>
+                                                    </div>
+                                                </div>
+                                            </template>
                                         </div>
-                                    </div>
+                                    </template>
                                 </template>
                             </div>
                         </template>

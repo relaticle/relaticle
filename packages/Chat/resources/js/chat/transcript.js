@@ -132,9 +132,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     _daySeparatorEls: null,
     _unwatchDaySeparatorCount: null,
 
-    // Bridge state for the docked livewire proposal-card. _lastActiveProposalId
-    // dedupes proposal:set-active dispatches.
+    // Bridge state for the docked livewire proposal-card. The signature of the
+    // whole pending set dedupes proposal:set-active dispatches, so a plan that
+    // gains a step mid-stream still re-docks (see syncActiveProposal).
     _lastActiveProposalId: null,
+    _lastActiveProposalSignature: null,
 
     // Conversation switcher overlay (Cmd+O / Ctrl+O, see onChatRootKeydown()).
     // Full-page chat only (see the guard in onChatRootKeydown); the side panel
@@ -735,10 +737,19 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return pending.length > 0 ? pending[0].pending_action_id : null;
     },
 
+    // Keyed on the WHOLE pending set, not just the docked id: a chained turn
+    // streams its steps in one by one, and the dock has to be told about the
+    // later ones — otherwise it keeps rendering the plan as it looked when only
+    // step one existed.
     syncActiveProposal() {
-        const id = this.activePendingActionId();
-        if (id === this._lastActiveProposalId) return;
+        const pending = this.visiblePendingActions();
+        const signature = pending.map((a) => a.pending_action_id).join(',');
+        if (signature === this._lastActiveProposalSignature) return;
+        this._lastActiveProposalSignature = signature;
+
+        const id = pending.length > 0 ? pending[0].pending_action_id : null;
         this._lastActiveProposalId = id;
+
         if (window.Livewire?.dispatch) {
             window.Livewire.dispatch('proposal:set-active', { id, context: this.context });
         }
@@ -1074,6 +1085,88 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                 : this.proposalTexts.proposalDiscarded;
         }
         return null;
+    },
+
+    // Proposals from one assistant turn are ONE decision, so the transcript shows
+    // them as one card in the order they run. A proposal without a turn (anything
+    // written before plans existed) stands alone, which is also the single-write
+    // case.
+    proposalGroups(msg) {
+        const actions = (msg && msg.pending_actions) || [];
+        const groups = [];
+        const byTurn = new Map();
+
+        for (const action of actions) {
+            const turn = action.turn_id || null;
+
+            if (!turn) {
+                groups.push({ key: action.pending_action_id, turnId: null, actions: [action] });
+                continue;
+            }
+
+            if (!byTurn.has(turn)) {
+                const group = { key: turn, turnId: turn, actions: [] };
+                byTurn.set(turn, group);
+                groups.push(group);
+            }
+
+            byTurn.get(turn).actions.push(action);
+        }
+
+        return groups;
+    },
+
+    isPlanGroup(group) {
+        return !!group && Array.isArray(group.actions) && group.actions.length > 1;
+    },
+
+    planGroupResolved(group) {
+        return !!group && group.actions.every((action) => action.status !== 'pending');
+    },
+
+    // One sentence for the whole plan. Steps that share a verb are merged
+    // ("Created A, B and C") rather than repeated once per step, which is how a
+    // person would report having done them.
+    planOutcome(group) {
+        if (!this.planGroupResolved(group)) return null;
+
+        const byVerb = new Map();
+        const discarded = [];
+        const others = [];
+
+        for (const action of group.actions) {
+            const name = action.record?.label
+                || this.extractQuotedName(action.display?.summary);
+            const isSingle = name && !Array.isArray(action.display?.items);
+
+            if (isSingle && action.status === 'approved') {
+                const verb = this.itemVerb(action);
+                if (!byVerb.has(verb)) byVerb.set(verb, []);
+                byVerb.get(verb).push(name);
+                continue;
+            }
+
+            if (isSingle && action.status === 'rejected' && action.operation !== 'delete') {
+                discarded.push(name);
+                continue;
+            }
+
+            const sentence = this.proposalOutcome(action);
+            if (sentence) others.push(sentence);
+        }
+
+        const parts = [...byVerb.entries()].map(([verb, names]) =>
+            this.proposalTexts.outcomeSingle
+                .replace(':verb', verb)
+                .replace(':name', this.joinNames(names)));
+
+        if (discarded.length > 0) {
+            parts.push(this.proposalTexts.discardedName.replace(':name', this.joinNames(discarded)));
+        }
+
+        parts.push(...others);
+
+        return parts.length > 0 ? parts.join(' ') : null;
     },
 
     proposalItemName(item) {

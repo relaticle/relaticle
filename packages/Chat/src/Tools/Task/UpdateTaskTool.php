@@ -9,7 +9,6 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -125,7 +124,7 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
             $fields[] = [
                 'label' => $label,
                 'old' => $this->joinNames(array_values($model->{$relation}()->pluck('name')->all())),
-                'new' => $this->namesForIds($ids, $modelClass, 'name', $scope),
+                'new' => $ids === [] ? __('(none)') : $this->recordNames()->names($ids, $modelClass, $scope),
                 '_oldValue' => array_map(strval(...), $model->{$relation}()->pluck($model->{$relation}()->getRelated()->getQualifiedKeyName())->all()),
                 '_newValue' => $ids,
             ];
@@ -139,6 +138,9 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
     }
 
     /**
+     * A relationship row reads "(none)" when the link list is empty, never as a
+     * blank cell: an emptied relationship is a change worth seeing.
+     *
      * @param  list<mixed>  $names
      */
     private function joinNames(array $names): string
@@ -146,24 +148,5 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
         $names = array_values(array_filter($names, static fn (mixed $name): bool => is_string($name) && $name !== ''));
 
         return $names === [] ? __('(none)') : implode(', ', $names);
-    }
-
-    /**
-     * @param  list<string>  $ids
-     * @param  class-string<Model>  $modelClass
-     */
-    private function namesForIds(array $ids, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($ids === []) {
-            return __('(none)');
-        }
-
-        $instance = new $modelClass;
-        $query = $modelClass::query()->whereIn($instance->getKeyName(), $ids);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return $query->pluck($nameAttribute)->implode(', ');
     }
 }

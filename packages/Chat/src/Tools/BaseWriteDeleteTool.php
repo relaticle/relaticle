@@ -13,10 +13,12 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteDeleteTool implements Tool
 {
+    use LimitsPlanSteps;
     use WithConversationContext;
 
     /** @return class-string<Model> */
@@ -50,6 +52,12 @@ abstract class BaseWriteDeleteTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
+
+        $planLimitError = $this->planStepLimitError();
+
+        if ($planLimitError !== null) {
+            return (string) json_encode(['error' => $planLimitError], JSON_UNESCAPED_SLASHES);
+        }
 
         $requestedIds = $this->requestedIds($request);
 
@@ -89,11 +97,13 @@ abstract class BaseWriteDeleteTool implements Tool
             entityType: $this->entityType(),
             actionData: $this->actionData($deletable),
             displayData: $this->displayData($deletable),
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => class_basename($this->actionClass()),
             'entity_type' => $this->entityType(),
             'operation' => 'delete',

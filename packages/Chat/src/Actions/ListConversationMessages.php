@@ -69,18 +69,19 @@ final readonly class ListConversationMessages
 
         $pendingIds = array_values(array_unique($pendingIds));
 
-        /** @var array<string, array{status: string, entity_type: ?string, result_data: ?array<string, mixed>}> $records */
+        /** @var array<string, array{status: string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}> $records */
         $records = $pendingIds === []
             ? []
             : DB::table('pending_actions')
                 ->whereIn('id', $pendingIds)
                 ->where('user_id', $user->getKey())
                 ->where('team_id', $user->current_team_id)
-                ->get(['id', 'status', 'entity_type', 'result_data'])
+                ->get(['id', 'status', 'entity_type', 'turn_id', 'result_data'])
                 ->keyBy('id')
                 ->map(fn (object $row): array => [
                     'status' => (string) $row->status,
                     'entity_type' => $row->entity_type === null ? null : (string) $row->entity_type,
+                    'turn_id' => $row->turn_id === null ? null : (string) $row->turn_id,
                     'result_data' => $row->result_data === null ? null : (function (mixed $raw): ?array {
                         $decoded = json_decode((string) $raw, true);
 
@@ -181,7 +182,7 @@ final readonly class ListConversationMessages
 
     /**
      * @param  list<array<string, mixed>>  $envelopes
-     * @param  array<string, array{status: string, entity_type: ?string, result_data: ?array<string, mixed>}>  $records
+     * @param  array<string, array{status: string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}>  $records
      * @return array<int, mixed>
      */
     private function extractPendingActions(array $envelopes, array $records): array
@@ -192,6 +193,10 @@ final readonly class ListConversationMessages
             $pendingId = (string) ($inner['pending_action_id'] ?? '');
             $info = $records[$pendingId] ?? null;
             $inner['status'] = $info['status'] ?? 'expired';
+            // The turn groups the proposals of one chained request into a single
+            // plan card; the stored row is authoritative, since a tool result
+            // written before plans existed carries no turn.
+            $inner['turn_id'] = $info['turn_id'] ?? ($inner['turn_id'] ?? null);
 
             $resultData = is_array($info['result_data'] ?? null) ? $info['result_data'] : null;
             $entityType = $info['entity_type'] ?? (isset($inner['entity_type']) ? (string) $inner['entity_type'] : null);
@@ -214,6 +219,12 @@ final readonly class ListConversationMessages
                         $inner['records'] = $refs;
                     }
                 }
+            }
+
+            // A step cancelled because a step it depended on was rejected reads as an
+            // unexplained disappearance unless the card can say why.
+            if (is_string($resultData['cancelled_by'] ?? null)) {
+                $inner['cancelled_by'] = $resultData['cancelled_by'];
             }
 
             $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : null;

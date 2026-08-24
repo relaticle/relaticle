@@ -6,11 +6,13 @@ use App\Enums\CustomFieldType;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -18,7 +20,9 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Data\VisibilityConditionData;
@@ -985,4 +989,142 @@ it('never puts a database error message on the card or in the transcript', funct
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+describe('plan card', function (): void {
+    /**
+     * A chained turn: company, then a person referencing it, then a task
+     * referencing the person. Same shape the assistant produces live.
+     *
+     * @return array{0: PendingAction, 1: PendingAction, 2: PendingAction}
+     */
+    function planCardSteps(User $user): array
+    {
+        $conversationId = '019dfb00-5555-7000-8000-000000000009';
+        $turnId = '01PLANCARDTURNAAAAAAAAAAAA';
+
+        DB::table('agent_conversations')->insert([
+            'id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
+            'team_id' => $user->currentTeam->getKey(),
+            'title' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $tool = function (string $class) use ($conversationId, $turnId) {
+            $instance = resolve($class);
+            $instance->setConversationId($conversationId);
+            $instance->setTurnId($turnId);
+
+            return $instance;
+        };
+
+        $tool(CreateCompanyTool::class)->handle(new Request(['records' => [['name' => 'Northwind Traders']]]));
+        $company = PendingAction::query()->where('entity_type', 'company')->latest('id')->firstOrFail();
+
+        $tool(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Priya Raman', 'company_id' => PlanReference::to((string) $company->getKey())]],
+        ]));
+        $person = PendingAction::query()->where('entity_type', 'people')->latest('id')->firstOrFail();
+
+        $tool(CreateTaskTool::class)->handle(new Request([
+            'records' => [['title' => 'Call Priya', 'people_ids' => [PlanReference::to((string) $person->getKey())]]],
+        ]));
+        $task = PendingAction::query()->where('entity_type', 'task')->latest('id')->firstOrFail();
+
+        return [$company, $person, $task];
+    }
+
+    it('presents every step of the turn, in order, with its dependency', function (): void {
+        Bus::fake();
+        [$company] = planCardSteps($this->user);
+
+        $steps = Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->instance()
+            ->stepViews();
+
+        expect($steps)->toHaveCount(3)
+            ->and(array_column($steps, 'position'))->toBe([1, 2, 3])
+            ->and(array_column($steps, 'entity_type'))->toBe(['company', 'people', 'task'])
+            ->and($steps[0]['blockedBy'])->toBe([])
+            ->and($steps[1]['blockedBy'])->toBe([1])
+            ->and($steps[2]['blockedBy'])->toBe([2])
+            ->and($steps[1]['isActive'])->toBeFalse()
+            ->and($steps[0]['isActive'])->toBeTrue();
+    });
+
+    it('creates every record from one approval', function (): void {
+        Bus::fake();
+        [$company] = planCardSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('approveAll')
+            ->assertSet('pendingActionId', null)
+            ->assertHasNoErrors();
+
+        $created = Company::query()->where('name', 'Northwind Traders')->firstOrFail();
+
+        expect(People::query()->where('name', 'Priya Raman')->value('company_id'))->toBe((string) $created->getKey())
+            ->and(Task::query()->where('title', 'Call Priya')->exists())->toBeTrue();
+    });
+
+    it('refuses a step whose dependency is still pending', function (): void {
+        Bus::fake();
+        [$company, $person] = planCardSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('approveStep', $person->getKey())
+            ->assertHasErrors('resolve');
+
+        expect(People::query()->count())->toBe(0)
+            ->and($person->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('approves one step and keeps the rest waiting', function (): void {
+        Bus::fake();
+        [$company, $person, $task] = planCardSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('approveStep', $company->getKey())
+            ->assertHasNoErrors();
+
+        expect(Company::query()->where('name', 'Northwind Traders')->exists())->toBeTrue()
+            ->and($person->refresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('cancels the dependent steps when one is rejected', function (): void {
+        Bus::fake();
+        [$company, $person, $task] = planCardSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('rejectStep', $person->getKey())
+            ->assertHasNoErrors();
+
+        expect($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($company->refresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('discards the whole plan without writing anything', function (): void {
+        Bus::fake();
+        [$company, $person, $task] = planCardSteps($this->user);
+
+        Livewire::test(ProposalCard::class)
+            ->call('setActive', $company->getKey())
+            ->call('discardAll')
+            ->assertSet('pendingActionId', null);
+
+        expect($company->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($task->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and(Company::query()->count())->toBe(0);
+    });
 });

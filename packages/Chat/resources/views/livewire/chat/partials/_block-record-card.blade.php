@@ -11,7 +11,17 @@
     :data-block="block.block"
     class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
 >
-    <div class="border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+    <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+        {{-- Only when the heading is plain text: a linked heading renders as a chip,
+             which already carries this glyph. --}}
+        <template x-if="!block.url && window.ChatModules.recordChipIcon(block.type)">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
+                </svg>
+            </span>
+        </template>
+
         <template x-if="block.url">
             <a class="chat-chip" :data-record-type="block.type" :href="block.url">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">

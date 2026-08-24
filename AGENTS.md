@@ -106,6 +106,16 @@ production: message ordering, approval races, duplicate proposals.
 - Every write tool takes batch input: `records[]` on create and update,
   `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
   a `_batch` the dock resolves per item. Do not add scalar-only tools.
+- A request needing several writes is ONE turn: the assistant chains the write
+  tools and links them with `$ref:<pending_action_id>` where a record it just
+  proposed would go. Proposals sharing a `turn_id` are one plan, presented as a
+  single card and approved once (`ProposalPlanService`). A new foreign key on a
+  write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
+  it will accept neither reference validation nor ownership checks.
+- Resolve a reference only at approval time (`PlanReferenceResolver`), never at
+  proposal time, and never let a `$ref` fall out of a card's display: a plan card
+  that hides the link being approved is the failure this design exists to
+  prevent (`RecordNameResolver` renders it as "Name (step N)").
 - Read tools take `lookup: true` to skip the `display_block`; the prompt tells
   the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
   result without that flag renders, so a new read tool must either emit a block

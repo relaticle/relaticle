@@ -137,15 +137,29 @@ it('write tool result includes agent_should_stop=true in meta', function (): voi
         ->and($result['meta']['agent_should_stop'] ?? null)->toBeTrue();
 });
 
-it('system prompt instructs the agent to stop after writes and handle approvals', function (): void {
+it('system prompt chains the writes of one request and stops after the last', function (): void {
     $agent = resolve(CrmAssistant::class);
 
     $instructions = $agent->instructions();
 
     expect($instructions)
-        ->toContain('After ANY write tool call')
-        ->toContain('STOP your turn immediately')
+        ->toContain('is ONE turn, not several')
+        ->toContain('$ref:<that pending_action_id>')
+        ->toContain('After the LAST write of the request, STOP your turn')
         ->toContain('never ask the user to approve one record at a time')
         ->not->toContain('[approval]')
-        ->not->toContain('automatically be prompted to continue');
+        ->not->toContain('automatically be prompted to continue')
+        // The old contract was one write per turn, with the user typing "continue"
+        // between steps. Plans replaced it, and the prompt must not reinstate it.
+        ->not->toContain('continue from <resolved_actions> when they say')
+        ->toContain('never ask them to say "continue"');
+});
+
+it('bounds how many steps one turn may chain into a single card', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    // The cap is enforced in the tool layer (LimitsPlanSteps), never as prompt text:
+    // a limit the model only knows about is a limit it can talk itself out of.
+    expect($agent->instructions())->not->toContain('max_plan_steps')
+        ->and(config('chat.max_plan_steps'))->toBeGreaterThan(1);
 });

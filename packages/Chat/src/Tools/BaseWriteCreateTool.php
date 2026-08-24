@@ -15,12 +15,16 @@ use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
+use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\ResolvesRecordNames;
 use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteCreateTool implements Tool
 {
     use GuardsRecordNames;
+    use LimitsPlanSteps;
+    use ResolvesRecordNames;
     use ValidatesOwnedForeignKeys;
     use WithConversationContext;
 
@@ -86,6 +90,12 @@ abstract class BaseWriteCreateTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
+
+        $planLimitError = $this->planStepLimitError();
+
+        if ($planLimitError !== null) {
+            return (string) json_encode(['error' => $planLimitError], JSON_UNESCAPED_SLASHES);
+        }
 
         $records = $request['records'] ?? null;
 
@@ -172,11 +182,13 @@ abstract class BaseWriteCreateTool implements Tool
             entityType: $this->entityType(),
             actionData: $actionData,
             displayData: $displayData,
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => class_basename($this->actionClass()),
             'entity_type' => $this->entityType(),
             'operation' => 'create',

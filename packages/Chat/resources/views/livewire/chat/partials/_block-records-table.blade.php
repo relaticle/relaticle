@@ -13,8 +13,20 @@
     class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
 >
     {{-- Header strip: title left, truncation meta right. --}}
-    <div class="flex items-baseline justify-between gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
-        <span class="text-sm font-semibold text-gray-900 dark:text-white" x-text="blockTitle(block)"></span>
+    <div class="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+        <span class="flex min-w-0 items-center gap-2">
+            {{-- Same glyph as the chips in the reply and the proposal cards: one
+                 record type reads as one thing wherever chat draws it. --}}
+            <template x-if="window.ChatModules.recordChipIcon(block.type)">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
+                    </svg>
+                </span>
+            </template>
+
+            <span class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="blockTitle(block)"></span>
+        </span>
         <template x-if="blockHasMore(block)">
             <span class="text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500" x-text="blockFooter(block)"></span>
         </template>

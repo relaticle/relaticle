@@ -29,6 +29,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Max Plan Steps
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of write tool calls one turn may chain into a single plan
+    | proposal. Enforced server-side in the tool layer, and stated in the prompt
+    | so the assistant splits a longer request instead of being cut off.
+    */
+
+    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 6),
+
+    /*
+    |--------------------------------------------------------------------------
     | Tool Call Credit Bonus
     |--------------------------------------------------------------------------
     */

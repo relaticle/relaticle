@@ -168,6 +168,7 @@ final class UpdateCustomFieldTool implements Tool
                     'items' => $items,
                 ]
                 : $items[0],
+            turnId: $this->resolveTurnId(),
         );
 
         $publicRecords = array_map(
@@ -178,6 +179,7 @@ final class UpdateCustomFieldTool implements Tool
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => 'UpdateCustomField',
             'entity_type' => 'custom_field',
             'operation' => 'update',

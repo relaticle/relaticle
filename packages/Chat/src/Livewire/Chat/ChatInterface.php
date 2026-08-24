@@ -186,6 +186,7 @@ final class ChatInterface extends BaseLivewireComponent
         return array_values(array_map(static fn (PendingAction $action): array => [
             'type' => 'pending_action',
             'pending_action_id' => (string) $action->getKey(),
+            'turn_id' => $action->turn_id,
             'operation' => $action->operation->value,
             'entity_type' => $action->entity_type,
             'data' => $action->action_data,

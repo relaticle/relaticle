@@ -6,10 +6,8 @@ namespace Relaticle\Chat\Tools\People;
 
 use App\Actions\People\CreatePeople;
 use App\Models\Company;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class CreatePersonTool extends BaseWriteCreateTool
@@ -63,7 +61,7 @@ final class CreatePersonTool extends BaseWriteCreateTool
 
         $companyId = $record['company_id'] ?? null;
         $companyId = is_string($companyId) && $companyId !== '' ? $companyId : null;
-        $companyName = $this->nameForId($companyId, Company::class, 'name', $team);
+        $companyName = $this->recordNames()->name($companyId, Company::class, $team);
         if ($companyName !== '') {
             $fields[] = ['label' => 'Company', 'value' => $companyName];
         }
@@ -73,22 +71,5 @@ final class CreatePersonTool extends BaseWriteCreateTool
             'summary' => "Create person \"{$name}\"",
             'fields' => $fields,
         ];
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function nameForId(?string $id, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($id === null) {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
     }
 }

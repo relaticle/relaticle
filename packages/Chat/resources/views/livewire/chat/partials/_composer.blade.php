@@ -19,7 +19,10 @@
                 <x-heroicon-o-sparkles class="h-3.5 w-3.5 text-primary-500 dark:text-primary-400" aria-hidden="true" />
                 <span>{{ __('Review before continuing') }}</span>
             </div>
-            <div class="max-h-[55vh] overflow-y-auto">
+            {{-- Bounded, but NOT a scroller: the card scrolls its own steps and keeps
+                 the decision buttons pinned. Scrolling here instead would push
+                 Approve below the fold on any plan taller than the dock. --}}
+            <div class="flex max-h-[55vh] min-h-0 flex-col">
                 <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />
             </div>
         </div>

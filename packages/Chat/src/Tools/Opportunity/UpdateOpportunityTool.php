@@ -8,7 +8,6 @@ use App\Actions\Opportunity\UpdateOpportunity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -92,8 +91,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
             $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
-                'old' => $this->nameForId($model->getAttribute('company_id'), Company::class, 'name', $team),
-                'new' => $newCompanyId === null ? __('(none)') : $this->nameForId($newCompanyId, Company::class, 'name', $team),
+                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $team),
+                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $team),
                 '_oldValue' => $model->getAttribute('company_id'),
                 '_newValue' => $newCompanyId,
             ];
@@ -103,8 +102,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
             $newContactId = $this->stringOrNull($request, 'contact_id');
             $fields[] = [
                 'label' => 'Contact',
-                'old' => $this->nameForId($model->getAttribute('contact_id'), People::class, 'name', $team),
-                'new' => $newContactId === null ? __('(none)') : $this->nameForId($newContactId, People::class, 'name', $team),
+                'old' => $this->recordNames()->name($model->getAttribute('contact_id'), People::class, $team),
+                'new' => $newContactId === null ? __('(none)') : $this->recordNames()->name($newContactId, People::class, $team),
                 '_oldValue' => $model->getAttribute('contact_id'),
                 '_newValue' => $newContactId,
             ];
@@ -122,22 +121,5 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         $value = $request[$key] ?? null;
 
         return is_string($value) && $value !== '' ? $value : null;
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function nameForId(?string $id, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($id === null || $id === '') {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
     }
 }
