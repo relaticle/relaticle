@@ -46,7 +46,7 @@ final readonly class RecordChipRenderer implements NodeRendererInterface
 
     /**
      * The glyph for a record type, for the surfaces that show a record outside a
-     * chip — the proposal card's entity identity, above all. Same path data, so a
+     * chip, the proposal card's entity identity, above all. Same path data, so a
      * company looks like a company wherever chat draws one.
      */
     public static function iconPath(string $type): ?string

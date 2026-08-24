@@ -217,7 +217,7 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     // Deliberately a usleep poll, NOT assertCount: the auto-retrying
     // assertion hammers the CDP bridge in a tight loop, and (verified
     // empirically, 4/4 runs) the in-process server then never finishes
-    // serving THIS second back-to-back load-earlier request — the count
+    // serving THIS second back-to-back load-earlier request, the count
     // stays 100 for the whole 30s retry budget. The quiet usleep windows
     // leave the shared event loop free to serve the XHR; the same poll is
     // why this test passed before the assertCount migration.

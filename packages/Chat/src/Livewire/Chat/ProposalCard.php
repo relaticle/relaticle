@@ -37,7 +37,7 @@ use RuntimeException;
 /**
  * The docked proposal card: the one place a chat-proposed write is decided.
  *
- * It presents a PLAN — every proposal the assistant's turn produced, in order —
+ * It presents a PLAN, every proposal the assistant's turn produced, in order,
  * even when that plan has a single step, which is the common case and behaves
  * exactly as it always has. A multi-step plan adds the parts a chained request
  * needs: each step's fields stay visible, a step whose dependency is still
@@ -944,7 +944,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         // Rejecting a step cancels its dependents, so the transcript is told about
-        // each of them too — a card that silently vanished would read as a bug.
+        // each of them too, a card that silently vanished would read as a bug.
         foreach ($this->cancelledDependentsOf($pendingAction) as $cancelled) {
             $this->announceResolution($cancelled, 'rejected');
         }
@@ -1007,7 +1007,7 @@ final class ProposalCard extends BaseLivewireComponent
 
     /**
      * After a step resolves, the dock either moves to the plan's next undecided
-     * step or closes when there is none left — and when there is none left, the
+     * step or closes when there is none left, and when there is none left, the
      * decision itself becomes the next turn.
      */
     private function settleAfterResolution(PendingAction $resolved): void

@@ -14,7 +14,7 @@ use Relaticle\Chat\Models\PendingAction;
  * Every write tool needs this and each one used to keep a private copy. It also
  * has to understand plan references: `$ref:<pending_action_id>` names a record an
  * earlier step will create, so there is nothing in the database to look up. A
- * reference resolves to the proposed name plus the step it comes from — without
+ * reference resolves to the proposed name plus the step it comes from, without
  * that, the row would resolve to an empty string and be dropped, and the user
  * would approve a link they were never shown.
  */

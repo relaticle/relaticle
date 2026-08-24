@@ -130,7 +130,7 @@ final class ChatInterface extends BaseLivewireComponent
      * The client passes its own id for the same reason conversationTitle() takes
      * one: on the FIRST turn of a new chat the conversation is created by the
      * client's fetch, so $conversationId is still null here and reconcile would
-     * hand back nothing — leaving the turn's tables missing until a reload. The
+     * hand back nothing, leaving the turn's tables missing until a reload. The
      * query below is scoped to the authed participant and team, so an id from
      * the client cannot reach another user's conversation.
      *

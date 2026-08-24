@@ -5,7 +5,7 @@
      puts a filtered field first), and the row `cells` map is read defensively
      because it is sparse.
 
-     Surface: the solid data-block tier (crisp hairline card, no shadow) —
+     Surface: the solid data-block tier (crisp hairline card, no shadow),
      deliberately distinct from the translucent pill/chip tier, so server data
      reads as a firm object on the flat transcript. --}}
 <div

@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * The single definition of "this conversation may still be auto-titled".
  *
- * Titling is attempted from more than one place — when a message is sent, and
- * again when that turn ends without having produced a title — and both must
+ * Titling is attempted from more than one place, when a message is sent, and
+ * again when that turn ends without having produced a title, and both must
  * agree on two things or they will fight each other: which stored title a
  * generated one is allowed to replace, and when to stop trying.
  *
@@ -26,7 +26,7 @@ final readonly class ConversationTitleGate
     /**
      * How many of a conversation's opening user messages may trigger a titling
      * attempt. More than one because an opener like "hey" carries no topic to
-     * name — the titler declines it and the next message gets a turn.
+     * name, the titler declines it and the next message gets a turn.
      */
     private const int ATTEMPT_TURNS = 3;
 
@@ -41,7 +41,7 @@ final readonly class ConversationTitleGate
 
     /**
      * Called once the turn has ended, by which point the agent's store has
-     * persisted the message this turn ran on — so one more stored message is
+     * persisted the message this turn ran on, so one more stored message is
      * allowed here than in beforeTurn() for the same conversation.
      *
      * Returns the latest typed message alongside the provisional, because the
@@ -111,7 +111,7 @@ final readonly class ConversationTitleGate
      * on the ABSENCE of any kind rather than on a known list of them, so a kind
      * added later is excluded by default: the failure that matters is naming a
      * chat after machinery the user never saw. Use coalesce, not a bare
-     * `meta->>'kind'` comparison — on a row with no meta the comparison is NULL,
+     * `meta->>'kind'` comparison, on a row with no meta the comparison is NULL,
      * the enclosing AND is NULL, and the row silently drops out.
      *
      * Superseded rows are deliberately still counted. Editing the opening

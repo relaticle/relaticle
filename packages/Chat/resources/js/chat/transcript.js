@@ -643,7 +643,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
         // Server-resolved mention URLs are authoritative. When a message carries a
         // `mentions` array (loaded from the backend) links are rendered ONLY from
-        // it — never from the client-controlled document. A just-sent (optimistic)
+        // it, never from the client-controlled document. A just-sent (optimistic)
         // message has no server mentions yet, so it falls back to the picker URL
         // stored on the node, which is still scheme-validated before use.
         const serverMentions = Array.isArray(message.mentions) ? message.mentions : null;
@@ -757,7 +757,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     // Keyed on the WHOLE pending set, not just the docked id: a chained turn
     // streams its steps in one by one, and the dock has to be told about the
-    // later ones — otherwise it keeps rendering the plan as it looked when only
+    // later ones, otherwise it keeps rendering the plan as it looked when only
     // step one existed.
     syncActiveProposal() {
         const pending = this.visiblePendingActions();
@@ -866,7 +866,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             this.copiedKey = msg.clientKey;
             clearTimeout(this._copiedTimer);
             this._copiedTimer = setTimeout(() => { this.copiedKey = null; }, 1500);
-        } catch (_) { /* clipboard blocked — silently ignore */ }
+        } catch (_) { /* clipboard blocked, silently ignore */ }
     },
 
     // Injected translated labels (chat-interface.blade.php); defaults keep the
@@ -1063,7 +1063,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     // Reload-safe agent outcome summary for a finalized proposal. Built purely from
     // the persisted action (status, itemResults, record refs, display) so it survives
-    // a conversation reload exactly like the audit card — no stored message and no AI
+    // a conversation reload exactly like the audit card, no stored message and no AI
     // continuation (both intentionally removed). Returns null while still pending.
     proposalOutcome(action) {
         if (!action || action.status === 'pending') return null;

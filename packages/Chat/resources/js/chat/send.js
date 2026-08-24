@@ -42,7 +42,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     rateLimitResendTimer: null,
 
     // Documents stashed in Alpine state come back as reactive Proxies, and
-    // TipTap's setDocument structuredClones its input — Proxies cannot be
+    // TipTap's setDocument structuredClones its input, Proxies cannot be
     // structuredCloned, so the call throws and silently kills whatever line
     // was next (this lost queued messages AND broke rate-limit auto-send
     // before it was found). Always unwrap to plain JSON first.
@@ -285,7 +285,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         const payload = this.localEditor()?.getDocument() ?? this.documentFromInput(text);
         // Captured once per send: the pill attaches to THIS message only. Both the
         // optimistic bubble below and the request payload further down must read
-        // the SAME snapshot — re-reading activePageContext() after the consumed
+        // the SAME snapshot, re-reading activePageContext() after the consumed
         // flag flips would silently drop it from the outgoing request.
         const contextForSend = this.activePageContext();
         const nowIso = new Date().toISOString();
@@ -613,7 +613,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         // replace it. Bail and leave the retryable bubble in place.
         if (this.rateLimit) return;
 
-        // Failed user turn: the server never stored the message — re-send the
+        // Failed user turn: the server never stored the message, re-send the
         // preceding user message from local state (same flow as edit-resend).
         // Compute userIndex BEFORE committing to any state change so the no-op
         // path never sets _retrying.
@@ -622,7 +622,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
 
         const userText = this.messages[userIndex].content;
         // Splice exactly the user message at userIndex plus the failed assistant
-        // bubble (msg) when it sits directly after — no further messages removed.
+        // bubble (msg) when it sits directly after, no further messages removed.
         const removeCount = (this.messages[userIndex + 1] === msg) ? 2 : 1;
         this.messages.splice(userIndex, removeCount);
         this.input = userText;
@@ -663,7 +663,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             if (!target) return;
             // setTimeout, NOT $nextTick: an exception in any effect sharing
             // Alpine's flush queue (e.g. the banner tearing down) would drop a
-            // queued nextTick callback — observed live. A macrotask is isolated.
+            // queued nextTick callback, observed live. A macrotask is isolated.
             this.rateLimitResendTimer = setTimeout(() => this.resendMessage(target), 50);
         }, 1000);
     },

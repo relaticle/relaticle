@@ -26,7 +26,7 @@ final class ChatSidebarNav extends BaseLivewireComponent
      * loses the parent's paint too, so a chat list that listened here stayed
      * stale even once the right event was dispatched alongside it. Everything
      * that changes this list therefore dispatches `refresh-sidebar` and nothing
-     * else — see ChatSidebarNav::deleteConversation and the chat JS.
+     * else, see ChatSidebarNav::deleteConversation and the chat JS.
      */
     public function deleteConversation(string $conversationId): void
     {

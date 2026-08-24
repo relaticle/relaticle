@@ -100,13 +100,13 @@ abstract class BaseWriteCreateTool implements Tool
         $records = $request['records'] ?? null;
 
         if (! is_array($records) || $records === []) {
-            return (string) json_encode(['error' => 'Provide `records` — a non-empty array of records to create.'], JSON_UNESCAPED_SLASHES);
+            return (string) json_encode(['error' => 'Provide `records`: a non-empty array of records to create.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($records) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         $validator = resolve(CustomFieldsRequestValidator::class);

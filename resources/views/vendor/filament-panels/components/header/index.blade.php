@@ -31,19 +31,7 @@
     }}
 >
     @if ($isAppPanel && filled($heading))
-        <template x-teleport=".fi-topbar-start">
-            <div
-                data-page-heading
-                class="fi-topbar-page-heading"
-                title="{{ str(strip_tags((string) $heading))->squish() }}"
-            >
-                <h1 class="fi-topbar-page-title">{{ $heading }}</h1>
-
-                @if (filled($headingEnd))
-                    {{ $headingEnd }}
-                @endif
-            </div>
-        </template>
+        @include('filament.app.topbar-page-heading', ['heading' => $heading, 'headingEnd' => $headingEnd])
     @endif
 
     @if ($hasInlineHeaderContent)

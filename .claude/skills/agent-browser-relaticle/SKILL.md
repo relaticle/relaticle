@@ -206,7 +206,7 @@ await comp2.call("callMountedAction");
   solid red"'` → screenshot → if no red border, the pipeline is stale. Fix:
   `pkill -9 -f agent-browser; sleep 3`, new session, re-login. Don't debug the "bug"
   in the PNG before running the red-outline probe. UPDATE (verified: 2026-08-23): the
-  pkill+new-session fix did NOT clear it — a fresh session's very first screenshots
+  pkill+new-session fix did NOT clear it, a fresh session's very first screenshots
   again failed the red-outline probe (dark-mode text read black in the PNG while
   `getComputedStyle` + `elementFromPoint` at the same coordinates said white). When
   the probe fails twice, stop shooting: assert via DOM reads (computed styles,

@@ -36,7 +36,7 @@ final readonly class ProviderStreamError
      *
      * Also answers for laravel/ai's own StreamErrorException, which carries the
      * provider's Error event on ->error (null when the stream simply ended
-     * without completing the step — not retryable on its own).
+     * without completing the step, not retryable on its own).
      */
     public static function isRetryable(?Error $event): bool
     {

@@ -42,7 +42,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     destroyed: false,
     // Inactivity watchdog for a lost `stream_end` (dropped Reverb frame): after this
     // long with no stream event, reconcile the turn from the DB. It MUST exceed the
-    // server-side ProcessChatMessage #[Timeout(120)] — a slow self-hosted model
+    // server-side ProcessChatMessage #[Timeout(120)], a slow self-hosted model
     // (Ollama/qwen3-class "thinking" models emit no client-visible delta during their
     // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
     // for a reply that is still generating server-side and does persist.
@@ -220,7 +220,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
         const chips = Array.isArray(event?.chips) ? event.chips.slice(0, 3) : [];
         // Chips belong to the turn that just COMPLETED. If a queued send
         // already minted a fresh stub, the last assistant bubble is the wrong
-        // (unstarted) one — attach to the last rendered bubble instead.
+        // (unstarted) one, attach to the last rendered bubble instead.
         const target = this.messages.findLast((m) => m.role === 'assistant' && m.rendered) ?? this.lastAssistantBubble();
         if (target) target.follow_ups = chips;
     },
@@ -393,7 +393,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
             const result = typeof event.result === 'string' ? JSON.parse(event.result) : event.result;
             if (result.type !== 'pending_action') return;
             // A retried job re-emits the same proposal (server collapses it to the
-            // same id) — rendering it twice would show two identical cards.
+            // same id), rendering it twice would show two identical cards.
             const seen = this.messages.some((m) =>
                 (m.pending_actions || []).some((a) => a.pending_action_id === result.pending_action_id));
             if (seen) return;
@@ -417,7 +417,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
             // $conversationId is still null and it would hand back nothing.
             const authoritative = await this.$wire.latestAssistantMessage(this.conversationId);
             if (!authoritative) return;
-            // Capture the persisted id even when the text already matches —
+            // Capture the persisted id even when the text already matches,
             // feedback (thumbs) and supersede anchoring need it.
             if (authoritative.id && !assistantMsg.id) {
                 assistantMsg.id = authoritative.id;
@@ -458,7 +458,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
         if (!assistantMsg) {
             assistantMsg = this.lastAssistantBubble();
             // Never finalize an unstarted continuation stub minted AFTER the
-            // ended stream — the ended turn is the assistant bubble before it.
+            // ended stream, the ended turn is the assistant bubble before it.
             if (assistantMsg && assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered) {
                 const idx = this.messages.indexOf(assistantMsg);
                 assistantMsg = this.messages.slice(0, idx).findLast((m) => m.role === 'assistant') ?? assistantMsg;
@@ -475,7 +475,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
         }
-        // A completed turn means the conversation recovered — failure banners on
+        // A completed turn means the conversation recovered, failure banners on
         // earlier bubbles describe a state that no longer exists (and reload
         // would drop them anyway, since failed turns are never persisted).
         this.messages.forEach((m) => {
@@ -494,8 +494,8 @@ export const streamModule = ({ texts = {} } = {}) => ({
 
     // Pull fallback for the `.conversation.title` push. On a brand-new chat the
     // Filament page header (H1 + tab title) was rendered at mount and still
-    // reads "New chat"; if the broadcast was dropped — or landed before this
-    // client finished subscribing — the header would stay generic until reload.
+    // reads "New chat"; if the broadcast was dropped, or landed before this
+    // client finished subscribing, the header would stay generic until reload.
     // Still reading "New chat" at turn end means no title ever arrived, so a
     // pull here can never clobber a rename the user typed mid-turn.
     async maybeSyncTitle() {
@@ -513,7 +513,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
         this.currentToolStatus = null;
         // Prefer the bubble that is actually mid-stream (unrendered). The last
         // bubble can be a fresh continuation stub minted after the failing
-        // turn — painting the error there would mislabel a different turn.
+        // turn, painting the error there would mislabel a different turn.
         const b = this.messages.findLast((m) => m.role === 'assistant' && !m.rendered) ?? this.lastAssistantBubble();
         if (b && !b.rendered) {
             b.content = '';
@@ -544,7 +544,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
     // after `delaySeconds`. Pre-clear the partial text (the re-stream replays it)
     // and tell the user what's happening instead of going silent.
     // Ghost-guard: if there is no unrendered bubble and we are not streaming, this
-    // event is a stale broadcast from a previous turn — ignore it entirely.
+    // event is a stale broadcast from a previous turn, ignore it entirely.
     handleStreamRetrying(event) {
         // When an invocation_id is present, target the bubble for that specific
         // invocation (handles approve-mid-stream where the last bubble may be a
@@ -559,7 +559,7 @@ export const streamModule = ({ texts = {} } = {}) => ({
         if ((!b || b.rendered) && !this.isStreaming) return;
         if (b && !b.rendered) {
             b.content = '';
-            // Do NOT null invocationId — the re-stream reuses the same invocation.
+            // Do NOT null invocationId, the re-stream reuses the same invocation.
             b._needsSeparator = false;
         }
         this.isStreaming = true;

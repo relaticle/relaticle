@@ -13,8 +13,8 @@ use Relaticle\Chat\Agents\CrmAssistant;
  * The cached-prefix saving depends on laravel/ai merging providerOptions over the
  * request body, which is what lets CrmAssistant replace Anthropic's plain-string
  * `system` with content blocks carrying a cache_control breakpoint. Nothing else
- * fails if that merge order changes upstream — the turn just silently costs full
- * price again — so assert the built request body itself.
+ * fails if that merge order changes upstream, the turn just silently costs full
+ * price again, so assert the built request body itself.
  */
 mutates(CrmAssistant::class);
 

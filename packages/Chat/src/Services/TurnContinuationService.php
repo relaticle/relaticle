@@ -112,8 +112,8 @@ final readonly class TurnContinuationService
      * Load-bearing for the approve-mid-stream case: the steps of a chained turn
      * share one turn_id, so approving step 1 before step 2 has streamed in fires
      * a continuation that the job then correctly refuses. Without this the
-     * once-per-turn guard is spent, and approving step 2 — the moment this
-     * feature exists for — would resume nothing, silently, for an hour.
+     * once-per-turn guard is spent, and approving step 2, the moment this
+     * feature exists for, would resume nothing, silently, for an hour.
      */
     public function release(string $resolvedTurnId): void
     {

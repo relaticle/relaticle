@@ -250,7 +250,7 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
  * The first turn of a new chat creates the conversation from the client's own
  * fetch, so the server component's $conversationId is still null when the
  * stream ends. Without the client-supplied id, reconcile got null back and the
- * turn's tables — which are never broadcast, so reconcile is their only path —
+ * turn's tables, which are never broadcast, so reconcile is their only path,
  * stayed missing until a full page reload.
  */
 it('returns display blocks from a client-supplied id when the server property is unset (first turn)', function (): void {

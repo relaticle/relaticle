@@ -856,8 +856,8 @@ final class ProcessChatMessage implements ShouldQueue
      * Last chance to name a conversation the opening dispatch could not.
      *
      * ChatController fires a titling attempt as the message arrives, off the
-     * message alone. When that message had no subject to name — "hey", "do it",
-     * "what about the other one?" — the titler declines and the chat keeps
+     * message alone. When that message had no subject to name, "hey", "do it",
+     * "what about the other one?", the titler declines and the chat keeps
      * sitting under its own opening words. By the time the turn ends there IS
      * something to name it from: the assistant just answered, and its reply
      * names the records the turn was actually about.

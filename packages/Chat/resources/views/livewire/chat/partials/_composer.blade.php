@@ -39,7 +39,7 @@
 
         @include('chat::livewire.chat.partials._banners')
 
-        {{-- Ambient context: the record the assistant treats as "this". Dismissible —
+        {{-- Ambient context: the record the assistant treats as "this". Dismissible,
              the record is only sent while this is visible. --}}
         <div
             x-show="!hasPendingProposal && pageContext && pageContextLabel && !pageContextDismissed && !pageContextConsumed"
@@ -93,7 +93,7 @@
                      draft debounce against the wrong conversation key. --}}
                 x-on:chat:editor-submit.window="if ($event.detail?.context === @js($context ?? 'conversation')) sendMessage()"
                 x-on:chat:editor-change.window="if ($event.detail?.context === @js($context ?? 'conversation')) { input = $event.detail.text; saveDraft() }"
-                {{-- No global setter needed — chatInterface uses localEditor() to scope-resolve. --}}
+                {{-- No global setter needed, chatInterface uses localEditor() to scope-resolve. --}}
                 data-chat-context="{{ $context ?? 'conversation' }}"
             >
                 @include('chat::livewire.chat.partials._composer-bar', [

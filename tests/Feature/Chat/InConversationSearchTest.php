@@ -74,7 +74,7 @@ it('strips markdown syntax from snippets', function (): void {
         $user,
         'conv-md',
         'm-md',
-        "There's 1 task with the status **Done** — [Send proposal to Tim](/r/task/01abc) is ready.",
+        "There's 1 task with the status **Done**, [Send proposal to Tim](/r/task/01abc) is ready.",
         ['role' => 'assistant'],
     );
 

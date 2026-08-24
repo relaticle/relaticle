@@ -68,7 +68,7 @@ abstract class BaseWriteDeleteTool implements Tool
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($requestedIds) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         /** @var Collection<int, Model> $models */

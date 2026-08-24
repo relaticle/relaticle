@@ -219,7 +219,7 @@ final readonly class ChatController
      * ConversationTitleGate decides whether there is anything to do: it returns
      * the provisional title (the opening message, sanitized) only while the
      * stored title still IS that, and only for the conversation's first few typed
-     * messages. That single condition carries two rules — a chat the user has
+     * messages. That single condition carries two rules, a chat the user has
      * named is never re-titled, and a chat whose opener carried no topic stays
      * eligible, so the next few messages get a chance to name it instead of it
      * being stuck on "hey" forever.

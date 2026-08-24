@@ -2,7 +2,7 @@
      produced, decided together. Expects the Alpine scope var `group`.
 
      One surface, one header, and the steps stacked in the order they ran, each
-     keeping the same body a lone proposal renders — so the audit trail reads as
+     keeping the same body a lone proposal renders, so the audit trail reads as
      the single decision the user actually made. The header carries the outcome,
      because a decided plan is read for what happened to it, not for how many
      steps it had. --}}

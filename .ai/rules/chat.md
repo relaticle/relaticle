@@ -22,7 +22,7 @@ references an earlier one with `$ref:<pending_action_id>` in place of a record i
 still-pending single-record CREATE of the expected entity type, and
 `PlanReferenceResolver` swaps it for the real id inside the approving transaction.
 Rejecting a step cascade-cancels its dependents (`result_data.cancelled_by`), and
-`approveAll` commits per step and stops at the first failure — a plan is a sequence
+`approveAll` commits per step and stops at the first failure, a plan is a sequence
 of real CRM writes, not a transaction.
 The dock re-docks on the WHOLE pending set (`syncActiveProposal` keys on a signature
 of all pending ids): keying on the first id alone leaves the card rendering the plan
@@ -61,16 +61,16 @@ request. Four invariants keep it bounded, and all four are load-bearing:
   and double clicks. `CreditService::reserveCredit` is idempotent by key and cannot
   stand in for this.
 - It costs a credit like any other turn. Out of credits means no resume, not a queued
-  one — the user can still type.
+  one, the user can still type.
 The turn runs on a synthetic user message (the provider needs a final user turn). It is
 stamped `meta->kind = "continuation"` by `SupersededAwareConversationStore` and excluded
 in `TranscriptScope`, so the model sees it and the transcript does not. Compare that
 exclusion with `coalesce(...)`, not a bare `meta->>'kind'`: on every other row the
-comparison is NULL, the enclosing AND is NULL, and `NOT NULL` drops the row — which hid
+comparison is NULL, the enclosing AND is NULL, and `NOT NULL` drops the row, which hid
 half the transcript the first time it was written.
 Prompt and UI follow from this: the assistant must never ask the user to say "continue"
 or "next", and a decided proposal card collapses to one line (pending stays fully
-expanded — you may not approve what you were not shown).
+expanded, you may not approve what you were not shown).
 
 ## The sidebar chat list cannot repaint itself
 `ChatSidebarNav` is mounted through a Filament render hook, so it is a Livewire
