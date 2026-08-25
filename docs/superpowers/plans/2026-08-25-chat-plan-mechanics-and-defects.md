@@ -20,7 +20,17 @@
 - Never assert on prompt wording in a new test. Assert on behaviour.
 - Pre-commit, in order: `vendor/bin/pint --dirty --format agent`, `vendor/bin/rector --dry-run`, `vendor/bin/phpstan analyse`, `composer test:type-coverage`, then the targeted Pest run.
 - Conventional commits, subject under 72 chars, lowercase, present tense. No AI attribution anywhere in commits, code or comments.
-- The shared test database `relaticle_testing` is used by 13 checkouts. Run `pgrep -fl pest` first; if another suite is running, wait rather than risk a `40P01` deadlock.
+- **Always prefix test commands with `DB_DATABASE=relaticle_testing_dhaka`.** The default
+  `relaticle_testing` is shared by 13 checkouts, and a concurrent suite causes `40P01` deadlocks or
+  transient "column does not exist" errors on columns that are present, which reads like a broken
+  migration and is not. This workspace now has its own migrated database. `phpunit.xml` declares
+  `DB_DATABASE` without `force`, so a shell environment variable wins. Verified 2026-08-25: 19
+  tests ran green here while another checkout ran a full parallel suite against the shared one.
+  Do NOT edit `.env.testing` or `phpunit.xml` to achieve this. Both are tracked and shared.
+- To see whether another checkout is mid-run, use `ps -Ao command | grep vendor/bin/pest`.
+  `pgrep -fl pest` matches unrelated shell wrappers and will report a false negative.
+- Never run a test suite as a background task and then end your turn waiting on it. Run it in the
+  foreground. Three separate implementer turns were lost to that pattern on 2026-08-25.
 
 ---
 
