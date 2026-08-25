@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -93,4 +94,23 @@ it('list notes tool does not leak rows from other teams', function (): void {
 
     expect($payload)->toContain('TEAM-A-NOTE');
     expect($payload)->not->toContain('TEAM-B-NOTE');
+});
+
+it('list companies tool points open_url at the current team panel, never another team\'s', function (): void {
+    $userA = User::factory()->withPersonalTeam()->create();
+    $userB = User::factory()->withPersonalTeam()->create();
+    $teamA = $userA->currentTeam;
+    $teamB = $userB->currentTeam;
+
+    Company::factory()->count(15)->for($teamA)->create();
+    Company::factory()->for($teamB)->create();
+
+    $this->actingAs($userA);
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['has_more'])->toBeTrue()
+        ->and($payload['display_block']['open_url'])->toBe(CompanyResource::getUrl('index', panel: 'app', tenant: $teamA))
+        ->and($payload['display_block']['open_url'])->toContain($teamA->slug)
+        ->and($payload['display_block']['open_url'])->not->toContain($teamB->slug);
 });

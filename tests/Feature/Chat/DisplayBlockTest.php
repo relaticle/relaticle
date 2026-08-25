@@ -300,15 +300,19 @@ it('keeps the model-facing rows under data alongside the block', function (): vo
 
 // --- (a2) the block carries the whole page, and the remainder is explicit ---
 
-it('carries every row of the page in the block, never a slice of it', function (): void {
+it('carries every row of the page in the block, never a slice of it, in the same order as data', function (): void {
     $user = $this->user;
 
     Company::factory()->count(15)->for($user->currentTeam)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 15])), true);
 
+    $dataIds = array_column($payload['data'], 'id');
+    $rowIds = array_column($payload['display_block']['rows'], 'id');
+
     expect($payload['data'])->toHaveCount(15)
-        ->and($payload['display_block']['rows'])->toHaveCount(15);
+        ->and($payload['display_block']['rows'])->toHaveCount(15)
+        ->and($rowIds)->toBe($dataIds);
 });
 
 it('reports has_more true and next_page set on a first page with a remainder', function (): void {
@@ -320,6 +324,17 @@ it('reports has_more true and next_page set on a first page with a remainder', f
 
     expect($payload['has_more'])->toBeTrue()
         ->and($payload['next_page'])->toBe(2);
+});
+
+it('reports has_more true and next_page 3 on a middle page', function (): void {
+    $user = $this->user;
+
+    Company::factory()->count(25)->for($user->currentTeam)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
+
+    expect($payload['has_more'])->toBeTrue()
+        ->and($payload['next_page'])->toBe(3);
 });
 
 it('reports has_more false and next_page null on the last page', function (): void {
