@@ -13,11 +13,15 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
+use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\DestinationResolver;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
+use Symfony\Component\Mailer\Exception\TransportException;
 
 mutates(InviteTeamMemberTool::class);
 
@@ -77,6 +81,36 @@ it('approving a single invitation proposal writes the row and sends the invite m
         ->exists())->toBeTrue();
 
     Mail::assertSent(TeamInvitationMail::class);
+});
+
+it('keeps the mail transport failure off the card when the invite email cannot be sent', function (): void {
+    $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('send')->andThrow(new TransportException($transportMessage));
+
+    app(InviteTeamMemberTool::class)->handle(new Request([
+        'records' => [['email' => 'undeliverable@example.com', 'role' => 'editor']],
+    ]));
+
+    $pending = pendingActionForTeam($this->user);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved')
+        ->assertHasErrors('resolve');
+
+    $shown = $component->errors()->first('resolve');
+
+    expect($shown)->toBe('The email could not be sent, so nothing was saved. Please try again in a moment.')
+        ->and($shown)->not->toContain('smtp.internal.test')
+        ->and($shown)->not->toContain('postmaster@relaticle');
+
+    // The approve transaction rolls back, so retrying stays safe.
+    expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
 it('approving an email that already belongs to a team member surfaces the validation error and writes no row', function (): void {
@@ -145,6 +179,26 @@ it('refuses to propose an invitation for a member who does not own the workspace
     expect($result)->toContain('Only the workspace owner can invite teammates')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
         ->and(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('hands the non-owner refusal the real Members url so the model has none to invent', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+    $member->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($member);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
+    ]));
+
+    $membersUrl = resolve(DestinationResolver::class)->resolve('team_members', $this->team);
+
+    expect($membersUrl)->toBeString()
+        ->and($membersUrl)->toContain($this->team->slug)
+        ->and($result)->toContain($membersUrl)
+        ->and($result)->toContain('Never write any other URL');
 });
 
 it('does not render a name row on the invitation card', function (): void {

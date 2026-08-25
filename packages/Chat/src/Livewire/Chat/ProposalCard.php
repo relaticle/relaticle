@@ -33,6 +33,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * The docked proposal card: the one place a chat-proposed write is decided.
@@ -689,6 +690,10 @@ final class ProposalCard extends BaseLivewireComponent
             $this->reportDatabaseFailure($anchor, $exception);
 
             return;
+        } catch (TransportExceptionInterface $exception) {
+            $this->reportDeliveryFailure($anchor, $exception);
+
+            return;
         } catch (RuntimeException|ValidationException $exception) {
             $this->reportResolveFailure($anchor, $exception->getMessage());
 
@@ -744,6 +749,10 @@ final class ProposalCard extends BaseLivewireComponent
             $plan->approveStep($step, $this->authUser());
         } catch (QueryException $exception) {
             $this->reportDatabaseFailure($step, $exception);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            $this->reportDeliveryFailure($step, $exception);
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
@@ -864,6 +873,15 @@ final class ProposalCard extends BaseLivewireComponent
             // there and its getMessage() put the failing SQL, the row's values and
             // the connection host straight onto the card and into the transcript.
             $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            // Same reasoning as the QueryException arm: TransportException extends
+            // \RuntimeException, so an SMTP failure would otherwise render its own
+            // message, which names the mail host and port and, on an auth failure,
+            // the SMTP username. Inviting a teammate is the first proposal action
+            // that sends mail inside approve().
+            $this->reportDeliveryFailure($pendingAction, $exception);
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
@@ -1282,6 +1300,18 @@ final class ProposalCard extends BaseLivewireComponent
         $this->reportResolveFailure($pendingAction, $exception->getCode() === '23505'
             ? __('Someone else just made a conflicting change. Reload the page and try again.')
             : __('This change could not be saved. Please try again.'));
+    }
+
+    /**
+     * The approval transaction rolls back when the mail send throws, so nothing was
+     * written and retrying is safe: say exactly that, and keep the transport's own
+     * message (mail host, port, SMTP username) out of the card and the transcript.
+     */
+    private function reportDeliveryFailure(PendingAction $pendingAction, TransportExceptionInterface $exception): void
+    {
+        report($exception);
+
+        $this->reportResolveFailure($pendingAction, __('The email could not be sent, so nothing was saved. Please try again in a moment.'));
     }
 
     private function reportResolveFailure(PendingAction $pendingAction, string $message): void

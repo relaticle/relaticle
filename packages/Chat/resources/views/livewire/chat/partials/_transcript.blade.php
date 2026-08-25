@@ -371,7 +371,7 @@
                                 <button
                                     type="button"
                                     data-regenerate-button
-                                    x-show="!isStreaming"
+                                    x-show="!isStreaming && hasUserPrompt(index)"
                                     x-on:click="regenerateMessage(index)"
                                     :disabled="!canRegenerate(index) || rateLimit !== null"
                                     :aria-label="regenerateButtonLabel(index)"

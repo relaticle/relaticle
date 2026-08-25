@@ -8,6 +8,7 @@ use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\TeamRole;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Relaticle\Chat\Support\DestinationResolver;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class InviteTeamMemberTool extends BaseWriteCreateTool
@@ -67,11 +68,23 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
      * AuthorizationException the proposal card does not catch: without this the
      * Approve button would be a permanent no-op for anyone else. Refuse at
      * proposal time instead, so the assistant can say why.
+     *
+     * The refusal carries the resolved Members URL. Naming the page without one
+     * left the model to supply the link itself, and it invented a production
+     * address that routes nowhere (`app.relaticle.com/settings/members`), which is
+     * worse than not offering the page at all. DestinationResolver passes the panel
+     * and tenant explicitly, so this also holds inside the queued chat job.
      */
     protected function validateRecord(array $record, User $user): ?string
     {
         if (! $user->ownsTeam($user->currentTeam)) {
-            return __('Only the workspace owner can invite teammates. I can take you to the Members page so you can ask them.');
+            $membersUrl = resolve(DestinationResolver::class)->resolve('team_members', $user->currentTeam);
+
+            if ($membersUrl === null) {
+                return __('Only the workspace owner can invite teammates. Tell the user to ask an owner, and do not link to any page.');
+            }
+
+            return __('Only the workspace owner can invite teammates. Tell the user this, and link them to the Members page using exactly this URL: :url. Never write any other URL.', ['url' => $membersUrl]);
         }
 
         $email = (string) ($record['email'] ?? '');
