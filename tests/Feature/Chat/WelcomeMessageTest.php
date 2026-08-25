@@ -11,7 +11,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\SendWelcomeMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -62,9 +64,75 @@ it('writes the welcome conversation synchronously, before the job runs', functio
         ->and(json_decode((string) $message->meta, true))->toMatchArray(['welcome' => true]);
 });
 
+it('leaves the welcome copy alone once the user has replied', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    $conversationId = DB::table('agent_conversations')->where('team_id', $team->getKey())->value('id');
+
+    // A sentinel distinct from the templated fallback: the fallback text is
+    // what compose() also falls back to with no AI provider faked, so leaving
+    // $before untouched would make a guard removal and a same-content refine
+    // look identical.
+    DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->update(['content' => 'sentinel before refine']);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $owner->getMorphClass(),
+        'participant_id' => (string) $owner->getKey(),
+        'agent' => CrmAssistant::class,
+        'role' => 'user',
+        'content' => 'already talking',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '[]',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    (new SendWelcomeMessage($team))->handle();
+
+    expect(DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->where('role', 'assistant')->value('content'))
+        ->toBe('sentinel before refine');
+});
+
+it('does not insert a second welcome message when it refines', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    $conversationId = DB::table('agent_conversations')->where('team_id', $team->getKey())->value('id');
+
+    // Same sentinel as the sibling test, so a refine that actually runs is
+    // provable: the content must move away from the sentinel.
+    DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->update(['content' => 'sentinel before refine']);
+
+    (new SendWelcomeMessage($team))->handle();
+
+    expect(DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->where('role', 'assistant')->value('content'))
+        ->toBe(__('chat-welcome.fallback', ['name' => explode(' ', trim($owner->name))[0]]))
+        ->and(DB::table('agent_conversation_messages')
+            ->whereRaw("coalesce(meta->>'welcome', '') = 'true'")
+            ->count())->toBe(1);
+});
+
 it('writes the welcome conversation with the fallback copy when generation fails', function (): void {
     // No AI provider is faked, so the WelcomeComposer prompt throws and the
     // job must fall back to the templated message.
+    Feature::define(OnboardSeed::class, true);
+
     $owner = User::factory()->withPersonalTeam()->create();
     $team = $owner->currentTeam;
 
@@ -85,6 +153,8 @@ it('writes the welcome conversation with the fallback copy when generation fails
 });
 
 it('never charges the team credit balance', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
     $owner = User::factory()->withPersonalTeam()->create();
     $team = $owner->currentTeam;
     $before = AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining');
@@ -96,6 +166,8 @@ it('never charges the team credit balance', function (): void {
 });
 
 it('does not write a second conversation when run twice', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
     $owner = User::factory()->withPersonalTeam()->create();
     $team = $owner->currentTeam;
 
@@ -135,6 +207,8 @@ it('builds the workspace prompt from real seeded records', function (): void {
 });
 
 it('greets a user whose name is blank without a dangling comma', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
     $owner = User::factory()->withPersonalTeam()->create(['name' => ' ']);
     $team = $owner->currentTeam;
 

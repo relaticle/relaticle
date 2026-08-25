@@ -11,23 +11,24 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Responses\StructuredAgentResponse;
-use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Agents\WelcomeComposer;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\TipTapDocumentParser;
-use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\WelcomeCopy;
 use Throwable;
 
 /**
- * Seeds Rela's proactive welcome conversation for a brand-new personal
- * workspace. Generation failures fall back to templated copy: this job must
- * never surface an error for a prompt problem, and it never touches the
+ * Refines Rela's welcome message with LLM-composed copy once the workspace's
+ * templated version already exists (SeedWelcomeConversation writes it
+ * synchronously). Generation failures leave the template in place: this job
+ * must never surface an error for a prompt problem, and it never touches the
  * team's credit balance (it bypasses ChatController's reservation path
  * entirely).
  */
@@ -50,59 +51,52 @@ final class SendWelcomeMessage implements ShouldQueue
 
     public function handle(): void
     {
-        $alreadyWelcomed = DB::table('agent_conversations')
-            ->where('team_id', $this->team->getKey())
-            ->exists();
-
-        if ($alreadyWelcomed) {
-            return;
-        }
-
         $owner = $this->team->owner;
 
         if (! $owner instanceof User) {
             return;
         }
 
+        $message = DB::table('agent_conversation_messages as m')
+            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
+            ->where('c.team_id', $this->team->getKey())
+            ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
+            ->orderBy('m.id')
+            ->first(['m.id', 'm.conversation_id']);
+
+        // SeedWelcomeConversation writes this row synchronously, so a missing
+        // one means the workspace was created before that shipped, or the team
+        // was deleted. Either way there is nothing to refine.
+        if ($message === null) {
+            return;
+        }
+
         $text = $this->compose($owner);
         $document = resolve(TipTapDocumentParser::class)->buildFromText($text, [], $this->team);
-        $now = now();
-        $conversationId = (string) Str::uuid7();
 
-        DB::transaction(function () use ($conversationId, $owner, $text, $document, $now): void {
-            DB::table('agent_conversations')->insert([
-                'id' => $conversationId,
-                'participant_type' => $owner->getMorphClass(),
-                'participant_id' => (string) $owner->getKey(),
-                'team_id' => $this->team->getKey(),
-                'title' => TitleSanitizer::clean(__('chat-welcome.title')),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            DB::table('agent_conversation_messages')->insert([
-                'id' => (string) Str::uuid7(),
-                'conversation_id' => $conversationId,
-                'participant_type' => $owner->getMorphClass(),
-                'participant_id' => (string) $owner->getKey(),
-                'agent' => CrmAssistant::class,
-                'role' => 'assistant',
+        // The guard lives inside the statement on purpose. A read followed by a
+        // write loses the race when a reply lands between the two, and rewriting
+        // a message a turn has already consumed invalidates the prompt cache
+        // prefix from that turn on. Zero affected rows is a success: the user
+        // beat the job and the templated copy stands.
+        DB::table('agent_conversation_messages')
+            ->where('id', $message->id)
+            ->whereNotExists(fn (Builder $query): Builder => $query
+                ->select(DB::raw('1'))
+                ->from('agent_conversation_messages as u')
+                ->where('u.conversation_id', $message->conversation_id)
+                ->where('u.role', 'user'))
+            ->update([
                 'content' => $text,
-                'attachments' => '[]',
-                'tool_calls' => '[]',
-                'tool_results' => '[]',
-                'usage' => '[]',
-                'meta' => json_encode(['welcome' => true], JSON_THROW_ON_ERROR),
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
-                'created_at' => $now,
-                'updated_at' => $now,
+                'updated_at' => now(),
             ]);
-        });
     }
 
     private function compose(User $owner): string
     {
-        $firstName = $this->firstName($owner);
+        $copy = resolve(WelcomeCopy::class);
+        $firstName = $copy->firstName($owner);
 
         try {
             $response = (new WelcomeComposer)->prompt(
@@ -124,7 +118,7 @@ final class SendWelcomeMessage implements ShouldQueue
             // Fall through to the template.
         }
 
-        return __('chat-welcome.fallback', ['name' => $firstName]);
+        return $copy->templated($owner);
     }
 
     /**
@@ -137,17 +131,6 @@ final class SendWelcomeMessage implements ShouldQueue
         $clean = str_replace(["\u{2014}", "\u{2013}"], ', ', trim($message));
 
         return Str::limit($clean, self::MAX_LENGTH, preserveWords: true);
-    }
-
-    /**
-     * A blank or whitespace-only name would render "Hi , welcome to Relaticle",
-     * so fall back to a greeting that reads correctly without one.
-     */
-    private function firstName(User $owner): string
-    {
-        $first = explode(' ', trim($owner->name))[0];
-
-        return $first === '' ? __('chat-welcome.default_name') : $first;
     }
 
     private function workspaceBlock(string $firstName): string
