@@ -824,7 +824,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                         record: payload.record || null,
                     },
                 };
-                if (payload.finalized) action.status = 'approved';
+                // Mirror finalizeBatchIfComplete server-side: a batch whose every
+                // item was skipped finalizes as rejected, not approved.
+                if (payload.finalized) {
+                    action.status = Object.values(action.itemResults).some((r) => r?.status === 'approved')
+                        ? 'approved'
+                        : 'rejected';
+                }
                 isNewResolution = true;
             } else if (payload.record && !existing.record) {
                 action.itemResults = {
@@ -883,6 +889,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         createdVerb: 'Created',
         updatedVerb: 'Updated',
         deletedVerb: 'Deleted',
+        countCreated: ':count created',
+        countUpdated: ':count updated',
+        countDeleted: ':count deleted',
+        countSkipped: ':count skipped',
+        countKept: ':count kept',
         ...proposalTexts,
     },
 
@@ -1040,6 +1051,33 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // getter in both its compact-while-pending and full resolved modes.
     itemResult(action, index) {
         return (action.itemResults && action.itemResults[index]) || null;
+    },
+
+    // Derived receipt for a finalized batch. The row-level status ('approved')
+    // hides a mixed outcome (approving 2 of 3 records still finalizes the row
+    // as approved), so the header chip is computed from the per-item results
+    // instead of echoing the status. Returns null for non-batch cards, undecided
+    // batches, and expired/superseded ones (whose status chip stays truthful).
+    batchOutcome(action) {
+        if (!action || (action.status !== 'approved' && action.status !== 'rejected')) return null;
+
+        const results = Object.values(action.itemResults || {});
+        if (results.length === 0) return null;
+
+        const done = results.filter((r) => r?.status === 'approved').length;
+        const skipped = results.length - done;
+
+        const t = this.proposalTexts;
+        const op = action.operation;
+        const doneTemplate = op === 'delete' ? t.countDeleted : (op === 'update' ? t.countUpdated : t.countCreated);
+        const skippedTemplate = op === 'delete' ? t.countKept : t.countSkipped;
+
+        return {
+            done,
+            skipped,
+            doneLabel: doneTemplate.replace(':count', String(done)),
+            skippedLabel: skippedTemplate.replace(':count', String(skipped)),
+        };
     },
 
     // Whether any item of a batch has been decided. Read by the card's

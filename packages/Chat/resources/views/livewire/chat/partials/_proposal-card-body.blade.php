@@ -158,17 +158,40 @@
                 </template>
             </span>
 
+            {{-- A finalized batch reports what actually happened per item: its
+                 row-level status says "approved" even when a record was skipped,
+                 so the receipt is derived from itemResults ("2 created", "1
+                 skipped") instead of echoing it. --}}
+            <template x-if="batchOutcome(action)">
+                <span class="pointer-events-none relative inline-flex shrink-0 items-center gap-1">
+                    <template x-if="batchOutcome(action).done > 0">
+                        <span
+                            class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400"
+                            x-text="batchOutcome(action).doneLabel"
+                        ></span>
+                    </template>
+                    <template x-if="batchOutcome(action).skipped > 0">
+                        <span
+                            class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                            x-text="batchOutcome(action).skippedLabel"
+                        ></span>
+                    </template>
+                </span>
+            </template>
+
             {{-- Translated label map, not charAt-capitalized enum values:
                  'superseded' also reads as jargon, so it shows as Replaced. --}}
-            <span
-                class="pointer-events-none relative inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
-                :class="{
-                    'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
-                    'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
-                    'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
-                }"
-                x-text="(@js($outcomeLabels))[action.status] ?? action.status"
-            ></span>
+            <template x-if="!batchOutcome(action)">
+                <span
+                    class="pointer-events-none relative inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
+                    :class="{
+                        'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400': action.status === 'approved',
+                        'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400': action.status === 'rejected',
+                        'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400': action.status === 'expired' || action.status === 'superseded',
+                    }"
+                    x-text="(@js($outcomeLabels))[action.status] ?? action.status"
+                ></span>
+            </template>
 
             {{-- The affordance is labelled rather than a bare chevron: on touch
                  there is no hover to reveal that the row does anything at all. --}}

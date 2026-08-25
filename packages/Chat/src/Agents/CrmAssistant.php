@@ -117,7 +117,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * transcript, whose tool results keep claiming the proposal is pending.
      * Superseded proposals are NOT here: see $supersededProposals above.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>}>
      */
     public array $resolvedActions = [];
 
@@ -449,18 +449,30 @@ PROMPT;
 
         foreach ($this->resolvedActions as $action) {
             $records = $action['records'] ?? [];
+            $skipped = $action['skipped'] ?? [];
 
-            if (count($records) > 1) {
+            if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
                 $lines[] = "- {$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
 
                 foreach ($records as $record) {
                     $lines[] = '    - '.$this->quotedLabel($record['label'])." (id: {$record['id']}, url: {$record['url']})";
                 }
 
+                foreach ($skipped as $label) {
+                    $lines[] = '    - skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").': '.$this->quotedLabel($label);
+                }
+
                 continue;
             }
 
-            $lines[] = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
+            $line = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
+
+            if ($skipped !== []) {
+                $skippedLabels = implode(', ', array_map($this->quotedLabel(...), $skipped));
+                $line .= '; skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").": {$skippedLabels}";
+            }
+
+            $lines[] = $line;
         }
 
         $lines[] = '</resolved_actions>';
@@ -527,7 +539,7 @@ PROMPT;
     }
 
     /**
-     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>}>  $resolved
+     * @param  list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>}>  $resolved
      */
     public function withResolvedActions(array $resolved): self
     {

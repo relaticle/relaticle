@@ -353,14 +353,15 @@ it('renders a plan without re-reading the plan or the custom fields once per ste
         ->and($customFieldQueries)->toBeLessThanOrEqual(4, "custom fields re-read per step: {$customFieldQueries} custom_fields queries");
 });
 
-it('lets the user page through a step the dock is not focused on before approving the plan', function (): void {
+it('lists every record of a batch step the dock is not focused on before approving the plan', function (): void {
     ($this->tool)(CreateCompanyTool::class)->handle(new Request([
         'records' => [['name' => 'Acme Robotics']],
     ]));
     $company = ($this->proposalFor)('company');
 
     // Step 2 proposes three people at once. The dock focuses step 1 on mount, so
-    // without a reachable pager the user approves Ada and Grace sight unseen.
+    // without every record listed as a row the user approves Ada and Grace sight
+    // unseen.
     ($this->tool)(CreatePersonTool::class)->handle(new Request([
         'records' => [
             ['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $company->getKey())],
@@ -376,16 +377,15 @@ it('lets the user page through a step the dock is not focused on before approvin
     ]);
 
     $card->assertSee('Jane Doe')
-        ->assertDontSee('Ada Lovelace')
-        // The pager has to be on the page for step 2, not just callable: a step
-        // the dock never focuses would otherwise have no way to reach record 2.
-        ->assertSee("stepNext('".$people->getKey()."')", escape: false);
+        ->assertSee('Ada Lovelace')
+        ->assertSee('Grace Hopper')
+        // The rows have to be interactive for step 2, not just visible: a step
+        // the dock never focuses would otherwise have no way to open record 2.
+        ->assertSee("focusItem('".$people->getKey()."', 1)", escape: false)
+        ->assertSee("skipItem('".$people->getKey()."', 1)", escape: false);
 
-    $card->call('stepNext', (string) $people->getKey())
+    $card->call('focusItem', (string) $people->getKey(), 1)
         ->assertSet('activeStepId', (string) $people->getKey())
         ->assertSee('Ada Lovelace')
         ->assertSet('cursor', 1);
-
-    $card->call('stepNext', (string) $people->getKey())
-        ->assertSee('Grace Hopper');
 });

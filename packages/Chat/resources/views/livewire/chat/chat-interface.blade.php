@@ -77,6 +77,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'createdVerb' => __('Created'),
             'updatedVerb' => __('Updated'),
             'deletedVerb' => __('Deleted'),
+            'countCreated' => __(':count created'),
+            'countUpdated' => __(':count updated'),
+            'countDeleted' => __(':count deleted'),
+            'countSkipped' => __(':count skipped'),
+            'countKept' => __(':count kept'),
         ]),
     }),
     ...window.ChatModules.sendModule({

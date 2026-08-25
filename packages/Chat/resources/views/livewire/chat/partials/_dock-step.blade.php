@@ -72,38 +72,12 @@
             @endif
         </div>
 
-        {{-- Per-record pager, for a step proposing several records of one type.
-             Not gated on the step being active: a plan is approved as one
-             decision, so every step's records have to be reachable before the
-             user commits to them. Paging a step focuses it. --}}
+        {{-- Remaining-record count, for a step proposing several records of one
+             type. The rows below carry the records themselves. --}}
         @if ($step['isBatch'] && $step['remainingCount'] > 1)
-            <div class="flex shrink-0 items-center gap-0.5">
-                <button
-                    type="button"
-                    wire:click="stepPrev('{{ $step['id'] }}')"
-                    @disabled($step['isActive'] && $step['position_in_batch'] <= 1)
-                    class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
-                    aria-label="{{ __('Previous record') }}"
-                >
-                    <x-heroicon-o-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-
-                <span
-                    class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500"
-                    aria-live="polite"
-                    aria-label="{{ __('Record :position of :total', ['position' => $step['position_in_batch'], 'total' => $step['remainingCount']]) }}"
-                >{{ $step['position_in_batch'] }}&hairsp;/&hairsp;{{ $step['remainingCount'] }}</span>
-
-                <button
-                    type="button"
-                    wire:click="stepNext('{{ $step['id'] }}')"
-                    @disabled($step['isActive'] && $step['position_in_batch'] >= $step['remainingCount'])
-                    class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-white/5 dark:hover:text-gray-300"
-                    aria-label="{{ __('Next record') }}"
-                >
-                    <x-heroicon-o-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-            </div>
+            <span class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500" aria-live="polite">
+                {{ trans_choice(':count record|:count records', $step['remainingCount'], ['count' => $step['remainingCount']]) }}
+            </span>
         @endif
 
         {{-- Per-step decision. Only a plan shows these: a single proposal is
@@ -150,7 +124,67 @@
         </div>
     @endif
 
-    @if ($step['fields'] !== [])
+    @if ($step['isBatch'])
+        {{-- One row per undecided record, each with its own skip control. The
+             active row expands into its editable fields; per-record removal
+             lives HERE, on the named row, never in the shared footer: a footer
+             per-record discard reads as "dismiss card" and silently skips a
+             record the user meant to create. --}}
+        <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+            @foreach ($step['items'] as $item)
+                <div wire:key="batch-item-{{ $step['id'] }}-{{ $item['index'] }}">
+                    <div @class([
+                        'group/item flex items-center gap-1.5 py-1 transition',
+                        'pe-2 ps-2' => ! $isPlan,
+                        'pe-2 ps-9' => $isPlan,
+                        'bg-gray-50 dark:bg-white/5' => $item['isActive'],
+                    ])>
+                        <button
+                            type="button"
+                            wire:click="focusItem('{{ $step['id'] }}', {{ $item['index'] }})"
+                            data-proposal-batch-row
+                            class="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-start text-sm text-gray-700 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-300 dark:hover:text-white"
+                        >
+                            {{ $item['summary'] }}
+                        </button>
+
+                        <button
+                            type="button"
+                            wire:click="skipItem('{{ $step['id'] }}', {{ $item['index'] }})"
+                            wire:loading.attr="disabled"
+                            {{-- Always visible on touch: there is no hover to reveal it
+                                 with, and a skip control nobody can find is the whole
+                                 defect this row exists to fix. --}}
+                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 sm:opacity-0 sm:group-hover/item:opacity-100 dark:hover:bg-red-400/10 dark:hover:text-red-400"
+                            aria-label="{{ __('Skip this record') }}"
+                            title="{{ __('Skip this record') }}"
+                        >
+                            <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                        </button>
+                    </div>
+
+                    @if ($item['isActive'] && $step['fields'] !== [])
+                        <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+                            @foreach ($step['fields'] as $row)
+                                <div @class([
+                                    'py-2.5',
+                                    'px-4' => ! $isPlan,
+                                    'pe-3 ps-11' => $isPlan,
+                                ]) data-proposal-field-row>
+                                    @include('chat::livewire.chat.partials._dock-field', [
+                                        'row' => $row,
+                                        'stepId' => $step['id'],
+                                        'isEditable' => ($row['code'] ?? null) !== null && in_array($row['code'], $step['editableCodes'], true),
+                                        'isEditing' => $editingFieldCode !== null && $editingFieldCode === ($row['code'] ?? null) && $editingStepId === $step['id'],
+                                    ])
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @elseif ($step['fields'] !== [])
         <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
             @foreach ($step['fields'] as $row)
                 <div @class([

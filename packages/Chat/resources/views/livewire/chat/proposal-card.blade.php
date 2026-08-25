@@ -1,15 +1,25 @@
 @php
     $operation = $proposal?->operation->value;
     $stepCount = count($steps);
-    $primaryLabel = $isPlan
-        ? __('Approve all :count', ['count' => $stepCount])
-        : match ($operation) {
+    // The footer always decides everything that remains: the whole plan, every
+    // undecided record of a batch, or the single record. The label says so with
+    // a count, so one click can never read as a one-record commit.
+    $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
+    $primaryLabel = match (true) {
+        $isPlan => __('Approve all :count', ['count' => $stepCount]),
+        $isBatch && $remainingCount > 1 => match ($operation) {
+            'update' => __('Save all :count', ['count' => $remainingCount]),
+            'delete' => __('Delete all :count', ['count' => $remainingCount]),
+            default => __('Create all :count', ['count' => $remainingCount]),
+        },
+        default => match ($operation) {
             'update' => __('Save changes'),
             'delete' => __('Delete'),
             default => __('Create'),
-        };
+        },
+    };
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
-    $discardLabel = $isPlan ? __('Discard all') : __('Discard');
+    $discardLabel = $isPlan || ($isBatch && $remainingCount > 1) ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
 @endphp
