@@ -20,8 +20,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Pennant\Feature;
-use Relaticle\Chat\Actions\SeedWelcomeConversation;
-use Relaticle\Chat\Jobs\SendWelcomeMessage;
 use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
 use Relaticle\CustomFields\Data\CustomFieldData;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
@@ -73,10 +71,6 @@ final readonly class CreateTeamCustomFields
                 : 'sales';
 
             $this->onboardSeeder->run($owner, $team, $fixtureSet);
-
-            resolve(SeedWelcomeConversation::class)->execute($team);
-
-            dispatch(new SendWelcomeMessage($team))->afterCommit();
         }
     }
 

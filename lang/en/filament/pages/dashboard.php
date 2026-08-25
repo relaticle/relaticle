@@ -31,20 +31,6 @@ return [
                 'prompt' => "What's in my pipeline right now?",
             ],
         ],
-        'next_action' => [
-            'first_record' => [
-                'label' => 'Add your first contact',
-                'prompt' => 'Add my first contact to the CRM',
-            ],
-            'import' => [
-                'label' => 'Import your contacts',
-                'prompt' => 'Help me import my contacts from a CSV file',
-            ],
-            'invite' => [
-                'label' => 'Invite a teammate',
-                'prompt' => 'Invite a teammate to this workspace',
-            ],
-        ],
     ],
     'tasks' => [
         'heading' => 'Tasks',

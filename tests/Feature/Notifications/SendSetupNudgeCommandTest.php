@@ -12,9 +12,7 @@ use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\Company;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 it('renders the nudge naming the unfinished step', function (): void {
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
@@ -175,7 +173,7 @@ it('skips a workspace already scheduled for deletion', function (): void {
     Mail::assertNothingQueued();
 });
 
-it('points the nudge at the dashboard when the workspace has no welcome conversation', function (): void {
+it('points the nudge at the dashboard, never at an id-less chat URL', function (): void {
     Mail::fake();
 
     $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
@@ -192,48 +190,4 @@ it('points the nudge at the dashboard when the workspace has no welcome conversa
         return $mail->conversationUrl === Dashboard::getUrl(['tenant' => $team], panel: 'app')
             && $mail->conversationUrl !== ChatConversation::getUrl(['tenant' => $team], panel: 'app');
     });
-});
-
-it('points the nudge at the welcome conversation when the workspace has one', function (): void {
-    Mail::fake();
-
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
-    $team = $owner->currentTeam;
-
-    $this->travelTo(now()->setTime(9, 0));
-    $team->forceFill(['created_at' => now()->subDays(2)])->save();
-
-    $conversationId = (string) Str::uuid7();
-
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'team_id' => $team->getKey(),
-        'participant_type' => $owner->getMorphClass(),
-        'participant_id' => (string) $owner->getKey(),
-        'title' => 'Welcome',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::uuid7(),
-        'conversation_id' => $conversationId,
-        'participant_type' => $owner->getMorphClass(),
-        'participant_id' => (string) $owner->getKey(),
-        'role' => 'assistant',
-        'content' => 'Welcome!',
-        'agent' => 'crm',
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '{}',
-        'meta' => json_encode(['welcome' => true]),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
-
-    Mail::assertQueued(SetupNudgeMail::class, fn (SetupNudgeMail $mail): bool => $mail->conversationUrl
-        === ChatConversation::getUrl(['tenant' => $team, 'conversationId' => $conversationId], panel: 'app'));
 });

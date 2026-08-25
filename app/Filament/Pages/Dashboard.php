@@ -6,13 +6,10 @@ namespace App\Filament\Pages;
 
 use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
-use App\Enums\ActivationStep;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
-use App\Services\WorkspaceActivationFacts;
 use BackedEnum;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -21,18 +18,11 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
 use Relaticle\Chat\Services\MyTasksService;
-use Relaticle\Chat\Support\MarkdownRenderer;
-use Spatie\Onboard\OnboardingStep;
 
-/**
- * @property-read array{conversation_id: string, html: string}|null $welcome
- * @property-read array{label: string, prompt: string}|null $nextAction
- */
 final class Dashboard extends Page
 {
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-home';
@@ -92,89 +82,6 @@ final class Dashboard extends Page
             $hour < 18 => __('Good afternoon, :name.', ['name' => $firstName]),
             default => __('Good evening, :name.', ['name' => $firstName]),
         };
-    }
-
-    /**
-     * Rela's seeded welcome message, when this user should still see it on the
-     * dashboard. Null is the "not first run" signal: the user has replied, the
-     * checklist was dismissed, the conversation belongs to somebody else, or the
-     * workspace predates the welcome.
-     *
-     * @return array{conversation_id: string, html: string}|null
-     */
-    #[Computed]
-    public function welcome(): ?array
-    {
-        $team = Filament::getTenant();
-
-        if (! $team instanceof Team || $team->activation_checklist_dismissed_at !== null) {
-            return null;
-        }
-
-        /** @var User $user */
-        $user = Filament::auth()->user();
-
-        $message = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('c.team_id', $team->getKey())
-            ->where('c.participant_type', $user->getMorphClass())
-            ->where('c.participant_id', (string) $user->getKey())
-            ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
-            ->orderBy('m.id')
-            ->first(['m.content', 'm.conversation_id']);
-
-        if ($message === null) {
-            return null;
-        }
-
-        if (resolve(WorkspaceActivationFacts::class)->hasUserChatMessage($team)) {
-            return null;
-        }
-
-        return [
-            'conversation_id' => (string) $message->conversation_id,
-            'html' => (new MarkdownRenderer)->render((string) $message->content),
-        ];
-    }
-
-    /**
-     * The single next action offered under Rela's welcome: the highest-priority
-     * unfinished activation step. AskRela is excluded because pressing the
-     * button completes it.
-     *
-     * @return array{label: string, prompt: string}|null
-     */
-    #[Computed]
-    public function nextAction(): ?array
-    {
-        if ($this->welcome === null) {
-            return null;
-        }
-
-        $team = Filament::getTenant();
-
-        if (! $team instanceof Team) {
-            return null;
-        }
-
-        $steps = $team->onboarding()->steps();
-
-        foreach ([ActivationStep::FirstRecord, ActivationStep::Import, ActivationStep::Invite] as $candidate) {
-            $step = $steps->first(function (OnboardingStep $step) use ($candidate): bool {
-                $key = $step->attribute('key');
-
-                return ($key instanceof ActivationStep ? $key : ActivationStep::from((string) $key)) === $candidate;
-            });
-
-            if ($step instanceof OnboardingStep && $step->incomplete()) {
-                return [
-                    'label' => __("filament/pages/dashboard.activation.next_action.{$candidate->value}.label"),
-                    'prompt' => __("filament/pages/dashboard.activation.next_action.{$candidate->value}.prompt"),
-                ];
-            }
-        }
-
-        return null;
     }
 
     /**

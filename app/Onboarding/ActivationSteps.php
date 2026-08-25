@@ -10,8 +10,8 @@ use App\Services\WorkspaceActivationFacts;
 use Spatie\Onboard\OnboardingSteps;
 
 /**
- * The four activation steps every consumer reads: dashboard checklist,
- * welcome-message job, and the chat agent's workspace-state block.
+ * The four activation steps every consumer reads: the activation checklist,
+ * the setup-nudge command, and the chat agent's workspace-state block.
  *
  * Titles and descriptions live in lang files and are resolved by the
  * consumers via the `label_key`/`description_key` attributes — step titles
@@ -29,7 +29,7 @@ use Spatie\Onboard\OnboardingSteps;
  * excluding a later import so importing twice cannot count as returning):
  * a day-0 record predicts a 10.0% return against a 4.0% base, day-0 chat 11.0%,
  * while import reaches 0.5% of workspaces and invite 0.3%. Import and invite
- * stay because they are true facts about the workspace and the welcome job
+ * stay because they are true facts about the workspace and the setup nudge
  * reads the same registry, but they sit last: a checklist that opens on two
  * rows almost nobody completes reads as unachievable.
  */

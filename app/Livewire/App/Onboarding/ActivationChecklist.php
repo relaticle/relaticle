@@ -7,7 +7,6 @@ namespace App\Livewire\App\Onboarding;
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Data\ActivationStepData;
 use App\Enums\ActivationStep;
-use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\PeopleResource;
 use App\Models\Team;
@@ -86,15 +85,13 @@ final class ActivationChecklist extends Component
             return [];
         }
 
-        $welcomeConversationId = resolve(WorkspaceActivationFacts::class)->welcomeConversationId($team);
-
         return array_values($team->onboarding()->steps()
             ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
                 key: $this->stepKey($step)->value,
                 label: __((string) $step->attribute('label_key')),
                 description: __((string) $step->attribute('description_key')),
-                url: $this->stepUrl($this->stepKey($step), $welcomeConversationId),
-                prompt: $this->stepPrompt($this->stepKey($step), $welcomeConversationId),
+                url: $this->stepUrl($this->stepKey($step)),
+                prompt: $this->stepPrompt($this->stepKey($step)),
                 icon: (string) $step->attribute('icon'),
                 complete: $step->complete(),
             ))
@@ -113,20 +110,17 @@ final class ActivationChecklist extends Component
      * means a step added to ActivationSteps without one fails here rather than
      * quietly rendering a row that links to the People list.
      *
-     * AskRela links straight to Rela's seeded welcome conversation so the step
-     * opens onto the guided setup message. A workspace without one has no chat
-     * to open: an id-less chat URL is not a destination, the page bounces
-     * straight back to the dashboard, so that row seeds the composer instead.
+     * AskRela has no transcript to open, so it seeds the composer instead: an
+     * id-less chat URL is not a destination, the page bounces straight back to
+     * the dashboard.
      */
-    private function stepUrl(ActivationStep $step, ?string $welcomeConversationId): ?string
+    private function stepUrl(ActivationStep $step): ?string
     {
         return match ($step) {
             ActivationStep::FirstRecord => PeopleResource::getUrl('index'),
             ActivationStep::Import => ImportPeople::getUrl(),
             ActivationStep::Invite => Members::getUrl(),
-            ActivationStep::AskRela => $welcomeConversationId === null
-                ? null
-                : ChatConversation::getUrl(['conversationId' => $welcomeConversationId]),
+            ActivationStep::AskRela => null,
         };
     }
 
@@ -135,9 +129,9 @@ final class ActivationChecklist extends Component
      * nowhere to navigate. It is seeded, never sent: a checklist click must
      * not spend the workspace's credits on the user's behalf.
      */
-    private function stepPrompt(ActivationStep $step, ?string $welcomeConversationId): ?string
+    private function stepPrompt(ActivationStep $step): ?string
     {
-        if ($step !== ActivationStep::AskRela || $welcomeConversationId !== null) {
+        if ($step !== ActivationStep::AskRela) {
             return null;
         }
 

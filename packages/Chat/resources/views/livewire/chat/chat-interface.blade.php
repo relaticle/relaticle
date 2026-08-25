@@ -238,8 +238,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 sessionStorage.removeItem('chat:bootstrap');
                 const parsed = JSON.parse(raw);
 
-                // The payload names the conversation it was typed for: null
-                // for a fresh chat, the welcome id on first run.
+                // The payload names the conversation it was typed for, so a
+                // stale handoff cannot fire into whichever chat is opened next.
                 if ((parsed?.conversationId ?? null) === (this.conversationId ?? null)) {
                     const bootstrapDoc = parsed?.document;
                     const bootstrapModel = parsed?.model;

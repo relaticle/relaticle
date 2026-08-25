@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Enums\ActivationStep;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
-use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\Team;
@@ -128,7 +127,7 @@ final class SendSetupNudgeCommand extends Command
             return false;
         }
 
-        $conversationUrl = $this->continueUrl($team, $facts);
+        $conversationUrl = $this->continueUrl($team);
 
         Mail::to($user)
             ->send(new SetupNudgeMail($user, $team, $stepKey->value, $conversationUrl));
@@ -159,15 +158,11 @@ final class SendSetupNudgeCommand extends Command
 
     /**
      * Where "Continue in Rela" lands. An id-less chat URL is not a destination:
-     * that page bounces straight back to the dashboard, so a workspace with no
-     * seeded welcome is sent to the dashboard composer directly.
+     * that page bounces straight back to the dashboard, so the nudge points at
+     * the dashboard composer directly.
      */
-    private function continueUrl(Team $team, WorkspaceActivationFacts $facts): string
+    private function continueUrl(Team $team): string
     {
-        $conversationId = $facts->welcomeConversationId($team);
-
-        return $conversationId === null
-            ? Dashboard::getUrl(['tenant' => $team], panel: 'app')
-            : ChatConversation::getUrl(['tenant' => $team, 'conversationId' => $conversationId], panel: 'app');
+        return Dashboard::getUrl(['tenant' => $team], panel: 'app');
     }
 }

@@ -13,10 +13,9 @@ mutates(ChatInterface::class);
 
 /**
  * Regenerating replays the user message that produced a reply, so a reply with no
- * user message before it has nothing to replay. Rela's proactive welcome opens its
- * conversation, which is the only way that happens; every disabled reason the UI
- * can offer names a pending approval, so the button is hidden rather than shown
- * with a reason that is not true.
+ * user message before it has nothing to replay. Every disabled reason the UI can
+ * offer names a pending approval, so the button is hidden rather than shown with
+ * a reason that is not true.
  */
 function regenerateAffordanceInsertMessage(string $conversationId, User $user, string $role, string $content): void
 {
@@ -33,21 +32,21 @@ function regenerateAffordanceInsertMessage(string $conversationId, User $user, s
         'tool_calls' => '[]',
         'tool_results' => '[]',
         'usage' => '{}',
-        'meta' => $role === 'assistant' ? '{"welcome": true}' : '{}',
+        'meta' => '{}',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 }
 
-it('hides the regenerate button on a welcome message that no user message precedes', function (): void {
+it('hides the regenerate button on a reply that no user message precedes', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
     $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'Getting started');
 
-    regenerateAffordanceInsertMessage($conversationId, $user, 'assistant', 'Welcome to Relaticle.');
+    regenerateAffordanceInsertMessage($conversationId, $user, 'assistant', 'Here is what I found.');
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
-        ->assertSourceHas('Welcome to Relaticle.');
+        ->assertSourceHas('Here is what I found.');
 
     $state = $page->script(<<<'JS'
         (() => {

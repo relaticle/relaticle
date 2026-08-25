@@ -77,14 +77,14 @@ it('completes invite for a pending invitation', function (): void {
     expect(stepByKey($this->team, 'invite')->complete())->toBeTrue();
 });
 
-it('completes ask_rela only when a user-role message exists, not for the seeded welcome', function (): void {
+it('completes ask_rela only when a user-role message exists, not for an assistant reply alone', function (): void {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => (string) $this->owner->getKey(),
         'team_id' => $this->team->getKey(),
-        'title' => 'Welcome',
+        'title' => 'Pipeline check',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -106,7 +106,7 @@ it('completes ask_rela only when a user-role message exists, not for the seeded 
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),
         'role' => 'assistant',
-        'content' => 'Welcome!',
+        'content' => 'Here is what I found.',
         ...$baseMessage,
     ]);
 

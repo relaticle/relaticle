@@ -30,8 +30,8 @@ beforeEach(function (): void {
 });
 
 /**
- * The click handler the ask_rela row carries when it has no conversation to
- * open: it seeds the dashboard composer instead of navigating.
+ * The click handler the ask_rela row carries: it seeds the dashboard composer
+ * instead of navigating, because an id-less chat URL is not a destination.
  */
 function composePromptUrl(): string
 {
@@ -245,11 +245,10 @@ it('answers all four steps without repeating a query', function (): void {
 
     $log = collect(DB::getQueryLog())->map(fn (array $entry): string => (string) $entry['query']);
 
-    // Two `agent_conversations`-joining queries are expected: one answers the
-    // ask_rela fact (hasUserChatMessage), the other resolves the step's deep
-    // link to Rela's seeded welcome conversation (askRelaUrl). Neither repeats.
+    // One `agent_conversations`-joining query is expected, answering the
+    // ask_rela fact (hasUserChatMessage), and it does not repeat.
     expect($log->filter(fn (string $sql): bool => str_contains($sql, 'creation_source')))->toHaveCount(1)
-        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(2)
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(1)
         ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'team_invitations')))->toHaveCount(1);
 });
 
@@ -267,77 +266,6 @@ it('renders in the sidebar on every panel page, not just the dashboard', functio
     $this->get(PeopleResource::getUrl('index'))
         ->assertOk()
         ->assertSee('data-testid="activation-step"', escape: false);
-});
-
-it('links the ask_rela step to the seeded welcome conversation when one exists', function (): void {
-    $conversationId = (string) Str::uuid7();
-
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'team_id' => $this->team->getKey(),
-        'participant_type' => $this->owner->getMorphClass(),
-        'participant_id' => (string) $this->owner->getKey(),
-        'title' => __('chat-welcome.title'),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::uuid7(),
-        'conversation_id' => $conversationId,
-        'participant_type' => $this->owner->getMorphClass(),
-        'participant_id' => (string) $this->owner->getKey(),
-        'role' => 'assistant',
-        'content' => 'Welcome!',
-        'agent' => 'crm',
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '{}',
-        'meta' => json_encode(['welcome' => true]),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    livewire(ActivationChecklist::class)
-        ->assertSeeHtml('href="'.ChatConversation::getUrl(['conversationId' => $conversationId]).'"');
-});
-
-it('hands the ask_rela step to the dashboard composer when no welcome conversation exists', function (): void {
-    $conversationId = (string) Str::uuid7();
-
-    DB::table('agent_conversations')->insert([
-        'id' => $conversationId,
-        'team_id' => $this->team->getKey(),
-        'participant_type' => $this->owner->getMorphClass(),
-        'participant_id' => (string) $this->owner->getKey(),
-        'title' => 'Pipeline check',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    DB::table('agent_conversation_messages')->insert([
-        'id' => (string) Str::uuid7(),
-        'conversation_id' => $conversationId,
-        'participant_type' => $this->owner->getMorphClass(),
-        'participant_id' => (string) $this->owner->getKey(),
-        'role' => 'user',
-        'content' => 'hi',
-        'agent' => 'crm',
-        'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
-        'usage' => '{}',
-        'meta' => '{}',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    // An id-less chat URL is a dead click: that page redirects straight back to
-    // the dashboard, so the row must never render one.
-    livewire(ActivationChecklist::class)
-        ->assertDontSeeHtml('href="'.ChatConversation::getUrl().'"')
-        ->assertSeeHtml(composePromptUrl());
 });
 
 /**

@@ -1122,10 +1122,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
     },
 
-    // Whether this message came from a prompt at all. Rela's proactive welcome
-    // message opens its conversation, so it has nothing to regenerate FROM: the
-    // button is hidden for it rather than disabled, because every disabled reason
-    // the UI can offer is about a pending approval and would be a lie here.
+    // Whether this message came from a prompt at all. A reply with no user
+    // message before it has nothing to regenerate FROM: the button is hidden
+    // rather than disabled, because every disabled reason the UI can offer is
+    // about a pending approval and would be a lie here.
     hasUserPrompt(index) {
         return this.messages.slice(0, index).some((m) => m.role === 'user');
     },
