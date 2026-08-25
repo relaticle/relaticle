@@ -121,7 +121,10 @@
                              shorter (16:10) image tab can't collapse the mockup frame. --}}
                         <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
                             {{-- AI Agent tab (default — featured) --}}
-                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1">
+                            {{-- min-w-0: a grid item defaults to min-width:auto, so the
+                                 chat panel's own table would size the column to its
+                                 intrinsic width and push the transcript past the frame. --}}
+                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 min-w-0">
                                 @include('home.partials.hero-agent-preview')
                             </div>
 

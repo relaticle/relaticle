@@ -5,32 +5,13 @@
      Icons use Heroicon outline to match the real Filament app exactly (the rest of
      the marketing site uses Remix Icon per project convention). --}}
 <aside class="hero-agent-shell hidden md:flex md:w-48 lg:w-56 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-    {{-- Workspace switcher.
-         The mark is a pixel-art "N" constructed from 13 discrete <rect>
-         squares on a 5×5 grid: two full vertical columns plus three diagonal
-         stair-step squares between them. Each cell is 4 units wide with a
-         1-unit gap on a 24×24 viewBox, so the squares read as separate
-         pixels rather than a solid letter. --}}
+    {{-- Workspace switcher. The real tenant avatar (fi-tenant-avatar) is a
+         generated SVG: a solid black square with the workspace initials in
+         white, centred. Reproduced here as markup rather than a data URI so it
+         picks up the same dark-mode treatment as the rest of the mock. --}}
     <div class="flex items-center gap-2 px-3 pt-2.5 pb-2">
-        <div class="flex h-6 w-6 items-center justify-center rounded bg-gray-900 shrink-0 dark:bg-white/[0.1]">
-            <svg viewBox="0 0 24 24" class="h-3 w-3 text-white" fill="currentColor" aria-hidden="true" shape-rendering="crispEdges">
-                {{-- Left column --}}
-                <rect x="0"  y="0"  width="4" height="4"/>
-                <rect x="0"  y="5"  width="4" height="4"/>
-                <rect x="0"  y="10" width="4" height="4"/>
-                <rect x="0"  y="15" width="4" height="4"/>
-                <rect x="0"  y="20" width="4" height="4"/>
-                {{-- Diagonal stair --}}
-                <rect x="5"  y="5"  width="4" height="4"/>
-                <rect x="10" y="10" width="4" height="4"/>
-                <rect x="15" y="15" width="4" height="4"/>
-                {{-- Right column --}}
-                <rect x="20" y="0"  width="4" height="4"/>
-                <rect x="20" y="5"  width="4" height="4"/>
-                <rect x="20" y="10" width="4" height="4"/>
-                <rect x="20" y="15" width="4" height="4"/>
-                <rect x="20" y="20" width="4" height="4"/>
-            </svg>
+        <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-white/[0.1]">
+            <span class="text-pico font-bold leading-none text-white">NW</span>
         </div>
         <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">Northwind</div>

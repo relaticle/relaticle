@@ -4,7 +4,7 @@
      The label column is fixed so values align down the card, and a change
      renders as old → new rather than as the new value alone. --}}
 <div class="group/field flex items-start gap-3">
-    <span class="w-24 shrink-0 pt-0.5 text-xs font-medium leading-5 text-gray-500 sm:w-28 dark:text-gray-400">{{ $row['label'] ?? '' }}</span>
+    <span class="w-24 shrink-0 text-[length:var(--text-micro)] font-medium leading-5 text-gray-400 sm:w-28 dark:text-gray-500">{{ $row['label'] ?? '' }}</span>
 
     @if ($isEditing)
         <div class="w-full min-w-0">
@@ -73,7 +73,10 @@
                         ])
                     >{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                 @else
-                    <span class="font-medium text-gray-900 dark:text-white">{{ $row['new'] ?? $row['value'] ?? '' }}</span>
+                    <span @class([
+                        'font-medium text-gray-900 dark:text-white' => array_key_exists('new', $row),
+                        'text-gray-700 dark:text-gray-300' => ! array_key_exists('new', $row),
+                    ])>{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                 @endif
             @endif
 

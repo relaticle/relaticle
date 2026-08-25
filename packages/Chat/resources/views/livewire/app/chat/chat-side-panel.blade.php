@@ -408,7 +408,6 @@
                     'pageContextType' => $recordType,
                     'pageContextId' => $recordId,
                     'pageContextLabel' => $recordName,
-                    'contextPrompts' => $starterPrompts,
                 ], key('side-panel-chat-' . ($conversationId ?? 'new')))
             </div>
         </div>

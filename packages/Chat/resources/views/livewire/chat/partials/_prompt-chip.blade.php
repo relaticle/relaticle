@@ -2,7 +2,12 @@
      <template x-for>. $item: name of the Alpine loop variable holding
      {label, prompt}; $click: the Alpine click expression. Blade-escaped
      `&gt;` in the attribute decodes back to `>` before Alpine reads it,
-     same round-trip _composer-bar documents for $sendDisabled. --}}
+     same round-trip _composer-bar documents for $sendDisabled.
+
+     Sole caller is the follow-up strip in _transcript.blade.php: chips the
+     model proposes from what a reply actually did (FollowUpService, broadcast
+     as `follow_ups`). The old canned starter prompts that also used this
+     partial are gone -- an empty composer offers no suggestions now. --}}
 <button
     type="button"
     x-on:click="{{ $click }}"

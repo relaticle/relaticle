@@ -1,11 +1,23 @@
+@php
+    $askLabel = __('Ask :name', ['name' => (string) config('chat.assistant_name')]);
+    // Server-derived, so the predicate is independent of how the panel is routed.
+    // Counting path segments only ever identified the tenant root on a
+    // domain-routed install; every path-routed one (the .env.example default)
+    // showed this button on the dashboard, next to the composer that does the
+    // same thing. Path-only: the dashboard and the current page always share a
+    // host, and comparing full URLs would break on a query string.
+    $dashboardPath = parse_url(\App\Filament\Pages\Dashboard::getUrl(), PHP_URL_PATH) ?? '/';
+@endphp
+
 <div
     x-data="{
         onChatPage: false,
         check() {
-            const p = window.location.pathname;
-            const segments = p.split('/').filter(Boolean);
-            // Hide on the tenant root (dashboard, single-segment path) and on any /chats route.
-            this.onChatPage = segments.length === 1 || /\/chats(\/|$)/.test(p);
+            const path = window.location.pathname.replace(/\/+$/, '') || '/';
+            const dashboard = @js(rtrim($dashboardPath, '/') ?: '/');
+            // Hide on the dashboard (its composer is the same entry point) and
+            // on any /chats route (the conversation IS the chat).
+            this.onChatPage = path === dashboard || /\/chats(\/|$)/.test(path);
         },
         init() {
             this.check();
@@ -20,8 +32,6 @@
     x-cloak
     class="me-2"
 >
-    @php($askLabel = __('Ask :name', ['name' => (string) config('chat.assistant_name')]))
-
     <x-filament::button
         outlined
         color="gray"

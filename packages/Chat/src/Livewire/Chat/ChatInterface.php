@@ -36,14 +36,6 @@ final class ChatInterface extends BaseLivewireComponent
 
     public ?string $pageContextLabel = null;
 
-    /**
-     * Record-aware starter prompts supplied by the side panel. Empty on the
-     * full-page chat, where the interface falls back to a generic list.
-     *
-     * @var array<int, array{label: string, prompt: string}>
-     */
-    public array $contextPrompts = [];
-
     private const int PAGE_SIZE = 50;
 
     /**
@@ -51,17 +43,13 @@ final class ChatInterface extends BaseLivewireComponent
      */
     public array $messages = [];
 
-    /**
-     * @param  array<int, array{label: string, prompt: string}>  $contextPrompts
-     */
-    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null, ?string $pageContextType = null, ?string $pageContextId = null, ?string $pageContextLabel = null, array $contextPrompts = []): void
+    public function mount(?string $conversationId = null, ?string $initialMessage = null, string $context = 'conversation', ?string $initialModel = null, ?string $pageContextType = null, ?string $pageContextId = null, ?string $pageContextLabel = null): void
     {
         $this->conversationId = $conversationId;
         $this->context = $context;
         $this->pageContextType = $pageContextType;
         $this->pageContextId = $pageContextId;
         $this->pageContextLabel = $pageContextLabel;
-        $this->contextPrompts = $contextPrompts;
 
         /** @var string|null $promptQuery */
         $promptQuery = request()->query('prompt');
