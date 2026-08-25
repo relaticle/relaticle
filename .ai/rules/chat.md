@@ -91,19 +91,59 @@ detached node and the stale title returns with the template. And the all-chats
 panel is nested the same way and has the same defect, still unfixed: it shows
 the list as of its last full page load.
 
-## A batch card decides the whole remainder; only a record's own row skips it
-The dock footer of a batch proposal is one decision over everything still
-undecided: "Create all N" (`ProposalCard::createCurrent` -> `approveRemainingItems`)
-and "Discard all" (`discardCurrent` -> `rejectRemainingItems`), both looping the
-per-item service calls and stopping at the first failure. Per-record skip lives
-ONLY on the record's own row (`skipItem`, the ✕ in `_dock-step.blade.php`).
-It was the other way round once: the footer read "Create"/"Discard" and resolved
-ONE record per click, so a user who clicked Discard to dismiss the card silently
-rejected the record under the cursor. That is how a proposed contact was skipped
-while the card still reported success. Never put a per-record decision back in
-the footer, and never let the footer label omit the count.
-The skip ✕ is hover-revealed on `sm:` and up but ALWAYS visible below it: touch
-has no hover, and an invisible skip control is the same defect again.
+## The footer decides exactly what is rendered; a paginated batch shows ONE record
+Since 2026-08 (user-directed Attio redesign) a standalone batch docks as
+pagination: the card renders ONLY the active record, the footer arrows
+(`prevItem`/`nextItem`) page through the undecided ones ("2/3"), and the
+footer's "Create"/"Discard" resolve the ACTIVE record alone
+(`ProposalCard::createCurrent` -> `approveActiveItem`, `discardCurrent` ->
+`rejectActiveItem`), advancing to the next undecided record. ⌘⏎ therefore
+creates one record per press mid-batch.
+The invariant that makes a per-record footer safe: the card must never render
+more than the record those buttons decide. In 2026 the footer decided ONE
+hidden record under the cursor while the card LISTED every record, so a user
+who clicked Discard to dismiss the card silently rejected a contact the card
+still reported as created. Re-adding a visible record list beside a per-record
+footer recreates that bug; a footer deciding more than what is rendered
+recreates its mirror image.
+A PLAN's batch step still lists every record row (the plan footer is
+"Approve all N", so everything it decides must be on screen) with per-row skip
+(`skipItem`, hover-revealed on `sm:`+ but ALWAYS visible below it: touch has no
+hover, and an invisible skip control was its own past defect).
+
+## Attribute checkboxes exclude fields at approval time, never from action_data
+Each excludable field row of a standalone card carries a checkbox
+(`ProposalCard::$excludedFields`, applied by `PendingActionService::approve`/
+`approveItem` via `sanitizedExclusions` + `withoutExcludedFields`). Unchecked
+codes are stripped from the write IN MEMORY at execution; the stored
+action_data stays frozen (replay/prompt-cache contract). The list is
+client-writable checkbox state, so the SERVICE guard is the defense: payload
+markers and the entity's title key are never excludable, delete excludes
+nothing. Exclusions reset on every navigation (setActive, focusItem,
+prev/next, each decided item) so one record's exclusions cannot leak onto the
+next. Audit truth: excluded codes persist in `result_data.excluded` (single)
+or `result_data.items[i].excluded` (batch item) and reach the model via
+`excludedFieldEntries()` -> `<resolved_actions>` ("fields unchecked by the
+user, NOT written") — without that line the model reports values it never
+set, the same defect class `skippedItemLabels()` exists to prevent.
+
+## Duplicates are caught by the REAL field rules, which need the tenant bound
+The card-level "Heads up: already proposed a moment ago" warning was removed
+(user-directed, 2026-08). Duplicate values (a person email above all) are
+rejected by the custom-fields package's own unique rules running inside
+`CustomFieldsRequestValidator` at proposal time — never re-implement them as
+bespoke lookups in a tool; they drift, and any escape hatch they offer is a
+lie the real rule blocks later. Two load-bearing pieces:
+- `ProcessChatMessage::bindAuth()` binds `TenantContextService` for the whole
+  job (restored in `releaseAuth()`). Without it the unique rules silently
+  no-op in the queued job — the exact bug that let chat create duplicate
+  emails while the panel form rejected them. Any new chat entry point that
+  validates or writes custom fields needs the same binding.
+- `BaseWriteCreateTool` SKIPS a record that fails validation instead of
+  aborting the call: the valid records still become one proposal, and
+  `skipped_records` (+ `skipped_note`) in the tool result tell the model each
+  skipped record and reason to relay to the user. All records failing returns
+  a plain error listing every reason.
 
 ## A partially-skipped batch is stored Approved: never render that status raw
 `finalizeBatchIfComplete` marks the row Approved when ANY item was created, so

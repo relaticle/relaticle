@@ -120,7 +120,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * transcript, whose tool results keep claiming the proposal is pending.
      * Superseded proposals are NOT here: see $supersededProposals above.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>}>
      */
     public array $resolvedActions = [];
 
@@ -496,6 +496,7 @@ PROMPT;
         foreach ($this->resolvedActions as $action) {
             $records = $action['records'] ?? [];
             $skipped = $action['skipped'] ?? [];
+            $excluded = $action['excluded'] ?? [];
 
             if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
                 $lines[] = "- {$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
@@ -508,6 +509,10 @@ PROMPT;
                     $lines[] = '    - skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").': '.$this->quotedLabel($label);
                 }
 
+                foreach ($excluded as $entry) {
+                    $lines[] = '    - fields unchecked by the user on '.$this->quotedLabel($entry['record']).', NOT written: '.implode(', ', $entry['fields']);
+                }
+
                 continue;
             }
 
@@ -516,6 +521,15 @@ PROMPT;
             if ($skipped !== []) {
                 $skippedLabels = implode(', ', array_map($this->quotedLabel(...), $skipped));
                 $line .= '; skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").": {$skippedLabels}";
+            }
+
+            // A field the user unchecked was NOT written even though the replayed
+            // proposal still lists it; without this line the model reports values
+            // it never set.
+            foreach ($excluded as $entry) {
+                $line .= '; fields unchecked by the user'
+                    .($entry['record'] === null ? '' : ' on '.$this->quotedLabel($entry['record']))
+                    .', NOT written: '.implode(', ', $entry['fields']);
             }
 
             $lines[] = $line;

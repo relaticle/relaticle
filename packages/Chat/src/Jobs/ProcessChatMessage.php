@@ -50,6 +50,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -924,14 +925,30 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
+    /**
+     * The custom-fields tenant id in force before this job bound its own,
+     * restored by releaseAuth() so the override never outlives the job.
+     */
+    private null|int|string $previousTenantId = null;
+
     private function bindAuth(): void
     {
         Auth::guard('web')->setUser($this->user);
+
+        // The job runs with no Filament panel request, so the custom-fields
+        // package has no ambient tenant. Without one its TenantScope no-ops:
+        // per-field validation rules that query other records (unique values,
+        // above all) silently pass during tool validation, which is how a
+        // duplicate unique email sailed through chat while the panel form
+        // rejected it. Same contract as SetApiTeamContext on the API path.
+        $this->previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($this->team->getKey());
     }
 
     private function releaseAuth(): void
     {
         Auth::guard('web')->forgetUser();
+        TenantContextService::setTenantId($this->previousTenantId);
     }
 
     private function resolutionKey(): string

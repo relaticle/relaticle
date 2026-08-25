@@ -208,13 +208,6 @@
             'border-t border-gray-100 dark:border-white/5',
             'ps-5' => $inPlan,
         ])>
-            <template x-if="action.display?.duplicate_warning">
-                <div class="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
-                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span x-text="action.display.duplicate_warning"></span>
-                </div>
-            </template>
-
             <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
                 <div class="divide-y divide-gray-100 dark:divide-white/5">
                     <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
