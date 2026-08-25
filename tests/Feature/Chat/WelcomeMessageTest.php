@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Jobs\SendWelcomeMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 
 mutates(SendWelcomeMessage::class, CreateTeamCustomFields::class);
 
@@ -96,6 +98,36 @@ it('leaves the welcome copy alone once the user has replied', function (): void 
         'meta' => '{}',
         'created_at' => now(),
         'updated_at' => now(),
+    ]);
+
+    (new SendWelcomeMessage($team))->handle();
+
+    expect(DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->where('role', 'assistant')->value('content'))
+        ->toBe('sentinel before refine');
+});
+
+it('leaves the welcome copy alone while a reply is still in flight', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    $conversationId = DB::table('agent_conversations')->where('team_id', $team->getKey())->value('id');
+
+    DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->update(['content' => 'sentinel before refine']);
+
+    // No user message row exists yet: ChatController::send() does not persist
+    // one until the assistant turn finishes. The reservation row is written
+    // synchronously in the send request, so it is what the job must see.
+    AiCreditTransaction::factory()->create([
+        'team_id' => $team->getKey(),
+        'user_id' => $owner->getKey(),
+        'conversation_id' => $conversationId,
+        'idempotency_key' => 'reserve-in-flight-turn',
+        'type' => AiCreditType::Reservation,
     ]);
 
     (new SendWelcomeMessage($team))->handle();

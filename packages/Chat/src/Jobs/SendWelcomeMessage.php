@@ -79,6 +79,13 @@ final class SendWelcomeMessage implements ShouldQueue
         // a message a turn has already consumed invalidates the prompt cache
         // prefix from that turn on. Zero affected rows is a success: the user
         // beat the job and the templated copy stands.
+        //
+        // A user message row alone is not enough: ChatController::send() does
+        // not persist it until the assistant turn finishes, so a reply that is
+        // still streaming would be invisible to that check. The credit ledger
+        // row is written synchronously in the send request, before the turn
+        // starts, so it is the earliest reliable signal that a reply is in
+        // flight.
         DB::table('agent_conversation_messages')
             ->where('id', $message->id)
             ->whereNotExists(fn (Builder $query): Builder => $query
@@ -86,6 +93,10 @@ final class SendWelcomeMessage implements ShouldQueue
                 ->from('agent_conversation_messages as u')
                 ->where('u.conversation_id', $message->conversation_id)
                 ->where('u.role', 'user'))
+            ->whereNotExists(fn (Builder $query): Builder => $query
+                ->select(DB::raw('1'))
+                ->from('ai_credit_transactions')
+                ->where('conversation_id', $message->conversation_id))
             ->update([
                 'content' => $text,
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
