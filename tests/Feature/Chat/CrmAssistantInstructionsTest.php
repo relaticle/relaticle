@@ -144,3 +144,32 @@ it('tells the model to reach for include when asked for related records', functi
         ->toContain('pass `include` to the list tool')
         ->toContain('no single block and no `include` can show');
 });
+
+/**
+ * Since the display block now renders every row the model received (no more
+ * BLOCK_ROW_LIMIT slicing), the old warning that `showing` "can exceed the
+ * rows the table under your reply prints" is false: the table always shows
+ * exactly what the model saw. Leaving the stale clause in would tell the
+ * model to distrust a table that is now trustworthy.
+ */
+it('no longer warns that showing can exceed what the table prints', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->not->toContain('can exceed the rows the table under your reply prints')
+        ->toContain('has_more');
+});
+
+/**
+ * `next_page` is the only instruction that tells the model how to reach page
+ * 2 of a list result. If a future prompt trim drops this line, the model has
+ * no way to fetch more rows and will either fabricate a "view more" answer or
+ * silently truncate the user's request to the first page.
+ */
+it('tells the model how to fetch the next page of a list result', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('page` set to the result\'s `next_page`')
+        ->toContain('narrow the filter instead');
+});
