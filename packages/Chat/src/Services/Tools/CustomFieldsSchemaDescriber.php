@@ -34,19 +34,15 @@ final readonly class CustomFieldsSchemaDescriber
             return 'No custom fields are defined for this entity type.';
         }
 
+        [$activeFields, $inactiveFields] = $fields->partition(fn (CustomField $field): bool => $field->active);
+
         $lines = [
             'Available custom fields for this entity. Keys MUST be one of these codes. Values MUST match the documented format.',
             '',
         ];
 
-        foreach ($fields as $field) {
-            $line = '- '.$this->describeField($field);
-
-            if (! $field->active) {
-                $line .= ' (inactive, not settable: the workspace owner can reactivate it in custom field settings)';
-            }
-
-            $lines[] = $line;
+        foreach ($activeFields as $field) {
+            $lines[] = '- '.$this->describeField($field);
         }
 
         $lines[] = '';
@@ -55,7 +51,24 @@ final readonly class CustomFieldsSchemaDescriber
             .'If a field is required the write is rejected with a validation error naming it, '
             .'so never claim a field cannot be cleared without attempting it.';
 
+        if ($inactiveFields->isNotEmpty()) {
+            $lines[] = '';
+            $lines[] = 'Also defined on this entity but INACTIVE. These codes are NOT valid keys and a write using '
+                .'one is rejected. They exist and hold stored values, so never tell the user the field does not exist:';
+
+            foreach ($inactiveFields as $field) {
+                $lines[] = '- '.$this->describeInactiveField($field);
+            }
+        }
+
         return implode("\n", $lines);
+    }
+
+    private function describeInactiveField(CustomField $field): string
+    {
+        $typeData = CustomFieldsType::getFieldType($field->type);
+
+        return "{$field->code} (".$this->humanType($typeData?->dataType, $field->type).')';
     }
 
     private function describeField(CustomField $field): string
