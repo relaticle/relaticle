@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Features\OnboardSeed;
 use App\Listeners\CreateTeamCustomFields;
+use App\Models\Company;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -75,4 +78,48 @@ it('does not write a second conversation when run twice', function (): void {
     (new SendWelcomeMessage($team))->handle();
 
     expect(DB::table('agent_conversations')->where('team_id', $team->getKey())->count())->toBe(1);
+});
+
+/**
+ * The other tests all reach the templated fallback, because Http::preventStrayRequests()
+ * makes generation throw. That hid a crash in the prompt-building path itself: it queried
+ * a column tasks does not have, and the job died before it could fall back. Build the
+ * prompt directly so the generation path is exercised on its own.
+ */
+it('builds the workspace prompt from real seeded records', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Whitfield']);
+    $team = $owner->currentTeam;
+
+    Company::factory()->create([
+        'team_id' => $team->getKey(),
+        'name' => 'Northwind Traders',
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+    Task::factory()->create([
+        'team_id' => $team->getKey(),
+        'title' => 'Follow up with Dylan',
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    $job = new SendWelcomeMessage($team);
+    $block = (new ReflectionMethod($job, 'workspaceBlock'))->invoke($job, 'Dana');
+
+    expect($block)->toContain('Northwind Traders')
+        ->and($block)->toContain('Follow up with Dylan')
+        ->and($block)->toContain('Owner first name: Dana');
+});
+
+it('greets a user whose name is blank without a dangling comma', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create(['name' => ' ']);
+    $team = $owner->currentTeam;
+
+    (new SendWelcomeMessage($team))->handle();
+
+    $content = DB::table('agent_conversation_messages')
+        ->join('agent_conversations as c', 'c.id', '=', 'agent_conversation_messages.conversation_id')
+        ->where('c.team_id', $team->getKey())
+        ->value('agent_conversation_messages.content');
+
+    expect($content)->not->toContain('Hi ,')
+        ->and($content)->toContain(__('chat-welcome.default_name'));
 });
