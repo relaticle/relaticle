@@ -18,30 +18,47 @@
         {{-- Surface: the solid data-block tier (crisp hairline card, no shadow)
              shared with the read-result blocks, so a proposal reads as the same
              kind of object as the data around it. --}}
-        <div class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
+        {{-- While a field is being edited the card must NOT clip: a Select renders
+             its panel as an absolutely-positioned child (Filament positions it
+             itself, there is no teleport to opt into), so `overflow-hidden` here
+             and `overflow-y-auto` on the steps below cut the options list off --
+             measured: a panel spanning 497-737 inside a card starting at 638 lost
+             141px, leaving the list unreadable above the input. Clipping returns
+             the moment the edit closes, so the rounded corners and the tall-plan
+             scroller behave normally the rest of the time. --}}
+        <div @class([
+            'flex min-h-0 flex-col rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]',
+            'overflow-hidden' => $editingFieldCode === null,
+        ])>
             @if ($isPlan)
                 {{-- Plan header: the card is one decision over several writes, so it
                      says how many and in what order they run. --}}
                 <div class="flex shrink-0 items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600 dark:bg-primary-400/10 dark:text-primary-400" aria-hidden="true">
+                    {{-- Neutral tile, matching the block headers (records_table,
+                         record_card): the coloured tiles belong to the STEP rows,
+                         where the tint actually distinguishes create from delete.
+                         A second colour on the header competed with them. --}}
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
                         <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
                     </span>
 
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">
-                            {{ trans_choice(':count step|:count steps', $stepCount, ['count' => $stepCount]) }}
-                        </p>
-                        <p class="text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                            {{ __('Approved together, created in order') }}
-                        </p>
-                    </div>
+                    <p class="min-w-0 flex-1 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">
+                        {{ trans_choice(':count step|:count steps', $stepCount, ['count' => $stepCount]) }}
+                    </p>
+
+                    {{-- Right-aligned meta, same slot the records_table header uses
+                         for its truncation count. --}}
+                    <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
+                        {{ __('Approved together, in order') }}
+                    </span>
                 </div>
             @endif
 
             {{-- A plan can be taller than the dock: the steps scroll, so the
                  decision buttons never leave the viewport. --}}
             <div @class([
-                'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+                'min-h-0 flex-1',
+                'overflow-y-auto overscroll-contain' => $editingFieldCode === null,
                 'divide-y divide-gray-100 dark:divide-white/5' => $isPlan,
             ])>
                 @foreach ($steps as $step)
@@ -56,7 +73,7 @@
             @enderror
 
             {{-- Footer: the decision. Separated by a hairline so it reads as one deliberate step. --}}
-            <div class="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 px-4 py-2.5 dark:border-white/5">
+            <div class="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
                 <button
                     type="button"
                     wire:click="{{ $discardAction }}"
@@ -64,7 +81,7 @@
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
+                        'inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
@@ -78,19 +95,19 @@
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
                         'bg-red-600 hover:bg-red-500 focus-visible:outline-red-500' => $operation === 'delete' && ! $isPlan,
                         'bg-primary-600 hover:bg-primary-500 focus-visible:outline-primary-500' => $operation !== 'delete' || $isPlan,
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
-                    <x-heroicon-o-check class="h-3.5 w-3.5" wire:loading.remove wire:target="{{ $primaryAction }}" aria-hidden="true" />
+                    <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
+                    <x-heroicon-o-check class="h-3 w-3" wire:loading.remove wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
                     <kbd
                         x-data
                         x-text="/Mac|iP/.test(navigator.platform) ? '⌘⏎' : 'Ctrl+⏎'"
-                        class="hidden rounded bg-white/20 px-1.5 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
+                        class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
                     ></kbd>
                 </button>
             </div>

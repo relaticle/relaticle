@@ -19,7 +19,7 @@
     @class([
         'group/step relative',
         'px-4 py-3' => ! $isPlan,
-        'py-3 pe-3 ps-11' => $isPlan,
+        'py-2.5 pe-3 ps-11' => $isPlan,
     ])
     wire:key="step-{{ $step['id'] }}"
 >
@@ -42,7 +42,7 @@
     <div class="flex items-start gap-2.5">
         <span
             @class([
-                'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
                 'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400' => $step['operation'] === 'create',
                 'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400' => $step['operation'] === 'update',
                 'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $step['operation'] === 'delete',
@@ -63,7 +63,7 @@
         </span>
 
         <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold leading-6 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
+            <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
 
             @if ($blockedBy !== [])
                 <p class="mt-0.5 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
@@ -146,7 +146,12 @@
         </div>
     @endif
 
-    <div class="mt-2.5 space-y-2.5">
+    <div @class([
+        'mt-2 space-y-2',
+        {{-- Align the fields with the step title rather than the tile: one left
+             edge per card, the way the block headers read. --}}
+        'ps-[2.125rem]' => ! $isPlan,
+    ])>
         @foreach ($step['fields'] as $row)
             @include('chat::livewire.chat.partials._dock-field', [
                 'row' => $row,

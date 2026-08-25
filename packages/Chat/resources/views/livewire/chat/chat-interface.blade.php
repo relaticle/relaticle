@@ -6,7 +6,6 @@
     x-on:chat:context-updated.window="
         pageContext = ($event.detail.type && $event.detail.id) ? { type: $event.detail.type, id: $event.detail.id } : null;
         pageContextLabel = $event.detail.label ?? null;
-        starterPrompts = ($event.detail.prompts && $event.detail.prompts.length) ? $event.detail.prompts : starterPrompts;
         pageContextDismissed = false;
         pageContextConsumed = false;
     "
@@ -78,16 +77,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'createdVerb' => __('Created'),
             'updatedVerb' => __('Updated'),
             'deletedVerb' => __('Deleted'),
-            'keptWord' => __('kept'),
-            'skippedWord' => __('skipped'),
-            'outcomePart' => __(':verb :names'),
-            'outcomeSingle' => __(':verb :name.'),
-            'fallbackRecord' => __('record'),
-            'fallbackTheRecord' => __('the record'),
-            'keptDeletionDiscarded' => __('Kept :name, deletion discarded.'),
-            'deletionDiscarded' => __('Deletion discarded.'),
-            'discardedName' => __('Discarded :name.'),
-            'proposalDiscarded' => __('Proposal discarded.'),
         ]),
     }),
     ...window.ChatModules.sendModule({
@@ -190,15 +179,6 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         if (! wrapper || ! window.Alpine) return null;
         return window.Alpine.$data(wrapper);
     },
-
-    // Record-aware when the side panel supplies them (so the chips name the record
-    // you are looking at); generic fallback on the full-page chat, which has no record.
-    starterPrompts: @js($contextPrompts !== [] ? $contextPrompts : [
-        ['label' => __('Give me a CRM overview'), 'prompt' => __('Give me a CRM overview')],
-        ['label' => __('Show overdue tasks'), 'prompt' => __('Show overdue tasks')],
-        ['label' => __('Recent companies'), 'prompt' => __('Recent companies')],
-        ['label' => __('Pipeline summary'), 'prompt' => __('Pipeline summary')],
-    ]),
 
     init() {
         this.context = this.$root?.dataset?.chatContext ?? 'conversation';

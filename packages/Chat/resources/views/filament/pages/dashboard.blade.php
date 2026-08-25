@@ -58,14 +58,6 @@
                 x-text="error"
             ></div>
 
-            {{-- Prompt suggestions: the composer's counterpart to the empty-state
-                 chips the full-page chat shows, so Home is the only place a chat
-                 has to be started from. --}}
-            <div class="mt-4 flex flex-wrap justify-center gap-2">
-                <template x-for="starter in starterPrompts" :key="starter.label">
-                    @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'starter', 'click' => 'useStarter(starter.prompt)'])
-                </template>
-            </div>
         </form>
 
         @include('chat::filament.pages.partials.my-tasks')
@@ -76,7 +68,6 @@
         Alpine.data('dashboardChatInput', (chatUrl, defaultModel) => ({
             submitting: false,
             error: null,
-            starterPrompts: @js($this->starterPrompts),
             @include('chat::livewire.chat.partials._model-state')
 
             init() {
@@ -97,14 +88,6 @@
                 const wrapper = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
                 if (! wrapper || ! window.Alpine) return null;
                 return window.Alpine.$data(wrapper);
-            },
-
-            useStarter(prompt) {
-                const editor = this.localEditor();
-                if (!editor || this.submitting) return;
-
-                editor.setText(prompt);
-                this.$nextTick(() => this.submit());
             },
 
             submit() {

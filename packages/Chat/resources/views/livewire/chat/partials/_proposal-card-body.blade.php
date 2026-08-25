@@ -177,7 +177,7 @@
             </template>
 
             <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-                <div class="space-y-2.5 px-4 py-3">
+                <div @class(['space-y-2 py-2.5', 'pe-4 ps-4' => $inPlan, 'px-4' => ! $inPlan])>
                     <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
                         @include('chat::livewire.chat.partials._proposal-field')
                     </template>

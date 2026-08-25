@@ -25,7 +25,7 @@
     </div>
 
     @if($count === 0)
-        <div class="rounded-xl border border-dashed border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-6 py-10 text-center">
+        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ __('filament/pages/dashboard.tasks.empty.title') }}
             </p>
@@ -37,7 +37,9 @@
             </div>
         </div>
     @else
-        <ul class="divide-y divide-[var(--surface-card-border)] overflow-hidden rounded-xl border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)]">
+        {{-- Solid block tier: the list is the page's primary object, and the
+             translucent card wash let the canvas gradient read through it. --}}
+        <ul class="divide-y divide-[var(--surface-block-border)] overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
             @foreach($myTasks as $task)
                 @php
                     $dateClass = match ($task->severity) {
@@ -67,16 +69,16 @@
                                 x-on:click="checked = true; setTimeout(() => $wire.completeTask(@js($task->id)).catch(() => checked = false), 450)"
                                 title="{{ __('filament/pages/dashboard.tasks.complete') }}"
                                 aria-label="{{ __('filament/pages/dashboard.tasks.complete') }}"
-                                class="flex size-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                                class="flex size-4 flex-shrink-0 items-center justify-center rounded-full border transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                 :class="checked
                                     ? 'border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500'
-                                    : 'border-gray-300 hover:border-primary-500 dark:border-gray-600 dark:hover:border-primary-400'"
+                                    : 'border-gray-400 hover:border-primary-500 dark:border-gray-500 dark:hover:border-primary-400'"
                             >
                                 <span
                                     class="transition duration-200 motion-reduce:transition-none"
                                     :class="checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
                                 >
-                                    <x-heroicon-m-check class="size-3.5 text-white" />
+                                    <x-heroicon-m-check class="size-3 text-white" />
                                 </span>
                             </button>
                         @endif

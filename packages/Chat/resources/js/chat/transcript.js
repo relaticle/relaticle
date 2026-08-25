@@ -878,22 +878,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         { value: 'other', label: 'Other' },
     ],
 
-    // Injected translated copy for the proposal chips and outcome sentences.
-    // The en defaults are asserted byte-for-byte by ProposalOutcomeSummaryTest.
+    // Injected translated copy for the resolved-item chips.
     proposalTexts: {
         createdVerb: 'Created',
         updatedVerb: 'Updated',
         deletedVerb: 'Deleted',
-        keptWord: 'kept',
-        skippedWord: 'skipped',
-        outcomePart: ':verb :names',
-        outcomeSingle: ':verb :name.',
-        fallbackRecord: 'record',
-        fallbackTheRecord: 'the record',
-        keptDeletionDiscarded: 'Kept :name, deletion discarded.',
-        deletionDiscarded: 'Deletion discarded.',
-        discardedName: 'Discarded :name.',
-        proposalDiscarded: 'Proposal discarded.',
         ...proposalTexts,
     },
 
@@ -1070,54 +1059,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             : (op === 'update' ? this.proposalTexts.updatedVerb : this.proposalTexts.createdVerb);
     },
 
-    // Reload-safe agent outcome summary for a finalized proposal. Built purely from
-    // the persisted action (status, itemResults, record refs, display) so it survives
-    // a conversation reload exactly like the audit card, no stored message and no AI
-    // continuation (both intentionally removed). Returns null while still pending.
-    proposalOutcome(action) {
-        if (!action || action.status === 'pending') return null;
-
-        const op = action.operation;
-        const verb = this.itemVerb(action);
-        const items = action.display?.items;
-
-        if (Array.isArray(items) && items.length > 0) {
-            const created = [];
-            const skipped = [];
-            items.forEach((item, i) => {
-                const res = this.itemResult(action, i) || this.itemResult(action, String(i));
-                if (!res) return;
-                const name = res.record?.label || this.proposalItemName(item) || this.proposalTexts.fallbackRecord;
-                if (res.status === 'approved') created.push(name);
-                else if (res.status === 'skipped') skipped.push(name);
-            });
-            const skippedVerb = op === 'delete' ? this.proposalTexts.keptWord : this.proposalTexts.skippedWord;
-            const parts = [];
-            if (created.length) parts.push(this.proposalTexts.outcomePart.replace(':verb', verb).replace(':names', this.joinNames(created)));
-            if (skipped.length) parts.push(this.proposalTexts.outcomePart.replace(':verb', skippedVerb).replace(':names', this.joinNames(skipped)));
-            if (parts.length === 0) return null;
-            const sentence = parts.join('; ') + '.';
-            return sentence.charAt(0).toUpperCase() + sentence.slice(1);
-        }
-
-        if (action.status === 'approved') {
-            const label = action.record?.label || this.extractQuotedName(action.display?.summary) || this.proposalTexts.fallbackTheRecord;
-            return this.proposalTexts.outcomeSingle.replace(':verb', verb).replace(':name', label);
-        }
-        if (action.status === 'rejected') {
-            const label = this.extractQuotedName(action.display?.summary);
-            if (op === 'delete') {
-                return label
-                    ? this.proposalTexts.keptDeletionDiscarded.replace(':name', label)
-                    : this.proposalTexts.deletionDiscarded;
-            }
-            return label
-                ? this.proposalTexts.discardedName.replace(':name', label)
-                : this.proposalTexts.proposalDiscarded;
-        }
-        return null;
-    },
-
     // Proposals from one assistant turn are ONE decision, so the transcript shows
     // them as one card in the order they run. A proposal without a turn (anything
     // written before plans existed) stands alone, which is also the single-write
@@ -1149,84 +1090,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     isPlanGroup(group) {
         return !!group && Array.isArray(group.actions) && group.actions.length > 1;
-    },
-
-    planGroupResolved(group) {
-        return !!group && group.actions.every((action) => action.status !== 'pending');
-    },
-
-    // One sentence for the whole plan. Steps that share a verb are merged
-    // ("Created A, B and C") rather than repeated once per step, which is how a
-    // person would report having done them.
-    planOutcome(group) {
-        if (!this.planGroupResolved(group)) return null;
-
-        const byVerb = new Map();
-        const discarded = [];
-        const others = [];
-
-        for (const action of group.actions) {
-            const name = action.record?.label
-                || this.extractQuotedName(action.display?.summary);
-            const isSingle = name && !Array.isArray(action.display?.items);
-
-            if (isSingle && action.status === 'approved') {
-                const verb = this.itemVerb(action);
-                if (!byVerb.has(verb)) byVerb.set(verb, []);
-                byVerb.get(verb).push(name);
-                continue;
-            }
-
-            if (isSingle && action.status === 'rejected' && action.operation !== 'delete') {
-                discarded.push(name);
-                continue;
-            }
-
-            const sentence = this.proposalOutcome(action);
-            if (sentence) others.push(sentence);
-        }
-
-        const parts = [...byVerb.entries()].map(([verb, names]) =>
-            this.proposalTexts.outcomeSingle
-                .replace(':verb', verb)
-                .replace(':name', this.joinNames(names)));
-
-        if (discarded.length > 0) {
-            parts.push(this.proposalTexts.discardedName.replace(':name', this.joinNames(discarded)));
-        }
-
-        parts.push(...others);
-
-        return parts.length > 0 ? parts.join(' ') : null;
-    },
-
-    proposalItemName(item) {
-        if (!item) return null;
-        const fields = item.fields;
-        if (Array.isArray(fields) && fields.length > 0) {
-            const value = fields[0].value ?? fields[0].new;
-            if (typeof value === 'string' && value !== '') return value;
-        }
-        return this.extractQuotedName(item.summary);
-    },
-
-    extractQuotedName(text) {
-        if (typeof text !== 'string') return null;
-        const match = text.match(/"([^"]+)"/);
-        return match ? match[1] : null;
-    },
-
-    // Locale-aware list join: Intl.ListFormat produces "A and B" /
-    // "A, B, and C" for en (matching the sentences ProposalOutcomeSummaryTest
-    // asserts) and the right conjunction for every other locale for free.
-    joinNames(names) {
-        const list = names.filter(Boolean);
-        if (list.length === 0) return '';
-        try {
-            return new Intl.ListFormat(document.documentElement.lang || 'en', { style: 'long', type: 'conjunction' }).format(list);
-        } catch (_) {
-            return list.join(', ');
-        }
     },
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they

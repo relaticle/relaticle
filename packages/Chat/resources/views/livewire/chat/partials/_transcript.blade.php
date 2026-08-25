@@ -25,22 +25,17 @@
                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                     {{ __('What do you need to know?') }}
                 </h3>
-                {{-- The side panel keeps its empty state to the greeting: the record
-                     it is bound to already frames what to ask, so the starter chips
-                     are noise there. --}}
+                {{-- Both surfaces keep the empty state to the greeting. The side
+                     panel is bound to a record that already frames what to ask,
+                     and the full-page chat sits directly above its own composer. --}}
                 @if (($context ?? 'conversation') === 'side-panel')
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {{ __('Ask about this record, or anything else in your CRM.') }}
                     </p>
                 @else
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __("Ask about a deal, a contact, or what's overdue. Try one of these:") }}
+                        {{ __("Ask about a deal, a contact, or what's overdue.") }}
                     </p>
-                    <div class="mt-4 flex flex-wrap justify-center gap-2">
-                        <template x-for="starter in starterPrompts" :key="starter.label">
-                            @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'starter', 'click' => 'input = starter.prompt; localEditor()?.setText(starter.prompt); $nextTick(() => sendMessage())'])
-                        </template>
-                    </div>
                 @endif
             </div>
         </div>
@@ -64,7 +59,7 @@
             x-transition:leave-end="motion-safe:opacity-0"
             x-text="stickyDateLabel"
             style="display: none;"
-            class="rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:text-gray-200"
+            class="rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg dark:text-gray-200"
         ></span>
     </div>
 
@@ -504,15 +499,6 @@
                                         <template x-if="group.actions.some((a) => a.status !== 'pending')">
                                             @include('chat::livewire.chat.partials._proposal-plan-card')
                                         </template>
-
-                                        <template x-if="planOutcome(group)">
-                                            <div class="flex justify-start">
-                                                <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
-                                                    <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
-                                                    <span x-text="planOutcome(group)"></span>
-                                                </div>
-                                            </div>
-                                        </template>
                                     </div>
                                 </template>
 
@@ -521,19 +507,6 @@
                                         <div class="space-y-2">
                                             <template x-if="action.status !== 'pending' || hasItemResults(action)">
                                                 @include('chat::livewire.chat.partials._proposal-card')
-                                            </template>
-
-                                            {{-- Agent outcome summary once the proposal is finalized. Reload-safe:
-                                                 derived from the persisted action by proposalOutcome(), not a stored message. --}}
-                                            {{-- Flat status line, matching the flattened assistant text
-                                                 it follows; the sparkles icon marks it as the agent's note. --}}
-                                            <template x-if="action.status !== 'pending' && proposalOutcome(action)">
-                                                <div class="flex justify-start">
-                                                    <div class="inline-flex items-start gap-1.5 px-1 py-1 text-sm text-gray-600 [overflow-wrap:anywhere] dark:text-gray-300">
-                                                        <x-heroicon-o-sparkles class="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" aria-hidden="true" />
-                                                        <span x-text="proposalOutcome(action)"></span>
-                                                    </div>
-                                                </div>
                                             </template>
                                         </div>
                                     </template>
@@ -568,7 +541,10 @@
             <button
                 type="button"
                 x-on:click="scrollToBottom(true)"
-                class="flex items-center gap-1.5 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                {{-- Solid block tier, not the translucent card tier: this floats
+                     OVER the transcript, and at gray-50/80 the message bubble
+                     underneath read straight through it. --}}
+                class="flex items-center gap-1.5 rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
                 x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
                 x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"

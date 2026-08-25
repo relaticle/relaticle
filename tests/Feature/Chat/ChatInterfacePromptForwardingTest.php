@@ -33,16 +33,14 @@ it('leaves initialMessage null when no prompt query and no prop', function (): v
         ->assertSet('initialMessage', null);
 });
 
-it('hides the starter prompt chips in the side panel', function (): void {
-    Livewire::test(ChatInterface::class, [
-        'context' => 'side-panel',
-        'contextPrompts' => [['label' => 'Summarize Acme', 'prompt' => 'Summarize Acme']],
-    ])
+it('keeps the side panel empty state to its record-aware greeting', function (): void {
+    Livewire::test(ChatInterface::class, ['context' => 'side-panel'])
         ->assertSee('Ask about this record, or anything else in your CRM.')
         ->assertDontSee('Try one of these');
 });
 
-it('keeps the starter prompt chips on the full-page chat', function (): void {
+it('keeps the full-page empty state to its greeting, with no starter chips', function (): void {
     Livewire::test(ChatInterface::class)
-        ->assertSee('Try one of these');
+        ->assertSee("Ask about a deal, a contact, or what's overdue.")
+        ->assertDontSee('Try one of these');
 });

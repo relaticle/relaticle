@@ -33,15 +33,6 @@ final class ChatSidePanel extends BaseLivewireComponent
     public ?string $recordName = null;
 
     /**
-     * Prompts for the chat interface's empty state. Computed regardless of panel
-     * state, because the interface renders them the moment the panel opens
-     * rather than on the next navigation.
-     *
-     * @var array<int, array{label: string, prompt: string}>
-     */
-    public array $starterPrompts = [];
-
-    /**
      * @var array<string, string>
      */
     protected $listeners = [
@@ -91,14 +82,11 @@ final class ChatSidePanel extends BaseLivewireComponent
         $this->recordType = $context['record_type'];
         $this->recordId = $context['record_id'];
         $this->recordName = $context['record_name'];
-        $this->starterPrompts = $contextService->getSuggestedPrompts($context);
-
         $this->dispatch(
             'chat:context-updated',
             type: $this->recordType,
             id: $this->recordId,
             label: $this->recordName,
-            prompts: $this->starterPrompts,
         );
     }
 
