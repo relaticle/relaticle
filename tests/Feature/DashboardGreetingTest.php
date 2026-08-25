@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -117,4 +119,27 @@ it('hides the welcome once the checklist is dismissed', function (): void {
     Filament::setTenant($owner->currentTeam);
 
     Livewire::test(Dashboard::class)->assertSee('Good');
+});
+
+it('points the first-run composer at the welcome conversation', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($owner);
+    Filament::setTenant($owner->currentTeam);
+
+    $conversationId = DB::table('agent_conversations')
+        ->where('team_id', $owner->currentTeam->getKey())
+        ->value('id');
+
+    // dashboardChatInput's first argument is rendered through @js(), which
+    // JSON-encodes the URL and escapes every slash as \/. Comparing against
+    // the raw URL would never match the markup, so build the expectation the
+    // same way Blade's @js() directive does.
+    $welcomeConversationUrl = Js::from(
+        ChatConversation::getUrl(['conversationId' => $conversationId])
+    )->toHtml();
+
+    Livewire::test(Dashboard::class)
+        ->assertSee($welcomeConversationUrl, escape: false);
 });

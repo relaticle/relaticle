@@ -1,6 +1,8 @@
 <x-filament-panels::page>
     <div
-        x-data="dashboardChatInput(@js(\App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
+        x-data="dashboardChatInput(@js($this->welcome
+            ? \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $this->welcome['conversation_id']])
+            : \App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
         class="mx-auto w-full max-w-3xl py-16"
     >
         {{-- Greeting. On a fresh workspace Rela's seeded welcome takes the slot
