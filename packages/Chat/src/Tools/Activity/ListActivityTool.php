@@ -40,12 +40,6 @@ final readonly class ListActivityTool implements Tool
     private const int ENTRY_LIMIT = 50;
 
     /**
-     * Rows carried by the `records_table` display block, matching the read list
-     * tools: a chat bubble that scrolls past ten rows stops being a summary.
-     */
-    private const int BLOCK_ROW_LIMIT = 10;
-
-    /**
      * Characters kept in the "what changed" cell, matching the cell cap the
      * read list tools use.
      */
@@ -128,7 +122,19 @@ final readonly class ListActivityTool implements Tool
         }
 
         $totalEntries = $this->countEntries($scope);
-        $payload = ['days' => $days, 'data' => $entries, 'total' => $totalEntries, 'showing' => count($entries)];
+
+        // Key presence describes the tool's capability, the value describes the
+        // current position. This tool has no `page` parameter and its rows span
+        // mixed entity types, so there is no next page to request and no single
+        // list page to open: `has_more` is emitted, `next_page` and `open_url`
+        // never are. The narrowing lever is `days` / `record_type` instead.
+        $payload = [
+            'days' => $days,
+            'data' => $entries,
+            'total' => $totalEntries,
+            'showing' => count($entries),
+            'has_more' => $totalEntries > count($entries),
+        ];
 
         if ($entries !== []) {
             $payload['display_block'] = $this->buildDisplayBlock($entries, $totalEntries);
@@ -427,7 +433,7 @@ final readonly class ListActivityTool implements Tool
     {
         $rows = [];
 
-        foreach (array_slice($entries, 0, self::BLOCK_ROW_LIMIT) as $index => $entry) {
+        foreach ($entries as $index => $entry) {
             $rows[] = [
                 'id' => (string) $index,
                 // Per-row, unlike a records_table: the subjects of one activity

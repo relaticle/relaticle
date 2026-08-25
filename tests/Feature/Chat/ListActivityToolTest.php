@@ -83,7 +83,10 @@ it('reports a name change with its old and new value', function (): void {
         ->and($payload['data'][0]['changes'])->toBe([
             ['field' => 'Name', 'old' => 'Old Co', 'new' => 'New Co'],
         ])
-        ->and($payload['data'][1]['event'])->toBe('created');
+        ->and($payload['data'][1]['event'])->toBe('created')
+        ->and($payload['has_more'])->toBeFalse()
+        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload)->not->toHaveKey('open_url');
 
     $block = $payload['display_block'];
 
@@ -304,13 +307,18 @@ it('reports the true entry count when the window holds more than one fetch', fun
     $payload = activityPayload();
 
     expect($payload['data'])->toHaveCount(50)
-        ->and($payload['display_block']['rows'])->toHaveCount(10)
-        // The footer reads "Showing :showing of :total". A count taken over the
-        // returned entries would say 50 here and mislead by exactly the rows it
-        // could not fetch.
+        ->and($payload['display_block']['rows'])->toHaveCount(50)
+        // The block renders every entry the model received; `total` still
+        // reports the true count of 51, one more than a fetch can carry, so the
+        // footer can say a row is missing without the table itself lying about
+        // what it shows.
         ->and($payload['display_block']['total'])->toBe(51)
         ->and($payload['total'])->toBe(51)
-        ->and($payload['showing'])->toBe(count($payload['data']));
+        ->and($payload['showing'])->toBe(count($payload['data']))
+        ->and($payload['has_more'])->toBeTrue()
+        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload)->not->toHaveKey('open_url')
+        ->and($payload['display_block'])->not->toHaveKey('open_url');
 });
 
 it('ignores activity older than the requested window', function (): void {
