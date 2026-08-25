@@ -26,8 +26,10 @@ it('renders the nudge naming the unfinished step', function (): void {
         ->toContain('Dana')
         ->toContain('Add your first contact')
         ->toContain('Put one real person in the CRM and the rest follows')
+        ->toContain('Continue in Rela')
         ->toContain('https://example.test/chat')
-        ->not->toContain('filament/pages/dashboard.');
+        ->not->toContain('filament/pages/dashboard.')
+        ->not->toContain('notifications.onboarding.');
 });
 
 it('never lets an unresolved step label reach the rendered body', function (): void {
