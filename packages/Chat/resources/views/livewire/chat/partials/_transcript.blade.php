@@ -44,11 +44,12 @@
     {{-- Sticky date pill: shows the calendar day the user has scrolled past
          (updated via IntersectionObserver over the inline separators below).
          The wrapper is `sticky` + zero-height so toggling the pill never
-         shifts scroll content; the pill itself overflows above/below that
-         0px box. Purely a supplementary visual aid: the inline separators
-         already carry the same information in reading order, so it stays
-         out of the accessibility tree. --}}
-    <div class="sticky top-2 z-20 flex h-0 justify-center" aria-hidden="true">
+         shifts scroll content; the pill hangs below that 0px box. `items-start`
+         is load-bearing: a flex child of a zero-height row stretches to 0 and
+         the label spills out of its own capsule. Purely a supplementary visual
+         aid: the inline separators already carry the same information in
+         reading order, so it stays out of the accessibility tree. --}}
+    <div class="sticky top-2 z-20 flex h-0 items-start justify-center" aria-hidden="true">
         <span
             x-show="stickyDateLabel"
             x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
@@ -59,7 +60,7 @@
             x-transition:leave-end="motion-safe:opacity-0"
             x-text="stickyDateLabel"
             style="display: none;"
-            class="rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg dark:text-gray-200"
+            class="inline-flex h-7 items-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 text-xs font-medium text-gray-700 shadow-md dark:text-gray-200"
         ></span>
     </div>
 
@@ -121,14 +122,22 @@
                 {{-- User message --}}
                 <template x-if="msg.role === 'user'">
                     <div class="flex justify-end" data-user-bubble :data-grouped="decorations(index).grouped" :data-send-state="msg.sendState ?? 'sent'">
-                        <div class="flex max-w-[85%] flex-col items-end gap-1">
+                        {{-- Reading width is the bubble's shrink-to-fit 85%; editing
+                             width is the whole message column. Rewriting a long
+                             message inside a bubble-sized box is the thing this
+                             widening fixes. --}}
+                        <div
+                            class="flex flex-col items-end gap-1"
+                            :class="msg.editing ? 'w-full max-w-full' : 'max-w-[85%]'"
+                        >
                             <template x-if="!msg.editing">
-                                {{-- Soft brand tint, not solid primary-600: a wall of
-                                     saturated bubbles overpowered the transcript; the
-                                     tint keeps who-said-what without shouting. --}}
+                                {{-- Neutral gray pill, matching the Attio reference
+                                     (user-directed, 2026-08): the flat assistant
+                                     column opposite keeps who-said-what scanning
+                                     without a brand tint. --}}
                                 <div
                                     :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
-                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15"
+                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100"
                                 >
                                     <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
                                 </div>
@@ -185,21 +194,48 @@
                             </template>
 
                             <template x-if="msg.editing">
-                                <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-50 p-2 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:ring-primary-400/15">
-                                    <textarea
-                                        :id="'chat-edit-' + index"
-                                        x-ref="editArea"
-                                        x-model="msg.editText"
-                                        @input="autosize($event.target)"
-                                        @keydown.escape.prevent="cancelEdit(msg)"
-                                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); saveEdit(msg, index) }"
-                                        rows="1"
-                                        maxlength="5000"
-                                        aria-label="{{ __('Edit message') }}"
-                                        class="block min-h-[28px] w-full resize-none rounded-xl border-0 bg-white px-3 py-2 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:bg-gray-900 dark:text-gray-100"
-                                        style="max-height: 200px;"
-                                    ></textarea>
-                                    <div class="mt-2 flex items-center justify-between gap-2 px-1">
+                                <div class="w-full">
+                                    {{-- Same frame as the composer bar below: editing a
+                                         message and writing a new one are the same act,
+                                         so they get the same control, not a tinted
+                                         read-mode bubble with an input dropped in it. --}}
+                                    <div class="ms-auto grid w-fit min-w-[12rem] max-w-full rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">
+                                        <textarea
+                                            :id="'chat-edit-' + index"
+                                            {{-- Focus on mount, not from startEdit(): the click
+                                                 that opens the editor destroys the hover action
+                                                 row it came from, and that teardown lands after
+                                                 startEdit()'s $nextTick and blew the focus away. --}}
+                                            x-init="$nextTick(() => { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length); autosize($el) })"
+                                            x-model="msg.editText"
+                                            {{-- Deferred: the mirror below has to repaint the new
+                                                 width first, or autosize() measures the wrapped
+                                                 height of the box as it was one keystroke ago. --}}
+                                            @input="$nextTick(() => autosize($event.target))"
+                                            @keydown.escape.prevent="cancelEdit(msg)"
+                                            @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); saveEdit(msg, index) }"
+                                            rows="1"
+                                            cols="1"
+                                            maxlength="5000"
+                                            aria-label="{{ __('Edit message') }}"
+                                            class="col-start-1 row-start-1 block min-h-[28px] w-full resize-none rounded-2xl border-0 bg-transparent px-4 py-3 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100"
+                                            style="max-height: 200px;"
+                                        ></textarea>
+                                        {{-- Width mirror. A textarea has no intrinsic width of
+                                             its own beyond `cols`, so an invisible copy of the
+                                             text shares the grid cell and lends the box its
+                                             max-content width: the frame tracks what is typed
+                                             up to the column edge, then wraps. Zero height, so
+                                             only the width is borrowed; autosize() still owns
+                                             the height. Padding/type must stay in sync with the
+                                             textarea above or the two measure differently. --}}
+                                        <span
+                                            aria-hidden="true"
+                                            x-text="(msg.editText || '') + ' '"
+                                            class="invisible col-start-1 row-start-1 max-h-0 overflow-hidden whitespace-pre-wrap px-4 py-3 text-sm leading-6 [overflow-wrap:anywhere]"
+                                        ></span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between gap-2">
                                         <span
                                             class="text-[length:var(--text-micro)]"
                                             :class="{
@@ -536,21 +572,25 @@
          top of the docked proposal card: the composer/dock sit entirely outside
          this scrolling box, whatever height they take, so there is nothing in this
          container for the pill to overlap. --}}
-    <div class="sticky bottom-2 z-20 flex h-0 justify-center">
+    <div class="sticky bottom-2 z-20 flex h-0 items-end justify-center">
         <template x-if="hasUnseenBelow">
             <button
                 type="button"
                 x-on:click="scrollToBottom(true)"
-                {{-- Solid block tier, not the translucent card tier: this floats
-                     OVER the transcript, and at gray-50/80 the message bubble
-                     underneath read straight through it. --}}
-                class="flex items-center gap-1.5 rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                aria-label="{{ __('New messages') }}"
+                title="{{ __('New messages') }}"
+                {{-- Icon-only circle, matching the Attio reference (user-directed,
+                     2026-08). Solid block tier, not the translucent card tier:
+                     this floats OVER the transcript, and at gray-50/80 the
+                     message bubble underneath read straight through it.
+                     `items-end` on the wrapper keeps the zero-height row from
+                     squashing the circle. --}}
+                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                 x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
                 x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
                 x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
             >
-                <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
-                {{ __('New messages') }}
+                <x-heroicon-m-arrow-down class="h-4 w-4" aria-hidden="true" />
             </button>
         </template>
     </div>

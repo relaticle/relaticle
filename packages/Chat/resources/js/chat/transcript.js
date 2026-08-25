@@ -1161,14 +1161,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         });
         msg.editText = msg.content;
         msg.editing = true;
-
-        this.$nextTick(() => {
-            const el = this.$refs.editArea;
-            if (!el) return;
-            el.focus();
-            el.setSelectionRange(el.value.length, el.value.length);
-            this.autosize(el);
-        });
+        // Focus/caret/autosize live on the textarea's own x-init (see
+        // _transcript.blade.php): doing it from here raced the teardown of the
+        // hover action row the edit click came from, which blurred it back out.
     },
 
     cancelEdit(msg) {

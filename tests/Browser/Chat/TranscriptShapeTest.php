@@ -625,7 +625,7 @@ it('renders the sticky transcript pills at their natural height inside the zero-
         (() => {
             const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
             const jump = Array.from(container.querySelectorAll('button'))
-                .find((el) => el.textContent.trim() === 'New messages');
+                .find((el) => el.getAttribute('title') === 'New messages');
             const date = Array.from(container.querySelectorAll('.sticky > span'))
                 .find((el) => el.textContent.trim().length > 0);
 
@@ -636,8 +636,8 @@ it('renders the sticky transcript pills at their natural height inside the zero-
         })();
     JS);
 
-    // 28px is the h-7 both pills are built at; anything at or under ~20 means
-    // the zero-height row squashed them again.
+    // 32px (h-8 jump circle) and 28px (h-7 date pill) are the built heights;
+    // anything at or under ~20 means the zero-height row squashed them again.
     expect($heights['jump'])->toBeGreaterThanOrEqual(26.0);
     expect($heights['date'])->toBeGreaterThanOrEqual(26.0);
 });
