@@ -94,3 +94,79 @@ it('skips an owner who turned setup reminders off', function (): void {
 
     Mail::assertNothingQueued();
 });
+
+it('sends at 09:00 in the owner timezone, not the app timezone', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+
+    // 00:00 UTC is 09:00 in Tokyo: the band has to be read in the user's zone.
+    $this->travelTo(now()->setTime(0, 0));
+
+    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertQueuedCount(1);
+});
+
+it('stays silent outside the owner local 09:00 hour', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+
+    // 09:00 UTC is 18:00 in Tokyo: right hour in the wrong zone must not fire.
+    $this->travelTo(now()->setTime(9, 0));
+
+    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+    expect($owner->currentTeam->fresh()->setup_nudge_sent_at)->toBeNull();
+});
+
+it('never nudges an owner who has not verified their email', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->withPersonalTeam()->unverified()->create(['timezone' => 'UTC']);
+
+    $this->travelTo(now()->setTime(9, 0));
+
+    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('leaves a workspace younger than two days alone', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+
+    $this->travelTo(now()->setTime(9, 0));
+
+    $owner->currentTeam->forceFill(['created_at' => now()->subDay()])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('skips a workspace already scheduled for deletion', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+
+    $this->travelTo(now()->setTime(9, 0));
+
+    $owner->currentTeam->forceFill([
+        'created_at' => now()->subDays(2),
+        'scheduled_deletion_at' => now()->addDays(7),
+    ])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});

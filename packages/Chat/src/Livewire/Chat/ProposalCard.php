@@ -927,6 +927,15 @@ final class ProposalCard extends BaseLivewireComponent
                 $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
 
                 return;
+            } catch (TransportExceptionInterface $exception) {
+                // Must sit above the RuntimeException arm: TransportException extends
+                // \RuntimeException, so without this a failed invite mail would render
+                // the transport's own message (mail host, port, SMTP username) onto the
+                // card. Same masking the single-record path applies in createCurrent().
+                $this->reportDeliveryFailure($pendingAction, $exception, $index);
+                $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+                return;
             } catch (RuntimeException|ValidationException $exception) {
                 $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $exception->getMessage()));
                 $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
@@ -1306,12 +1315,19 @@ final class ProposalCard extends BaseLivewireComponent
      * The approval transaction rolls back when the mail send throws, so nothing was
      * written and retrying is safe: say exactly that, and keep the transport's own
      * message (mail host, port, SMTP username) out of the card and the transcript.
+     *
+     * On a batch the failure belongs to one record, so name it: the items before it
+     * did commit, and a bare message would read as if the whole batch had failed.
      */
-    private function reportDeliveryFailure(PendingAction $pendingAction, TransportExceptionInterface $exception): void
+    private function reportDeliveryFailure(PendingAction $pendingAction, TransportExceptionInterface $exception, ?int $index = null): void
     {
         report($exception);
 
-        $this->reportResolveFailure($pendingAction, __('The email could not be sent, so nothing was saved. Please try again in a moment.'));
+        $message = __('The email could not be sent, so nothing was saved. Please try again in a moment.');
+
+        $this->reportResolveFailure($pendingAction, $index === null
+            ? $message
+            : $this->itemFailureMessage($pendingAction, $index, $message));
     }
 
     private function reportResolveFailure(PendingAction $pendingAction, string $message): void

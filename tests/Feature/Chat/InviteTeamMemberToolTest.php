@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\TeamRole;
+use App\Filament\Pages\Team\Members;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -181,7 +182,7 @@ it('refuses to propose an invitation for a member who does not own the workspace
         ->and(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
 
-it('hands the non-owner refusal the real Members url so the model has none to invent', function (): void {
+it('never links the non-owner refusal to a page that would 403 for them', function (): void {
     $member = User::factory()->create();
     $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
     $member->forceFill(['current_team_id' => $this->team->getKey()])->save();
@@ -193,12 +194,15 @@ it('hands the non-owner refusal the real Members url so the model has none to in
         'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
     ]));
 
+    // Members::canAccess() is `can('update', $tenant)`, the exact complement of the
+    // guard above, so every user who reaches this refusal is barred from that page.
     $membersUrl = resolve(DestinationResolver::class)->resolve('team_members', $this->team);
 
-    expect($membersUrl)->toBeString()
-        ->and($membersUrl)->toContain($this->team->slug)
-        ->and($result)->toContain($membersUrl)
-        ->and($result)->toContain('Never write any other URL');
+    expect(Members::canAccess())->toBeFalse()
+        ->and($result)->toContain('Only the workspace owner can invite teammates')
+        ->and($result)->toContain('ask an owner')
+        ->and($result)->not->toContain($membersUrl)
+        ->and($result)->not->toContain('http');
 });
 
 it('does not render a name row on the invitation card', function (): void {
@@ -258,4 +262,33 @@ it('names the entity in plain words on a batch card', function (): void {
 
     expect($display['summary'] ?? '')->not->toContain('team_invitations')
         ->and($display['summary'] ?? '')->toContain('team invitations');
+});
+
+it('keeps the mail transport failure off the card on the batch path too', function (): void {
+    $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('send')->andThrow(new TransportException($transportMessage));
+
+    app(InviteTeamMemberTool::class)->handle(new Request([
+        'records' => [
+            ['email' => 'first@example.com', 'role' => 'editor'],
+            ['email' => 'second@example.com', 'role' => 'editor'],
+        ],
+    ]));
+
+    $pending = pendingActionForTeam($this->user);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertHasErrors('resolve');
+
+    $shown = $component->errors()->first('resolve');
+
+    expect($shown)->not->toContain('smtp.internal.test')
+        ->and($shown)->not->toContain('postmaster@relaticle')
+        ->and($shown)->not->toContain('587');
+
+    expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
