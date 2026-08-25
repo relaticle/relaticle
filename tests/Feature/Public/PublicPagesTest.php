@@ -227,11 +227,41 @@ describe('Hero AI tab — conversation', function () {
         $response->assertStatus(200);
         // Exchange 1
         $response->assertSee('You have 3 overdue tasks');
-        // Exchange 2 climax
+        // Exchange 2 climax. Approving resumes the turn, so the line under the
+        // decided row is the agent's own reply, as in the shipped transcript.
         $response->assertSee('Review the proposal below to update the task');
-        $response->assertSee('Updated Schedule demo with Kovra Systems');
-        // Exchange 3
-        $response->assertSee('Added Sarah and linked her to Kovra Systems');
+        $response->assertSee('has been marked done');
+        // Exchange 3 is a WRITE, so it is gated by review exactly like exchange 2
+        // (CreatePersonTool returns a proposal for approval). It must never show
+        // a create landing unattended.
+        $response->assertSee('Review the proposal below to add her to Kovra Systems');
+        $response->assertSee('has been created and linked to');
+    });
+
+    it('gates every write in the demo behind a review, like the real tools do', function () {
+        $body = (string) $this->get('/')->assertSuccessful()->getContent();
+
+        // Both writes the demo performs are proposals in the product
+        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
+        // so each must reach the transcript carrying an Approved outcome.
+        // Advertising an unattended write would contradict the review-before-write
+        // contract the demo's own second exchange is built to show off.
+        expect(substr_count($body, 'Update task "Schedule demo with Kovra Systems"'))->toBeGreaterThanOrEqual(2)
+            ->and(substr_count($body, 'Create person "Sarah Chen"'))->toBeGreaterThanOrEqual(2)
+            ->and(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2);
+    });
+
+    it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
+        $body = (string) $this->get('/')->assertSuccessful()->getContent();
+
+        // The user bubble is a soft tint, never solid primary-600: see the
+        // comment on _transcript.blade.php's bubble.
+        expect($body)->toContain('rounded-br-md bg-primary-50')
+            ->and($body)->not->toContain('rounded-br-md bg-primary-600');
+
+        // Read results render as a records_table with a chip-linked core column,
+        // not the deleted chat/data-table component.
+        expect($body)->toContain('chat-chip');
     });
 });
 
@@ -729,23 +759,28 @@ describe('Hero AI tab — entry phase', function () {
         $response->assertSee("This week's pipeline review", false);
     });
 
-    it('shows the four real dashboard starter chips to anchor the demo', function () {
+    it('does not offer canned starter prompts, matching the real dashboard', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
 
-        $response->assertSee('CRM overview');
-        $response->assertSee('Overdue tasks');
-        $response->assertSee('Recent companies');
-        $response->assertSee('Pipeline summary');
+        // The starter chips were removed from the product: an empty composer
+        // makes no suggestions. The mock must not reintroduce them.
+        $response->assertDontSee('CRM overview');
+        $response->assertDontSee('Recent companies');
+        $response->assertDontSee('Pipeline summary');
     });
 
-    it('renders the empty My Tasks section mirroring the dashboard', function () {
+    it('renders a populated My Tasks section mirroring the dashboard', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
 
-        $response->assertSee(__('filament/pages/dashboard.tasks.empty.title'));
-        $response->assertSee(__('filament/pages/dashboard.tasks.empty.description'));
+        // Populated, not the zero-state: a frame selling an AI CRM must not
+        // depict an empty CRM, and the real dashboard shows the list with
+        // overdue dates called out.
         $response->assertSee(__('filament/pages/dashboard.tasks.view_all'));
+        $response->assertSee('Call Sarah Chen');
+        $response->assertSee('Renewal prep for Daniel Okafor');
+        $response->assertDontSee(__('filament/pages/dashboard.tasks.empty.title'));
     });
 
     it('renders a second composer scoped with entry IDs', function () {

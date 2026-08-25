@@ -42,27 +42,20 @@
          keeps the sidebar visible during the entry phase too. --}}
     <div class="relative flex-1 flex flex-col min-w-0">
 
-        {{-- Topbar — mirrors the real fi-topbar: sidebar toggle on the left,
-             "Ask <assistant>" outlined trigger + user avatar on the right. The Ask
-             pill only exists on the dashboard in the real app, so the script
-             fades it out during the entry → conversation transition. Sits above
-             the entry overlay (which starts at top-10) so it stays visible in
-             both phases, exactly like the real shell. --}}
+        {{-- Topbar. Mirrors the real fi-topbar: the PAGE HEADING sits here, not in
+             the page body -- topbar-page-heading.blade.php teleports the h1 into
+             .fi-topbar-start, so a chat page has no in-body title at all. The Ask
+             pill is a page-level control the real app hides on the dashboard and
+             on any /chats route (chat-topbar-toggle-hook), which is the exact
+             inverse of what this mock used to show. Here it is hidden in both
+             phases, because the demo only ever visits those two surfaces.
+             Sits above the entry overlay (which starts at top-10) so the shell
+             stays continuous across the transition, exactly like the real one. --}}
         <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-gray-200/60 bg-white px-3 dark:border-white/[0.06] dark:bg-zinc-900">
-            <x-heroicon-o-bars-3 class="w-4 h-4 text-gray-400 md:hidden dark:text-zinc-500"/>
-            <x-heroicon-o-chevron-left class="hidden w-4 h-4 text-gray-400 md:block dark:text-zinc-500"/>
-            <div class="flex items-center gap-2">
-                <span class="mcp-topbar-ask inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:text-zinc-200 dark:ring-white/10">
-                    <x-heroicon-o-chat-bubble-left-ellipsis class="w-3.5 h-3.5" aria-hidden="true"/>
-                    <span>{{ __('Ask :name', ['name' => (string) config('chat.assistant_name')]) }}</span>
-                </span>
-                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
+            <div class="hero-agent-title min-w-0 flex-1">
+                <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">Overdue tasks this week</h2>
             </div>
-        </div>
-
-        {{-- Conversation title — mirrors app chat-page H1: large, bold, left-aligned, no chrome --}}
-        <div class="hero-agent-title px-4 sm:px-6 md:px-8 pt-5 pb-3">
-            <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white truncate">Overdue tasks this week</h2>
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
         </div>
 
         {{-- Messages --}}
@@ -119,8 +112,6 @@
                     el.style.transform = '';
                 });
                 this.resetDock();
-                var ask = this.$root.querySelector('.mcp-topbar-ask');
-                if (ask) ask.style.opacity = '';
                 this.setShellActive('home');
                 if (this.$refs.messagesScroll) {
                     this.$refs.messagesScroll.scrollTop = 0;
@@ -132,26 +123,20 @@
             // Reset only the entry (dashboard) layer so it can replay its intro,
             // without disturbing a conversation that may still be on screen.
             resetEntryOnly() {
-                this.$root.querySelectorAll('.mcp-entry-greeting, .mcp-entry-recent, .mcp-entry-composer, .mcp-entry-chips, .mcp-entry-tasks').forEach(function(el) {
+                this.$root.querySelectorAll('.mcp-entry-greeting, .mcp-entry-recent, .mcp-entry-composer, .mcp-entry-tasks').forEach(function(el) {
                     el.style.opacity = '0';
                     el.style.transform = '';
                 });
                 this.clearEntryComposer();
             },
 
-            // Restore the shell chrome to its dashboard state (Home active,
-            // Ask pill back). Runs once the entry curtain is opaque over the
-            // chat column, so the sidebar/topbar change lands at the same
-            // moment the "page" changes — like a real navigation.
+            // Restore the shell chrome to its dashboard state (Home active).
+            // Runs once the entry curtain is opaque over the chat column, so
+            // the sidebar change lands at the same moment the "page" changes,
+            // like a real navigation. The topbar heading is faded separately
+            // by the entry/conversation transition.
             restoreShellToDashboard() {
                 this.setShellActive('home');
-                var ask = this.$root.querySelector('.mcp-topbar-ask');
-                if (!ask) return;
-                if (getComputedStyle(ask).opacity !== '1' && typeof animate === 'function') {
-                    animate(ask, { opacity: [0, 1] }, { duration: 0.3, ease: this.ease });
-                } else {
-                    ask.style.opacity = '';
-                }
             },
 
             // Swap the sidebar's active item between Home (dashboard phase) and
@@ -203,6 +188,7 @@
             // composer input back in the flow (its opacity is owned by the
             // .mcp-el reset/animation cycle).
             resetDock() {
+                this.setDockVariant('update');
                 var dock = this.$root.querySelector('.mcp-dock');
                 if (dock) {
                     dock.style.display = 'none';
@@ -215,12 +201,39 @@
                 }
             },
 
+            // Show one operation body and label the primary button to match.
+            setDockVariant(variant) {
+                var isCreate = variant === 'create';
+                var update = this.$root.querySelector('.mcp-dock-update');
+                var create = this.$root.querySelector('.mcp-dock-create');
+                var label = this.$root.querySelector('.mcp-dock-label');
+                if (update) update.style.display = isCreate ? 'none' : '';
+                if (create) create.style.display = isCreate ? '' : 'none';
+                if (label) label.textContent = isCreate ? 'Create' : 'Save changes';
+            },
+
+            // The real send button is gray while the composer is empty
+            // (disabled:bg-gray-200) and primary once there is something to
+            // send. Both hero composers follow the same rule so the frame never
+            // shows a saturated button above an empty input.
+            setSendActive(selector, active) {
+                var btn = this.$root.querySelector(selector);
+                if (!btn) return;
+                var on = ['bg-primary-600', 'text-white'];
+                var off = ['bg-gray-200', 'text-gray-400', 'dark:bg-gray-700', 'dark:text-gray-500'];
+                btn.classList.remove.apply(btn.classList, active ? off : on);
+                btn.classList.add.apply(btn.classList, active ? on : off);
+            },
+
             // Swap the composer input for the docked proposal, like the real
-            // chat does while a write awaits review.
-            showDock() {
+            // chat does while a write awaits review. `variant` picks the
+            // operation body ('update' or 'create') and its button label,
+            // mirroring proposal-card.blade.php's $primaryLabel match.
+            showDock(variant) {
                 var input = this.$root.querySelector('.mcp-input');
                 var dock = this.$root.querySelector('.mcp-dock');
                 if (!input || !dock) return;
+                this.setDockVariant(variant || 'update');
                 var self = this;
                 if (typeof animate === 'function') {
                     animate(input, { opacity: [1, 0] }, { duration: 0.18, ease: this.ease });
@@ -270,6 +283,9 @@
                 var placeholder = this.$root.querySelector(placeholderSelector);
                 if (typed) typed.textContent = '';
                 if (placeholder) placeholder.classList.remove('is-hidden');
+                // Empty composer, gray send: same rule the real button's
+                // :disabled binding enforces.
+                this.setSendActive(typedSelector === '#hero-entry-typed' ? '#hero-entry-send' : '#hero-composer-send', false);
             },
 
             typeIntoComposer(text, charMs) {
@@ -286,6 +302,7 @@
                 if (!typed) return 0;
                 if (placeholder) placeholder.classList.add('is-hidden');
                 typed.textContent = '';
+                this.setSendActive(typedSelector === '#hero-entry-typed' ? '#hero-entry-send' : '#hero-composer-send', true);
                 var self = this;
                 for (var i = 0; i < text.length; i++) {
                     (function(idx) {
@@ -345,12 +362,12 @@
             },
 
             cancelInflight() {
-                // .mcp-dock and .mcp-topbar-ask aren't .mcp-el but are animated
-                // (the composer/dock swap and the Ask-pill fade), so include
-                // them — otherwise an in-flight / delayed animation keeps
-                // holding opacity and overrides a static reset (e.g. the
-                // reduced-motion view after a tab switch).
-                this.$root.querySelectorAll('.mcp-el, .mcp-dock, .mcp-topbar-ask').forEach(function(el) {
+                // .mcp-dock and .hero-agent-title aren't .mcp-el but are
+                // animated (the composer/dock swap and the topbar heading
+                // fade), so include them. Otherwise an in-flight or delayed
+                // animation keeps holding opacity and overrides a static reset
+                // (e.g. the reduced-motion view after a tab switch).
+                this.$root.querySelectorAll('.mcp-el, .mcp-dock, .hero-agent-title').forEach(function(el) {
                     if (el.getAnimations) {
                         el.getAnimations().forEach(function(a) { a.cancel(); });
                     }
@@ -374,13 +391,11 @@
                 this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
                     el.style.opacity = '1';
                 });
-                // Static view shows the resolved review (audit card + outcome
+                // Static view shows the resolved review (audit card + reply
                 // are .mcp-el, shown above); the dock stays hidden and the
                 // composer stays in the flow. The shell reflects the final
-                // conversation state: Ask pill hidden, chat item highlighted.
+                // conversation state: chat item highlighted in the sidebar.
                 this.resetDock();
-                var ask = this.$root.querySelector('.mcp-topbar-ask');
-                if (ask) ask.style.opacity = '0';
                 this.setShellActive('chat');
                 var entry = this.$root.querySelector('.hero-agent-entry');
                 if (entry) entry.style.opacity = '0';
@@ -408,14 +423,8 @@
                     }, { duration: d * 0.85, delay: d * 0.15, ease: ease });
                 }
 
-                // The real app only shows the "Ask <assistant>" trigger on the
-                // dashboard; the sidebar highlight moves to the conversation.
-                var ask = this.$root.querySelector('.mcp-topbar-ask');
-                if (ask && typeof animate === 'function') {
-                    animate(ask, { opacity: [1, 0] }, { duration: d * 0.6, ease: ease });
-                } else if (ask) {
-                    ask.style.opacity = '0';
-                }
+                // The sidebar highlight moves to the conversation, like the
+                // real shell marking the current page.
                 this.setShellActive('chat');
             },
 
@@ -475,8 +484,7 @@
                 animate(root.querySelector('.mcp-entry-greeting'),  { opacity: [0, 1], transform: ['translateY(8px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.05, ease: ease });
                 animate(root.querySelector('.mcp-entry-recent'),    { opacity: [0, 1] }, { duration: 0.4, delay: 0.18, ease: ease });
                 animate(root.querySelector('.mcp-entry-composer'),  { opacity: [0, 1], transform: ['translateY(12px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.22, ease: ease });
-                animate(root.querySelector('.mcp-entry-chips'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.32, ease: ease });
-                animate(root.querySelector('.mcp-entry-tasks'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.42, ease: ease });
+                animate(root.querySelector('.mcp-entry-tasks'),     { opacity: [0, 1], transform: ['translateY(6px)', 'translateY(0px)'] }, { duration: 0.4, delay: 0.32, ease: ease });
 
                 // Loop restart: the entry curtain (above) has now faded in over
                 // the previous conversation. Clear that conversation underneath
@@ -524,8 +532,8 @@
                 // The composer types while the view stays on exchange 1. The
                 // response then docks a proposal where the composer was — the
                 // same swap the real chat performs — and after a beat the "Save
-                // changes" press resolves it into the transcript audit card and
-                // the agent outcome bubble.
+                // changes" press resolves it into the transcript audit card,
+                // with the agent's confirming reply under it.
                 var p2 = this.prompts[1];
                 var typeStart2 = conversationStart + 2700;
                 this.pendingTimers.push(setTimeout(function() { self.typeIntoComposer(p2.text, p2.charMs); }, typeStart2));
@@ -546,7 +554,8 @@
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, dockAt + 580));
 
                 // Resolve the review: press "Save changes", the dock hands back
-                // to the composer, and the audit card + outcome land inline.
+                // to the composer, and the audit card + the agent's reply land
+                // inline.
                 var approveAt = dockAt + 1900;
                 this.pendingTimers.push(setTimeout(function() { self.flashButton('#hero-approve-btn'); }, approveAt));
                 this.pendingTimers.push(setTimeout(function() { self.hideDock(); }, approveAt + 220));
@@ -565,14 +574,28 @@
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-user-3'); }, send3At));
                 animate(root.querySelector('.mcp-avatar-3'), { opacity: [0, 1], transform: ['scale(0.95)', 'scale(1)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-label-3'),  { opacity: [0, 1] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-tool-3'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (send3At + 300) / 1000, duration: 0.25, ease: ease });
-                animate(root.querySelector('.mcp-tool-3 .mcp-tool-done'), { opacity: [0, 1] }, { delay: (send3At + 600) / 1000, duration: 0.2, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-3'); }, send3At + 320));
-                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 90); }, send3At + 700));
-                animate(root.querySelector('.mcp-card'),     { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (send3At + 1050) / 1000, duration: 0.35, ease: ease });
-                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-card'); }, send3At + 1080));
+                this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-3', 90); }, send3At + 500));
 
-                var cycleEnd = send3At + 1400;
+                // A create is a proposal too (CreatePersonTool: "Returns a
+                // proposal for user approval"), so this exchange docks and is
+                // approved exactly like exchange 2. Showing a write land
+                // unattended would advertise behaviour the product does not
+                // have, and contradict the exchange right above it.
+                var dock3At = send3At + 1000;
+                this.pendingTimers.push(setTimeout(function() { self.showDock('create'); }, dock3At));
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-3'); }, dock3At + 580));
+
+                var approve3At = dock3At + 1900;
+                this.pendingTimers.push(setTimeout(function() { self.flashButton('#hero-approve-btn'); }, approve3At));
+                this.pendingTimers.push(setTimeout(function() { self.hideDock(); }, approve3At + 220));
+                animate(root.querySelector('.mcp-create-card'), { opacity: [0, 1], transform: ['translateY(8px) scale(0.98)', 'translateY(0px) scale(1)'] }, { delay: (approve3At + 500) / 1000, duration: 0.4, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-create-card'); }, approve3At + 530));
+                animate(root.querySelector('.mcp-create-done'), { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (approve3At + 750) / 1000, duration: 0.3, ease: ease });
+                animate(root.querySelector('.mcp-card'),        { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (approve3At + 950) / 1000, duration: 0.35, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-card'); }, approve3At + 980));
+
+                var cycleEnd = approve3At + 1400;
                 var totalMs = cycleEnd + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
                     self.animateChat();
