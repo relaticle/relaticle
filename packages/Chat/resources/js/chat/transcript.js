@@ -27,6 +27,14 @@ const CONVERSATION_ID_PLACEHOLDER = '__CONVERSATION_ID__';
 // visual group (no repeated timestamp/avatar chrome, tighter spacing).
 const GROUPING_GAP_MINUTES = 3;
 
+// A records_table block carries the WHOLE page the model read (see
+// BaseReadListTool: it stopped slicing server-side so the model and the
+// table never disagree about what was shown). But a chat bubble that scrolls
+// past ten rows stops reading as a summary and starts reading as a dump, so
+// the client still caps the PAINT at this many rows until the user asks for
+// the rest via the collapse toggle.
+const RECORDS_TABLE_COLLAPSE_ROWS = 10;
+
 // Cache-first conversation switching (window-scoped Map, LRU-capped at 5).
 //
 // Confirmed empirically before writing this: clicking a `wire:navigate`
@@ -118,7 +126,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -389,8 +397,86 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return column?.key === block?.core && !!row?.url && this.blockCell(row, column) !== '';
     },
 
-    blockFooter(block) {
-        const showing = (block?.rows || []).length;
+    // --- Records-table row collapse (D4) ------------------------------------
+    //
+    // Widget state, not tool state: whether a block is expanded lives ONLY in
+    // this plain object, never on `block` or `msg` themselves. That keeps the
+    // OpenAI Apps SDK boundary this codebase already follows for `data` versus
+    // `display_block` intact one level deeper: the tool result stays exactly
+    // what the model saw, and "did the user click show-more" is purely a
+    // rendering fact. Never reaches the server. `expandedBlocks` itself is
+    // excluded from the conversation cache's snapshotMessages() (which clones
+    // `messages`, not this), so switching conversations forgets it too - only
+    // the KEYS below ever survive inside `messages`, and only because they are
+    // plain data already present there for other reasons (see blockKey).
+    expandedBlocks: {},
+
+    // Identity for a records_table block, deliberately NOT read off the block
+    // object: reconcileLatestAssistant() (stream.js) replaces
+    // `assistantMsg.display_blocks` wholesale with a brand-new array of
+    // brand-new objects on every stream-end and on the lost-stream watchdog,
+    // so anything minted onto the old `block` is gone the moment that runs -
+    // silently collapsing an expanded table and orphaning its expandedBlocks
+    // entry. Composed instead from two things that are already stable:
+    //  - msg.clientKey: minted once by ensureClientKey() and never reassigned,
+    //    by its own contract survives reconciliation;
+    //  - block.tool_call_order: stamped by DisplayBlocks::collect() on every
+    //    path that ever produces this block (initial load AND reconcile), so
+    //    a re-fetched block for the SAME tool call always carries the SAME
+    //    order number, even though it is a different object instance.
+    // Two blocks in one message get distinct keys because tool_call_order is
+    // per tool call. Sanitized so it can double as a DOM id (aria-controls
+    // target for the toggle button below).
+    blockKey(msg, block) {
+        const raw = `${msg?.clientKey ?? 'msg'}-${block?.tool_call_order ?? 'blk'}`;
+        return 'rt-' + raw.replace(/[^a-zA-Z0-9_-]/g, '-');
+    },
+
+    toggleBlockExpanded(msg, block) {
+        const key = this.blockKey(msg, block);
+        this.expandedBlocks[key] = !this.expandedBlocks[key];
+    },
+
+    blockIsExpanded(msg, block) {
+        return !!this.expandedBlocks[this.blockKey(msg, block)];
+    },
+
+    blockCanExpand(block) {
+        return (block?.rows || []).length > RECORDS_TABLE_COLLAPSE_ROWS;
+    },
+
+    // The rows the table actually paints: every row once expanded, otherwise
+    // the first RECORDS_TABLE_COLLAPSE_ROWS of the page `block.rows` already
+    // holds in full (see BaseReadListTool, which stopped slicing server-side).
+    blockVisibleRows(msg, block) {
+        const rows = block?.rows || [];
+        return this.blockIsExpanded(msg, block) ? rows : rows.slice(0, RECORDS_TABLE_COLLAPSE_ROWS);
+    },
+
+    blockToggleLabel(msg, block) {
+        return this.blockIsExpanded(msg, block)
+            ? blockShowFewerText
+            : blockShowAllTemplate.replace(':count', String((block?.rows || []).length));
+    },
+
+    // D5: the entity's real list page, present on the payload only when the
+    // tool's OWN pagination says a further page exists (see
+    // BaseReadListTool::openUrlFor / RecordReferenceResolver::indexUrlFor).
+    // Distinct from the row toggle above: expanding to see every row already
+    // on this page never reveals a row that lives on page 2. No expansion
+    // state involved, so this stays keyed on `block` alone.
+    blockOpenUrl(block) {
+        return block?.open_url ?? null;
+    },
+
+    blockOpenUrlLabel(block) {
+        return blockOpenUrlTemplate
+            .replace(':total', String(block?.total ?? ''))
+            .replace(':title', this.blockTitle(block));
+    },
+
+    blockFooter(msg, block) {
+        const showing = this.blockVisibleRows(msg, block).length;
         const from = Number(block?.from ?? 0);
 
         // On any page past the first the rows are a window into the middle of the
@@ -404,8 +490,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             .replace(':total', String(block?.total ?? showing));
     },
 
-    blockHasMore(block) {
-        return (block?.total ?? 0) > (block?.rows || []).length;
+    // Counts VISIBLE rows, not the full page: while collapsed this is what
+    // keeps "Showing 10 of 25" honest instead of silently claiming credit for
+    // rows 11-25, which are in the DOM's data but not yet painted.
+    blockHasMore(msg, block) {
+        return (block?.total ?? 0) > this.blockVisibleRows(msg, block).length;
     },
 
     // Sticky date pill: a floating element (see chat-interface.blade.php)
@@ -824,7 +913,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
                         record: payload.record || null,
                     },
                 };
-                if (payload.finalized) action.status = 'approved';
+                // Mirror finalizeBatchIfComplete server-side: a batch whose every
+                // item was skipped finalizes as rejected, not approved.
+                if (payload.finalized) {
+                    action.status = Object.values(action.itemResults).some((r) => r?.status === 'approved')
+                        ? 'approved'
+                        : 'rejected';
+                }
                 isNewResolution = true;
             } else if (payload.record && !existing.record) {
                 action.itemResults = {
@@ -883,6 +978,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         createdVerb: 'Created',
         updatedVerb: 'Updated',
         deletedVerb: 'Deleted',
+        countCreated: ':count created',
+        countUpdated: ':count updated',
+        countDeleted: ':count deleted',
+        countSkipped: ':count skipped',
+        countKept: ':count kept',
         ...proposalTexts,
     },
 
@@ -1040,6 +1140,35 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // getter in both its compact-while-pending and full resolved modes.
     itemResult(action, index) {
         return (action.itemResults && action.itemResults[index]) || null;
+    },
+
+    // Derived receipt for a finalized batch. The row-level status 'approved'
+    // hides a mixed outcome (approving 2 of 3 records still finalizes the row
+    // as approved), so the header chip is computed from the per-item results
+    // instead of echoing it. Only that status: a batch that wrote nothing
+    // finalizes as 'rejected' and keeps the plain red Rejected chip, which is
+    // both truthful and the stronger signal that nothing happened. Undecided,
+    // expired and superseded cards keep their status chip too.
+    batchOutcome(action) {
+        if (!action || action.status !== 'approved') return null;
+
+        const results = Object.values(action.itemResults || {});
+        if (results.length === 0) return null;
+
+        const done = results.filter((r) => r?.status === 'approved').length;
+        const skipped = results.length - done;
+
+        const t = this.proposalTexts;
+        const op = action.operation;
+        const doneTemplate = op === 'delete' ? t.countDeleted : (op === 'update' ? t.countUpdated : t.countCreated);
+        const skippedTemplate = op === 'delete' ? t.countKept : t.countSkipped;
+
+        return {
+            done,
+            skipped,
+            doneLabel: doneTemplate.replace(':count', String(done)),
+            skippedLabel: skippedTemplate.replace(':count', String(skipped)),
+        };
     },
 
     // Whether any item of a batch has been decided. Read by the card's

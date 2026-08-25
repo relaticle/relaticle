@@ -165,9 +165,10 @@ final readonly class PendingActionService
 
                 $this->validateResolvable($pendingAction);
 
-                // Batches resolve one record at a time through approveItem()/rejectItem() —
-                // the dock has no whole-batch control. Refuse a whole-batch approve so no
-                // caller can bypass the per-item review and commit every record at once.
+                // Batches resolve one record at a time through approveItem()/rejectItem(),
+                // which is what the dock's "Create all N" loops over, per record and per
+                // transaction. Refuse a whole-batch approve so no caller can bypass that
+                // and commit every record in one atomic write with no per-item outcome.
                 throw_if(
                     ProposalPayload::from($pendingAction)->isBatch,
                     RuntimeException::class,
@@ -531,7 +532,7 @@ final readonly class PendingActionService
      * proposals are left out: they travel in their own block (see
      * supersededForConversation()) and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>}>
      */
     public function resolvedForConversation(string $conversationId): array
     {
@@ -558,7 +559,42 @@ final readonly class PendingActionService
             'record_id' => $this->resolveResultRecordId($action),
             'record_ids' => $this->resolveResultRecordIds($action),
             'records' => $this->resolvedRecords($action),
+            'skipped' => $this->skippedItemLabels($action),
         ], $actions->all()));
+    }
+
+    /**
+     * Labels of the batch records the user skipped. A partially-skipped batch
+     * finalizes as Approved, so without these the model reads "approved" plus
+     * the proposal's full record list and reports every record as created,
+     * including the ones the user explicitly declined.
+     *
+     * @return list<string>
+     */
+    private function skippedItemLabels(PendingAction $action): array
+    {
+        $payload = ProposalPayload::from($action);
+
+        if (! $payload->isBatch) {
+            return [];
+        }
+
+        $resultData = is_array($action->result_data) ? $action->result_data : [];
+        $resultItems = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+        $items = $payload->items();
+        $labels = [];
+
+        foreach ($resultItems as $index => $result) {
+            if (! is_array($result) || ($result['status'] ?? null) !== 'rejected') {
+                continue;
+            }
+
+            $item = $items[(int) $index] ?? null;
+            $label = $item === null ? null : $this->recordLabel($item['data'], $item['display']);
+            $labels[] = $label ?? __('record :position', ['position' => (int) $index + 1]);
+        }
+
+        return $labels;
     }
 
     /**

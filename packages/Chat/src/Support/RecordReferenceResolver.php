@@ -134,6 +134,45 @@ final readonly class RecordReferenceResolver
     }
 
     /**
+     * The entity's Filament list page: where a display block's `open_url`
+     * sends the user when a list tool page has more rows than it returned.
+     * Tier 1 only (the unfiltered list), not the chat call's own filters:
+     * mapping a chat filter to a Filament table filter, including custom
+     * fields, is deferred. Restricted to CHIP_TYPES; every other citation type
+     * (e.g. custom_field) has no standalone list page.
+     *
+     * @param  Team|null  $team  The tenant to build the panel URL against. Defaults to the
+     *                           authenticated user's current team, mirroring urlFor().
+     */
+    public function indexUrlFor(string $entityType, ?Team $team = null): ?string
+    {
+        $authUser = auth()->user();
+
+        if (! $authUser instanceof User) {
+            return null;
+        }
+
+        $team ??= $authUser->currentTeam;
+
+        if ($team === null) {
+            return null;
+        }
+
+        try {
+            return match ($entityType) {
+                'company' => CompanyResource::getUrl('index', panel: 'app', tenant: $team),
+                'people' => PeopleResource::getUrl('index', panel: 'app', tenant: $team),
+                'opportunity' => OpportunityResource::getUrl('index', panel: 'app', tenant: $team),
+                'task' => TaskResource::getUrl('index', panel: 'app', tenant: $team),
+                'note' => NoteResource::getUrl('index', panel: 'app', tenant: $team),
+                default => null,
+            };
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * The custom-fields management page, focused on the tab owning this field.
      * Scoped explicitly to the team and past every global scope: this also runs on
      * conversation reload and for deactivated fields, where neither the ambient

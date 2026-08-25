@@ -90,3 +90,47 @@ an `x-if` template Alpine tears down while renaming, so the write lands on a
 detached node and the stale title returns with the template. And the all-chats
 panel is nested the same way and has the same defect, still unfixed: it shows
 the list as of its last full page load.
+
+## A batch card decides the whole remainder; only a record's own row skips it
+The dock footer of a batch proposal is one decision over everything still
+undecided: "Create all N" (`ProposalCard::createCurrent` -> `approveRemainingItems`)
+and "Discard all" (`discardCurrent` -> `rejectRemainingItems`), both looping the
+per-item service calls and stopping at the first failure. Per-record skip lives
+ONLY on the record's own row (`skipItem`, the ✕ in `_dock-step.blade.php`).
+It was the other way round once: the footer read "Create"/"Discard" and resolved
+ONE record per click, so a user who clicked Discard to dismiss the card silently
+rejected the record under the cursor. That is how a proposed contact was skipped
+while the card still reported success. Never put a per-record decision back in
+the footer, and never let the footer label omit the count.
+The skip ✕ is hover-revealed on `sm:` and up but ALWAYS visible below it: touch
+has no hover, and an invisible skip control is the same defect again.
+
+## A partially-skipped batch is stored Approved: never render that status raw
+`finalizeBatchIfComplete` marks the row Approved when ANY item was created, so
+`pending_actions.status` cannot describe a mixed outcome. Two readers must derive
+from `result_data.items` instead:
+- the transcript header chip, via `batchOutcome()` in `transcript.js` ("2 created"
+  + "1 skipped"), never `action.status`;
+- the model's `<resolved_actions>` block, via `PendingActionService::
+  skippedItemLabels()` -> `CrmAssistant::resolvedBlock()`, which names each skipped
+  record as "skipped by the user, NOT created".
+Without the second one the assistant reads "approved" plus the proposal's full
+record list and tells the user every record was created, including the ones they
+declined. Both are asserted (`ProposalCardComponentTest`, `BatchResolvedActionsTest`).
+
+## The table's paint budget is client-only: the model can never state a row count
+`BaseReadListTool` stopped slicing server-side, so `display_block.rows` carries the
+WHOLE page the model read. The trim moved to `RECORDS_TABLE_COLLAPSE_ROWS` in
+`transcript.js`, which paints the first 10 until the user clicks "Show all N rows".
+That constant is never sent to the model and has no payload field, so the only
+numbers the model can state truthfully are `total` and `has_more`; ANY row count it
+writes is unverifiable and routinely wrong (a 25-row page paints 10).
+CrmAssistant rule 10 therefore bans row counts outright. The ban leaked once because
+it did not cover the case where the USER names the number first: "show me 25
+companies" produced "here are the first 25 of your 56" above a table reading
+"Showing 10 of 56". Rule 10 now spells that case out and gives the sentence to write
+instead ("the first page of 56"), asserted in `CrmAssistantInstructionsTest`.
+Two consequences for future work: never add a prompt rule that asks the model to
+state how many rows the user can see, and if a payload field is ever wanted for it,
+it must be the SERVER telling the model the paint budget, not the model guessing.
+Prompt constraints are probabilistic: this narrows the tail, it does not close it.

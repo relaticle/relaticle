@@ -144,3 +144,50 @@ it('tells the model to reach for include when asked for related records', functi
         ->toContain('pass `include` to the list tool')
         ->toContain('no single block and no `include` can show');
 });
+
+/**
+ * Since the display block now renders every row the model received (no more
+ * BLOCK_ROW_LIMIT slicing), the old warning that `showing` "can exceed the
+ * rows the table under your reply prints" is false: the table always shows
+ * exactly what the model saw. Leaving the stale clause in would tell the
+ * model to distrust a table that is now trustworthy.
+ */
+it('no longer warns that showing can exceed what the table prints', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->not->toContain('can exceed the rows the table under your reply prints')
+        ->toContain('has_more');
+});
+
+/**
+ * The client collapses a long page to ten painted rows, and that budget lives
+ * only in transcript.js: the model never sees it. So a page size it states is
+ * a number it cannot verify, and a live turn proved it states one anyway once
+ * the user says it first ("show me 25 companies" produced "here are the first
+ * 25 of your 56" over a table reading "Showing 10 of 56"). The general ban on
+ * row counts was already there; only the named-page-size case leaks through,
+ * so that case is spelled out with the sentence to write instead.
+ */
+it('forbids repeating a page size the user named', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('even when the user named a page size')
+        ->toContain('never by repeating it in your reply')
+        ->toContain('never "the first 25 of your 56"');
+});
+
+/**
+ * `next_page` is the only instruction that tells the model how to reach page
+ * 2 of a list result. If a future prompt trim drops this line, the model has
+ * no way to fetch more rows and will either fabricate a "view more" answer or
+ * silently truncate the user's request to the first page.
+ */
+it('tells the model how to fetch the next page of a list result', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('page` set to the result\'s `next_page`')
+        ->toContain('narrow the filter instead');
+});
