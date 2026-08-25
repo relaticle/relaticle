@@ -155,41 +155,26 @@
                                 </a>
                             </template>
 
-                            {{-- Telegram-style send-state glyph: only rendered for a bubble sent THIS
-                                 session. Reloaded (persisted) messages carry no sendState and stay
-                                 silent rather than showing a permanent checkmark on every past message. --}}
-                            <template x-if="msg.sendState && !msg.editing">
-                                <div
-                                    class="flex items-center gap-1 px-1 text-[length:var(--text-micro)]"
-                                    :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'"
-                                >
-                                    <template x-if="msg.sendState === 'sending'">
-                                        <span role="status" class="inline-flex">
-                                            <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span class="sr-only">{{ __('Sending') }}</span>
-                                        </span>
-                                    </template>
-                                    <template x-if="msg.sendState === 'sent'">
-                                        <span role="status" class="inline-flex">
-                                            <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span class="sr-only">{{ __('Sent') }}</span>
-                                        </span>
-                                    </template>
-                                    <template x-if="msg.sendState === 'failed'">
-                                        <span class="inline-flex items-center gap-1" role="alert">
-                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span>{{ __('Not sent') }}</span>
-                                            <button
-                                                type="button"
-                                                data-resend-button
-                                                x-on:click="resendMessage(msg)"
-                                                :disabled="isStreaming"
-                                                class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
-                                            >
-                                                {{ __('Resend') }}
-                                            </button>
-                                        </span>
-                                    </template>
+                            {{-- Failure notice only. There is no delivery receipt on a
+                                 sent message: the assistant's reply is the confirmation,
+                                 so a clock or checkmark under every bubble was noise.
+                                 A send that did NOT land still has to say so, and carry
+                                 the retry. --}}
+                            <template x-if="msg.sendState === 'failed' && !msg.editing">
+                                <div class="flex items-center gap-1 px-1 text-[length:var(--text-micro)] text-red-500 dark:text-red-400">
+                                    <span class="inline-flex items-center gap-1" role="alert">
+                                        <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span>{{ __('Not sent') }}</span>
+                                        <button
+                                            type="button"
+                                            data-resend-button
+                                            x-on:click="resendMessage(msg)"
+                                            :disabled="isStreaming"
+                                            class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
+                                        >
+                                            {{ __('Resend') }}
+                                        </button>
+                                    </span>
                                 </div>
                             </template>
 
