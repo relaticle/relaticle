@@ -5,8 +5,12 @@ declare(strict_types=1);
 return [
     'activation' => [
         'heading' => 'Get started',
-        'progress' => ':completed of :total',
+        'progress' => ':completed/:total steps completed',
         'dismiss' => 'Dismiss',
+        'collapse' => 'Collapse checklist',
+        'more_actions' => 'More actions',
+        'encouragement' => "Let's go!",
+        'invite_members' => 'Invite team members',
         'sample_data' => 'This workspace is preloaded with sample records so you can look around. Anything you add sits alongside them.',
         'steps' => [
             'first_record' => [
@@ -24,6 +28,7 @@ return [
             'ask_rela' => [
                 'label' => 'Ask Rela about your pipeline',
                 'description' => 'Your assistant can read, draft, and update records for you',
+                'prompt' => "What's in my pipeline right now?",
             ],
         ],
         'next_action' => [

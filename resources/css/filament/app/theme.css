@@ -140,6 +140,12 @@
         padding-block: calc(var(--spacing) * 1.7);
     }
 
+    /* Filament ships these at 1rem, which reads a size larger than every other
+       label in the panel and than the sidebar footer directly beneath. */
+    .fi-sidebar-item-label {
+        @apply text-sm;
+    }
+
     .fi-sidebar-item-icon {
         width: calc(var(--spacing) * 5);
         height: calc(var(--spacing) * 5);

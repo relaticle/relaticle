@@ -56,6 +56,22 @@ final class WorkspaceActivationFacts
             ->exists();
     }
 
+    /**
+     * The conversation holding Rela's seeded welcome, when the workspace has
+     * one. Callers use it to link at a real transcript: an id-less chat URL is
+     * not a destination, it bounces back to the dashboard.
+     */
+    public function welcomeConversationId(Team $team): ?string
+    {
+        $conversationId = DB::table('agent_conversation_messages as m')
+            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
+            ->where('c.team_id', $team->getKey())
+            ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
+            ->value('m.conversation_id');
+
+        return is_string($conversationId) ? $conversationId : null;
+    }
+
     public function sampleRecordCount(Team $team): int
     {
         $total = 0;

@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
@@ -87,12 +86,15 @@ final class ActivationChecklist extends Component
             return [];
         }
 
+        $welcomeConversationId = resolve(WorkspaceActivationFacts::class)->welcomeConversationId($team);
+
         return array_values($team->onboarding()->steps()
             ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
                 key: $this->stepKey($step)->value,
                 label: __((string) $step->attribute('label_key')),
                 description: __((string) $step->attribute('description_key')),
-                url: $this->stepUrl($this->stepKey($step)),
+                url: $this->stepUrl($this->stepKey($step), $welcomeConversationId),
+                prompt: $this->stepPrompt($this->stepKey($step), $welcomeConversationId),
                 icon: (string) $step->attribute('icon'),
                 complete: $step->complete(),
             ))
@@ -110,38 +112,36 @@ final class ActivationChecklist extends Component
      * Every registered step needs a destination. Matching the key exhaustively
      * means a step added to ActivationSteps without one fails here rather than
      * quietly rendering a row that links to the People list.
+     *
+     * AskRela links straight to Rela's seeded welcome conversation so the step
+     * opens onto the guided setup message. A workspace without one has no chat
+     * to open: an id-less chat URL is not a destination, the page bounces
+     * straight back to the dashboard, so that row seeds the composer instead.
      */
-    private function stepUrl(ActivationStep $step): string
+    private function stepUrl(ActivationStep $step, ?string $welcomeConversationId): ?string
     {
         return match ($step) {
             ActivationStep::FirstRecord => PeopleResource::getUrl('index'),
             ActivationStep::Import => ImportPeople::getUrl(),
             ActivationStep::Invite => Members::getUrl(),
-            ActivationStep::AskRela => $this->askRelaUrl(),
+            ActivationStep::AskRela => $welcomeConversationId === null
+                ? null
+                : ChatConversation::getUrl(['conversationId' => $welcomeConversationId]),
         };
     }
 
     /**
-     * Links straight to Rela's seeded welcome conversation when one exists,
-     * so the step opens onto the guided setup message rather than a blank
-     * composer. Falls back to the generic chat page for a workspace created
-     * before this shipped, or whose welcome job never ran.
+     * The question dropped into the dashboard composer for a step that has
+     * nowhere to navigate. It is seeded, never sent: a checklist click must
+     * not spend the workspace's credits on the user's behalf.
      */
-    private function askRelaUrl(): string
+    private function stepPrompt(ActivationStep $step, ?string $welcomeConversationId): ?string
     {
-        $team = $this->team();
+        if ($step !== ActivationStep::AskRela || $welcomeConversationId !== null) {
+            return null;
+        }
 
-        $conversationId = $team instanceof Team
-            ? DB::table('agent_conversation_messages as m')
-                ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-                ->where('c.team_id', $team->getKey())
-                ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
-                ->value('m.conversation_id')
-            : null;
-
-        return is_string($conversationId)
-            ? ChatConversation::getUrl(['conversationId' => $conversationId])
-            : ChatConversation::getUrl();
+        return __('filament/pages/dashboard.activation.steps.ask_rela.prompt');
     }
 
     #[Computed]

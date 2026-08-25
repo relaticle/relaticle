@@ -1,5 +1,5 @@
 <div
-    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
+    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null))"
     x-on:keydown="onChatRootKeydown($event)"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     x-on:chat:editor-arrow-up.window="if ($event.detail?.context === @js($context ?? 'conversation')) maybeEditLastUserMessage()"
@@ -29,7 +29,7 @@
 
 @script
 <script>
-Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
+Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt) => ({
     ...window.ChatModules.transcriptModule({
         messagesUrl: @js(url('/chat/messages')),
         {{-- Templated on the conversation id for the same reason the switcher's
@@ -264,6 +264,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.input = initialMessage;
                 this.localEditor()?.setText(initialMessage);
                 this.sendMessage();
+            });
+        }
+
+        // Seeded, never sent: the user reads it and presses send themselves.
+        // Skipped when a bootstrap handoff already filled the composer, so a
+        // ?prompt= in the URL cannot overwrite what the user just typed.
+        if (initialPrompt && !initialMessage && !ranBootstrapSend) {
+            this.$nextTick(() => {
+                this.input = initialPrompt;
+                this.localEditor()?.setText(initialPrompt);
+                this.localEditor()?.focus();
             });
         }
 

@@ -7,6 +7,7 @@ use App\Enums\CreationSource;
 use App\Enums\TeamRole;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\PeopleResource;
 use App\Livewire\App\Onboarding\ActivationChecklist;
 use App\Models\People;
 use App\Models\Team;
@@ -28,6 +29,17 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
+/**
+ * The click handler the ask_rela row carries when it has no conversation to
+ * open: it seeds the dashboard composer instead of navigating.
+ */
+function composePromptUrl(): string
+{
+    return ChatConversation::getUrl([
+        'prompt' => __('filament/pages/dashboard.activation.steps.ask_rela.prompt'),
+    ]);
+}
+
 function stepState(string $key, bool $complete): string
 {
     return sprintf('data-step="%s" data-complete="%s"', $key, $complete ? 'true' : 'false');
@@ -39,7 +51,7 @@ it('starts every step incomplete in a fresh workspace', function (): void {
         ->assertSeeHtml(stepState('import', false))
         ->assertSeeHtml(stepState('invite', false))
         ->assertSeeHtml(stepState('ask_rela', false))
-        ->assertSee('0 of 4');
+        ->assertSee('0/4 steps completed');
 });
 
 it('completes the first-record step once the workspace holds a record the team made', function (): void {
@@ -51,7 +63,7 @@ it('completes the first-record step once the workspace holds a record the team m
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('first_record', true))
-        ->assertSee('1 of 4');
+        ->assertSee('1/4 steps completed');
 });
 
 it('leaves the first-record step incomplete while only seeded demo records exist', function (): void {
@@ -62,7 +74,7 @@ it('leaves the first-record step incomplete while only seeded demo records exist
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('first_record', false))
-        ->assertSee('0 of 4');
+        ->assertSee('0/4 steps completed');
 });
 
 it('completes the import step for an imported record', function (): void {
@@ -241,9 +253,20 @@ it('answers all four steps without repeating a query', function (): void {
         ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'team_invitations')))->toHaveCount(1);
 });
 
-it('renders on the dashboard', function (): void {
-    livewire(Dashboard::class)
-        ->assertSeeHtml('data-testid="activation-step"');
+/**
+ * The checklist moved off the dashboard body into the panel sidebar, so it
+ * follows the user into every page rather than only existing on Home. Asserted
+ * through a real page request because a render hook is not part of the
+ * Livewire component under test.
+ */
+it('renders in the sidebar on every panel page, not just the dashboard', function (): void {
+    $this->get(Dashboard::getUrl())
+        ->assertOk()
+        ->assertSee('data-testid="activation-step"', escape: false);
+
+    $this->get(PeopleResource::getUrl('index'))
+        ->assertOk()
+        ->assertSee('data-testid="activation-step"', escape: false);
 });
 
 it('links the ask_rela step to the seeded welcome conversation when one exists', function (): void {
@@ -280,7 +303,7 @@ it('links the ask_rela step to the seeded welcome conversation when one exists',
         ->assertSeeHtml('href="'.ChatConversation::getUrl(['conversationId' => $conversationId]).'"');
 });
 
-it('falls back to the generic chat page for ask_rela when no welcome conversation exists', function (): void {
+it('hands the ask_rela step to the dashboard composer when no welcome conversation exists', function (): void {
     $conversationId = (string) Str::uuid7();
 
     DB::table('agent_conversations')->insert([
@@ -310,6 +333,38 @@ it('falls back to the generic chat page for ask_rela when no welcome conversatio
         'updated_at' => now(),
     ]);
 
+    // An id-less chat URL is a dead click: that page redirects straight back to
+    // the dashboard, so the row must never render one.
     livewire(ActivationChecklist::class)
-        ->assertSeeHtml('href="'.ChatConversation::getUrl().'"');
+        ->assertDontSeeHtml('href="'.ChatConversation::getUrl().'"')
+        ->assertSeeHtml(composePromptUrl());
+});
+
+/**
+ * `?prompt=` seeds the composer and stops. The chat page used to feed that
+ * parameter into initialMessage, which sends on arrival: a checklist click
+ * would have spent a workspace credit before its owner read what was typed.
+ */
+it('seeds the composer with the ask_rela question rather than sending it', function (): void {
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(composePromptUrl())
+        ->assertDontSeeHtml('href="'.ChatConversation::getUrl().'"');
+});
+
+it('shows the invite row to a workspace admin and hides it from an editor', function (): void {
+    $this->get(Dashboard::getUrl())
+        ->assertOk()
+        ->assertSee(__('filament/pages/dashboard.activation.invite_members'));
+
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($member);
+    Filament::setTenant($this->team);
+
+    // Members::canAccess() is can('update', $tenant), so this row would link an
+    // editor straight to a 403.
+    $this->get(Dashboard::getUrl())
+        ->assertOk()
+        ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));
 });

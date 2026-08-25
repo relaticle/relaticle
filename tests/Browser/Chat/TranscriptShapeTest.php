@@ -97,13 +97,13 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
  * tests/Feature/Chat/MessagePaginationTest.php for this exact ordering
  * concern.
  */
-function transcriptShapeInsertSequencedMessages(string $conversationId, User $user, int $count, Carbon $baseline): void
+function transcriptShapeInsertSequencedMessages(string $conversationId, User $user, int $count, Carbon $baseline, string $prefix = 'seq'): void
 {
     $rows = [];
 
     foreach (range(1, $count) as $i) {
         $rows[] = [
-            'id' => sprintf('seq-%04d', $i),
+            'id' => sprintf('%s-%04d', $prefix, $i),
             'conversation_id' => $conversationId,
             'participant_type' => 'user',
             'participant_id' => (string) $user->getKey(),
@@ -575,4 +575,133 @@ it('emits chip markup identical to the server for every citable type, and chips 
     foreach ($neverChipped as $type) {
         expect($serverChipByType[$type])->toBeNull();
     }
+});
+
+/**
+ * Both sticky pills (the date marker at the top of the transcript and the
+ * jump-to-latest button at the bottom) live inside a zero-height sticky row so
+ * toggling them never shifts scroll content. A flex child of a zero-height row
+ * stretches to that height unless the row aligns it, which collapsed both
+ * capsules to roughly half their intended height and pushed the label out
+ * through the border. Assert the rendered height, not the classes.
+ */
+it('renders the sticky transcript pills at their natural height inside the zero-height sticky row', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'sticky pills', $conversationId);
+
+    // Two calendar days so the transcript carries a day separator for the
+    // sticky date pill to mirror; ids stay lexicographically ordered across
+    // both batches ('dayA-…' sorts before 'dayB-…').
+    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline->copy()->subDay(), 'dayA');
+    transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline, 'dayB');
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Seeded message 0020');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    // The real path that raises the jump pill: the user has scrolled up (so
+    // the transcript is no longer pinned) and new content lands below them.
+    // Scrolling past the day separator is what puts a label in the date pill.
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
+            const separator = container.querySelector('[data-day-separator]');
+            container.scrollTop = separator.offsetTop + separator.offsetHeight + 40;
+            container.dispatchEvent(new Event('scroll'));
+            data.updateStickyDateLabel();
+            data.scrollToBottom(false);
+
+            return true;
+        })();
+    JS);
+
+    $heights = $page->script(<<<'JS'
+        (() => {
+            const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
+            const jump = Array.from(container.querySelectorAll('button'))
+                .find((el) => el.textContent.trim() === 'New messages');
+            const date = Array.from(container.querySelectorAll('.sticky > span'))
+                .find((el) => el.textContent.trim().length > 0);
+
+            return {
+                jump: jump ? jump.getBoundingClientRect().height : null,
+                date: date ? date.getBoundingClientRect().height : null,
+            };
+        })();
+    JS);
+
+    // 28px is the h-7 both pills are built at; anything at or under ~20 means
+    // the zero-height row squashed them again.
+    expect($heights['jump'])->toBeGreaterThanOrEqual(26.0);
+    expect($heights['date'])->toBeGreaterThanOrEqual(26.0);
+});
+
+/**
+ * Editing a message opens an input the user can type into immediately, sized to
+ * what it holds: the caret lands in the box without a second click, and the
+ * frame grows with the text instead of sitting at one fixed width.
+ */
+it('focuses the message editor on open and grows its width with the text', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'edit affordance', $conversationId);
+
+    $baseline = Carbon::parse('2026-08-19 09:00:00', 'UTC');
+    transcriptShapeInsertMessage($conversationId, $user, 'short', $baseline);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('short');
+
+    // The real affordance, not startEdit() directly: the click destroys the
+    // hover action row it came from, and that teardown is what used to blow
+    // the focus back out to the body.
+    $page->script(<<<'JS'
+        (() => {
+            document.querySelector('[data-edit-button]').click();
+
+            return true;
+        })();
+    JS);
+
+    $opened = $page->script(<<<'JS'
+        (() => {
+            const editor = document.querySelector('textarea[aria-label="Edit message"]');
+
+            return {
+                focused: document.activeElement === editor,
+                caretAtEnd: editor.selectionStart === editor.value.length,
+                width: editor.parentElement.getBoundingClientRect().width,
+            };
+        })();
+    JS);
+
+    expect($opened['focused'])->toBeTrue();
+    expect($opened['caretAtEnd'])->toBeTrue();
+
+    $page->script(<<<'JS'
+        (() => {
+            const editor = document.querySelector('textarea[aria-label="Edit message"]');
+            editor.value = 'a considerably longer message than the one this bubble started out holding';
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+
+            return true;
+        })();
+    JS);
+
+    $grown = $page->script(<<<'JS'
+        (() => {
+            const editor = document.querySelector('textarea[aria-label="Edit message"]');
+
+            return editor.parentElement.getBoundingClientRect().width;
+        })();
+    JS);
+
+    expect($grown)->toBeGreaterThan($opened['width']);
 });

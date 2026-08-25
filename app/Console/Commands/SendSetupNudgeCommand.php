@@ -8,6 +8,7 @@ use App\Enums\ActivationStep;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\ChatConversation;
+use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\Team;
 use App\Models\User;
@@ -19,7 +20,6 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Onboard\OnboardingStep;
 
@@ -128,7 +128,7 @@ final class SendSetupNudgeCommand extends Command
             return false;
         }
 
-        $conversationUrl = $this->welcomeConversationUrl($team);
+        $conversationUrl = $this->continueUrl($team, $facts);
 
         Mail::to($user)
             ->send(new SetupNudgeMail($user, $team, $stepKey->value, $conversationUrl));
@@ -157,16 +157,17 @@ final class SendSetupNudgeCommand extends Command
         return null;
     }
 
-    private function welcomeConversationUrl(Team $team): string
+    /**
+     * Where "Continue in Rela" lands. An id-less chat URL is not a destination:
+     * that page bounces straight back to the dashboard, so a workspace with no
+     * seeded welcome is sent to the dashboard composer directly.
+     */
+    private function continueUrl(Team $team, WorkspaceActivationFacts $facts): string
     {
-        $conversationId = DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('c.team_id', $team->getKey())
-            ->whereRaw("coalesce(m.meta->>'welcome', '') = 'true'")
-            ->value('m.conversation_id');
+        $conversationId = $facts->welcomeConversationId($team);
 
-        return is_string($conversationId)
-            ? ChatConversation::getUrl(['tenant' => $team, 'conversationId' => $conversationId], panel: 'app')
-            : ChatConversation::getUrl(['tenant' => $team], panel: 'app');
+        return $conversationId === null
+            ? Dashboard::getUrl(['tenant' => $team], panel: 'app')
+            : ChatConversation::getUrl(['tenant' => $team, 'conversationId' => $conversationId], panel: 'app');
     }
 }

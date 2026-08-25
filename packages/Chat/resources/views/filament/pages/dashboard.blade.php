@@ -93,8 +93,6 @@
 
         </form>
 
-        @livewire(\App\Livewire\App\Onboarding\ActivationChecklist::class)
-
         @include('chat::filament.pages.partials.my-tasks')
     </div>
 
