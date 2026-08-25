@@ -193,8 +193,8 @@ describe('manageSharing table action', function (): void {
                 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
                 'shares' => [
                     [
-                        'shared_with' => $this->viewer->id,
                         'tier' => EmailPrivacyTier::SUBJECT->value,
+                        'shared_with' => [$this->viewer->id],
                     ],
                 ],
             ])
@@ -205,6 +205,45 @@ describe('manageSharing table action', function (): void {
             'shared_with' => $this->viewer->id,
             'tier' => EmailPrivacyTier::SUBJECT->value,
         ]);
+    });
+
+    it('creates EmailShare rows for multiple teammates selected in one tier row', function (): void {
+        $secondViewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('manageSharing', $email, data: [
+                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
+                'shares' => [
+                    [
+                        'tier' => EmailPrivacyTier::SUBJECT->value,
+                        'shared_with' => [
+                            $this->viewer->id,
+                            $secondViewer->id,
+                        ],
+                    ],
+                ],
+            ])
+            ->assertNotified('Sharing settings saved.');
+
+        foreach ([$this->viewer, $secondViewer] as $viewer) {
+            $this->assertDatabaseHas('email_shares', [
+                'email_id' => $email->getKey(),
+                'shared_with' => $viewer->id,
+                'tier' => EmailPrivacyTier::SUBJECT->value,
+            ]);
+        }
     });
 
     it("clears the owner's previous shares when saved with an empty shares list", function (): void {
@@ -311,8 +350,8 @@ describe('shareAllOnRecord header action', function (): void {
                 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
                 'shares' => [
                     [
-                        'shared_with' => $this->viewer->id,
                         'tier' => EmailPrivacyTier::SUBJECT->value,
+                        'shared_with' => [$this->viewer->id],
                     ],
                 ],
             ])
