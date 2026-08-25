@@ -35,13 +35,6 @@ abstract class BaseReadListTool implements Tool
     use ReportsValidationFailures;
 
     /**
-     * Rows carried by the `records_table` display block. The model still sees
-     * the full page under `data`; the block is what the user reads, and a chat
-     * bubble that scrolls past ten rows stops being a summary.
-     */
-    private const int BLOCK_ROW_LIMIT = 10;
-
-    /**
      * Columns carried by the block: the entity's core name/title column plus up
      * to five custom-field columns, wide enough for the fields a team marks
      * visible and narrow enough for a chat bubble.
@@ -50,25 +43,27 @@ abstract class BaseReadListTool implements Tool
 
     /**
      * Characters kept per table cell. Tighter than the record card's cap: a cell
-     * is one line of a ten-row table, not a record summary.
+     * is one line of a table row, not a record summary.
      */
     private const int CELL_VALUE_LIMIT = 120;
 
     /**
      * Related records attached per row under `included` and as a chip column.
      * Tighter than the show tool's INCLUDE_LIMIT: a list block already carries
-     * up to ten rows, so each row's own chip column stays to a glance.
+     * a full page of rows, so each row's own chip column stays to a glance.
      */
     private const int INCLUDE_ITEM_LIMIT = 3;
 
     /**
-     * Page cap applied when any include is requested. A full page of rows times
-     * every available relation times INCLUDE_ITEM_LIMIT is a large result for one
-     * tool call, and the whole payload then sits in the prompt cache for the rest
-     * of the conversation. `total` still reports the real count, so the model can
-     * say it is showing a subset.
+     * Page cap for every list call, with or without an include. A `data` record
+     * costs roughly 101 tokens on every subsequent turn (it is replayed, unlike
+     * the one-turn `display_block`), so page size is a permanent prompt-cache
+     * budget, not a UX knob. A full page of rows times every available relation
+     * times INCLUDE_ITEM_LIMIT compounds that cost further for an include-bearing
+     * call. `total` still reports the real count, so the model can say it is
+     * showing a subset, and `has_more`/`next_page` say whether one exists.
      */
-    private const int INCLUDE_PAGE_LIMIT = 25;
+    private const int MAX_PER_PAGE = 25;
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -143,7 +138,7 @@ abstract class BaseReadListTool implements Tool
                 'sort' => $schema->string()->description(
                     'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
                 ),
-                'per_page' => $schema->integer()->description('Results per page (default 15, max 50).')->default(15),
+                'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
                 'page' => $schema->integer()->description('Page number.')->default(1),
                 'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
             ],
@@ -158,8 +153,7 @@ abstract class BaseReadListTool implements Tool
                 ->items($schema->string())
                 ->description(
                     "Related records to attach per row under `included` and as a chip column in the table. Valid values: {$valid}. "
-                    .'Only the '.self::INCLUDE_ITEM_LIMIT.' most recent related records per row are attached; `total` inside each row\'s `included` entry gives the real count. '
-                    .'Asking for any include caps this call at '.self::INCLUDE_PAGE_LIMIT.' rows, so leave it off when you want a long list.'
+                    .'Only the '.self::INCLUDE_ITEM_LIMIT.' most recent related records per row are attached; `total` inside each row\'s `included` entry gives the real count.'
                 );
         }
 
@@ -193,7 +187,7 @@ abstract class BaseReadListTool implements Tool
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
-                perPage: $this->perPageFor($request, $requestedIncludes),
+                perPage: $this->perPageFor($request),
                 page: isset($request['page']) ? (int) $request['page'] : null,
                 request: $httpRequest,
             );
@@ -263,6 +257,10 @@ abstract class BaseReadListTool implements Tool
             'data' => $items,
             'total' => $results->total(),
             'showing' => count($items),
+            'has_more' => $results instanceof LengthAwarePaginator && $results->hasMorePages(),
+            'next_page' => $results instanceof LengthAwarePaginator && $results->hasMorePages()
+                ? $results->currentPage() + 1
+                : null,
         ];
 
         if ($block !== null) {
@@ -272,16 +270,9 @@ abstract class BaseReadListTool implements Tool
         return (string) json_encode($this->localiseDatetimes($payload, $user), JSON_UNESCAPED_SLASHES);
     }
 
-    /**
-     * @param  list<string>  $requestedIncludes
-     */
-    private function perPageFor(Request $request, array $requestedIncludes): int
+    private function perPageFor(Request $request): int
     {
-        $perPage = max(1, min((int) ($request['per_page'] ?? 15), 50));
-
-        return $requestedIncludes === []
-            ? $perPage
-            : min($perPage, self::INCLUDE_PAGE_LIMIT);
+        return max(1, min((int) ($request['per_page'] ?? 10), self::MAX_PER_PAGE));
     }
 
     /**
@@ -428,7 +419,7 @@ abstract class BaseReadListTool implements Tool
      */
     private function buildDisplayBlock(User $user, LengthAwarePaginator $results, Request $request, array $includes): ?array
     {
-        $records = array_slice(array_values($results->items()), 0, self::BLOCK_ROW_LIMIT);
+        $records = array_values($results->items());
 
         if ($records === []) {
             return null;
@@ -481,10 +472,32 @@ abstract class BaseReadListTool implements Tool
             ],
             'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey, $includes),
             'total' => $results->total(),
-            // The rows are this PAGE's first ten, not the result set's. Without the
-            // offset the footer renders "Showing 10 of 200" over records 101-110.
+            // The rows are this PAGE's, not the result set's. Without the offset
+            // the footer renders "Showing 25 of 200" over records 101-125.
             'from' => $results->firstItem() ?? 0,
+            ...$this->openUrlFor($user, $results),
         ];
+    }
+
+    /**
+     * `open_url` only earns a place in the block when there is somewhere further
+     * to send the user: a next page exists and the entity has a list page to
+     * send them to. Returned as a spreadable array rather than a nullable value
+     * so the key is omitted entirely rather than carried as `null`, which the
+     * partial reads defensively.
+     *
+     * @param  LengthAwarePaginator<int, Model>  $results
+     * @return array{open_url?: string}
+     */
+    private function openUrlFor(User $user, LengthAwarePaginator $results): array
+    {
+        if (! $results->hasMorePages()) {
+            return [];
+        }
+
+        $url = resolve(RecordReferenceResolver::class)->indexUrlFor($this->citationType(), $user->currentTeam);
+
+        return $url === null ? [] : ['open_url' => $url];
     }
 
     /**

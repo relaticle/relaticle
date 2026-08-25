@@ -369,8 +369,8 @@ it('reports total and showing when results exceed one page', function (): void {
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
     expect($payload['total'])->toBe(17)
-        ->and($payload['showing'])->toBe(15)
-        ->and($payload['data'])->toHaveCount(15);
+        ->and($payload['showing'])->toBe(10)
+        ->and($payload['data'])->toHaveCount(10);
 });
 
 it('reports total equal to showing when results fit on one page', function (): void {
@@ -385,4 +385,28 @@ it('reports total equal to showing when results fit on one page', function (): v
     expect($payload['total'])->toBe(3)
         ->and($payload['showing'])->toBe(3)
         ->and($payload['data'])->toHaveCount(3);
+});
+
+it('defaults to 10 rows per page when per_page is not given', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    Company::factory()->count(30)->for($team)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['data'])->toHaveCount(10);
+});
+
+it('clamps per_page at 25 even when a larger value is requested', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    Company::factory()->count(30)->for($team)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 50])), true);
+
+    expect($payload['data'])->toHaveCount(25);
 });

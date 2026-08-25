@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\Company\CreateCompany;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Opportunity\CreateOpportunity;
+use App\Filament\Resources\CompanyResource;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -294,6 +296,65 @@ it('keeps the model-facing rows under data alongside the block', function (): vo
         ->and($decoded['data'])->toHaveCount(1)
         ->and($decoded['data'][0]['attributes']['name'])->toBe('Acme')
         ->and($decoded['data'][0]['url'])->toBe("/r/company/{$decoded['data'][0]['id']}");
+});
+
+// --- (a2) the block carries the whole page, and the remainder is explicit ---
+
+it('carries every row of the page in the block, never a slice of it', function (): void {
+    $user = $this->user;
+
+    Company::factory()->count(15)->for($user->currentTeam)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 15])), true);
+
+    expect($payload['data'])->toHaveCount(15)
+        ->and($payload['display_block']['rows'])->toHaveCount(15);
+});
+
+it('reports has_more true and next_page set on a first page with a remainder', function (): void {
+    $user = $this->user;
+
+    Company::factory()->count(15)->for($user->currentTeam)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+
+    expect($payload['has_more'])->toBeTrue()
+        ->and($payload['next_page'])->toBe(2);
+});
+
+it('reports has_more false and next_page null on the last page', function (): void {
+    $user = $this->user;
+
+    Company::factory()->count(15)->for($user->currentTeam)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
+
+    expect($payload['has_more'])->toBeFalse()
+        ->and($payload['next_page'])->toBeNull();
+});
+
+it('carries open_url on the block only when has_more is true', function (): void {
+    $user = $this->user;
+    $team = $user->currentTeam;
+
+    Company::factory()->count(15)->for($team)->create();
+
+    $firstPage = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
+    $lastPage = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
+
+    expect($firstPage['display_block'])->toHaveKey('open_url')
+        ->and($firstPage['display_block']['open_url'])->toBe(CompanyResource::getUrl('index', panel: 'app', tenant: $team))
+        ->and($lastPage['display_block'])->not->toHaveKey('open_url');
+});
+
+it('reports the paginator offset in from on page 2', function (): void {
+    $user = $this->user;
+
+    Company::factory()->count(15)->for($user->currentTeam)->create();
+
+    $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
+
+    expect($payload['display_block']['from'])->toBe(11);
 });
 
 // --- (b) show tool emits a record_card block ---
