@@ -87,6 +87,37 @@ function displayBlockTableFixture(): array
 }
 
 /**
+ * A records_table block shaped like a real BaseReadListTool payload with
+ * $rowCount rows on the page and $total across the whole result set. Passing
+ * $openUrl mirrors BaseReadListTool::openUrlFor: present only when the tool's
+ * own pagination has a further page to send the user to.
+ *
+ * @return array<string, mixed>
+ */
+function displayBlockLongTableFixture(int $rowCount, int $total, ?string $openUrl = null): array
+{
+    $rows = array_map(static fn (int $n): array => [
+        'id' => sprintf('01ROW%02d', $n),
+        'url' => sprintf('/r/company/01ROW%02d', $n),
+        'cells' => ['name' => "Company {$n}"],
+    ], range(1, $rowCount));
+
+    return [
+        'block' => 'records_table',
+        'title' => 'Companies',
+        'type' => 'company',
+        'core' => 'name',
+        'columns' => [
+            ['key' => 'name', 'label' => 'Name'],
+        ],
+        'rows' => $rows,
+        'total' => $total,
+        'from' => 1,
+        ...($openUrl !== null ? ['open_url' => $openUrl] : []),
+    ];
+}
+
+/**
  * @return array<string, mixed>
  */
 function displayBlockCardFixture(string $longUrl): array
@@ -383,4 +414,126 @@ it('attaches display blocks to the streamed bubble at stream-end reconcile', fun
     JS);
 
     $page->assertCount('[data-block]', 2);
+});
+
+it('collapses a table past ten rows and reveals the rest when the toggle is clicked', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    // 25 rows on the page (the model's whole page, per BaseReadListTool/D1),
+    // 42 across the full result set: the footer's count must keep tracking
+    // total minus VISIBLE rows through the toggle, never settle at "42 of 42".
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
+        displayBlockLongTableFixture(25, 42),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Here are your companies.');
+
+    $collapsed = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+            const toggle = table.querySelector('[data-block-toggle]');
+
+            return JSON.stringify({
+                rowCount: table.querySelectorAll('tbody tr').length,
+                toggleLabel: toggle?.textContent.trim() ?? null,
+                toggleExpanded: toggle?.getAttribute('aria-expanded') ?? null,
+                toggleIsButton: toggle?.tagName ?? null,
+                footerShows10Of42: table.textContent.includes('Showing 10 of 42'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($collapsed['rowCount'])->toBe(10)
+        ->and($collapsed['toggleLabel'])->toBe('Show all 25 rows')
+        ->and($collapsed['toggleExpanded'])->toBe('false')
+        ->and($collapsed['toggleIsButton'])->toBe('BUTTON')
+        ->and($collapsed['footerShows10Of42'])->toBeTrue();
+
+    $page->click('[data-block="records_table"] [data-block-toggle]');
+
+    $expanded = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+            const toggle = table.querySelector('[data-block-toggle]');
+
+            return JSON.stringify({
+                rowCount: table.querySelectorAll('tbody tr').length,
+                toggleLabel: toggle?.textContent.trim() ?? null,
+                toggleExpanded: toggle?.getAttribute('aria-expanded') ?? null,
+                footerShows25Of42: table.textContent.includes('Showing 25 of 42'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($expanded['rowCount'])->toBe(25)
+        ->and($expanded['toggleLabel'])->toBe('Show fewer')
+        ->and($expanded['toggleExpanded'])->toBe('true')
+        ->and($expanded['footerShows25Of42'])->toBeTrue();
+});
+
+it('renders no toggle for a table with exactly the collapse threshold of rows', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
+        displayBlockLongTableFixture(10, 10),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Here are your companies.');
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+
+            return JSON.stringify({
+                rowCount: table.querySelectorAll('tbody tr').length,
+                hasToggle: !!table.querySelector('[data-block-toggle]'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($shape['rowCount'])->toBe(10)
+        ->and($shape['hasToggle'])->toBeFalse();
+});
+
+it('renders the open_url link to the entity list page when the tool has more pages', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    $openUrl = 'https://relaticle.test/app/'.$team->slug.'/companies';
+
+    // Under the collapse threshold on purpose: `open_url` is the tool's OWN
+    // "more pages exist" signal (D5), independent of the client-side row
+    // toggle, so it must render even when there is nothing to collapse.
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
+        displayBlockLongTableFixture(6, 42, $openUrl),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Here are your companies.');
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+            const link = table.querySelector('[data-block-open-link]');
+
+            return JSON.stringify({
+                href: link?.getAttribute('href') ?? null,
+                label: link?.textContent.trim() ?? null,
+                navigating: link?.hasAttribute('wire:navigate') ?? false,
+                hasToggle: !!table.querySelector('[data-block-toggle]'),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($shape['href'])->toBe($openUrl)
+        ->and($shape['label'])->toBe('Open all 42 in Companies')
+        ->and($shape['navigating'])->toBeFalse()
+        ->and($shape['hasToggle'])->toBeFalse();
 });

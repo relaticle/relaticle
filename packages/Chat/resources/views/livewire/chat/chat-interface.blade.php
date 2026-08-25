@@ -67,6 +67,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ],
         ]),
         blockFooterTemplate: @js(__('Showing :showing of :total')),
+        {{-- Records-table collapse (D4) and the tool's own "more pages exist"
+             link (D5). See blockToggleLabel/blockOpenUrlLabel in transcript.js. --}}
+        blockShowAllTemplate: @js(__('Show all :count rows')),
+        blockShowFewerText: @js(__('Show fewer')),
+        blockOpenUrlTemplate: @js(__('Open all :total in :title')),
         feedbackCategories: @js([
             ['value' => 'inaccurate', 'label' => __('Inaccurate')],
             ['value' => 'did_not_follow', 'label' => __("Didn't do what I asked")],

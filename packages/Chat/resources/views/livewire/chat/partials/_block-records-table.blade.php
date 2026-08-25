@@ -1,9 +1,24 @@
 {{-- Read-tool `records_table` display block. Expects the Alpine scope var
-     `block`: {block, title, type, core, columns[], rows[], total}.
+     `block`: {block, title, type, core, columns[], rows[], total, open_url?}.
 
      The record link hangs off the CORE column (query-aware promotion routinely
      puts a filtered field first), and the row `cells` map is read defensively
      because it is sparse.
+
+     `block.rows` carries the WHOLE page the model read (BaseReadListTool no
+     longer slices it), but the table only PAINTS blockVisibleRows(block): the
+     first 10 rows until the user clicks the toggle below. Collapsing here
+     rather than at the server keeps the model and the on-screen table looking
+     at the same data while still keeping a long page from turning a chat
+     bubble into a scroll-forever dump. Expansion is Alpine-only widget state
+     (transcript.js: blockIsExpanded/toggleBlockExpanded), never sent to the
+     server and gone the moment this block is refetched.
+
+     `open_url`, when present, is a different thing: the server's own signal
+     that more PAGES exist beyond this one (see BaseReadListTool::openUrlFor),
+     rendered as a link to the real list page in the header strip. It shows
+     regardless of the row toggle above, because expanding to see all 25 rows
+     already on the page never reveals row 26.
 
      Surface: the solid data-block tier (crisp hairline card, no shadow),
      deliberately distinct from the translucent pill/chip tier, so server data
@@ -27,9 +42,23 @@
 
             <span class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="blockTitle(block)"></span>
         </span>
-        <template x-if="blockHasMore(block)">
-            <span class="text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500" x-text="blockFooter(block)"></span>
-        </template>
+        <span class="flex shrink-0 items-center gap-2 text-[length:var(--text-micro)]">
+            <template x-if="blockHasMore(block)">
+                <span class="text-gray-400 dark:text-gray-500" x-text="blockFooter(block)"></span>
+            </template>
+            {{-- D5: the tool's OWN pagination remainder, not the row toggle
+                 below. `open_url` only ever appears when a next PAGE exists
+                 server-side (BaseReadListTool::openUrlFor), so a fully
+                 expanded 25-row page with no page 2 never shows this link. --}}
+            <template x-if="blockOpenUrl(block)">
+                <a
+                    data-block-open-link
+                    :href="blockOpenUrl(block)"
+                    class="font-medium text-primary-600 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-primary-400"
+                    x-text="blockOpenUrlLabel(block)"
+                ></a>
+            </template>
+        </span>
     </div>
 
     {{-- tabindex + role=region: a wide table scrolls horizontally, and a
@@ -53,7 +82,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-white/5">
-                <template x-for="row in (block.rows || [])" :key="row.id">
+                <template x-for="row in blockVisibleRows(block)" :key="row.id">
                     <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                         <template x-for="column in (block.columns || [])" :key="column.key">
                             <td class="max-w-48 px-4 py-2.5 align-top text-sm text-gray-700 dark:text-gray-300">
@@ -97,4 +126,21 @@
             <p class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ __('No records to show.') }}</p>
         </template>
     </div>
+
+    {{-- D4: the collapse toggle. Only rendered once there is something to
+         collapse (blockCanExpand: more than 10 rows on the page), so a short
+         table never grows a row it doesn't need. A real button, not a link:
+         it changes what THIS page paints, it does not navigate anywhere. --}}
+    <template x-if="blockCanExpand(block)">
+        <div class="border-t border-gray-100 px-4 py-2 dark:border-white/5">
+            <button
+                type="button"
+                data-block-toggle
+                :aria-expanded="blockIsExpanded(block) ? 'true' : 'false'"
+                x-on:click="toggleBlockExpanded(block)"
+                class="text-[length:var(--text-micro)] font-medium text-gray-500 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-200"
+                x-text="blockToggleLabel(block)"
+            ></button>
+        </div>
+    </template>
 </div>

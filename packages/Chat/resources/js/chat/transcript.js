@@ -27,6 +27,14 @@ const CONVERSATION_ID_PLACEHOLDER = '__CONVERSATION_ID__';
 // visual group (no repeated timestamp/avatar chrome, tighter spacing).
 const GROUPING_GAP_MINUTES = 3;
 
+// A records_table block carries the WHOLE page the model read (see
+// BaseReadListTool: it stopped slicing server-side so the model and the
+// table never disagree about what was shown). But a chat bubble that scrolls
+// past ten rows stops reading as a summary and starts reading as a dump, so
+// the client still caps the PAINT at this many rows until the user asks for
+// the rest via the collapse toggle.
+const RECORDS_TABLE_COLLAPSE_ROWS = 10;
+
 // Cache-first conversation switching (window-scoped Map, LRU-capped at 5).
 //
 // Confirmed empirically before writing this: clicking a `wire:navigate`
@@ -118,7 +126,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -389,8 +397,69 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return column?.key === block?.core && !!row?.url && this.blockCell(row, column) !== '';
     },
 
+    // --- Records-table row collapse (D4) ------------------------------------
+    //
+    // Widget state, not tool state: whether a block is expanded lives ONLY in
+    // this plain object, never on `block` or `msg` themselves. That keeps the
+    // OpenAI Apps SDK boundary this codebase already follows for `data` versus
+    // `display_block` intact one level deeper: the tool result stays exactly
+    // what the model saw, and "did the user click show-more" is purely a
+    // rendering fact. It is never persisted (excluded from the conversation
+    // cache's snapshotMessages(), which clones `messages`, not this) and never
+    // reaches the server, so a reload always starts every block collapsed.
+    expandedBlocks: {},
+
+    // A block carries no id of its own, so one is minted the first time it is
+    // actually toggled (never on a plain read, to keep every other accessor
+    // below a pure function with no side effect). Mirrors ensureClientKey()'s
+    // approach for messages: a client-only tag the server never sees.
+    toggleBlockExpanded(block) {
+        if (!block) return;
+        if (!block.__uiKey) {
+            block.__uiKey = 'blk-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random()));
+        }
+        this.expandedBlocks[block.__uiKey] = !this.expandedBlocks[block.__uiKey];
+    },
+
+    blockIsExpanded(block) {
+        return !!(block?.__uiKey && this.expandedBlocks[block.__uiKey]);
+    },
+
+    blockCanExpand(block) {
+        return (block?.rows || []).length > RECORDS_TABLE_COLLAPSE_ROWS;
+    },
+
+    // The rows the table actually paints: every row once expanded, otherwise
+    // the first RECORDS_TABLE_COLLAPSE_ROWS of the page `block.rows` already
+    // holds in full (see BaseReadListTool, which stopped slicing server-side).
+    blockVisibleRows(block) {
+        const rows = block?.rows || [];
+        return this.blockIsExpanded(block) ? rows : rows.slice(0, RECORDS_TABLE_COLLAPSE_ROWS);
+    },
+
+    blockToggleLabel(block) {
+        return this.blockIsExpanded(block)
+            ? blockShowFewerText
+            : blockShowAllTemplate.replace(':count', String((block?.rows || []).length));
+    },
+
+    // D5: the entity's real list page, present on the payload only when the
+    // tool's OWN pagination says a further page exists (see
+    // BaseReadListTool::openUrlFor / RecordReferenceResolver::indexUrlFor).
+    // Distinct from the row toggle above: expanding to see every row already
+    // on this page never reveals a row that lives on page 2.
+    blockOpenUrl(block) {
+        return block?.open_url ?? null;
+    },
+
+    blockOpenUrlLabel(block) {
+        return blockOpenUrlTemplate
+            .replace(':total', String(block?.total ?? ''))
+            .replace(':title', this.blockTitle(block));
+    },
+
     blockFooter(block) {
-        const showing = (block?.rows || []).length;
+        const showing = this.blockVisibleRows(block).length;
         const from = Number(block?.from ?? 0);
 
         // On any page past the first the rows are a window into the middle of the
@@ -404,8 +473,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             .replace(':total', String(block?.total ?? showing));
     },
 
+    // Counts VISIBLE rows, not the full page: while collapsed this is what
+    // keeps "Showing 10 of 25" honest instead of silently claiming credit for
+    // rows 11-25, which are in the DOM's data but not yet painted.
     blockHasMore(block) {
-        return (block?.total ?? 0) > (block?.rows || []).length;
+        return (block?.total ?? 0) > this.blockVisibleRows(block).length;
     },
 
     // Sticky date pill: a floating element (see chat-interface.blade.php)
