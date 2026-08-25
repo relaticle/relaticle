@@ -71,6 +71,7 @@ final readonly class ListActivityTool implements Tool
             'days' => $schema->integer()
                 ->description('How many days back to look (default '.self::DEFAULT_DAYS.', max '.self::MAX_DAYS.').')
                 ->default(self::DEFAULT_DAYS),
+            'page' => $schema->integer()->description('Which page of entries to return (default 1).')->default(1),
         ];
     }
 
@@ -100,6 +101,7 @@ final readonly class ListActivityTool implements Tool
         }
 
         $days = $this->days($request);
+        $page = $this->page($request);
         $scope = $this->scopedQuery((string) $team->getKey(), $days, $recordType, $recordId);
 
         $rows = $scope->clone()
@@ -108,7 +110,7 @@ final readonly class ListActivityTool implements Tool
             // on it; the auto-increment id breaks the tie deterministically.
             ->latest()
             ->orderByDesc('id')
-            ->limit(self::ENTRY_LIMIT)
+            ->forPage($page, self::ENTRY_LIMIT)
             ->get();
 
         $entries = [];
@@ -123,17 +125,23 @@ final readonly class ListActivityTool implements Tool
 
         $totalEntries = $this->countEntries($scope);
 
-        // Key presence describes the tool's capability, the value describes the
-        // current position. This tool has no `page` parameter and its rows span
-        // mixed entity types, so there is no next page to request and no single
-        // list page to open: `has_more` is emitted, `next_page` and `open_url`
-        // never are. The narrowing lever is `days` / `record_type` instead.
+        // `has_more` and `next_page` compare against the RAW ROW count, not
+        // `total` (a grouped entry count): `forPage()` pages over rows, and a
+        // save that writes more than one row (a native column plus a custom
+        // field) means the two counts diverge -- comparing `total` against
+        // `page * ENTRY_LIMIT` would under-report pages whenever a window's
+        // saves average more than one row each. `total` still reports the true
+        // entry count for the footer; only the pagination check reads rows.
+        $hasMore = $this->countRows($scope) > $page * self::ENTRY_LIMIT;
+
         $payload = [
             'days' => $days,
+            'page' => $page,
             'data' => $entries,
             'total' => $totalEntries,
             'showing' => count($entries),
-            'has_more' => $totalEntries > count($entries),
+            'has_more' => $hasMore,
+            'next_page' => $hasMore ? $page + 1 : null,
         ];
 
         if ($entries !== []) {
@@ -197,6 +205,20 @@ final readonly class ListActivityTool implements Tool
             ->toBase()
             ->selectRaw("count(distinct (coalesce(batch_uuid::text, 'row:' || id::text), subject_type, subject_id)) as aggregate")
             ->value('aggregate');
+    }
+
+    /**
+     * How many raw rows the window holds, before groupBySave() merges them.
+     * `forPage()` pages over this same row set, so this is the count pagination
+     * has to compare against; `countEntries()` answers a different question
+     * (how many saves those rows represent) and would misjudge whether another
+     * page exists whenever a save spans more than one row.
+     *
+     * @param  Builder<Activity>  $scope
+     */
+    private function countRows(Builder $scope): int
+    {
+        return $scope->clone()->toBase()->count();
     }
 
     /**
@@ -556,6 +578,17 @@ final readonly class ListActivityTool implements Tool
         }
 
         return max(1, min((int) $days, self::MAX_DAYS));
+    }
+
+    private function page(Request $request): int
+    {
+        $page = $request['page'] ?? null;
+
+        if (! is_numeric($page)) {
+            return 1;
+        }
+
+        return max(1, (int) $page);
     }
 
     private function stringOrNull(mixed $value): ?string

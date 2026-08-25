@@ -85,7 +85,7 @@ it('reports a name change with its old and new value', function (): void {
         ])
         ->and($payload['data'][1]['event'])->toBe('created')
         ->and($payload['has_more'])->toBeFalse()
-        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload['next_page'])->toBeNull()
         ->and($payload)->not->toHaveKey('open_url');
 
     $block = $payload['display_block'];
@@ -316,7 +316,7 @@ it('reports the true entry count when the window holds more than one fetch', fun
         ->and($payload['total'])->toBe(51)
         ->and($payload['showing'])->toBe(count($payload['data']))
         ->and($payload['has_more'])->toBeTrue()
-        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload['next_page'])->toBe(2)
         ->and($payload)->not->toHaveKey('open_url')
         ->and($payload['display_block'])->not->toHaveKey('open_url');
 });
@@ -392,4 +392,24 @@ it('renders no table when nothing changed in the window', function (): void {
         ->and($payload['total'])->toBe(0)
         ->and($payload['showing'])->toBe(0)
         ->and($payload)->not->toHaveKey('display_block');
+});
+
+it('returns a second page of activity entries', function (): void {
+    // ENTRY_LIMIT is 50 and entries are grouped per save, so 55 separate
+    // requests produce more than one page.
+    foreach (range(1, 55) as $n) {
+        nextActivityRequest();
+        resolve(CreateCompany::class)->execute($this->user, ['name' => "Paged Co {$n}"]);
+    }
+
+    $first = activityPayload(['days' => 30]);
+
+    expect($first['has_more'])->toBeTrue()
+        ->and($first['next_page'])->toBe(2);
+
+    $second = activityPayload(['days' => 30, 'page' => 2]);
+
+    expect($second['data'])->not->toBeEmpty()
+        ->and($second['data'])->not->toEqual($first['data'])
+        ->and($second['next_page'])->toBeNull();
 });
