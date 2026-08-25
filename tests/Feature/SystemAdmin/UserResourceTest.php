@@ -119,6 +119,7 @@ it('hydrates notification toggles from the enum defaults', function (): void {
             'notification_preferences' => [
                 'task_assigned' => ['in_app' => true, 'email' => false],
                 'task_digest' => ['email' => true],
+                'setup_nudge' => ['email' => true],
             ],
         ]);
 });
