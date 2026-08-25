@@ -80,8 +80,10 @@ it('opens the fields from anywhere on the row and reaches the record only from t
     seedDecidedProposal($user, $team->getKey(), $conversationId, $person);
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
-        ->assertSee('Create person "Sam"')
+        ->assertSee('Sam')
+        ->assertSee('Create')
         ->assertMissing('[data-proposal-details]')
+        ->assertVisible('[data-proposal-record-chip]')
         ->assertVisible('[data-proposal-record-link]');
 
     // The toggle covers the row, and the record link is the only interactive
@@ -90,6 +92,7 @@ it('opens the fields from anywhere on the row and reaches the record only from t
         (() => {
             const row = document.querySelector('[data-proposal-row]');
             const link = document.querySelector('[data-proposal-record-link]');
+            const chip = document.querySelector('[data-proposal-record-chip]');
             const rowBox = row.getBoundingClientRect();
             const linkBox = link.getBoundingClientRect();
 
@@ -103,6 +106,8 @@ it('opens the fields from anywhere on the row and reaches the record only from t
             return {
                 rowTag: row.tagName,
                 linkTag: link.tagName,
+                chipText: chip.textContent.trim(),
+                chipType: chip.dataset.recordType,
                 expanded: row.getAttribute('aria-expanded'),
                 anchorsInsideToggle: row.querySelectorAll('a').length,
                 atSummary: at(rowBox.left + 40, rowBox.top + rowBox.height / 2),
@@ -116,6 +121,8 @@ it('opens the fields from anywhere on the row and reaches the record only from t
 
     expect($hitTest['rowTag'])->toBe('BUTTON')
         ->and($hitTest['linkTag'])->toBe('A')
+        ->and($hitTest['chipText'])->toBe('Sam')
+        ->and($hitTest['chipType'])->toBe('people')
         ->and($hitTest['expanded'])->toBe('false')
         ->and($hitTest['anchorsInsideToggle'])->toBe(0)
         ->and($hitTest['atSummary'])->toBe('row')

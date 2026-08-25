@@ -73,7 +73,7 @@
             @enderror
 
             {{-- Footer: the decision. Separated by a hairline so it reads as one deliberate step. --}}
-            <div class="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+            <div class="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-2 dark:border-white/5 dark:bg-white/[0.02]">
                 <button
                     type="button"
                     wire:click="{{ $discardAction }}"

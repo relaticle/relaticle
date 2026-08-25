@@ -551,6 +551,7 @@ final class ProposalCard extends BaseLivewireComponent
                 'operation' => $step->operation->value,
                 'entity_type' => $step->entity_type,
                 'summary' => $this->stepSummary($step),
+                'recordLabel' => $this->stepRecordLabel($step),
                 'fields' => $this->recordFieldsOf($step),
                 'editableCodes' => $this->editableCodesOf($step),
                 'duplicateWarning' => $step->display_data['duplicate_warning'] ?? null,
@@ -605,6 +606,31 @@ final class ProposalCard extends BaseLivewireComponent
             ?? '';
 
         return is_string($summary) ? $summary : '';
+    }
+
+    /**
+     * The record identity shown in the same compact pill used by read results.
+     * Create payloads hold the exact title. Other operations keep the current
+     * title in their display summary, outside the fields that are changing.
+     */
+    private function stepRecordLabel(PendingAction $step): string
+    {
+        if ($step->operation === PendingActionOperation::Create) {
+            $record = $this->currentRecord($step);
+            $title = $record[ProposalCoreFields::titleKey($step->entity_type)] ?? null;
+
+            if (is_string($title) && $title !== '') {
+                return $title;
+            }
+        }
+
+        $summary = $this->stepSummary($step);
+
+        if (preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
+            return $matches[1];
+        }
+
+        return '';
     }
 
     private function firstUnresolvedIndex(PendingAction $pendingAction): int

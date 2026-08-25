@@ -60,7 +60,12 @@
         </template>
 
         <template x-if="!['badges', 'boolean', 'link'].includes(field.type)">
-            <span class="font-medium text-gray-900 dark:text-white" x-text="field.new ?? field.value"></span>
+            <span
+                :class="Object.prototype.hasOwnProperty.call(field, 'new')
+                    ? 'font-medium text-gray-900 dark:text-white'
+                    : 'text-gray-700 dark:text-gray-300'"
+                x-text="field.new ?? field.value"
+            ></span>
         </template>
     </span>
 </div>

@@ -4,6 +4,13 @@
      chevron-up-down, the push-to-talk mic, and a ROUND send button that reads
      gray while the composer is empty. --}}
 
+@php
+    $heroDockIcons = [
+        'task' => \Relaticle\Chat\Support\RecordChipRenderer::iconPath('task'),
+        'people' => \Relaticle\Chat\Support\RecordChipRenderer::iconPath('people'),
+    ];
+@endphp
+
 <div class="border-t border-gray-200 bg-white px-4 py-4 dark:border-zinc-700 dark:bg-zinc-900">
     {{-- Docked proposal. Mirrors _composer.blade.php: the composer is hidden
          entirely while a write awaits review, replaced by the "Review before
@@ -19,22 +26,23 @@
              proposal-card.blade.php and the read-result blocks. --}}
         <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
             {{-- Update variant (exchange 2). --}}
-            <div class="mcp-dock-update px-4 py-3">
-                <div class="flex items-start gap-2.5">
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400" aria-hidden="true">
-                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5"/>
+            <div class="mcp-dock-update">
+                <div class="flex items-center gap-2 px-4 py-2.5">
+                    <span class="chat-chip" data-record-type="task">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['task'] }}"/>
+                        </svg>
+                        <span class="chat-chip-label">Schedule demo with Kovra Systems</span>
                     </span>
-                    <p class="min-w-0 flex-1 text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                        Update task "Schedule demo with Kovra Systems"
-                    </p>
+                    <span class="text-micro font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Update</span>
                 </div>
 
-                <div class="mt-2 space-y-2 ps-[2.125rem]">
-                    <div class="flex items-start gap-2.5">
+                <div class="border-t border-gray-100 dark:border-white/5">
+                    <div class="flex items-start gap-3 px-4 py-2.5">
                         <span class="w-24 shrink-0 text-micro font-medium leading-5 text-gray-400 dark:text-gray-500">Status</span>
-                        <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 text-xs">
+                        <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 text-sm">
                             <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">To do</span>
-                            <x-heroicon-m-arrow-right class="h-2.5 w-2.5 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                            <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
                             <span class="font-medium text-gray-900 dark:text-white">Done</span>
                         </span>
                     </div>
@@ -43,31 +51,32 @@
 
             {{-- Create variant (exchange 3). A create proposal shows the fields
                  it is about to write, with no old value to strike through. --}}
-            <div class="mcp-dock-create px-4 py-3" style="display: none;">
-                <div class="flex items-start gap-2.5">
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400" aria-hidden="true">
-                        <x-heroicon-o-plus class="h-3.5 w-3.5"/>
+            <div class="mcp-dock-create" style="display: none;">
+                <div class="flex items-center gap-2 px-4 py-2.5">
+                    <span class="chat-chip" data-record-type="people">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['people'] }}"/>
+                        </svg>
+                        <span class="chat-chip-label">Sarah Chen</span>
                     </span>
-                    <p class="min-w-0 flex-1 text-sm font-medium leading-6 text-gray-900 dark:text-white">
-                        Create person "Sarah Chen"
-                    </p>
+                    <span class="text-micro font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">Create</span>
                 </div>
 
-                <div class="mt-2 space-y-2 ps-[2.125rem]">
+                <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
                     @foreach ([
                         ['label' => 'Name', 'value' => 'Sarah Chen'],
                         ['label' => 'Job title', 'value' => 'VP of Engineering'],
                         ['label' => 'Company', 'value' => 'Kovra Systems'],
                     ] as $heroDockField)
-                        <div class="flex items-start gap-2.5">
+                        <div class="flex items-start gap-3 px-4 py-2.5">
                             <span class="w-24 shrink-0 text-micro font-medium leading-5 text-gray-400 dark:text-gray-500">{{ $heroDockField['label'] }}</span>
-                            <span class="min-w-0 flex-1 text-xs font-medium text-gray-900 dark:text-white">{{ $heroDockField['value'] }}</span>
+                            <span class="min-w-0 flex-1 text-sm text-gray-700 dark:text-gray-300">{{ $heroDockField['value'] }}</span>
                         </div>
                     @endforeach
                 </div>
             </div>
 
-            <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
+            <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-2 dark:border-white/5 dark:bg-white/[0.02]">
                 <button type="button" tabindex="-1" class="inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300">
                     Discard
                 </button>

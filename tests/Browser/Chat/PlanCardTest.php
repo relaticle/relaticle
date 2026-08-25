@@ -29,12 +29,12 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
         (() => {
             {$resolveInterface}
 
-            const step = (id, status, summary) => ({
+            const step = (id, status, entityType, summary) => ({
                 pending_action_id: id,
                 turn_id: 'turn-1',
                 status,
                 operation: 'create',
-                entity_type: 'company',
+                entity_type: entityType,
                 display: { summary },
                 itemResults: {},
             });
@@ -46,9 +46,9 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
                 rendered: true,
                 html: '<p>Here is the plan.</p>',
                 pending_actions: [
-                    step('pa-1', 'rejected', 'Create company "Acme"'),
-                    step('pa-2', 'pending', 'Create person "Jane"'),
-                    step('pa-3', 'pending', 'Create task "Call Jane"'),
+                    step('pa-1', 'rejected', 'company', 'Create company "Acme"'),
+                    step('pa-2', 'pending', 'people', 'Create person "Jane"'),
+                    step('pa-3', 'pending', 'task', 'Create task "Call Jane"'),
                 ],
             }];
 
@@ -58,7 +58,8 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
 
     // The plan card is on screen (a decided step forces it) with its two
     // undecided siblings, and neither of them claims any progress.
-    $page->assertSee('Create person "Jane"')
+    $page->assertSee('Jane')
+        ->assertVisible('[data-proposal-record-chip][data-record-type="people"]')
         ->assertDontSee('0 of 0 resolved')
         ->assertDontSee('Review the rest below')
         ->assertDontSee('Cancelled with the step it depended on');

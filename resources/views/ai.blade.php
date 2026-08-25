@@ -9,6 +9,7 @@
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
     $maxBatchSize = (int) config('chat.max_batch_size');
     $pendingActionExpiry = (int) config('chat.pending_action_expiry_minutes');
+    $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
 
     $title = __(':name: AI Assistant for Relaticle CRM', ['name' => $assistantName]).' - Relaticle';
     $description = __(
@@ -145,27 +146,25 @@
                     <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
                         {{ __('Step 2: :name proposes', ['name' => $assistantName]) }}
                     </p>
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        <div class="flex items-start gap-3">
-                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
-                                <x-ri-pencil-line class="h-4 w-4"/>
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ __('Update Northwind renewal') }}
-                                </p>
-                                <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('Opportunity') }}</p>
-                            </div>
+                    <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] flex-1">
+                        <div class="flex min-w-0 items-center gap-2 px-4 py-2.5">
+                            <span class="chat-chip min-w-0" data-record-type="opportunity">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
+                                </svg>
+                                <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>
+                            </span>
+                            <span class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">{{ __('Update') }}</span>
                         </div>
 
-                        <dl class="mt-3 space-y-1.5">
+                        <dl class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
                             @foreach([
                                 [__('Stage'), __('Negotiation'), __('Won')],
                                 [__('Close date'), __('Not set'), __('Today')],
                             ] as [$field, $before, $after])
-                                <div class="flex items-center gap-2 text-xs">
-                                    <dt class="w-20 shrink-0 text-gray-400 dark:text-gray-500">{{ $field }}</dt>
-                                    <dd class="flex items-center gap-1.5 min-w-0">
+                                <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                    <dt class="w-20 shrink-0 text-[length:var(--text-micro)] font-medium text-gray-400 dark:text-gray-500">{{ $field }}</dt>
+                                    <dd class="flex min-w-0 items-center gap-1.5">
                                         <span class="text-gray-400 dark:text-gray-500 line-through truncate">{{ $before }}</span>
                                         <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
                                         <span class="font-medium text-gray-900 dark:text-white truncate">{{ $after }}</span>

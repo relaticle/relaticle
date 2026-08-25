@@ -1059,6 +1059,21 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             : (op === 'update' ? this.proposalTexts.updatedVerb : this.proposalTexts.createdVerb);
     },
 
+    // Keep resolved proposal identity aligned with the record pills used in
+    // assistant replies and read-result blocks. Approved records carry their
+    // resolved label. Rejected and expired proposals fall back to the quoted
+    // title stored in the display summary.
+    proposalRecordLabel(action) {
+        const resolvedLabel = action?.record?.label;
+        if (typeof resolvedLabel === 'string' && resolvedLabel !== '') return resolvedLabel;
+
+        const summary = action?.display?.summary;
+        if (typeof summary !== 'string') return '';
+
+        const match = summary.match(/"(.*)"/u);
+        return match?.[1] || '';
+    },
+
     // Proposals from one assistant turn are ONE decision, so the transcript shows
     // them as one card in the order they run. A proposal without a turn (anything
     // written before plans existed) stands alone, which is also the single-write

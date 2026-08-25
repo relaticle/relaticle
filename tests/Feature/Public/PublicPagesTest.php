@@ -214,8 +214,10 @@ describe('Hero AI tab — conversation', function () {
         $response->assertSee('Schedule demo with Kovra Systems');
         $response->assertSee('Mark the Kovra demo as done');
         // The proposal docks at the composer and resolves into the audit card.
+        // The decided row names the record as a chip plus an operation label,
+        // so assert the label, not a "Update task \"...\"" sentence that a
+        // restyle of the row legitimately changes.
         $response->assertSee('Review before continuing');
-        $response->assertSee('Update task');
         $response->assertSee('Save changes');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
@@ -243,12 +245,19 @@ describe('Hero AI tab — conversation', function () {
 
         // Both writes the demo performs are proposals in the product
         // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
-        // so each must reach the transcript carrying an Approved outcome.
-        // Advertising an unattended write would contradict the review-before-write
-        // contract the demo's own second exchange is built to show off.
-        expect(substr_count($body, 'Update task "Schedule demo with Kovra Systems"'))->toBeGreaterThanOrEqual(2)
-            ->and(substr_count($body, 'Create person "Sarah Chen"'))->toBeGreaterThanOrEqual(2)
-            ->and(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2);
+        // so each must reach the transcript carrying an Approved outcome, and
+        // the dock must offer a decision for each before it lands. Advertising
+        // an unattended write would contradict the review-before-write contract
+        // the demo's own second exchange is built to show off.
+        //
+        // Asserted on the review CHROME rather than on a card heading: the row
+        // renders the record as a chip plus an operation label, and pinning that
+        // wording made this test fail on a pure restyle while the invariant it
+        // guards -- no write without an approval -- still held.
+        expect(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2)
+            ->and(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
+            ->and($body)->toContain('Review the proposal below to update the task')
+            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems');
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {

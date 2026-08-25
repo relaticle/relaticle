@@ -149,6 +149,7 @@ it('paints persisted read results as a real table and card, and drops an unknown
                 footer: table.textContent.includes('Showing 1 of 12'),
                 cardChipLabel: cardChip?.textContent.trim() ?? null,
                 cardChipHref: cardChip?.getAttribute('href') ?? null,
+                cardFieldRows: card.querySelectorAll('[data-record-field-row]').length,
                 cardBadges: Array.from(card.querySelectorAll('span')).map((el) => el.textContent.trim()),
                 cardLinkHref: cardLink?.getAttribute('href') ?? null,
             });
@@ -174,6 +175,7 @@ it('paints persisted read results as a real table and card, and drops an unknown
 
     expect($shape['cardChipLabel'])->toBe('Acme Corporation')
         ->and($shape['cardChipHref'])->toBe('/r/company/01ACME')
+        ->and($shape['cardFieldRows'])->toBe(2)
         // Real chips per option, not one comma-joined string.
         ->and($shape['cardBadges'])->toContain('Enterprise', 'Manufacturing')
         ->and($shape['cardBadges'])->not->toContain('Enterprise, Manufacturing')

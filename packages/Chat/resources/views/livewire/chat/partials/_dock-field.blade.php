@@ -73,7 +73,10 @@
                         ])
                     >{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                 @else
-                    <span class="font-medium text-gray-900 dark:text-white">{{ $row['new'] ?? $row['value'] ?? '' }}</span>
+                    <span @class([
+                        'font-medium text-gray-900 dark:text-white' => array_key_exists('new', $row),
+                        'text-gray-700 dark:text-gray-300' => ! array_key_exists('new', $row),
+                    ])>{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                 @endif
             @endif
 

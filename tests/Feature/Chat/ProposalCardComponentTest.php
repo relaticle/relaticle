@@ -208,7 +208,8 @@ it('loads and renders the active pending action summary', function (): void {
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSet('pendingActionId', $action->getKey())
-        ->assertSee('Create company "Acme Corp"')
+        ->assertSeeHtml('data-proposal-record-chip')
+        ->assertSeeHtml('data-record-type="company"')
         ->assertSee('Acme Corp');
 });
 
@@ -1049,6 +1050,7 @@ describe('plan card', function (): void {
         expect($steps)->toHaveCount(3)
             ->and(array_column($steps, 'position'))->toBe([1, 2, 3])
             ->and(array_column($steps, 'entity_type'))->toBe(['company', 'people', 'task'])
+            ->and(array_column($steps, 'recordLabel'))->toBe(['Northwind Traders', 'Priya Raman', 'Call Priya'])
             ->and($steps[0]['blockedBy'])->toBe([])
             ->and($steps[1]['blockedBy'])->toBe([1])
             ->and($steps[2]['blockedBy'])->toBe([2])

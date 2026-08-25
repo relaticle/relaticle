@@ -132,19 +132,18 @@
         </div>
     </div>
 
-    {{-- Decided proposal, collapsed to one line: operation glyph, summary,
-         record link, outcome chip, Details disclosure. The fields are an audit
-         trail once you have decided, so they stay behind the disclosure. --}}
+    {{-- Decided proposal, collapsed to one line: record pill, operation, record
+         link, outcome chip, and Details disclosure. --}}
     <div class="mcp-el mcp-audit-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
-            <span class="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400" aria-hidden="true">
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
-                </svg>
-            </span>
-
-            <span class="relative flex min-w-0 flex-1 items-center gap-1.5">
-                <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">Update task "Schedule demo with Kovra Systems"</span>
+            <span class="relative flex min-w-0 flex-1 items-center gap-2">
+                <span class="chat-chip min-w-0" data-record-type="task">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
+                    </svg>
+                    <span class="chat-chip-label">Schedule demo with Kovra Systems</span>
+                </span>
+                <span class="shrink-0 text-micro font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Update</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
@@ -196,14 +195,14 @@
     {{-- Decided create, same one-line shape as exchange 2 with the create tone. --}}
     <div class="mcp-el mcp-create-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
-            <span class="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400" aria-hidden="true">
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
-                </svg>
-            </span>
-
-            <span class="relative flex min-w-0 flex-1 items-center gap-1.5">
-                <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white">Create person "Sarah Chen"</span>
+            <span class="relative flex min-w-0 flex-1 items-center gap-2">
+                <span class="chat-chip min-w-0" data-record-type="people">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
+                    </svg>
+                    <span class="chat-chip-label">Sarah Chen</span>
+                </span>
+                <span class="shrink-0 text-micro font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">Create</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
@@ -245,14 +244,14 @@
             </span>
         </div>
 
-        <div class="space-y-2.5 px-4 py-3">
+        <div class="divide-y divide-gray-100 dark:divide-white/5">
             @foreach ([
                 ['label' => 'Job title', 'value' => 'VP of Engineering'],
                 ['label' => 'Company', 'value' => 'Kovra Systems'],
             ] as $heroField)
-                <div class="flex items-start gap-2.5">
+                <div class="flex items-start gap-3 px-4 py-2.5">
                     <span class="w-24 shrink-0 text-micro font-medium leading-5 text-gray-400 dark:text-gray-500">{{ $heroField['label'] }}</span>
-                    <span class="min-w-0 flex-1 text-xs text-gray-900 dark:text-white">{{ $heroField['value'] }}</span>
+                    <span class="min-w-0 flex-1 text-sm text-gray-700 dark:text-gray-300">{{ $heroField['value'] }}</span>
                 </div>
             @endforeach
         </div>

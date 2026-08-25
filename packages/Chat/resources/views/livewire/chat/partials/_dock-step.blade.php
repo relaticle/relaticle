@@ -16,11 +16,7 @@
 @endphp
 
 <div
-    @class([
-        'group/step relative',
-        'px-4 py-3' => ! $isPlan,
-        'py-2.5 pe-3 ps-11' => $isPlan,
-    ])
+    class="group/step relative"
     wire:key="step-{{ $step['id'] }}"
 >
     @if ($isPlan)
@@ -39,31 +35,35 @@
         <span class="absolute bottom-0 start-[1.6rem] top-8 w-px bg-gray-200 group-last/step:hidden dark:bg-white/10" aria-hidden="true"></span>
     @endif
 
-    <div class="flex items-start gap-2.5">
-        <span
-            @class([
-                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
-                'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400' => $step['operation'] === 'create',
-                'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400' => $step['operation'] === 'update',
-                'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400' => $step['operation'] === 'delete',
-            ])
-            aria-hidden="true"
-        >
-            @if ($entityIcon)
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
-                </svg>
-            @elseif ($step['operation'] === 'delete')
-                <x-heroicon-o-trash class="h-3.5 w-3.5" />
-            @elseif ($step['operation'] === 'update')
-                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-            @else
-                <x-heroicon-o-plus class="h-3.5 w-3.5" />
-            @endif
-        </span>
-
+    <div @class([
+        'flex items-center gap-2.5',
+        'px-4 py-2.5' => ! $isPlan,
+        'py-2.5 pe-3 ps-11' => $isPlan,
+    ])>
         <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
+            <div class="flex min-w-0 items-center gap-2">
+                @if ($entityIcon && $step['recordLabel'] !== '')
+                    <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="{{ $step['entity_type'] }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
+                        </svg>
+                        <span class="chat-chip-label">{{ $step['recordLabel'] }}</span>
+                    </span>
+                @else
+                    <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
+                @endif
+
+                @if ($entityIcon && $step['recordLabel'] !== '')
+                    <span
+                        @class([
+                            'shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider',
+                            'text-blue-600 dark:text-blue-400' => $step['operation'] === 'create',
+                            'text-amber-600 dark:text-amber-400' => $step['operation'] === 'update',
+                            'text-red-600 dark:text-red-400' => $step['operation'] === 'delete',
+                        ])
+                    >{{ $operationLabel }}</span>
+                @endif
+            </div>
 
             @if ($blockedBy !== [])
                 <p class="mt-0.5 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
@@ -140,25 +140,32 @@
     </div>
 
     @if (! empty($step['duplicateWarning']))
-        <div class="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200">
+        <div @class([
+            'mb-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-400/10 dark:text-amber-200',
+            'mx-4' => ! $isPlan,
+            'me-3 ms-11' => $isPlan,
+        ])>
             <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{{ $step['duplicateWarning'] }}</span>
         </div>
     @endif
 
-    <div @class([
-        'mt-2 space-y-2',
-        {{-- Align the fields with the step title rather than the tile: one left
-             edge per card, the way the block headers read. --}}
-        'ps-[2.125rem]' => ! $isPlan,
-    ])>
-        @foreach ($step['fields'] as $row)
-            @include('chat::livewire.chat.partials._dock-field', [
-                'row' => $row,
-                'stepId' => $step['id'],
-                'isEditable' => ($row['code'] ?? null) !== null && in_array($row['code'], $step['editableCodes'], true),
-                'isEditing' => $editingFieldCode !== null && $editingFieldCode === ($row['code'] ?? null) && $editingStepId === $step['id'],
-            ])
-        @endforeach
-    </div>
+    @if ($step['fields'] !== [])
+        <div class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+            @foreach ($step['fields'] as $row)
+                <div @class([
+                    'py-2.5',
+                    'px-4' => ! $isPlan,
+                    'pe-3 ps-11' => $isPlan,
+                ]) data-proposal-field-row>
+                    @include('chat::livewire.chat.partials._dock-field', [
+                        'row' => $row,
+                        'stepId' => $step['id'],
+                        'isEditable' => ($row['code'] ?? null) !== null && in_array($row['code'], $step['editableCodes'], true),
+                        'isEditing' => $editingFieldCode !== null && $editingFieldCode === ($row['code'] ?? null) && $editingStepId === $step['id'],
+                    ])
+                </div>
+            @endforeach
+        </div>
+    @endif
 </div>

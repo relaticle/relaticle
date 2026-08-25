@@ -9,8 +9,8 @@
      the fields are an audit trail, not a decision, and five expanded steps of
      them bury the reply they belong to. The line keeps what a reader scans for
      (what it was, what happened to it, and a link to the record) and the whole
-     line opens the fields. $inPlan drops the entity glyph, because the plan card
-     already draws a numbered rail down the left. --}}
+     line opens the fields. A plan keeps the same record pill beside its numbered
+     rail, so record identity stays consistent at every depth. --}}
 @php
     $inPlan = $inPlan ?? false;
     $operationLabels = ['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')];
@@ -53,7 +53,32 @@
 @if ($inPlan)
     <template x-if="action.status === 'pending' && ! hasItemResults(action)">
         <div class="px-4 py-3 ps-9">
-            <p class="text-xs text-gray-600 dark:text-gray-300" x-text="{{ $summaryExpression }}"></p>
+            <div class="flex min-w-0 items-center gap-2">
+                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
+                    <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
+                        </svg>
+                        <span class="chat-chip-label" x-text="proposalRecordLabel(action)"></span>
+                    </span>
+                </template>
+
+                <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalRecordLabel(action)">
+                    <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
+                </template>
+
+                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
+                    <span
+                        class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider"
+                        :class="{
+                            'text-blue-600 dark:text-blue-400': action.operation === 'create',
+                            'text-amber-600 dark:text-amber-400': action.operation === 'update',
+                            'text-red-600 dark:text-red-400': action.operation === 'delete',
+                        }"
+                        x-text="(@js($operationLabels))[action.operation] ?? action.operation"
+                    ></span>
+                </template>
+            </div>
             <p class="mt-1 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">{{ __('Waiting for your decision below.') }}</p>
         </div>
     </template>
@@ -90,40 +115,31 @@
                 class="absolute inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
             ></button>
 
-            @unless ($inPlan)
-                <span
-                    class="pointer-events-none relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-                    :class="{
-                        'bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400': action.operation === 'create',
-                        'bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400': action.operation === 'update',
-                        'bg-red-50 text-red-600 dark:bg-red-400/10 dark:text-red-400': action.operation === 'delete',
-                    }"
-                    aria-hidden="true"
-                >
-                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type)">
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <span class="pointer-events-none relative flex min-w-0 flex-1 items-center gap-2">
+                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
+                    <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
                         </svg>
-                    </template>
+                        <span class="chat-chip-label" x-text="proposalRecordLabel(action)"></span>
+                    </span>
+                </template>
 
-                    <template x-if="!window.ChatModules.recordChipIcon(action.entity_type)">
-                        <span>
-                            <template x-if="action.operation === 'update'">
-                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-                            </template>
-                            <template x-if="action.operation === 'delete'">
-                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
-                            </template>
-                            <template x-if="action.operation !== 'update' && action.operation !== 'delete'">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                            </template>
-                        </span>
-                    </template>
-                </span>
-            @endunless
+                <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalRecordLabel(action)">
+                    <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
+                </template>
 
-            <span class="pointer-events-none relative flex min-w-0 flex-1 items-center gap-1.5">
-                <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
+                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
+                    <span
+                        class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider"
+                        :class="{
+                            'text-blue-600 dark:text-blue-400': action.operation === 'create',
+                            'text-amber-600 dark:text-amber-400': action.operation === 'update',
+                            'text-red-600 dark:text-red-400': action.operation === 'delete',
+                        }"
+                        x-text="(@js($operationLabels))[action.operation] ?? action.operation"
+                    ></span>
+                </template>
 
                 {{-- The record, one click away and never in the row's own click
                      path: opening the page you just wrote to should not be
@@ -177,9 +193,11 @@
             </template>
 
             <template x-if="Array.isArray(action.display?.fields) && action.display.fields.length > 0">
-                <div @class(['space-y-2 py-2.5', 'pe-4 ps-4' => $inPlan, 'px-4' => ! $inPlan])>
+                <div class="divide-y divide-gray-100 dark:divide-white/5">
                     <template x-for="(field, fieldIdx) in (action.display?.fields || [])" :key="fieldIdx">
-                        @include('chat::livewire.chat.partials._proposal-field')
+                        <div class="px-4 py-2.5" data-proposal-field-row>
+                            @include('chat::livewire.chat.partials._proposal-field')
+                        </div>
                     </template>
                 </div>
             </template>
@@ -199,9 +217,11 @@
                                     </span>
                                 </template>
                             </div>
-                            <div class="mt-1.5 space-y-1.5">
+                            <div class="mt-2 divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
                                 <template x-for="(field, fieldIdx) in (item.fields || [])" :key="fieldIdx">
-                                    @include('chat::livewire.chat.partials._proposal-field')
+                                    <div class="py-2">
+                                        @include('chat::livewire.chat.partials._proposal-field')
+                                    </div>
                                 </template>
                             </div>
 
