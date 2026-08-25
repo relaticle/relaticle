@@ -43,7 +43,7 @@ final class OpportunityResource extends Resource
 
     protected static ?string $modelLabel = null;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trophy';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
 
     protected static ?int $navigationSort = 3;
 

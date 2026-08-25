@@ -47,15 +47,15 @@
             <span>People</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-home-modern class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-building-office class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Companies</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-trophy class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-currency-dollar class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Opportunities</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-check-circle class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-clipboard-document-check class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Tasks</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
