@@ -15,6 +15,9 @@ return [
         'heading' => 'Getting started',
         'title' => 'Setup reminders',
         'description' => 'One reminder a couple of days after you create a workspace, if it is still empty.',
+        'subject' => 'Your workspace is waiting',
+        'mail_heading' => ':name, your workspace is still waiting',
+        'mail_button' => 'Continue in Rela',
     ],
 
     'collaboration' => [
