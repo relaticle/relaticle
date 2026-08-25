@@ -82,7 +82,12 @@
 
         {{-- Per-step decision. Only a plan shows these: a single proposal is
              decided by the footer, and two competing sets of buttons on one card
-             is exactly the ambiguity this dock exists to avoid. --}}
+             is exactly the ambiguity this dock exists to avoid.
+
+             Hover-revealed from `sm:` up, always visible below it: touch has no
+             hover, so gating them on it alone left a plan's only per-step
+             controls unreachable on a phone (same defect as the batch row's
+             skip). --}}
         @if ($isPlan)
             <button
                 type="button"
@@ -90,7 +95,7 @@
                 wire:loading.attr="disabled"
                 @disabled($blockedBy !== [])
                 @class([
-                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 opacity-0 transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 group-hover/step:opacity-100',
+                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/step:opacity-100',
                     'hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-400/10 dark:hover:text-primary-400' => $blockedBy === [],
                     'cursor-not-allowed' => $blockedBy !== [],
                 ])
@@ -104,7 +109,7 @@
                 type="button"
                 wire:click="rejectStep(@js($step['id']))"
                 wire:loading.attr="disabled"
-                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 group-hover/step:opacity-100 dark:hover:bg-red-400/10 dark:hover:text-red-400"
+                class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500 sm:opacity-0 sm:group-hover/step:opacity-100 dark:hover:bg-red-400/10 dark:hover:text-red-400"
                 aria-label="{{ __('Remove this step') }}"
                 title="{{ __('Remove this step') }}"
             >

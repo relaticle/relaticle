@@ -235,3 +235,121 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
         ->and($items['chipTypes'])->toBe(['task', 'task'])
         ->and($items['outcomes'])->toBeTrue();
 });
+
+/**
+ * A partially-skipped batch finalizes as Approved, so the header cannot echo
+ * that status: it reports the per-item counts instead. A batch that wrote
+ * nothing finalizes as Rejected and keeps the plain chip, which says more than
+ * "0 created" would.
+ *
+ * @param  list<array<string, mixed>>  $resultItems
+ */
+function seedResolvedBatch(User $user, int|string $teamId, string $conversationId, PendingActionStatus $status, array $resultItems): void
+{
+    $pending = PendingAction::query()->create([
+        'team_id' => $teamId,
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [
+            ['title' => 'Draft the renewal note'],
+            ['title' => 'Book onboarding session'],
+        ]],
+        'display_data' => [
+            'title' => 'Create Tasks',
+            'summary' => 'Create 2 tasks',
+            'items' => [
+                ['title' => 'Create Task', 'summary' => 'Create task "Draft the renewal note"', 'fields' => [['label' => 'Title', 'value' => 'Draft the renewal note']]],
+                ['title' => 'Create Task', 'summary' => 'Create task "Book onboarding session"', 'fields' => [['label' => 'Title', 'value' => 'Book onboarding session']]],
+            ],
+        ],
+        'status' => $status,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['items' => $resultItems],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'CreateTaskTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateTask',
+                'entity_type' => 'task',
+                'operation' => 'create',
+                'data' => $pending->action_data,
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+it('heads a part-skipped batch with per-item counts rather than its Approved status', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $task = Task::factory()->for($team)->create(['title' => 'Draft the renewal note']);
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'part-skipped batch', $conversationId);
+    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Approved, [
+        ['status' => 'approved', 'id' => (string) $task->id],
+        ['status' => 'rejected'],
+    ]);
+
+    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks')
+        ->script(<<<'JS'
+            (() => {
+                const row = document.querySelector('[data-proposal-row]').parentElement;
+
+                return row.textContent.replace(/\s+/g, ' ').trim();
+            })();
+        JS);
+
+    expect($header)->toContain('1 created')
+        ->and($header)->toContain('1 skipped')
+        ->and($header)->not->toContain('Approved');
+});
+
+it('heads a fully-skipped batch with Rejected, since it wrote nothing', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'fully-skipped batch', $conversationId);
+    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Rejected, [
+        ['status' => 'rejected'],
+        ['status' => 'rejected'],
+    ]);
+
+    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks')
+        ->script(<<<'JS'
+            (() => {
+                const row = document.querySelector('[data-proposal-row]').parentElement;
+
+                return row.textContent.replace(/\s+/g, ' ').trim();
+            })();
+        JS);
+
+    expect($header)->toContain('Rejected')
+        ->and($header)->not->toContain('skipped');
+});

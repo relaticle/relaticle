@@ -1053,13 +1053,15 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return (action.itemResults && action.itemResults[index]) || null;
     },
 
-    // Derived receipt for a finalized batch. The row-level status ('approved')
+    // Derived receipt for a finalized batch. The row-level status 'approved'
     // hides a mixed outcome (approving 2 of 3 records still finalizes the row
     // as approved), so the header chip is computed from the per-item results
-    // instead of echoing the status. Returns null for non-batch cards, undecided
-    // batches, and expired/superseded ones (whose status chip stays truthful).
+    // instead of echoing it. Only that status: a batch that wrote nothing
+    // finalizes as 'rejected' and keeps the plain red Rejected chip, which is
+    // both truthful and the stronger signal that nothing happened. Undecided,
+    // expired and superseded cards keep their status chip too.
     batchOutcome(action) {
-        if (!action || (action.status !== 'approved' && action.status !== 'rejected')) return null;
+        if (!action || action.status !== 'approved') return null;
 
         const results = Object.values(action.itemResults || {});
         if (results.length === 0) return null;
