@@ -230,22 +230,31 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         let ranBootstrapSend = false;
         try {
             const raw = sessionStorage.getItem('chat:bootstrap');
-            if (raw && !this.conversationId) {
+            if (raw) {
+                // Clear it whatever happens next. A payload that cannot be
+                // delivered here must not survive to fire into the next chat
+                // the user opens, which is how a first-run reply ended up
+                // starting a second conversation.
                 sessionStorage.removeItem('chat:bootstrap');
                 const parsed = JSON.parse(raw);
-                const bootstrapDoc = parsed?.document;
-                const bootstrapModel = parsed?.model;
 
-                if (bootstrapModel && this.modelOptions.some((o) => o.value === bootstrapModel)) {
-                    this.selectedModel = bootstrapModel;
-                }
+                // The payload names the conversation it was typed for: null
+                // for a fresh chat, the welcome id on first run.
+                if ((parsed?.conversationId ?? null) === (this.conversationId ?? null)) {
+                    const bootstrapDoc = parsed?.document;
+                    const bootstrapModel = parsed?.model;
 
-                if (bootstrapDoc) {
-                    ranBootstrapSend = true;
-                    this.$nextTick(() => {
-                        this.localEditor()?.setDocument?.(bootstrapDoc);
-                        this.sendMessage();
-                    });
+                    if (bootstrapModel && this.modelOptions.some((o) => o.value === bootstrapModel)) {
+                        this.selectedModel = bootstrapModel;
+                    }
+
+                    if (bootstrapDoc) {
+                        ranBootstrapSend = true;
+                        this.$nextTick(() => {
+                            this.localEditor()?.setDocument?.(bootstrapDoc);
+                            this.sendMessage();
+                        });
+                    }
                 }
             }
         } catch (_) { /* sessionStorage unavailable or malformed payload */ }

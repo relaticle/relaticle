@@ -2,7 +2,7 @@
     <div
         x-data="dashboardChatInput(@js($this->welcome
             ? \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $this->welcome['conversation_id']])
-            : \App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
+            : \App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($this->welcome['conversation_id'] ?? null))"
         class="mx-auto w-full max-w-3xl py-16"
     >
         {{-- Greeting. On a fresh workspace Rela's seeded welcome takes the slot
@@ -84,7 +84,7 @@
 
     @script
     <script>
-        Alpine.data('dashboardChatInput', (chatUrl, defaultModel) => ({
+        Alpine.data('dashboardChatInput', (chatUrl, defaultModel, targetConversationId) => ({
             submitting: false,
             error: null,
             @include('chat::livewire.chat.partials._model-state')
@@ -125,6 +125,7 @@
                     sessionStorage.setItem('chat:bootstrap', JSON.stringify({
                         document: editor.getDocument(),
                         model: this.selectedModel,
+                        conversationId: targetConversationId ?? null,
                     }));
                 } catch (_) {
                     this.error = @js(__('Could not save message. Try again.'));
