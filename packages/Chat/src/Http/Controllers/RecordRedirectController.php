@@ -47,14 +47,20 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * `RecordReferenceResolver::customFieldUrl()` already runs its own
  * tenant-scoped query and returns null for a foreign or missing field, so it
  * is safe to resolve directly against the caller's current team.
+ *
+ * `team_invitations` is the same shape as `custom_field`: no per-record route,
+ * so every id resolves to the same destination (the Members page) against the
+ * caller's own current team, with no record fetch at all.
  */
 final readonly class RecordRedirectController
 {
     private const string CUSTOM_FIELD_TYPE = 'custom_field';
 
+    private const string TEAM_INVITATION_TYPE = 'team_invitations';
+
     public function __invoke(Request $request, RecordReferenceResolver $resolver, string $type, string $id): RedirectResponse|Response
     {
-        if ($type === self::CUSTOM_FIELD_TYPE) {
+        if ($type === self::CUSTOM_FIELD_TYPE || $type === self::TEAM_INVITATION_TYPE) {
             $url = $resolver->urlFor($type, $id);
 
             abort_if($url === null, 404);

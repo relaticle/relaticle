@@ -55,6 +55,7 @@ use Relaticle\Chat\Tools\Task\DeleteTaskTool as ChatDeleteTaskTool;
 use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
+use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
 
 // Only a fallback: every chat turn passes an explicit provider resolved by
 // AiModelResolver, and laravel/ai reads this attribute only when the prompt's
@@ -280,7 +281,8 @@ Some actions cannot be performed here but ARE available elsewhere in the workspa
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools); this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
 - Exporting records to a CSV or XLSX file -> the matching "export_*" destination.
-- Inviting or managing team members -> "team_members".
+- Inviting a new team member by email -> you CAN propose it directly via InviteTeamMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
+- Managing existing team members (changing a role, removing someone) -> "team_members".
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)."
 
 ## Formatting
@@ -732,6 +734,7 @@ PROMPT;
             ChatCreateNoteTool::class,
             ChatUpdateNoteTool::class,
             ChatDeleteNoteTool::class,
+            InviteTeamMemberTool::class,
 
             // Schema management tools (admin-only, proposal-gated)
             CreateCustomFieldTool::class,

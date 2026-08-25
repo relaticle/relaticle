@@ -32,6 +32,7 @@ use App\Models\People;
 use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Onboarding\ActivationSteps;
 use App\Services\Billing\HostedWorkspaceAccess;
@@ -461,6 +462,7 @@ final class AppServiceProvider extends ServiceProvider
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
+            'team_invitation' => TeamInvitation::class,
         ]);
 
         // Use custom models for custom-fields package

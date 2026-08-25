@@ -22,6 +22,7 @@ use App\Actions\People\UpdatePeople;
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
+use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -77,6 +78,7 @@ final readonly class PendingActionService
         CreateCustomField::class,
         UpdateCustomField::class,
         AddCustomFieldOptions::class,
+        CreateTeamInvitation::class,
     ];
 
     /**
