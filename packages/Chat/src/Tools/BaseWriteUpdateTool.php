@@ -126,6 +126,9 @@ abstract class BaseWriteUpdateTool implements Tool
         $actionRecords = [];
         $items = [];
 
+        /** @var list<array{index: int, reason: string}> $skipped */
+        $skipped = [];
+
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
                 return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
@@ -190,16 +193,30 @@ abstract class BaseWriteUpdateTool implements Tool
             $requestedRows = is_array($displayData['fields'] ?? null) ? array_values($displayData['fields']) : [];
             $displayData['fields'] = $this->rowsThatChange($requestedRows);
 
+            // A no-op record is not a validation failure: it carries no signal the model
+            // needs to fix, so it is dropped from the proposal instead of aborting a batch
+            // that has other records genuinely worth changing.
             if ($requestedRows === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass at least one field that changes."], JSON_UNESCAPED_SLASHES);
+                $skipped[] = ['index' => $index, 'reason' => 'Nothing to update: no field that changes was passed.'];
+
+                continue;
             }
 
             if ($displayData['fields'] === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Already up to date. Every value passed matches what the {$label} has now, so there is nothing to change."], JSON_UNESCAPED_SLASHES);
+                $skipped[] = ['index' => $index, 'reason' => "Already up to date: every value matches what the {$label} has now."];
+
+                continue;
             }
 
             $actionRecords[] = $actionData;
             $items[] = $displayData;
+        }
+
+        if ($actionRecords === []) {
+            return (string) json_encode([
+                'error' => 'Nothing to update: every record passed already matches its stored values.',
+                'skipped' => $skipped,
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $isBatch = count($actionRecords) > 1;
@@ -227,7 +244,7 @@ abstract class BaseWriteUpdateTool implements Tool
 
         $publicRecords = array_map(ProposalPayload::withoutMarkers(...), $actionRecords);
 
-        return (string) json_encode([
+        $response = [
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
             'turn_id' => $pending->turn_id,
@@ -237,7 +254,13 @@ abstract class BaseWriteUpdateTool implements Tool
             'data' => $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_UNESCAPED_SLASHES);
+        ];
+
+        if ($skipped !== []) {
+            $response['skipped'] = $skipped;
+        }
+
+        return (string) json_encode($response, JSON_UNESCAPED_SLASHES);
     }
 
     /**
