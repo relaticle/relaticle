@@ -67,11 +67,11 @@ use Spatie\Sluggable\SlugOptions;
 final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 {
     use Billable;
-
     use GetsOnboarded;
 
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
+
     use HasSlug;
     use HasUlids;
 
