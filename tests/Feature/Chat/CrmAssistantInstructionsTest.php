@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Models\People;
+use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use Relaticle\Chat\Agents\CrmAssistant;
 
 mutates(CrmAssistant::class);
@@ -189,4 +193,79 @@ it('tells the model how to fetch the next page of a list result', function (): v
 
     expect($instructions)
         ->toContain('page` set to the result\'s `next_page`');
+});
+
+it('tells the model to end every answer with exactly one offered next action', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('exactly one concrete offered next action or question')
+        ->toContain('the next action is mandatory and must offer to create or import the missing data');
+});
+
+it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('<workspace_state>')
+        ->toContain('must say plainly that these are seeded sample data');
+});
+
+it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->count(2)->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->toContain('only sample records');
+});
+
+it('stops claiming only sample records once the user has a record of their own', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($team);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->not->toContain('only sample records')
+        ->toContain("alongside the user's own records");
+});
+
+it('renders no workspace_state block for a workspace with no seeded sample data at all', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
+});
+
+it('renders no workspace_state block when no team is bound', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
 });

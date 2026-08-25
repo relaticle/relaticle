@@ -199,6 +199,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
+            $agent->withTeam($this->team);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),

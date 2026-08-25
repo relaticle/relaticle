@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
+use App\Models\Team;
+use App\Services\WorkspaceActivationFacts;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Temperature;
@@ -136,6 +138,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public ?array $currentUser = null;
 
     /**
+     * The team whose workspace this conversation belongs to. Drives the
+     * <workspace_state> block: without it the model has no signal that a
+     * workspace still holds only seeded sample data.
+     */
+    public ?Team $team = null;
+
+    /**
      * The id of the turn being streamed. Every proposal this turn creates carries
      * it, which is what groups a chained multi-step write into one plan card.
      */
@@ -168,6 +177,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public function withCurrentUser(?array $user): self
     {
         $this->currentUser = $user;
+
+        return $this;
+    }
+
+    public function withTeam(?Team $team): self
+    {
+        $this->team = $team;
 
         return $this;
     }
@@ -233,6 +249,8 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 14. If the user's request is ambiguous, ask for clarification rather than guessing, but ask ONCE: batch every clarifying question into a single message. Never ask about something you can resolve yourself: when only one record can match, proceed with it and state the assumption. "Me", "my" and "mine" are the Current user. When the user accepts an offer you just made ("yes", "do it", "go ahead"), execute exactly what you offered; never re-ask for details your own offer already named. When you deliver less than the user asked for (one item of a requested "all"), say so in your first sentence.
 15. Be concise. Don't over-explain CRM concepts the user likely knows.
 16. Never narrate tool usage ("Let me fetch that", "I'll now look it up", "First, let me find the notes"). Anything you write before a tool call joins the same reply. Call tools silently and write once, after the results are in.
+17. End every answer with exactly one concrete offered next action or question: the single most useful thing to do next, phrased as an offer ("Want me to ...?"). Never end on a bare statement, and never offer more than one thing. When a list, search, or summary comes back empty, the next action is mandatory and must offer to create or import the missing data: a bare "there are none" is a wrong answer. Exception: a turn that ends awaiting a proposal decision already has its offer, the card itself (see Writes), and a resumed turn after one either continues the request or stops when it is done (see Resuming); do not add another offer in either case.
+18. When the <workspace_state> block says the workspace holds only sample records, every summary or overview answer must say plainly that these are seeded sample data before presenting them, and the offered next action (Rule 17) must be importing or creating the user's real data, not exploring the samples further.
 
 ## Writes
 - To create, update, or delete MANY records of one type, call the tool ONCE with every record: `records: [{..}, {..}]` on create and update tools, `ids: [..]` on delete tools. That produces a single proposal listing all of them, approved item by item. Never loop one tool call per record, and never ask the user to approve one record at a time.
@@ -270,7 +288,7 @@ GuideToPageTool returns a page URL (not a record id). You MAY render that URL as
 - Never write a markdown table of records except the sanctioned join table above: read results that render as a block, and proposals, already list every record (the no-block tools in Rule 3 get a short list, never a table)
 - Never write a heading or bold label naming a set of results ("**Companies**", "## People"): every block prints its own title, and yours cannot sit next to it
 - No emoji of any kind: not celebratory, not decorative, not as status or priority markers. Express priority and status in words.
-- Do not end replies offering a next step ("say next", "want me to continue?"). You are resumed automatically after a decision, so an offer to continue is both noise and wrong.
+- Never offer to "continue" or ask the user to say "next" or "continue" after a proposal: you are resumed automatically after a decision, so that specific offer is both noise and wrong.
 - Keep responses focused and actionable
 
 ## Superseded Proposals
@@ -301,7 +319,7 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->currentUserBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
+        return $this->dateBlock().$this->currentUserBlock().$this->workspaceStateBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
     }
 
     /**
@@ -331,6 +349,33 @@ PROMPT;
         return "\n\n## Current user\n"
             ."{$name} (user id: {$this->currentUser['id']}, {$role}). "
             .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.';
+    }
+
+    /**
+     * Tells the model whether the workspace still holds only the sample
+     * records seeded on signup. Absent entirely once the workspace has real
+     * data, so an established workspace's prompt carries no sample-data noise.
+     */
+    private function workspaceStateBlock(): string
+    {
+        if (! $this->team instanceof Team) {
+            return '';
+        }
+
+        $facts = resolve(WorkspaceActivationFacts::class);
+
+        if (! $facts->hasSampleData($this->team)) {
+            return '';
+        }
+
+        $count = $facts->sampleRecordCount($this->team);
+        $qualifier = $facts->hasOwnRecord($this->team)
+            ? "alongside the user's own records"
+            : 'and the workspace holds only sample records so far';
+
+        return "\n\n<workspace_state>\n"
+            ."This workspace contains {$count} seeded sample records (creation source \"system\") {$qualifier}.\n"
+            .'</workspace_state>';
     }
 
     private function mentionsBlock(): string
