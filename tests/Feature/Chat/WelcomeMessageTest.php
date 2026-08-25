@@ -37,6 +37,31 @@ it('does not dispatch for a non-personal team', function (): void {
     Queue::assertNotPushed(SendWelcomeMessage::class);
 });
 
+it('writes the welcome conversation synchronously, before the job runs', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    Queue::fake([SendWelcomeMessage::class]);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+
+    $conversation = DB::table('agent_conversations')
+        ->where('team_id', $owner->currentTeam->getKey())
+        ->first();
+
+    expect($conversation)->not->toBeNull()
+        ->and($conversation->participant_id)->toBe((string) $owner->getKey())
+        ->and($conversation->title)->toBe(__('chat-welcome.title'));
+
+    $message = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversation->id)
+        ->first();
+
+    expect($message->role)->toBe('assistant')
+        ->and($message->content)->toBe(__('chat-welcome.fallback', [
+            'name' => explode(' ', trim($owner->name))[0],
+        ]))
+        ->and(json_decode((string) $message->meta, true))->toMatchArray(['welcome' => true]);
+});
+
 it('writes the welcome conversation with the fallback copy when generation fails', function (): void {
     // No AI provider is faked, so the WelcomeComposer prompt throws and the
     // job must fall back to the templated message.
