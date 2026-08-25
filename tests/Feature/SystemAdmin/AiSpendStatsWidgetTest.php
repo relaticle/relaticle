@@ -60,19 +60,17 @@ it('excludes Refund transactions so a failed/refunded job does not inflate spend
     expect($stats[0]->getValue())->toBe(number_format(10));
 });
 
-it('uses a half-open range so the previous-month boundary is not double-counted', function (): void {
-    $monthStart = now()->startOfMonth();
-
+it('splits current and previous spend at the period boundary', function (): void {
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
         'credits_charged' => 7,
-        'created_at' => $monthStart->copy()->subMicrosecond(),
+        'created_at' => now()->subDays(31),
     ]);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
         'credits_charged' => 3,
-        'created_at' => $monthStart,
+        'created_at' => now()->subDay(),
     ]);
 
     $component = livewire(AiSpendStatsWidget::class)->assertOk();
@@ -82,7 +80,27 @@ it('uses a half-open range so the previous-month boundary is not double-counted'
         ->and($stats[1]->getDescription())->toContain(number_format(7));
 });
 
-it('reports monthly ai cost in dollars from token usage', function (): void {
+it('respects the dashboard period filter', function (): void {
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'credits_charged' => 5,
+        'created_at' => now()->subDays(10),
+    ]);
+
+    AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'credits_charged' => 2,
+        'created_at' => now()->subDay(),
+    ]);
+
+    $component = livewire(AiSpendStatsWidget::class, ['pageFilters' => ['period' => '7']])->assertOk();
+    $stats = invade($component->instance())->getStats();
+
+    expect($stats[0]->getValue())->toBe(number_format(2))
+        ->and($stats[0]->getDescription())->toBe('Last 7 days');
+});
+
+it('reports period ai cost in dollars from token usage', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
     config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
 

@@ -151,3 +151,35 @@ it('excludes an unpaid subscription from the subscribed teams count', function (
         ->assertSee('Subscribed Teams')
         ->assertSee('0');
 });
+
+it('shows stage conversion rates when the denominators are non-zero', function (): void {
+    $activatedOwner = User::factory()->withTeam()->create([
+        'created_at' => now()->subDays(10),
+    ]);
+
+    User::factory()->withTeam()->create([
+        'created_at' => now()->subDays(8),
+    ]);
+
+    Company::withoutEvents(fn () => Company::factory()
+        ->for($activatedOwner->currentTeam)
+        ->create([
+            'creator_id' => $activatedOwner->id,
+            'account_owner_id' => $activatedOwner->id,
+            'creation_source' => CreationSource::WEB,
+            'created_at' => now()->subDays(4),
+        ]));
+
+    $activatedOwner->currentTeam->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_funnel_rates',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'created_at' => now()->subDays(2),
+    ]);
+
+    livewire(FunnelWidget::class)
+        ->assertSee('50% of sign-ups')
+        ->assertSee('100% of activated');
+});

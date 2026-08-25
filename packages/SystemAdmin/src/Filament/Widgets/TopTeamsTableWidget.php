@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
 use App\Enums\CreationSource;
+use App\Enums\Plan;
 use App\Models\Team;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
@@ -48,9 +52,21 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->color('primary')
                     ->url(fn (Team $record): ?string => $record->owner ? UserResource::getUrl('view', ['record' => $record->owner]) : null),
 
+                TextColumn::make('plan')
+                    ->label('Plan')
+                    ->badge()
+                    ->formatStateUsing(fn (Plan $state): string => $state->label())
+                    ->color(fn (Plan $state): string => match ($state) {
+                        Plan::Free => 'gray',
+                        Plan::Pro => 'success',
+                        Plan::Enterprise => 'primary',
+                    })
+                    ->sortable(),
+
                 TextColumn::make('members_count')
                     ->label('Members')
-                    ->numeric()
+                    ->state(fn (Team $record): string => "{$this->countActiveMembers($record)} / {$record->members_count}")
+                    ->tooltip('Active in period / total members')
                     ->sortable()
                     ->alignCenter()
                     ->badge()
@@ -81,6 +97,14 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->label('Created')
                     ->date('M j, Y')
                     ->sortable(),
+            ])
+            ->recordActions([
+                Action::make('activity')
+                    ->label('Activity')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (Team $record): string => ActivityResource::getUrl('index', [
+                        'filters' => ['team_id' => ['value' => $record->id]],
+                    ])),
             ])
             ->defaultSort('records_count', 'desc')
             ->paginated([10, 25])
@@ -117,6 +141,32 @@ final class TopTeamsTableWidget extends BaseWidget
         });
     }
 
+    /**
+     * Distinct users who created at least one record for the team inside the
+     * selected period. Runs per rendered row, which is fine at one page of
+     * ten teams.
+     */
+    private function countActiveMembers(Team $record): int
+    {
+        [$startStr, $endStr] = $this->getDateRange();
+        $systemSource = CreationSource::SYSTEM->value;
+
+        $unionParts = [];
+        $bindings = [];
+
+        foreach (self::ENTITY_TABLES as $table) {
+            $unionParts[] = "SELECT creator_id FROM {$table} WHERE team_id = ? AND creator_id IS NOT NULL AND deleted_at IS NULL AND creation_source != ? AND created_at BETWEEN ? AND ?";
+            $bindings[] = $record->id;
+            $bindings[] = $systemSource;
+            $bindings[] = $startStr;
+            $bindings[] = $endStr;
+        }
+
+        $sql = 'SELECT COUNT(DISTINCT creator_id) AS cnt FROM ('.implode(' UNION ALL ', $unionParts).') AS creators';
+
+        return (int) (DB::selectOne($sql, $bindings)->cnt ?? 0);
+    }
+
     private function buildQuery(): Builder
     {
         [$recordsCountSql, $recordsBindings] = $this->getRecordsCountExpression();
@@ -127,7 +177,8 @@ final class TopTeamsTableWidget extends BaseWidget
         return Team::query()
             ->select(['teams.*'])
             ->selectRaw("({$recordsCountSql}) as records_count", $recordsBindings)
-            ->selectRaw('(SELECT COUNT(*) FROM team_user WHERE team_user.team_id = teams.id) as members_count')
+            // Jetstream keeps the owner out of team_user, hence the +1.
+            ->selectRaw('(SELECT COUNT(*) + 1 FROM team_user WHERE team_user.team_id = teams.id) as members_count')
             ->selectRaw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count')
             ->selectRaw("{$lastActivitySql} as last_activity", $lastActivityBindings)
             ->where(function (Builder $query) use ($startStr, $endStr, $systemSource): void {

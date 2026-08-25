@@ -236,3 +236,41 @@ it('renders the top-active charts when the date filter is active', function (): 
     livewire(TopActiveTeamsChartWidget::class, ['tableFilters' => $filters])->assertOk();
     livewire(TopActiveUsersChartWidget::class, ['tableFilters' => $filters])->assertOk();
 });
+
+it('shows the subject name alongside its type on the list page', function (): void {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()->create(['name' => 'Acme Rockets']));
+    seedActivity($this->teamA, $this->ownerA, ['subject_id' => $company->id]);
+
+    livewire(ListActivities::class)
+        ->assertOk()
+        ->assertSee('Company: Acme Rockets');
+});
+
+it('keeps showing the subject name after the subject was soft-deleted', function (): void {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()->create(['name' => 'Ghost Corp']));
+    seedActivity($this->teamA, $this->ownerA, ['subject_id' => $company->id]);
+    $company->delete();
+
+    livewire(ListActivities::class)
+        ->assertOk()
+        ->assertSee('Company: Ghost Corp');
+});
+
+it('shows the subject name on the view page', function (): void {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()->create(['name' => 'Acme Rockets']));
+    $activity = seedActivity($this->teamA, $this->ownerA, ['subject_id' => $company->id]);
+
+    livewire(ViewActivity::class, ['record' => $activity->getKey()])
+        ->assertOk()
+        ->assertSee('Company: Acme Rockets');
+});
+
+it('hydrates the team filter from the top-teams deep link query string', function (): void {
+    $a = seedActivity($this->teamA, $this->ownerA);
+    $b = seedActivity($this->teamB, $this->ownerB);
+
+    Livewire\Livewire::withQueryParams(['filters' => ['team_id' => ['value' => $this->teamA->id]]])
+        ->test(ListActivities::class)
+        ->assertCanSeeTableRecords([$a])
+        ->assertCanNotSeeTableRecords([$b]);
+});
