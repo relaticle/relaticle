@@ -24,8 +24,21 @@ it('renders the nudge naming the unfinished step', function (): void {
 
     expect($rendered)
         ->toContain('Dana')
-        ->toContain(__('filament/pages/dashboard.activation.steps.first_record.label'))
-        ->toContain('https://example.test/chat');
+        ->toContain('Add your first contact')
+        ->toContain('Put one real person in the CRM and the rest follows')
+        ->toContain('https://example.test/chat')
+        ->not->toContain('filament/pages/dashboard.');
+});
+
+it('never lets an unresolved step label reach the rendered body', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
+    $team = $owner->currentTeam;
+
+    foreach (ActivationStep::cases() as $step) {
+        $mail = new SetupNudgeMail($owner, $team, $step->value, 'https://example.test/chat');
+
+        expect($mail->render())->not->toContain('filament/pages/dashboard.');
+    }
 });
 
 it('sends once to an owner who has created nothing', function (): void {
