@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -143,4 +144,94 @@ it('opens the fields from anywhere on the row and reaches the record only from t
     // The link, and only the link, leaves for the record.
     $page->click('[data-proposal-record-link]')
         ->assertPathIs("/app/{$team->slug}/people/{$person->id}");
+});
+
+it('leads each decided batch item with the record pill, beside its outcome chip', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $task = Task::factory()->for($team)->create(['title' => 'Send proposal to Meridian']);
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'decided batch', $conversationId);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $team->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [
+            ['title' => 'Send proposal to Meridian'],
+            ['title' => 'Book onboarding session'],
+        ]],
+        'display_data' => [
+            'title' => 'Create Tasks',
+            'summary' => 'Create 2 tasks',
+            'items' => [
+                ['title' => 'Create Task', 'summary' => 'Create task "Send proposal to Meridian"', 'fields' => [['label' => 'Title', 'value' => 'Send proposal to Meridian']]],
+                ['title' => 'Create Task', 'summary' => 'Create task "Book onboarding session"', 'fields' => [['label' => 'Title', 'value' => 'Book onboarding session']]],
+            ],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['items' => [
+            ['status' => 'approved', 'id' => (string) $task->id],
+            ['status' => 'rejected'],
+        ]],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'CreateTaskTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateTask',
+                'entity_type' => 'task',
+                'operation' => 'create',
+                'data' => $pending->action_data,
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks');
+
+    $page->click('[data-proposal-row]')
+        ->assertVisible('[data-proposal-details]');
+
+    $items = $page->script(<<<'JS'
+        (() => {
+            const details = document.querySelector('[data-proposal-details]');
+            const chips = Array.from(details.querySelectorAll('[data-proposal-record-chip]'));
+
+            return {
+                chipLabels: chips.map((chip) => chip.textContent.trim()),
+                chipTypes: chips.map((chip) => chip.dataset.recordType),
+                outcomes: details.textContent.includes('Created') && details.textContent.includes('Skipped'),
+            };
+        })();
+    JS);
+
+    expect($items['chipLabels'])->toBe(['Send proposal to Meridian', 'Book onboarding session'])
+        ->and($items['chipTypes'])->toBe(['task', 'task'])
+        ->and($items['outcomes'])->toBeTrue();
 });

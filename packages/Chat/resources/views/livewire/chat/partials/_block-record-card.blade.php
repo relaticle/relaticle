@@ -13,7 +13,7 @@
 >
     <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
         <template x-if="!block.url && window.ChatModules.recordChipIcon(block.type)">
-            <span class="chat-chip" :data-record-type="block.type">
+            <span class="chat-chip min-w-0" data-record-title-chip :data-record-type="block.type">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
                 </svg>
@@ -22,7 +22,7 @@
         </template>
 
         <template x-if="block.url">
-            <a class="chat-chip" :data-record-type="block.type" :href="block.url">
+            <a class="chat-chip min-w-0" data-record-title-chip :data-record-type="block.type" :href="block.url">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(block.type)"></path>
                 </svg>

@@ -1067,7 +1067,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const resolvedLabel = action?.record?.label;
         if (typeof resolvedLabel === 'string' && resolvedLabel !== '') return resolvedLabel;
 
-        const summary = action?.display?.summary;
+        return this.quotedSummaryTitle(action?.display?.summary);
+    },
+
+    // A batch item's record identity: its display title holds the operation
+    // ("Create Task"), so the record name only exists inside the quoted summary.
+    proposalItemLabel(item) {
+        return this.quotedSummaryTitle(item?.summary);
+    },
+
+    quotedSummaryTitle(summary) {
         if (typeof summary !== 'string') return '';
 
         const match = summary.match(/"(.*)"/u);

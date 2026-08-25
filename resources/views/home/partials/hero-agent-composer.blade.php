@@ -28,7 +28,7 @@
             {{-- Update variant (exchange 2). --}}
             <div class="mcp-dock-update">
                 <div class="flex items-center gap-2 px-4 py-2.5">
-                    <span class="chat-chip" data-record-type="task">
+                    <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="task">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['task'] }}"/>
                         </svg>
@@ -53,7 +53,7 @@
                  it is about to write, with no old value to strike through. --}}
             <div class="mcp-dock-create" style="display: none;">
                 <div class="flex items-center gap-2 px-4 py-2.5">
-                    <span class="chat-chip" data-record-type="people">
+                    <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="people">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroDockIcons['people'] }}"/>
                         </svg>
@@ -77,15 +77,14 @@
             </div>
 
             <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-2 dark:border-white/5 dark:bg-white/[0.02]">
-                <button type="button" tabindex="-1" class="inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                <button type="button" tabindex="-1" class="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
                     Discard
                 </button>
                 {{-- Label follows the operation, matching proposal-card.blade.php's
                      $primaryLabel match: update reads "Save changes", create "Create". --}}
-                <button id="hero-approve-btn" type="button" tabindex="-1" class="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                    <x-heroicon-o-check class="h-3 w-3" aria-hidden="true"/>
+                <button id="hero-approve-btn" type="button" tabindex="-1" class="inline-flex h-7 items-center gap-1.5 rounded-md bg-gray-900 px-2.5 text-xs font-medium text-white shadow-sm dark:bg-white dark:text-gray-900">
                     <span class="mcp-dock-label">Save changes</span>
-                    <kbd class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-pico font-medium sm:inline">&#8984;&#9166;</kbd>
+                    <kbd class="hidden rounded bg-white/15 px-1 py-0.5 font-sans text-pico font-medium sm:inline dark:bg-gray-900/10">&#8984;&#9166;</kbd>
                 </button>
             </div>
         </div>

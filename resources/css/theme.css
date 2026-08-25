@@ -114,6 +114,14 @@
     @apply max-w-[24ch] truncate;
 }
 
+/* Title-position chips: in a proposal row or a block header the pill IS the
+   row's title, so the inline 24ch cap would truncate against empty space.
+   The row's own min-w-0 flex still ellipsizes a name that truly overflows. */
+[data-proposal-record-chip] .chat-chip-label,
+[data-record-title-chip] .chat-chip-label {
+    max-width: none;
+}
+
 /* Hero gradient text animation — slow, subtle shimmer */
 @keyframes gradient-shift {
     0%, 100% { background-position: 0% center; }

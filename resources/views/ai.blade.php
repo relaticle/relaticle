@@ -148,7 +148,7 @@
                     </p>
                     <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] flex-1">
                         <div class="flex min-w-0 items-center gap-2 px-4 py-2.5">
-                            <span class="chat-chip min-w-0" data-record-type="opportunity">
+                            <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="opportunity">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
                                 </svg>
@@ -163,7 +163,7 @@
                                 [__('Close date'), __('Not set'), __('Today')],
                             ] as [$field, $before, $after])
                                 <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
-                                    <dt class="w-20 shrink-0 text-[length:var(--text-micro)] font-medium text-gray-400 dark:text-gray-500">{{ $field }}</dt>
+                                    <dt class="w-24 shrink-0 text-[length:var(--text-micro)] font-medium text-gray-400 sm:w-28 dark:text-gray-500">{{ $field }}</dt>
                                     <dd class="flex min-w-0 items-center gap-1.5">
                                         <span class="text-gray-400 dark:text-gray-500 line-through truncate">{{ $before }}</span>
                                         <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
@@ -183,11 +183,10 @@
                     </p>
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
-                                <x-ri-check-line class="h-3.5 w-3.5"/>
+                            <span class="inline-flex h-7 items-center rounded-md bg-gray-900 px-2.5 text-xs font-medium text-white shadow-sm dark:bg-white dark:text-gray-900">
                                 {{ __('Approve') }}
                             </span>
-                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            <span class="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 shadow-sm dark:border-white/[0.08] dark:bg-white/5 dark:text-gray-300">
                                 {{ __('Reject') }}
                             </span>
                         </div>

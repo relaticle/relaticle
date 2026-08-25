@@ -137,7 +137,7 @@
     <div class="mcp-el mcp-audit-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
             <span class="relative flex min-w-0 flex-1 items-center gap-2">
-                <span class="chat-chip min-w-0" data-record-type="task">
+                <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="task">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
                     </svg>
@@ -196,7 +196,7 @@
     <div class="mcp-el mcp-create-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
             <span class="relative flex min-w-0 flex-1 items-center gap-2">
-                <span class="chat-chip min-w-0" data-record-type="people">
+                <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="people">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
                     </svg>
@@ -236,7 +236,7 @@
          circle -- that component was deleted; fields are the real shape. --}}
     <div class="mcp-el mcp-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
         <div class="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
-            <span class="chat-chip" data-record-type="people">
+            <span class="chat-chip min-w-0" data-record-title-chip data-record-type="people">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
                 </svg>

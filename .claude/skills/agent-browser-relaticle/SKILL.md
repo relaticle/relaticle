@@ -182,6 +182,12 @@ await comp2.call("callMountedAction");
 
 ## 6. Environment hazards (dated)
 
+- **Factory/fresh teams redirect every app-panel page to /billing** (verified:
+  2026-08-25): `EnsureHostedWorkspaceAccess` allows only subscribed teams or
+  `trial_ends_at` in the future, and factory teams have neither, so login lands on
+  `/app/<slug>/billing` and stays there. Fix before browsing:
+  `$team->forceFill(['trial_ends_at' => now()->addDays(14)])->save();` (LocalSeeder's
+  user is already provisioned; this bites ChatQaSeeder and factory users).
 - **Shared local Redis across Herd apps**: another app's Horizon can consume this app's
   queue jobs (verified: 2026-06-11 — Journey ate Relaticle chat jobs). Use a dedicated
   `REDIS_DB` in `.env`; before queue-dependent testing, dispatch a sentinel job and

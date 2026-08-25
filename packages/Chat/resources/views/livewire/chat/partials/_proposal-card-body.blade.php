@@ -208,7 +208,21 @@
                     <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
                         <div class="py-3">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
+                                {{-- The item's record identity, in the same pill every other
+                                     card leads with; the summary text is the fallback for an
+                                     entity without a glyph or a quoted title. --}}
+                                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalItemLabel(item)">
+                                    <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
+                                        </svg>
+                                        <span class="chat-chip-label" x-text="proposalItemLabel(item)"></span>
+                                    </span>
+                                </template>
+
+                                <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalItemLabel(item)">
+                                    <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
+                                </template>
 
                                 {{-- Per-item resolved chip (Created / Skipped). --}}
                                 <template x-if="itemResult(action, itemIdx)">

@@ -11,6 +11,7 @@
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
     $discardLabel = $isPlan ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
+    $isDestructive = $operation === 'delete' && ! $isPlan;
 @endphp
 
 <div class="flex min-h-0 flex-col">
@@ -72,7 +73,10 @@
                 </p>
             @enderror
 
-            {{-- Footer: the decision. Separated by a hairline so it reads as one deliberate step. --}}
+            {{-- Footer: the decision. Separated by a hairline so it reads as one
+                 deliberate step. The confirm is monochrome, not brand-colored:
+                 approving is the routine end of every proposal, and only the
+                 genuinely destructive delete earns a color. --}}
             <div class="flex shrink-0 items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-2 dark:border-white/5 dark:bg-white/[0.02]">
                 <button
                     type="button"
@@ -81,7 +85,7 @@
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
+                        'inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white dark:disabled:hover:bg-white/5',
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
@@ -95,19 +99,22 @@
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
-                        'bg-red-600 hover:bg-red-500 focus-visible:outline-red-500' => $operation === 'delete' && ! $isPlan,
-                        'bg-primary-600 hover:bg-primary-500 focus-visible:outline-primary-500' => $operation !== 'delete' || $isPlan,
+                        'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 motion-safe:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
+                        'bg-red-600 text-white hover:bg-red-500 focus-visible:outline-red-500' => $isDestructive,
+                        'bg-gray-900 text-white hover:bg-gray-800 focus-visible:outline-primary-500 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100' => ! $isDestructive,
                         'opacity-50' => $editingFieldCode !== null,
                     ])
                 >
                     <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
-                    <x-heroicon-o-check class="h-3 w-3" wire:loading.remove wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
                     <kbd
                         x-data
                         x-text="/Mac|iP/.test(navigator.platform) ? '⌘⏎' : 'Ctrl+⏎'"
-                        class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
+                        @class([
+                            'hidden rounded px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline',
+                            'bg-white/20' => $isDestructive,
+                            'bg-white/15 dark:bg-gray-900/10' => ! $isDestructive,
+                        ])
                     ></kbd>
                 </button>
             </div>
