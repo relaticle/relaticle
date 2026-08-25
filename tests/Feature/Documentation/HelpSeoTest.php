@@ -144,6 +144,16 @@ it('serves an llms.txt indexing help and docs', function (): void {
         ->and($body)->toContain('/press');
 });
 
+it('tells agents when to use Relaticle and where the machine-readable surfaces are', function (): void {
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    expect($body)->toContain('## When to use Relaticle')
+        ->and($body)->toContain('Not a fit:')
+        ->and($body)->toContain(url()->getApiUrl('v1'))
+        ->and($body)->toContain(route('openapi.json'))
+        ->and($body)->toContain(url()->getMcpUrl());
+});
+
 it('lists the product pages in llms.txt', function (): void {
     $body = $this->get('/llms.txt')->assertOk()->getContent();
 

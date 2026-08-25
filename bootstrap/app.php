@@ -16,6 +16,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
@@ -24,6 +25,7 @@ use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
 use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -151,7 +153,41 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
-        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson());
+        $rendersJson = fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson();
+
+        $exceptions->shouldRenderJsonWhen($rendersJson);
+
+        // Agents fetching a dead URL get a markdown body that points at the
+        // indexes, so they can recover instead of guessing. Browsers send
+        // text/html and keep the regular error page.
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($rendersJson): ?Response {
+            $accept = (string) $request->header('Accept', '');
+            $wantsMarkdown = str_contains($accept, 'text/markdown') || ! str_contains($accept, 'text/html');
+
+            if ($rendersJson($request) || ! $wantsMarkdown) {
+                return null;
+            }
+
+            $indexes = array_filter([
+                __('Site index') => 'llms-txt',
+                __('Help centre') => 'help.index',
+                __('Developer docs') => 'documentation.index',
+                __('REST API spec') => 'openapi.json',
+            ], Route::has(...));
+
+            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => $request->url()]), ''];
+
+            foreach ($indexes as $label => $routeName) {
+                $lines[] = "- {$label}: ".route($routeName);
+            }
+
+            $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
+            $lines[] = '';
+
+            $body = implode("\n", $lines);
+
+            return response($body, 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
+        });
 
         // Stale tabs and deploy boundaries produce checksum failures that
         // Livewire already renders as 419 (page expired -> client refreshes).

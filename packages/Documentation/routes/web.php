@@ -6,6 +6,7 @@ use App\Http\Middleware\AddVaryAcceptHeader;
 use Illuminate\Support\Facades\Route;
 use Relaticle\Documentation\Http\Controllers\DocumentationController;
 use Relaticle\Documentation\Http\Controllers\HelpController;
+use Relaticle\Documentation\Http\Controllers\OpenApiSpecController;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->prefix('developers')->name('documentation.')->group(function (): void {
@@ -14,6 +15,8 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
 });
 
 Route::get('/llms.txt', [HelpController::class, 'llmsTxt'])->name('llms-txt');
+Route::get('/openapi.json', [OpenApiSpecController::class, 'json'])->name('openapi.json');
+Route::get('/openapi.yaml', [OpenApiSpecController::class, 'yaml'])->name('openapi.yaml');
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->prefix('help')->name('help.')->group(function (): void {
     Route::get('/', [HelpController::class, 'index'])->name('index');

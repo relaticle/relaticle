@@ -85,6 +85,35 @@ describe('rate limiting', function (): void {
     });
 });
 
+describe('rate limit headers', function (): void {
+    it('reports the limit and remaining budget on every authenticated response', function (): void {
+        $token = $this->user->createToken('test', ['*'])->plainTextToken;
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/companies')
+            ->assertOk();
+
+        expect((int) $response->headers->get('X-RateLimit-Limit'))->toBeGreaterThan(0)
+            ->and((int) $response->headers->get('X-RateLimit-Remaining'))->toBeLessThan((int) $response->headers->get('X-RateLimit-Limit'));
+    });
+
+    it('tells a throttled client how long to wait', function (): void {
+        RateLimiter::for('api', fn () => Limit::perMinute(1)->by($this->user->id));
+
+        $token = $this->user->createToken('test', ['*'])->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/v1/companies')->assertOk();
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/companies')
+            ->assertTooManyRequests()
+            ->assertJsonStructure(['message']);
+
+        expect((int) $response->headers->get('Retry-After'))->toBeGreaterThan(0)
+            ->and($response->headers->get('X-RateLimit-Remaining'))->toBe('0');
+    });
+});
+
 describe('real-token middleware chain', function (): void {
     it('authenticates and scopes via real bearer token through full middleware stack', function (): void {
         $companies = Company::factory()->recycle([$this->user, $this->team])->count(2)->create();
