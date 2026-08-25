@@ -51,7 +51,6 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
@@ -586,6 +585,7 @@ final class EmailInboxPage extends Page
                             ->schema([
                                 Radio::make('privacy_tier')
                                     ->hiddenLabel()
+                                    ->options(EmailPrivacyTier::class)
                                     ->view('email-integration::forms.sharing-tier-cards')
                                     ->viewData(['ariaLabel' => __('filament/pages/email-inbox.sharing.fields.privacy_tier.label')])
                                     ->required(),
@@ -609,8 +609,7 @@ final class EmailInboxPage extends Page
                                     // delete button on a line of its own. Naming the row
                                     // instead gives each entry a header that carries the
                                     // delete inline, and the two fields sit side by side.
-                                    ->itemLabel(fn (array $state): string => $this->teammateOptions()[$state['shared_with'] ?? null]
-                                        ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item'))
+                                    ->itemLabel(fn (array $state): string => $this->sharingRowLabel($state))
                                     ->columns(2)
                                     ->schema([
                                         Select::make('shared_with')
@@ -618,6 +617,7 @@ final class EmailInboxPage extends Page
                                             ->hiddenLabel()
                                             ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
                                             ->options(fn (): array => $this->teammateOptions())
+                                            ->multiple()
                                             ->searchable()
                                             ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                             ->required()
@@ -627,6 +627,7 @@ final class EmailInboxPage extends Page
                                             ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
                                             ->hiddenLabel()
                                             ->options(EmailPrivacyTier::class)
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                             ->required(),
                                     ]),
                             ]),
@@ -643,10 +644,12 @@ final class EmailInboxPage extends Page
                     'privacy_tier' => $email->privacy_tier->value,
                     'shares' => $email->shares()
                         ->get()
-                        ->map(fn (EmailShare $share): array => [
-                            'shared_with' => $share->shared_with,
-                            'tier' => $share->tier,
+                        ->groupBy('tier')
+                        ->map(fn (Collection $shares, string $tier): array => [
+                            'shared_with' => $shares->pluck('shared_with')->all(),
+                            'tier' => $tier,
                         ])
+                        ->values()
                         ->all(),
                 ];
             })
@@ -661,7 +664,7 @@ final class EmailInboxPage extends Page
                     $data['privacy_tier'] instanceof EmailPrivacyTier
                         ? $data['privacy_tier']
                         : EmailPrivacyTier::from($data['privacy_tier']),
-                    $data['shares'] ?? [],
+                    $this->flattenSharingRows($data['shares'] ?? []),
                 );
 
                 Notification::make()
@@ -669,6 +672,59 @@ final class EmailInboxPage extends Page
                     ->title(__('filament/pages/email-inbox.sharing.notifications.saved.title'))
                     ->send();
             });
+    }
+
+    /**
+     * @param  array{
+     *     shared_with?: array<int, string|int>|string|int|null,
+     *     tier?: string|null,
+     * }  $state
+     */
+    private function sharingRowLabel(array $state): string
+    {
+        $sharedWith = $state['shared_with'] ?? [];
+        $teammateIds = is_array($sharedWith) ? $sharedWith : [$sharedWith];
+
+        $names = collect($teammateIds)
+            ->map(fn (string|int|null $teammateId): ?string => $this->teammateOptions()[(string) $teammateId] ?? null)
+            ->filter()
+            ->values();
+
+        if ($names->isEmpty()) {
+            return __('filament/pages/email-inbox.sharing.fields.shares.new_item');
+        }
+
+        return $names->join(', ');
+    }
+
+    /**
+     * @param  array<int, array{
+     *     shared_with?: array<int, string|int>|string|int|null,
+     *     tier?: string|EmailPrivacyTier|null,
+     * }>  $shares
+     * @return array<int, array{shared_with: string|int, tier: string|EmailPrivacyTier}>
+     */
+    private function flattenSharingRows(array $shares): array
+    {
+        return collect($shares)
+            ->flatMap(function (array $share): array {
+                if (! isset($share['tier'])) {
+                    return [];
+                }
+
+                $sharedWith = $share['shared_with'] ?? [];
+                $teammateIds = is_array($sharedWith) ? $sharedWith : [$sharedWith];
+
+                return collect($teammateIds)
+                    ->filter()
+                    ->map(fn (string|int $teammateId): array => [
+                        'shared_with' => $teammateId,
+                        'tier' => $share['tier'],
+                    ])
+                    ->all();
+            })
+            ->values()
+            ->all();
     }
 
     private function resolveTeamEmail(?string $emailId, string $ability): ?Email

@@ -362,6 +362,7 @@ abstract class BaseRecordEmailsPage extends Page
                                             ->label(__('filament/pages/record-emails.fields.tier.label'))
                                             ->hiddenLabel()
                                             ->options(EmailPrivacyTier::class)
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                             ->required(),
                                     ]),
                             ]),

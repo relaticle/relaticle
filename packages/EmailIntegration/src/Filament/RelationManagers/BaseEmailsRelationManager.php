@@ -95,12 +95,14 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                             ->pluck('name', 'id')
                                             ->all();
                                     })
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->required()
                                     ->distinct(),
 
                                 Select::make('tier')
                                     ->label(__('filament/relation-managers/emails.fields.tier.label'))
                                     ->options(EmailPrivacyTier::class)
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->required(),
                             ]),
                     ])
@@ -247,6 +249,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                     Select::make('tier')
                                         ->label(__('filament/relation-managers/emails.fields.tier.label'))
                                         ->options(EmailPrivacyTier::class)
+                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                         ->required(),
                                 ]),
                         ])
