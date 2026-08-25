@@ -404,25 +404,41 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // OpenAI Apps SDK boundary this codebase already follows for `data` versus
     // `display_block` intact one level deeper: the tool result stays exactly
     // what the model saw, and "did the user click show-more" is purely a
-    // rendering fact. It is never persisted (excluded from the conversation
-    // cache's snapshotMessages(), which clones `messages`, not this) and never
-    // reaches the server, so a reload always starts every block collapsed.
+    // rendering fact. Never reaches the server. `expandedBlocks` itself is
+    // excluded from the conversation cache's snapshotMessages() (which clones
+    // `messages`, not this), so switching conversations forgets it too - only
+    // the KEYS below ever survive inside `messages`, and only because they are
+    // plain data already present there for other reasons (see blockKey).
     expandedBlocks: {},
 
-    // A block carries no id of its own, so one is minted the first time it is
-    // actually toggled (never on a plain read, to keep every other accessor
-    // below a pure function with no side effect). Mirrors ensureClientKey()'s
-    // approach for messages: a client-only tag the server never sees.
-    toggleBlockExpanded(block) {
-        if (!block) return;
-        if (!block.__uiKey) {
-            block.__uiKey = 'blk-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random()));
-        }
-        this.expandedBlocks[block.__uiKey] = !this.expandedBlocks[block.__uiKey];
+    // Identity for a records_table block, deliberately NOT read off the block
+    // object: reconcileLatestAssistant() (stream.js) replaces
+    // `assistantMsg.display_blocks` wholesale with a brand-new array of
+    // brand-new objects on every stream-end and on the lost-stream watchdog,
+    // so anything minted onto the old `block` is gone the moment that runs -
+    // silently collapsing an expanded table and orphaning its expandedBlocks
+    // entry. Composed instead from two things that are already stable:
+    //  - msg.clientKey: minted once by ensureClientKey() and never reassigned,
+    //    by its own contract survives reconciliation;
+    //  - block.tool_call_order: stamped by DisplayBlocks::collect() on every
+    //    path that ever produces this block (initial load AND reconcile), so
+    //    a re-fetched block for the SAME tool call always carries the SAME
+    //    order number, even though it is a different object instance.
+    // Two blocks in one message get distinct keys because tool_call_order is
+    // per tool call. Sanitized so it can double as a DOM id (aria-controls
+    // target for the toggle button below).
+    blockKey(msg, block) {
+        const raw = `${msg?.clientKey ?? 'msg'}-${block?.tool_call_order ?? 'blk'}`;
+        return 'rt-' + raw.replace(/[^a-zA-Z0-9_-]/g, '-');
     },
 
-    blockIsExpanded(block) {
-        return !!(block?.__uiKey && this.expandedBlocks[block.__uiKey]);
+    toggleBlockExpanded(msg, block) {
+        const key = this.blockKey(msg, block);
+        this.expandedBlocks[key] = !this.expandedBlocks[key];
+    },
+
+    blockIsExpanded(msg, block) {
+        return !!this.expandedBlocks[this.blockKey(msg, block)];
     },
 
     blockCanExpand(block) {
@@ -432,13 +448,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // The rows the table actually paints: every row once expanded, otherwise
     // the first RECORDS_TABLE_COLLAPSE_ROWS of the page `block.rows` already
     // holds in full (see BaseReadListTool, which stopped slicing server-side).
-    blockVisibleRows(block) {
+    blockVisibleRows(msg, block) {
         const rows = block?.rows || [];
-        return this.blockIsExpanded(block) ? rows : rows.slice(0, RECORDS_TABLE_COLLAPSE_ROWS);
+        return this.blockIsExpanded(msg, block) ? rows : rows.slice(0, RECORDS_TABLE_COLLAPSE_ROWS);
     },
 
-    blockToggleLabel(block) {
-        return this.blockIsExpanded(block)
+    blockToggleLabel(msg, block) {
+        return this.blockIsExpanded(msg, block)
             ? blockShowFewerText
             : blockShowAllTemplate.replace(':count', String((block?.rows || []).length));
     },
@@ -447,7 +463,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // tool's OWN pagination says a further page exists (see
     // BaseReadListTool::openUrlFor / RecordReferenceResolver::indexUrlFor).
     // Distinct from the row toggle above: expanding to see every row already
-    // on this page never reveals a row that lives on page 2.
+    // on this page never reveals a row that lives on page 2. No expansion
+    // state involved, so this stays keyed on `block` alone.
     blockOpenUrl(block) {
         return block?.open_url ?? null;
     },
@@ -458,8 +475,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             .replace(':title', this.blockTitle(block));
     },
 
-    blockFooter(block) {
-        const showing = this.blockVisibleRows(block).length;
+    blockFooter(msg, block) {
+        const showing = this.blockVisibleRows(msg, block).length;
         const from = Number(block?.from ?? 0);
 
         // On any page past the first the rows are a window into the middle of the
@@ -476,8 +493,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // Counts VISIBLE rows, not the full page: while collapsed this is what
     // keeps "Showing 10 of 25" honest instead of silently claiming credit for
     // rows 11-25, which are in the DOM's data but not yet painted.
-    blockHasMore(block) {
-        return (block?.total ?? 0) > this.blockVisibleRows(block).length;
+    blockHasMore(msg, block) {
+        return (block?.total ?? 0) > this.blockVisibleRows(msg, block).length;
     },
 
     // Sticky date pill: a floating element (see chat-interface.blade.php)

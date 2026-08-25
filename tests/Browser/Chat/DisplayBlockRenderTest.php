@@ -435,6 +435,8 @@ it('collapses a table past ten rows and reveals the rest when the toggle is clic
         (() => {
             const table = document.querySelector('[data-block="records_table"]');
             const toggle = table.querySelector('[data-block-toggle]');
+            const scrollRegion = table.querySelector('[role="region"]');
+            const openLink = table.querySelector('[data-block-open-link]');
 
             return JSON.stringify({
                 rowCount: table.querySelectorAll('tbody tr').length,
@@ -442,6 +444,17 @@ it('collapses a table past ten rows and reveals the rest when the toggle is clic
                 toggleExpanded: toggle?.getAttribute('aria-expanded') ?? null,
                 toggleIsButton: toggle?.tagName ?? null,
                 footerShows10Of42: table.textContent.includes('Showing 10 of 42'),
+                // Finding 2: the header strip must carry ONLY the title and the
+                // count now, never the open-list link (that moved to the bottom
+                // bar), so the title never has to fight it for room.
+                openLinkInHeader: !!table.querySelector('.border-b [data-block-open-link]'),
+                // Finding 3: the scroll region is its own aria-live="off" island
+                // (rows expand/collapse silently), the toggle's aria-controls
+                // points at that exact same element, and the id is derived from
+                // the deterministic blockKey(msg, block), not a minted UUID.
+                scrollRegionAriaLive: scrollRegion?.getAttribute('aria-live') ?? null,
+                scrollRegionId: scrollRegion?.id ?? null,
+                toggleControlsScrollRegion: toggle?.getAttribute('aria-controls') === scrollRegion?.id,
             });
         })();
     JS), true, 512, JSON_THROW_ON_ERROR);
@@ -450,7 +463,11 @@ it('collapses a table past ten rows and reveals the rest when the toggle is clic
         ->and($collapsed['toggleLabel'])->toBe('Show all 25 rows')
         ->and($collapsed['toggleExpanded'])->toBe('false')
         ->and($collapsed['toggleIsButton'])->toBe('BUTTON')
-        ->and($collapsed['footerShows10Of42'])->toBeTrue();
+        ->and($collapsed['footerShows10Of42'])->toBeTrue()
+        ->and($collapsed['openLinkInHeader'])->toBeFalse()
+        ->and($collapsed['scrollRegionAriaLive'])->toBe('off')
+        ->and($collapsed['scrollRegionId'])->not->toBeNull()
+        ->and($collapsed['toggleControlsScrollRegion'])->toBeTrue();
 
     $page->click('[data-block="records_table"] [data-block-toggle]');
 
@@ -536,4 +553,126 @@ it('renders the open_url link to the entity list page when the tool has more pag
         ->and($shape['label'])->toBe('Open all 42 in Companies')
         ->and($shape['navigating'])->toBeFalse()
         ->and($shape['hasToggle'])->toBeFalse();
+});
+
+it('expands two records_table blocks in one message independently', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    // Both blocks come from the SAME message, so blockKey(msg, block) can only
+    // tell them apart via block.tool_call_order (DisplayBlocks::collect() stamps
+    // it per tool call: 1 for the first ListCompaniesTool call, 2 for the
+    // second). If the key ever collapsed back to something message-only,
+    // expanding one would expand both.
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are two tables.', [
+        displayBlockLongTableFixture(25, 25),
+        displayBlockLongTableFixture(15, 15),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Here are two tables.');
+
+    $page->assertCount('[data-block="records_table"]', 2);
+
+    // Expand only the FIRST table.
+    $page->script(<<<'JS'
+        (() => {
+            document.querySelectorAll('[data-block="records_table"] [data-block-toggle]')[0].click();
+            return true;
+        })();
+    JS);
+
+    $shape = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const tables = Array.from(document.querySelectorAll('[data-block="records_table"]'));
+
+            return JSON.stringify(tables.map((table) => {
+                const scrollRegion = table.querySelector('[role="region"]');
+                return {
+                    rowCount: table.querySelectorAll('tbody tr').length,
+                    toggleLabel: table.querySelector('[data-block-toggle]')?.textContent.trim() ?? null,
+                    scrollRegionId: scrollRegion?.id ?? null,
+                };
+            }));
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($shape[0]['rowCount'])->toBe(25)
+        ->and($shape[0]['toggleLabel'])->toBe('Show fewer')
+        ->and($shape[1]['rowCount'])->toBe(10)
+        ->and($shape[1]['toggleLabel'])->toBe('Show all 15 rows')
+        // Two blocks, two distinct scroll-region ids: the aria-controls wiring
+        // (finding 3) can only target the RIGHT table when these differ.
+        ->and($shape[0]['scrollRegionId'])->not->toBe($shape[1]['scrollRegionId']);
+});
+
+it('keeps a table expanded across a second stream-end reconcile that replaces the block object', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
+        displayBlockLongTableFixture(25, 25),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Here are your companies.');
+
+    $page->click('[data-block="records_table"] [data-block-toggle]');
+
+    $afterExpand = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+            return JSON.stringify({ rowCount: table.querySelectorAll('tbody tr').length });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($afterExpand['rowCount'])->toBe(25);
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    // handleStreamEnd() is a real entry point (also fired by the lost-stream
+    // watchdog) that calls reconcileLatestAssistant() internally; calling that
+    // function bare here would also flip `rendered` false (the DB content is
+    // raw text, the already-hydrated bubble's is markdown-rendered HTML, so
+    // reconcileLatestAssistant's own content-diff branch fires) without ever
+    // flipping it back, since in production ONLY the caller does that. Going
+    // through handleStreamEnd exercises the exact real sequence: no active
+    // invocation_id matches this history-loaded message, so it falls back to
+    // lastAssistantBubble(), which resolves to our already-rendered,
+    // already-expanded bubble. reconcileLatestAssistant then replaces
+    // assistantMsg.display_blocks WHOLESALE with a brand-new array of
+    // brand-new block objects fetched fresh from $wire.latestAssistantMessage()
+    // (stream.js:443-444) - the exact mutation the lost-stream watchdog and a
+    // duplicate stream_end both perform on one turn.
+    $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            await data.handleStreamEnd({ invocation_id: null });
+
+            return true;
+        })();
+    JS);
+
+    $afterReconcile = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const table = document.querySelector('[data-block="records_table"]');
+            const toggle = table.querySelector('[data-block-toggle]');
+
+            return JSON.stringify({
+                rowCount: table.querySelectorAll('tbody tr').length,
+                toggleLabel: toggle?.textContent.trim() ?? null,
+                toggleExpanded: toggle?.getAttribute('aria-expanded') ?? null,
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    // Before finding 1's fix this reconcile silently re-collapsed the table:
+    // the fresh block object from the server carried no __uiKey, so
+    // blockIsExpanded() looked up nothing and fell back to false.
+    expect($afterReconcile['rowCount'])->toBe(25)
+        ->and($afterReconcile['toggleLabel'])->toBe('Show fewer')
+        ->and($afterReconcile['toggleExpanded'])->toBe('true');
 });
