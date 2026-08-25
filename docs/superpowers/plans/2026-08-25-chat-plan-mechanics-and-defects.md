@@ -747,6 +747,28 @@ The prompt restructure from spec sections 4 and 7 (registry-generated block map,
 
 Recommend writing that plan once Tasks 1 to 8 have landed and the browser walk is green.
 
+## Correction: Task 5's defect never existed
+
+Task 5 was written from the production audit, which read a `System-defined custom fields cannot be
+modified.` tool error on 2026-08-25 as the assistant proposing a doomed write. It was not.
+
+The guard at `UpdateCustomFieldTool.php:107-109` sits inside the per-record loop and returns before
+`createProposal()` at line 158, so no proposal is ever stored, for any record in the batch. It was
+introduced in `5c67199d0` (PR #367) and survived the batch refactor in `e135b618e` (PR #506).
+
+The production transcript confirms correct behaviour end to end:
+  10:49:16 assistant offers to reactivate the deactivated Priority field
+  10:49:32 the tool refuses, and the assistant escorts the user to Custom Fields settings with a
+           working deep link in the same turn
+That is the No Dead Ends contract working as designed.
+
+Task 5 therefore shipped regression tests only (`f758b1202`), with no production change.
+
+**Lesson for the remaining tasks and for the audit method.** A production transcript tells you what
+happened, not whether it was wrong. Two of the six "defects" in this plan turned out to be intended,
+tested behaviour: both `$ref` guards and this one. Verify against the code before calling a
+transcript observation a defect.
+
 ## Findings raised during execution, not in scope, awaiting a decision
 
 Both surfaced in the Task 1 review. Neither is fixed. They need the user's call before becoming tasks.
