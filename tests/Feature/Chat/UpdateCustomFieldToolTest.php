@@ -134,7 +134,30 @@ it('returns error when trying to update a system_defined field', function (): vo
     $decoded = json_decode($result, true);
 
     expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('System-defined')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses to propose reactivating a system-defined field', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    $priorityField = CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Priority',
+        'type' => 'select',
+        'system_defined' => true,
+        'active' => false,
+    ]);
+
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request(['records' => [[
+        'entity_type' => 'task',
+        'code' => $priorityField->code,
+        'active' => true,
+    ]]]));
+
+    expect($result)->toContain('System-defined')
+        ->and(PendingAction::query()->where('entity_type', 'custom_field')->count())->toBe(0);
 });
 
 it('rejects renaming to a name that already exists on the entity at proposal time', function (): void {
