@@ -170,3 +170,24 @@ it('does not leak one workspace\'s step state onto another', function (): void {
         ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === ActivationStep::FirstRecord)
         ->complete())->toBeTrue();
 });
+
+/**
+ * Registration order is display order, and it is ordered by measured value:
+ * a day-0 record and a day-0 chat each predict roughly a 2.5x return rate,
+ * while import reaches 0.5% of workspaces and invite 0.3%. Pinning the order
+ * here means a future edit that drops import or invite back to the top has to
+ * argue with the data rather than slip through as a diff nobody re-measures.
+ */
+it('orders the steps by measured value, not by build order', function (): void {
+    $keys = $this->team->onboarding()->steps()
+        ->map(fn (OnboardingStep $step): string => $step->attribute('key')->value)
+        ->values()
+        ->all();
+
+    expect($keys)->toBe([
+        ActivationStep::FirstRecord->value,
+        ActivationStep::AskRela->value,
+        ActivationStep::Import->value,
+        ActivationStep::Invite->value,
+    ]);
+});

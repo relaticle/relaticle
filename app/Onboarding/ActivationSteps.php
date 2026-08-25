@@ -22,6 +22,16 @@ use Spatie\Onboard\OnboardingSteps;
  * the Onboard facade: AppServiceProvider rebinds OnboardingSteps as a
  * non-singleton, so every resolve builds a fresh registry (see the binding
  * for why that is load-bearing) and each build must re-register these steps.
+ *
+ * Registration order IS display order, and it is ordered by what production
+ * data says the step is worth, not by how the feature was built. Measured on
+ * the analytics clone (2026-08-23, teams at least 8 days old, n=3587, "returned"
+ * excluding a later import so importing twice cannot count as returning):
+ * a day-0 record predicts a 10.0% return against a 4.0% base, day-0 chat 11.0%,
+ * while import reaches 0.5% of workspaces and invite 0.3%. Import and invite
+ * stay because they are true facts about the workspace and the welcome job
+ * reads the same registry, but they sit last: a checklist that opens on two
+ * rows almost nobody completes reads as unachievable.
  */
 final readonly class ActivationSteps
 {
@@ -35,6 +45,15 @@ final readonly class ActivationSteps
                 'icon' => 'heroicon-o-user-plus',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasOwnRecord($model));
+
+        $steps->addStep(ActivationStep::AskRela->value, Team::class)
+            ->attributes([
+                'key' => ActivationStep::AskRela,
+                'label_key' => 'filament/pages/dashboard.activation.steps.ask_rela.label',
+                'description_key' => 'filament/pages/dashboard.activation.steps.ask_rela.description',
+                'icon' => 'heroicon-o-sparkles',
+            ])
+            ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasUserChatMessage($model));
 
         $steps->addStep(ActivationStep::Import->value, Team::class)
             ->attributes([
@@ -53,14 +72,5 @@ final readonly class ActivationSteps
                 'icon' => 'heroicon-o-user-group',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasTeammate($model));
-
-        $steps->addStep(ActivationStep::AskRela->value, Team::class)
-            ->attributes([
-                'key' => ActivationStep::AskRela,
-                'label_key' => 'filament/pages/dashboard.activation.steps.ask_rela.label',
-                'description_key' => 'filament/pages/dashboard.activation.steps.ask_rela.description',
-                'icon' => 'heroicon-o-sparkles',
-            ])
-            ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasUserChatMessage($model));
     }
 }
