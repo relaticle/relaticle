@@ -117,3 +117,20 @@ from `result_data.items` instead:
 Without the second one the assistant reads "approved" plus the proposal's full
 record list and tells the user every record was created, including the ones they
 declined. Both are asserted (`ProposalCardComponentTest`, `BatchResolvedActionsTest`).
+
+## The table's paint budget is client-only: the model can never state a row count
+`BaseReadListTool` stopped slicing server-side, so `display_block.rows` carries the
+WHOLE page the model read. The trim moved to `RECORDS_TABLE_COLLAPSE_ROWS` in
+`transcript.js`, which paints the first 10 until the user clicks "Show all N rows".
+That constant is never sent to the model and has no payload field, so the only
+numbers the model can state truthfully are `total` and `has_more`; ANY row count it
+writes is unverifiable and routinely wrong (a 25-row page paints 10).
+CrmAssistant rule 10 therefore bans row counts outright. The ban leaked once because
+it did not cover the case where the USER names the number first: "show me 25
+companies" produced "here are the first 25 of your 56" above a table reading
+"Showing 10 of 56". Rule 10 now spells that case out and gives the sentence to write
+instead ("the first page of 56"), asserted in `CrmAssistantInstructionsTest`.
+Two consequences for future work: never add a prompt rule that asks the model to
+state how many rows the user can see, and if a payload field is ever wanted for it,
+it must be the SERVER telling the model the paint budget, not the model guessing.
+Prompt constraints are probabilistic: this narrows the tail, it does not close it.
