@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
+use App\Enums\ActivationStep;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Task;
@@ -26,7 +27,12 @@ use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
 use Relaticle\Chat\Services\MyTasksService;
 use Relaticle\Chat\Support\MarkdownRenderer;
+use Spatie\Onboard\OnboardingStep;
 
+/**
+ * @property-read array{conversation_id: string, html: string}|null $welcome
+ * @property-read array{label: string, prompt: string}|null $nextAction
+ */
 final class Dashboard extends Page
 {
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-home';
@@ -129,6 +135,46 @@ final class Dashboard extends Page
             'conversation_id' => (string) $message->conversation_id,
             'html' => (new MarkdownRenderer)->render((string) $message->content),
         ];
+    }
+
+    /**
+     * The single next action offered under Rela's welcome: the highest-priority
+     * unfinished activation step. AskRela is excluded because pressing the
+     * button completes it.
+     *
+     * @return array{label: string, prompt: string}|null
+     */
+    #[Computed]
+    public function nextAction(): ?array
+    {
+        if ($this->welcome === null) {
+            return null;
+        }
+
+        $team = Filament::getTenant();
+
+        if (! $team instanceof Team) {
+            return null;
+        }
+
+        $steps = $team->onboarding()->steps();
+
+        foreach ([ActivationStep::FirstRecord, ActivationStep::Import, ActivationStep::Invite] as $candidate) {
+            $step = $steps->first(function (OnboardingStep $step) use ($candidate): bool {
+                $key = $step->attribute('key');
+
+                return ($key instanceof ActivationStep ? $key : ActivationStep::from((string) $key)) === $candidate;
+            });
+
+            if ($step instanceof OnboardingStep && $step->incomplete()) {
+                return [
+                    'label' => __("filament/pages/dashboard.activation.next_action.{$candidate->value}.label"),
+                    'prompt' => __("filament/pages/dashboard.activation.next_action.{$candidate->value}.prompt"),
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**

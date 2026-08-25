@@ -19,6 +19,22 @@
             <div class="{{ \Relaticle\Chat\Support\ChatProse::MESSAGE }} mt-3 text-left">
                 {!! $this->welcome['html'] !!}
             </div>
+
+            @if ($this->nextAction)
+                <div class="mt-4 flex justify-center">
+                    {{-- @js() is a no-op inside a Blade component tag's attribute value:
+                         ComponentTagCompiler only expands {{ }}/{!! !!} echoes there, not
+                         @directives, so the raw echo does the same job @js() does elsewhere. --}}
+                    <x-filament::button
+                        size="sm"
+                        icon="heroicon-o-arrow-right"
+                        icon-position="after"
+                        x-on:click="sendPrompt({!! \Illuminate\Support\Js::from($this->nextAction['prompt'])->toHtml() !!})"
+                    >
+                        {{ $this->nextAction['label'] }}
+                    </x-filament::button>
+                </div>
+            @endif
         @else
             <div class="text-center">
                 <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
@@ -137,6 +153,18 @@
                 // a full reload here repainted the whole Filament shell on
                 // every first message.
                 window.Alpine?.navigate ? window.Alpine.navigate(chatUrl) : (window.location.href = chatUrl);
+            },
+
+            // The single first-run action. Deliberately not the canned starter
+            // strip PR #526 removed: one step, only while the welcome shows, and
+            // it goes through submit() so the write still runs the normal tool
+            // loop in the welcome conversation.
+            sendPrompt(text) {
+                const editor = this.localEditor();
+                if (!editor || this.submitting) return;
+
+                editor.setText(text);
+                this.$nextTick(() => this.submit());
             },
         }));
     </script>

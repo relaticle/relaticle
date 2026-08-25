@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\ActivationStep;
+use App\Enums\CreationSource;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
+use App\Models\Company;
 use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Js;
@@ -15,6 +19,17 @@ use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 
 mutates(Dashboard::class);
+
+// The next-action button's prompt is unique to it: the checklist and the
+// button both surface a "label" for the same step, and their copy happens
+// to read identically ("Add your first contact"), so asserting on the label
+// text alone would pass whether or not the button rendered. Asserting on the
+// JSON-encoded prompt embedded in its click handler instead pins the check
+// to the button.
+function nextActionPrompt(ActivationStep $step): string
+{
+    return Js::from(__("filament/pages/dashboard.activation.next_action.{$step->value}.prompt"))->toHtml();
+}
 
 it('shows good morning for a Tokyo user at 6am local time', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-04-19 21:00:00', new DateTimeZone('UTC'))); // 06:00 JST next day
@@ -142,4 +157,36 @@ it('points the first-run composer at the welcome conversation', function (): voi
 
     Livewire::test(Dashboard::class)
         ->assertSee($welcomeConversationUrl, escape: false);
+});
+
+it('offers the first unfinished step as the next action', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($owner);
+    Filament::setTenant($owner->currentTeam);
+
+    Livewire::test(Dashboard::class)
+        ->assertSee(nextActionPrompt(ActivationStep::FirstRecord), escape: false);
+});
+
+it('moves to the next step once the first one is done', function (): void {
+    Feature::define(OnboardSeed::class, true);
+
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+    Company::factory()->for($team)->create(['creation_source' => CreationSource::WEB]);
+
+    // The welcome job runs synchronously under QUEUE_CONNECTION=sync and
+    // already primed WorkspaceActivationFacts' per-team cache while seeding.
+    // Bust it, mirroring the same hazard in ActivationChecklistTest, or the
+    // record just created above is invisible to hasOwnRecord().
+    resolve(WorkspaceActivationFacts::class)->forget($team);
+
+    $this->actingAs($owner);
+    Filament::setTenant($team);
+
+    Livewire::test(Dashboard::class)
+        ->assertSee(nextActionPrompt(ActivationStep::Import), escape: false)
+        ->assertDontSee(nextActionPrompt(ActivationStep::FirstRecord), escape: false);
 });
