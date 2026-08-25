@@ -37,9 +37,40 @@ final readonly class PlanReference
         return $target === '' ? null : $target;
     }
 
-    public static function to(string $pendingActionId): string
+    /**
+     * $index addresses one record inside a batched proposal: an id alone is
+     * ambiguous once a create tool call proposed several records at once.
+     */
+    public static function to(string $pendingActionId, ?int $index = null): string
     {
-        return self::PREFIX.$pendingActionId;
+        return self::PREFIX.$pendingActionId.($index === null ? '' : '#'.$index);
+    }
+
+    /**
+     * The pending action id inside a target, with any `#<index>` suffix removed.
+     */
+    public static function actionId(string $target): string
+    {
+        $hash = strpos($target, '#');
+
+        return $hash === false ? $target : substr($target, 0, $hash);
+    }
+
+    /**
+     * The record index inside a batched proposal, or null when the target names
+     * a single-record proposal.
+     */
+    public static function index(string $target): ?int
+    {
+        $hash = strpos($target, '#');
+
+        if ($hash === false) {
+            return null;
+        }
+
+        $index = substr($target, $hash + 1);
+
+        return ctype_digit($index) ? (int) $index : null;
     }
 
     /**

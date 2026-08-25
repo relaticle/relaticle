@@ -48,7 +48,7 @@ final readonly class PlanReferenceValidator
         }
 
         $referenced = PendingAction::query()
-            ->whereKey($target)
+            ->whereKey(PlanReference::actionId($target))
             ->where('team_id', $user->currentTeam->getKey())
             ->where('user_id', $user->getKey())
             ->where('conversation_id', $conversationId)
@@ -67,8 +67,23 @@ final readonly class PlanReferenceValidator
             return "Step reference `{$value}` points at a proposal that is already {$referenced->status->value}. Use the record's real id instead.";
         }
 
-        if (ProposalPayload::from($referenced)->isBatch) {
-            return "Step reference `{$value}` points at a multi-record proposal, so it is ambiguous. Propose that record in its own tool call to reference it.";
+        $index = PlanReference::index($target);
+        $payload = ProposalPayload::from($referenced);
+
+        if ($payload->isBatch && $index === null) {
+            return "Step reference `{$value}` points at a multi-record proposal, so it is ambiguous. Add the record's index, for example `{$value}#0`, or propose that record in its own tool call.";
+        }
+
+        if ($index !== null) {
+            if (! $payload->isBatch) {
+                return "Step reference `{$value}` has an index but points at a single-record proposal. Drop the index.";
+            }
+
+            $count = $payload->count();
+
+            if ($index < 0 || $index >= $count) {
+                return "Step reference `{$value}` is out of range: that proposal only has {$count} records.";
+            }
         }
 
         $referencedModel = Relation::getMorphedModel($referenced->entity_type);
