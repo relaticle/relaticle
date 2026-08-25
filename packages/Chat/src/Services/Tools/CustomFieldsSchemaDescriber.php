@@ -10,6 +10,7 @@ use Relaticle\Chat\Support\PromptText;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 
 final readonly class CustomFieldsSchemaDescriber
 {
@@ -21,9 +22,10 @@ final readonly class CustomFieldsSchemaDescriber
     public function describe(Team $team, string $entityType): string
     {
         $fields = CustomField::query()
+            ->withoutGlobalScope(CustomFieldsActivableScope::class)
             ->where('tenant_id', $team->getKey())
             ->where('entity_type', $entityType)
-            ->active()
+            ->orderByDesc('active')
             ->orderBy('code')
             ->with(['options:id,custom_field_id,name'])
             ->get();
@@ -38,7 +40,13 @@ final readonly class CustomFieldsSchemaDescriber
         ];
 
         foreach ($fields as $field) {
-            $lines[] = '- '.$this->describeField($field);
+            $line = '- '.$this->describeField($field);
+
+            if (! $field->active) {
+                $line .= ' (inactive, not settable: the workspace owner can reactivate it in custom field settings)';
+            }
+
+            $lines[] = $line;
         }
 
         $lines[] = '';

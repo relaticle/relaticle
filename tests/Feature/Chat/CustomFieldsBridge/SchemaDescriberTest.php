@@ -53,3 +53,20 @@ it('returns an empty marker when the entity has no custom fields for the tenant'
 
     expect($description)->toBe('No custom fields are defined for this entity type.');
 });
+
+it('lists a deactivated field and marks it not settable', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    CustomField::query()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->update(['active' => false]);
+
+    $description = resolve(CustomFieldsSchemaDescriber::class)
+        ->describe($user->currentTeam, 'task');
+
+    expect($description)
+        ->toContain('priority')
+        ->toContain('inactive, not settable');
+});
