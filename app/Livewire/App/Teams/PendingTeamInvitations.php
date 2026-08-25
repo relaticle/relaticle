@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 
 /**
@@ -41,6 +42,7 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
 {
     use Tables\Concerns\InteractsWithTable;
 
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void

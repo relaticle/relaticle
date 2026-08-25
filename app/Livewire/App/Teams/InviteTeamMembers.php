@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Attributes\Locked;
 
 /**
  * The invite form that opens the members page. It is an inline section rather
@@ -51,6 +52,7 @@ final class InviteTeamMembers extends BaseLivewireComponent
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void

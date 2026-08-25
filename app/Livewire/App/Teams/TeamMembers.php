@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Attributes\Locked;
 
 /**
  * The workspace's people directory. Inviting lives in InviteTeamMembers and
@@ -36,6 +37,12 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 {
     use Tables\Concerns\InteractsWithTable;
 
+    // table() filters memberships on $this->team->id alone and never consults
+    // Filament::getTenant(), and Membership carries no global scope, so this
+    // property is the only thing keeping the roster inside one workspace.
+    // Livewire's model synth already refuses a client-swapped key; #[Locked] says
+    // so out loud and keeps holding if this ever becomes a plain string id.
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void
