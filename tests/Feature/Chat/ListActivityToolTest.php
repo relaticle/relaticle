@@ -321,6 +321,57 @@ it('reports the true entry count when the window holds more than one fetch', fun
         ->and($payload['display_block'])->not->toHaveKey('open_url');
 });
 
+it('reports has_more from merged entry counts, not the fetched row count', function (): void {
+    $user = $this->user;
+
+    // Created well outside the default 7-day window so these 30 `created`
+    // entries never enter this test's window at all; only what happens next
+    // does.
+    $this->travelTo(now()->subDays(20));
+
+    $companies = [];
+
+    for ($i = 0; $i < 30; $i++) {
+        $companies[] = app(CreateCompany::class)->execute($user, ['name' => "Co {$i}"]);
+    }
+
+    $this->travelBack();
+
+    app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Lead source',
+        'code' => 'lead_source',
+        'type' => 'text',
+    ]);
+
+    nextActivityRequest();
+
+    // One job touching 30 records, each save writing a native-column row and a
+    // custom-field row that collapse into one entry per company -- the shape a
+    // real bulk update produces, unlike the single-row-per-entry shape the
+    // over-fetch test above uses.
+    foreach ($companies as $i => $company) {
+        app(UpdateCompany::class)->execute($user, $company, [
+            'name' => "Co {$i} Updated",
+            'custom_fields' => ['lead_source' => 'Referral'],
+        ]);
+    }
+
+    $payload = activityPayload();
+
+    // 60 rows (2 per save) collapse to 30 entries; the SQL fetch is capped at
+    // ENTRY_LIMIT (50) ROWS, so only the most recent 25 saves' rows (50 rows)
+    // survive the fetch and merge down to 25 entries here. `showing` therefore
+    // sits well under ENTRY_LIMIT even though more entries exist beyond it --
+    // exactly the case `count($entries) >= self::ENTRY_LIMIT` gets wrong: that
+    // expression reads 25 < 50 and reports no more entries exist, when 5 more
+    // saves' worth of entries were dropped by the row-level fetch limit.
+    expect($payload['data'])->toHaveCount(25)
+        ->and($payload['showing'])->toBe(25)
+        ->and($payload['total'])->toBe(30)
+        ->and($payload['has_more'])->toBeTrue();
+});
+
 it('ignores activity older than the requested window', function (): void {
     $user = $this->user;
 
