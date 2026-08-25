@@ -14,11 +14,16 @@ namespace Relaticle\Chat\Support;
 final readonly class ProposalCoreFields
 {
     /**
-     * The entity's primary title column: `title` for task/note, `name` otherwise.
+     * The entity's primary title column: `title` for task/note, `email` for an
+     * invitation (which has no name at all), `name` otherwise.
      */
     public static function titleKey(string $entityType): string
     {
-        return in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+        return match (true) {
+            in_array($entityType, ['task', 'note'], true) => 'title',
+            $entityType === 'team_invitations' => 'email',
+            default => 'name',
+        };
     }
 
     /**
@@ -32,6 +37,10 @@ final readonly class ProposalCoreFields
 
         if ($entityType === 'company') {
             return [$titleKey, 'account_owner_id'];
+        }
+
+        if ($entityType === 'team_invitations') {
+            return [$titleKey, 'role'];
         }
 
         return [$titleKey];

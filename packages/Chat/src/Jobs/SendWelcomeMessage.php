@@ -117,7 +117,7 @@ final class SendWelcomeMessage implements ShouldQueue
                     // The spec caps this post-generation: the same production data
                     // that motivated the feature shows long replies end conversations,
                     // and MaxTokens is a model-side hint, not a guarantee.
-                    return Str::limit(trim($message), self::MAX_LENGTH, preserveWords: true);
+                    return $this->sanitize($message);
                 }
             }
         } catch (Throwable) {
@@ -125,6 +125,18 @@ final class SendWelcomeMessage implements ShouldQueue
         }
 
         return __('chat-welcome.fallback', ['name' => $firstName]);
+    }
+
+    /**
+     * The prompt forbids em dashes, but a prompt rule is a request, not a
+     * guarantee, and the house style bans them outright. Enforce it here, and
+     * apply the spec's length cap, before anything reaches a customer.
+     */
+    private function sanitize(string $message): string
+    {
+        $clean = str_replace(["\u{2014}", "\u{2013}"], ', ', trim($message));
+
+        return Str::limit($clean, self::MAX_LENGTH, preserveWords: true);
     }
 
     /**

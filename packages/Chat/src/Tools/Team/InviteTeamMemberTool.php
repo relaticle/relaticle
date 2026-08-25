@@ -61,8 +61,19 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
         ];
     }
 
+    /**
+     * Inviting is owner-only (TeamPolicy::addTeamMember). InviteTeamMember enforces
+     * that again at approval, but through Gate::authorize(), whose
+     * AuthorizationException the proposal card does not catch: without this the
+     * Approve button would be a permanent no-op for anyone else. Refuse at
+     * proposal time instead, so the assistant can say why.
+     */
     protected function validateRecord(array $record, User $user): ?string
     {
+        if (! $user->ownsTeam($user->currentTeam)) {
+            return __('Only the workspace owner can invite teammates. I can take you to the Members page so you can ask them.');
+        }
+
         $email = (string) ($record['email'] ?? '');
 
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {

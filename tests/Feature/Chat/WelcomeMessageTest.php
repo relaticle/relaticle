@@ -123,3 +123,14 @@ it('greets a user whose name is blank without a dangling comma', function (): vo
     expect($content)->not->toContain('Hi ,')
         ->and($content)->toContain(__('chat-welcome.default_name'));
 });
+
+it('strips em dashes from a generated welcome', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Priya Raman']);
+
+    $job = new SendWelcomeMessage($owner->currentTeam);
+    $clean = (new ReflectionMethod($job, 'sanitize'))
+        ->invoke($job, "Hi Priya, welcome\u{2014}here is what is next.");
+
+    expect($clean)->not->toContain("\u{2014}")
+        ->and($clean)->toContain('welcome, here is what is next.');
+});

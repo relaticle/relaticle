@@ -725,7 +725,7 @@ final readonly class PendingActionService
      */
     private function recordLabel(array $data, array $display): ?string
     {
-        foreach (['name', 'title'] as $field) {
+        foreach (['name', 'title', 'email'] as $field) {
             if (is_string($data[$field] ?? null) && $data[$field] !== '') {
                 return $data[$field];
             }
@@ -734,7 +734,7 @@ final readonly class PendingActionService
         $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
 
         foreach ($fields as $row) {
-            if (! is_array($row) || ! in_array($row['label'] ?? null, ['Name', 'Title'], true)) {
+            if (! is_array($row) || ! in_array($row['label'] ?? null, ['Name', 'Title', 'Email'], true)) {
                 continue;
             }
 
@@ -958,7 +958,7 @@ final readonly class PendingActionService
         foreach (ProposalPayload::of($actionData, [])->items() as $item) {
             $record = $item['data'];
 
-            foreach (['name', 'title'] as $field) {
+            foreach (['name', 'title', 'email'] as $field) {
                 if (is_string($record[$field] ?? null) && $record[$field] !== '') {
                     $lower = mb_strtolower(trim($record[$field]));
                     $map[$lower] = trim($record[$field]);

@@ -7,13 +7,16 @@ use App\Enums\TeamRole;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
 
 mutates(InviteTeamMemberTool::class);
@@ -125,4 +128,80 @@ it('rejects a batch over the configured max batch size', function (): void {
 
     expect($decoded['error'])->toContain('Too many records')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('refuses to propose an invitation for a member who does not own the workspace', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+    $member->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($member);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
+    ]));
+
+    expect($result)->toContain('Only the workspace owner can invite teammates')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
+        ->and(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('does not render a name row on the invitation card', function (): void {
+    (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Admin->value]],
+    ]));
+
+    $display = pendingActionForTeam($this->user)->display_data;
+    $labels = array_column($display['fields'] ?? [], 'label');
+
+    expect($labels)->not->toContain('Name')
+        ->and($labels)->toContain('Email')
+        ->and(ProposalCoreFields::titleKey('team_invitations'))->toBe('email');
+});
+
+it('labels a resolved invitation by its email so the assistant can name it', function (): void {
+    Mail::fake();
+
+    (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Admin->value]],
+    ]));
+
+    $pending = pendingActionForTeam($this->user);
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'team_id' => $this->team->getKey(),
+        'participant_type' => $this->user->getMorphClass(),
+        'participant_id' => (string) $this->user->getKey(),
+        'title' => 'Invites',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $pending->forceFill(['conversation_id' => $conversationId])->save();
+
+    resolve(PendingActionService::class)->approve($pending->fresh(), $this->user);
+
+    // This is what the next turn re-injects so the assistant can say who it
+    // invited. Without the email fallback in recordLabel() it is null, and the
+    // transcript calls the invitation "the record".
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId);
+
+    expect($resolved[0]['label'] ?? null)->toBe('alex@example.com');
+});
+
+it('names the entity in plain words on a batch card', function (): void {
+    (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [
+            ['email' => 'one@example.com', 'role' => TeamRole::Editor->value],
+            ['email' => 'two@example.com', 'role' => TeamRole::Editor->value],
+        ],
+    ]));
+
+    $display = pendingActionForTeam($this->user)->display_data;
+
+    expect($display['summary'] ?? '')->not->toContain('team_invitations')
+        ->and($display['summary'] ?? '')->toContain('team invitations');
 });

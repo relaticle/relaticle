@@ -169,7 +169,7 @@ abstract class BaseWriteCreateTool implements Tool
         $displayData = $isBatch
             ? [
                 'title' => __('Create :entities', ['entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
-                'summary' => sprintf('Create %d %s', count($items), Str::plural($this->entityType(), count($items))),
+                'summary' => sprintf('Create %d %s', count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
                 'items' => $items,
             ]
             : $items[0];
