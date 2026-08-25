@@ -17,6 +17,8 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
 
     public bool $digestEnabled = true;
 
+    public bool $setupNudgeEnabled = true;
+
     public function mount(): void
     {
         $user = $this->authUser();
@@ -28,6 +30,7 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
         }
 
         $this->digestEnabled = $user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email);
+        $this->setupNudgeEnabled = $user->wantsNotification(NotificationType::SetupNudge, NotificationChannel::Email);
     }
 
     public function updatedCells(bool $value, string $key): void
@@ -53,6 +56,11 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
     public function updatedDigestEnabled(bool $value): void
     {
         $this->persist(NotificationType::TaskDigest, NotificationChannel::Email, $value);
+    }
+
+    public function updatedSetupNudgeEnabled(bool $value): void
+    {
+        $this->persist(NotificationType::SetupNudge, NotificationChannel::Email, $value);
     }
 
     public function render(): View

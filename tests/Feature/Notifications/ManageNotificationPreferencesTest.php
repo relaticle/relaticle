@@ -48,3 +48,15 @@ it('renders the standalone notifications page', function (): void {
         ->assertSee('Daily digest')
         ->assertSee('Task Assignments');
 });
+
+it('turns the setup nudge off', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    Livewire::test(ManageNotificationPreferences::class)
+        ->assertSet('setupNudgeEnabled', true)
+        ->set('setupNudgeEnabled', false);
+
+    expect($user->fresh()->wantsNotification(NotificationType::SetupNudge, NotificationChannel::Email))
+        ->toBeFalse();
+});
