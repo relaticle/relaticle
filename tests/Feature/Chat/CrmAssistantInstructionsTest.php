@@ -161,6 +161,24 @@ it('no longer warns that showing can exceed what the table prints', function ():
 });
 
 /**
+ * The client collapses a long page to ten painted rows, and that budget lives
+ * only in transcript.js: the model never sees it. So a page size it states is
+ * a number it cannot verify, and a live turn proved it states one anyway once
+ * the user says it first ("show me 25 companies" produced "here are the first
+ * 25 of your 56" over a table reading "Showing 10 of 56"). The general ban on
+ * row counts was already there; only the named-page-size case leaks through,
+ * so that case is spelled out with the sentence to write instead.
+ */
+it('forbids repeating a page size the user named', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('even when the user named a page size')
+        ->toContain('never by repeating it in your reply')
+        ->toContain('never "the first 25 of your 56"');
+});
+
+/**
  * `next_page` is the only instruction that tells the model how to reach page
  * 2 of a list result. If a future prompt trim drops this line, the model has
  * no way to fetch more rows and will either fabricate a "view more" answer or
