@@ -25,3 +25,10 @@ writing records inside one request/test before re-reading a step.
 
 `tests/Feature/Onboarding/ActivationStepsTest.php` has a leak regression test:
 if it starts failing with "false is true", check whether the binding reverted.
+
+## Do not let `boost:update` eat these rules
+
+`php artisan boost:update` regenerates `.ai/rules/boost/*` and `.ai/rules/index.md`
+from its own templates. That strips the hand-added `packages/*` globs and the row
+pointing at this file. After running it, `git checkout HEAD -- .ai/rules/boost
+.ai/rules/index.md` and keep only the `.ai/guidelines/` change you intended.

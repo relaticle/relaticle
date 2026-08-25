@@ -30,6 +30,11 @@ Before committing any changes, always run these checks in order:
 4. `composer test:type-coverage` — type coverage must stay at 100%
 5. `php artisan test --compact` — run relevant tests (use `--filter` for targeted runs)
 
+`--dirty` only covers files with uncommitted changes, so a file you committed
+earlier in the branch stops being checked and its style break surfaces only in
+CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
+--parallel`, whole repo).
+
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
 
 ## Fixing & Verification
