@@ -3,22 +3,37 @@
         x-data="dashboardChatInput(@js(\App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
         class="mx-auto w-full max-w-3xl py-16"
     >
-        {{-- Greeting --}}
-        <div class="text-center">
-            <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                {{ $this->getGreeting() }}
-            </h1>
+        {{-- Greeting. On a fresh workspace Rela's seeded welcome takes the slot
+             the time-of-day line normally holds: the message has to land on the
+             surface the user is already looking at, not behind a link. --}}
+        @if ($this->welcome)
+            <div class="text-center">
+                <span class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <x-heroicon-o-sparkles class="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    {{ config('chat.assistant_name') }}
+                </span>
+            </div>
 
-            @if($recentChatId)
-                <a
-                    href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
-                    class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
-                >
-                    <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
-                    <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
-                </a>
-            @endif
-        </div>
+            <div class="{{ \Relaticle\Chat\Support\ChatProse::MESSAGE }} mt-3 text-left">
+                {!! $this->welcome['html'] !!}
+            </div>
+        @else
+            <div class="text-center">
+                <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
+                    {{ $this->getGreeting() }}
+                </h1>
+
+                @if($recentChatId)
+                    <a
+                        href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
+                        class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
+                    >
+                        <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
+                        <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
+                    </a>
+                @endif
+            </div>
+        @endif
 
         {{-- Chat input --}}
         <form @submit.prevent="submit()" class="mt-10">
