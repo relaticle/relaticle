@@ -609,24 +609,24 @@ final class EmailInboxPage extends Page
                                     // delete button on a line of its own. Naming the row
                                     // instead gives each entry a header that carries the
                                     // delete inline, and the two fields sit side by side.
-                                    ->itemLabel(fn (array $state): string => $this->teammateOptions()[$state['shared_with'] ?? null]
-                                        ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item'))
+                                    ->itemLabel(fn (array $state): string => $this->shareRowLabel($state))
                                     ->columns(2)
                                     ->schema([
+                                        Select::make('tier')
+                                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
+                                            ->hiddenLabel()
+                                            ->options(EmailPrivacyTier::class)
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                            ->required(),
+
                                         Select::make('shared_with')
                                             ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
                                             ->hiddenLabel()
                                             ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
                                             ->options(fn (): array => $this->teammateOptions())
+                                            ->multiple()
                                             ->searchable()
                                             ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->required()
-                                            ->distinct(),
-
-                                        Select::make('tier')
-                                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
-                                            ->hiddenLabel()
-                                            ->options(EmailPrivacyTier::class)
                                             ->required(),
                                     ]),
                             ]),
@@ -641,13 +641,7 @@ final class EmailInboxPage extends Page
 
                 return [
                     'privacy_tier' => $email->privacy_tier->value,
-                    'shares' => $email->shares()
-                        ->get()
-                        ->map(fn (EmailShare $share): array => [
-                            'shared_with' => $share->shared_with,
-                            'tier' => $share->tier,
-                        ])
-                        ->all(),
+                    'shares' => $this->shareFormRows($email),
                 ];
             })
             ->action(function (array $data, array $arguments): void {
@@ -669,6 +663,54 @@ final class EmailInboxPage extends Page
                     ->title(__('filament/pages/email-inbox.sharing.notifications.saved.title'))
                     ->send();
             });
+    }
+
+    /**
+     * @return array<int, array{tier: string, shared_with: array<int, int|string>}>
+     */
+    private function shareFormRows(Email $email): array
+    {
+        return $email->shares()
+            ->get()
+            ->groupBy(fn (EmailShare $share): string => $this->tierValue($share->tier))
+            ->map(fn (Collection $shares, string $tier): array => [
+                'tier' => $tier,
+                'shared_with' => $shares->pluck('shared_with')->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array{tier?: mixed}  $state
+     */
+    private function shareRowLabel(array $state): string
+    {
+        $tier = $state['tier'] ?? null;
+
+        if ($tier instanceof EmailPrivacyTier) {
+            return $tier->getLabel();
+        }
+
+        if (is_string($tier) || is_int($tier)) {
+            return EmailPrivacyTier::tryFrom((string) $tier)?->getLabel()
+                ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item');
+        }
+
+        return __('filament/pages/email-inbox.sharing.fields.shares.new_item');
+    }
+
+    private function tierValue(mixed $tier): string
+    {
+        if ($tier instanceof EmailPrivacyTier) {
+            return $tier->value;
+        }
+
+        if (is_string($tier) || is_int($tier)) {
+            return (string) $tier;
+        }
+
+        return '';
     }
 
     private function resolveTeamEmail(?string $emailId, string $ability): ?Email
