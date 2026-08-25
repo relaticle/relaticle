@@ -736,3 +736,21 @@ Summarise which tasks landed, paste the gate output, and attach the two screensh
 The prompt restructure from spec sections 4 and 7 (registry-generated block map, tool names out of prose, `page_summary`, server-side block placement, replacing the 35 wording assertions, and the compliance harness) is a separate plan. It carries different risk, it depends on the registry work, and Tasks 2 and 3 above already prove whether the reference model is right before the prompt is rewritten around it.
 
 Recommend writing that plan once Tasks 1 to 8 have landed and the browser walk is green.
+
+## Findings raised during execution, not in scope, awaiting a decision
+
+Both surfaced in the Task 1 review. Neither is fixed. They need the user's call before becoming tasks.
+
+1. **The read and filter path still hides deactivated custom fields.**
+   `app/Mcp/Schema/CustomFieldFilterSchema.php:148` (`resolveFilterableFields()`) still applies
+   `->active()`, and the result is cached for 60 seconds. Task 1 fixed the write-schema
+   description only, so "show me the high-priority tasks" can still produce the original wrong
+   answer on a workspace where Priority is deactivated, even though the values are still stored.
+   This is a direct sibling of the bug Task 1 fixed and is the more likely user-facing path.
+
+2. **Encrypted option labels can render as ciphertext for inactive fields.**
+   `packages/Chat/src/Tools/CustomField/ListCustomFieldsTool.php:49-63` bypasses the activable
+   scope, so `CustomFieldOption::name()` sees a null `customField` relation and returns the raw
+   encrypted string instead of decrypting. `SelectFieldType` is encryptable and field encryption
+   is enabled, so it is reachable. Task 1's describer no longer reaches this path because
+   inactive fields render code and type only, so the exposure is confined to that one tool.
