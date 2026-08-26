@@ -279,4 +279,4 @@ Custom fields are team-specific. If you don't see them, confirm they're configur
 
 ### Rate Limiting
 
-The MCP server uses the same rate limits as the REST API. If you hit limits, wait a moment and retry.
+MCP tool requests are limited to 120 per minute per authenticated user. OAuth authorization endpoints are limited to 20 per minute per IP address.

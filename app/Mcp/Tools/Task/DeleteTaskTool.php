@@ -8,9 +8,11 @@ use App\Actions\Task\DeleteTask;
 use App\Mcp\Tools\BaseDeleteTool;
 use App\Models\Task;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
+#[Title('Delete Task')]
 #[Description('Delete a task from the CRM (soft delete).')]
 #[IsDestructive]
 #[IsOpenWorld(false)]

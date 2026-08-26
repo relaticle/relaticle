@@ -12,11 +12,12 @@ use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
+#[Title('Detach Task Relationships')]
 #[Description('Detach a task from companies, people, opportunities, or unassign users. Removes specified links.')]
 #[IsDestructive]
 #[IsOpenWorld(false)]
@@ -63,7 +64,6 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
         /** @var Team $team */
         $team = $user->currentTeam;
         $teamId = $team->getKey();
-        $teamMemberIds = $team->allUsers()->pluck('id')->all();
 
         return [
             'company_ids' => ['sometimes', 'array'],
@@ -73,7 +73,7 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
             'opportunity_ids' => ['sometimes', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
             'assignee_ids' => ['sometimes', 'array'],
-            'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
+            'assignee_ids.*' => ['string'],
         ];
     }
 }

@@ -20,6 +20,7 @@ final readonly class AttachNoteRelationships
     public function execute(User $user, Note $note, array $data): Note
     {
         abort_unless($user->can('update', $note), 403);
+        abort_unless($note->team_id === $user->current_team_id, 403);
 
         TenantFkValidator::assertOwnedMany($user, $data, [
             'company_ids' => Company::class,
@@ -28,14 +29,19 @@ final readonly class AttachNoteRelationships
         ]);
 
         DB::transaction(function () use ($note, $data): void {
+            $lockedNote = Note::query()
+                ->whereKey($note->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if (array_key_exists('company_ids', $data)) {
-                $note->companies()->syncWithoutDetaching($data['company_ids']);
+                $lockedNote->companies()->syncWithoutDetaching($data['company_ids']);
             }
             if (array_key_exists('people_ids', $data)) {
-                $note->people()->syncWithoutDetaching($data['people_ids']);
+                $lockedNote->people()->syncWithoutDetaching($data['people_ids']);
             }
             if (array_key_exists('opportunity_ids', $data)) {
-                $note->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
+                $lockedNote->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
             }
         });
 

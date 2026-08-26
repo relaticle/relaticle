@@ -19,24 +19,22 @@ use Illuminate\Support\Facades\Mail;
 final readonly class NotifyTaskAssignees
 {
     /**
-     * @param  array<int>  $previousAssigneeIds
+     * @param  array<int, string>  $assigneeIds
      */
-    public function execute(Task $task, array $previousAssigneeIds = []): void
+    public function execute(Task $task, array $assigneeIds): void
     {
-        $currentIds = $task->assignees()->pluck('users.id')->all();
-        $newIds = array_diff($currentIds, $previousAssigneeIds);
-
-        if ($newIds === []) {
+        if ($assigneeIds === []) {
             return;
         }
 
+        $assigneeIds = array_values(array_unique($assigneeIds));
         $taskTitle = $task->title;
         $taskId = $task->id;
         $taskUrl = $this->resolveTaskUrl($task);
 
-        defer(function () use ($newIds, $taskTitle, $taskId, $taskUrl): void {
+        defer(function () use ($assigneeIds, $taskTitle, $taskId, $taskUrl): void {
             User::query()
-                ->whereIn('id', $newIds)
+                ->whereIn('id', $assigneeIds)
                 ->get()
                 ->each(function (User $recipient) use ($taskTitle, $taskId, $taskUrl): void {
                     if ($recipient->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::InApp)) {

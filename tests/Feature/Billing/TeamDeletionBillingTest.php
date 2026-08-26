@@ -46,4 +46,4 @@ it('logs instead of throwing when stripe is unreachable for a live subscription'
     app(CancelTeamSubscription::class)->execute($team);
 
     expect($team->fresh()->subscription()->stripe_status)->toBe('active');
-})->throwsNoExceptions();
+});

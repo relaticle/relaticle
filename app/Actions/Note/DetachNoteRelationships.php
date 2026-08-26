@@ -20,6 +20,7 @@ final readonly class DetachNoteRelationships
     public function execute(User $user, Note $note, array $data): Note
     {
         abort_unless($user->can('update', $note), 403);
+        abort_unless($note->team_id === $user->current_team_id, 403);
 
         TenantFkValidator::assertOwnedMany($user, $data, [
             'company_ids' => Company::class,

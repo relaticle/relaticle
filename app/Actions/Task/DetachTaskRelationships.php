@@ -20,14 +20,13 @@ final readonly class DetachTaskRelationships
     public function execute(User $user, Task $task, array $data): Task
     {
         abort_unless($user->can('update', $task), 403);
+        abort_unless($task->team_id === $user->current_team_id, 403);
 
         TenantFkValidator::assertOwnedMany($user, $data, [
             'company_ids' => Company::class,
             'people_ids' => People::class,
             'opportunity_ids' => Opportunity::class,
         ]);
-        TenantFkValidator::assertUsersInWorkspace($user, $data, ['assignee_ids']);
-
         DB::transaction(function () use ($task, $data): void {
             if (array_key_exists('company_ids', $data)) {
                 $task->companies()->detach($data['company_ids']);

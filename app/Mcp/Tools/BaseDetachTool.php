@@ -22,6 +22,11 @@ abstract class BaseDetachTool extends Tool
     use ChecksTokenAbility;
     use HasExplicitToolAnnotations;
 
+    protected function idempotentHint(): bool
+    {
+        return true;
+    }
+
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
 

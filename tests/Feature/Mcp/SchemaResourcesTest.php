@@ -3,15 +3,32 @@
 declare(strict_types=1);
 
 use App\Mcp\Resources\CompanySchemaResource;
+use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
 use App\Mcp\Resources\NoteSchemaResource;
 use App\Mcp\Resources\OpportunitySchemaResource;
 use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\User;
+use App\Providers\AppServiceProvider;
+use Illuminate\Testing\Fluent\AssertableJson;
+
+mutates(
+    AppServiceProvider::class,
+    CompanySchemaResource::class,
+    CustomFieldFilterSchema::class,
+    GetCrmSchemaTool::class,
+    NoteSchemaResource::class,
+    OpportunitySchemaResource::class,
+    PeopleSchemaResource::class,
+    ResolvesEntitySchema::class,
+    TaskSchemaResource::class,
+);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -61,6 +78,33 @@ it('returns valid note schema with correct fields', function (): void {
         ->assertSee('note')
         ->assertSee('"title"');
 });
+
+it('publishes complete task and note output contracts', function (string $entityType, string $relationship, string $toolsHint): void {
+    $toolContract = resolve(GetCrmSchemaTool::class)->toArray();
+
+    expect($toolContract)
+        ->toHaveKey('outputSchema.properties.writable_relationships.type', 'object')
+        ->toHaveKey('outputSchema.properties.tools_hint.type', 'string');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => $entityType])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has("writable_relationships.{$relationship}")
+            ->where('tools_hint', $toolsHint)
+            ->etc());
+})->with([
+    'task' => [
+        'task',
+        'assignee_ids',
+        'Use attach-task-to-entities and detach-task-from-entities tools for post-creation relationship management.',
+    ],
+    'note' => [
+        'note',
+        'company_ids',
+        'Use attach-note-to-entities and detach-note-from-entities tools for post-creation relationship management.',
+    ],
+]);
 
 it('includes custom fields in schema when they exist', function (): void {
     $team = $this->user->personalTeam();
@@ -202,6 +246,70 @@ it('describes hyphenated choice and datetime field types correctly', function ()
         ->assertSee('ISO 8601 datetime string')
         ->assertSee('Enterprise')
         ->assertSee('High');
+});
+
+it('describes tags-input values as arbitrary strings instead of option IDs', function (): void {
+    $team = $this->user->personalTeam();
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $team->id,
+        'entity_type' => 'company',
+        'name' => 'Tag Fields',
+        'code' => 'tag_fields',
+        'type' => 'section',
+        'sort_order' => 1,
+        'active' => true,
+    ]);
+
+    CustomField::query()->create([
+        'tenant_id' => $team->id,
+        'custom_field_section_id' => $section->id,
+        'entity_type' => 'company',
+        'code' => 'labels',
+        'name' => 'Labels',
+        'type' => 'tags-input',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $expected = implode("\n", [
+        '        "labels": {',
+        '            "name": "Labels",',
+        '            "type": "tags-input",',
+        '            "required": false,',
+        '            "input_format": "array of arbitrary string values",',
+        '            "example": [',
+        '                "priority",',
+        '                "customer"',
+        '            ]',
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(CompanySchemaResource::class)
+        ->assertOk()
+        ->assertSee($expected);
+});
+
+it('serializes empty custom-field maps as objects in resources and tools', function (): void {
+    $team = $this->user->personalTeam();
+
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'company')
+        ->update(['active' => false]);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(CompanySchemaResource::class)
+        ->assertOk()
+        ->assertSee('"custom_fields": {}')
+        ->assertSee('"filterable_fields": {}');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => 'company'])
+        ->assertOk()
+        ->assertSee('"custom_fields":{}')
+        ->assertSee('"filterable_fields":{}');
 });
 
 it('invalidates the entity schema cache when an option changes', function (): void {

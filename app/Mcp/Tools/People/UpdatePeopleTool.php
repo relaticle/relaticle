@@ -12,9 +12,11 @@ use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
+#[Title('Update Person')]
 #[Description('Update an existing person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
 #[IsIdempotent]
 #[IsOpenWorld(false)]

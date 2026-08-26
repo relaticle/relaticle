@@ -4,16 +4,38 @@ declare(strict_types=1);
 
 use App\Enums\CreationSource;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
 use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\Company;
+use App\Models\People;
 use App\Models\Scopes\TeamScope;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Testing\Fluent\AssertableJson;
+
+mutates(
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreateCompanyTool::class,
+    DeleteCompanyTool::class,
+    GetCompanyTool::class,
+    ListCompaniesTool::class,
+    SerializesRelatedModels::class,
+    UpdateCompanyTool::class,
+);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -30,7 +52,11 @@ it('can get a company by ID', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(GetCompanyTool::class, ['id' => $company->id])
         ->assertOk()
-        ->assertSee('Acme Corp');
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('data.id', $company->getKey())
+            ->where('data.attributes.name', 'Acme Corp')
+            ->missing('relationship_meta')
+            ->etc());
 });
 
 it('returns bounded related tasks with count and truncation metadata', function (): void {
@@ -44,9 +70,61 @@ it('returns bounded related tasks with count and truncation metadata', function 
             'include' => ['tasks'],
         ])
         ->assertOk()
-        ->assertSee('"returned":25')
-        ->assertSee('"total":27')
-        ->assertSee('"truncated":true');
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('data.tasks', 25)
+            ->where('relationship_meta.tasks.returned', 25)
+            ->where('relationship_meta.tasks.total', 27)
+            ->where('relationship_meta.tasks.truncated', true)
+            ->etc());
+});
+
+it('bounds every to-many relationship expanded by a show tool', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    People::factory()->count(27)->recycle([$this->user, $this->team])->create([
+        'company_id' => $company->getKey(),
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCompanyTool::class, [
+            'id' => $company->getKey(),
+            'include' => ['people'],
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('data.people', 25)
+            ->where('relationship_meta.people.returned', 25)
+            ->where('relationship_meta.people.total', 27)
+            ->where('relationship_meta.people.truncated', true)
+            ->etc());
+});
+
+it('rejects to-many expansion on paginated list tools', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListCompaniesTool::class, ['include' => ['people']])
+        ->assertHasErrors(['Use a show tool']);
+});
+
+it('returns actionable MCP errors without successful structured content', function (): void {
+    $token = $this->user->createToken('mcp-error-contract', ['*']);
+
+    $this->withHeader('Authorization', 'Bearer '.$token->plainTextToken)
+        ->postJson('/mcp', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => 'update-company-tool',
+                'arguments' => [
+                    'id' => '01K00000000000000000000000',
+                    'name' => 'Unreachable',
+                ],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonPath('result.isError', true)
+        ->assertJsonPath('result.content.0.type', 'text')
+        ->assertJsonPath('result.content.0.text', 'company with ID [01K00000000000000000000000] not found.')
+        ->assertJsonMissingPath('result.structuredContent');
 });
 
 it('can create, update, and clear a company account owner', function (): void {
@@ -192,6 +270,15 @@ describe('pagination', function (): void {
             ->assertSee('"per_page":2')
             ->assertSee('"has_more":true')
             ->assertSee('"next_page":2');
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, [
+                'per_page' => 2,
+                'page' => 2,
+            ])
+            ->assertOk()
+            ->assertSee('"has_more":false')
+            ->assertSee('"next_page":null');
     });
 
     it('rejects list page sizes above the MCP payload cap', function (): void {

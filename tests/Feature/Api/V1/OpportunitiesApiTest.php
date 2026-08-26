@@ -8,6 +8,7 @@ use App\Actions\Opportunity\ListOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\OpportunitiesController;
+use App\Http\Resources\V1\OpportunityResource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
@@ -25,6 +26,7 @@ mutates(
     UpdateOpportunity::class,
     DeleteOpportunity::class,
     ListOpportunities::class,
+    OpportunityResource::class,
 );
 
 beforeEach(function () {
@@ -104,6 +106,17 @@ it('can show an opportunity', function (): void {
                 ->etc()
             )
         );
+});
+
+it('does not expose MCP-only task relationships through the public API', function (): void {
+    Sanctum::actingAs($this->user);
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+
+    $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=tasks")
+        ->assertOk()
+        ->assertJsonMissingPath('data.relationships.tasks')
+        ->assertJsonMissingPath('included');
 });
 
 it('can update an opportunity', function (): void {

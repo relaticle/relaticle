@@ -706,4 +706,3 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
 /* Chat record chips moved to resources/css/theme.css: the marketing hero
    mock renders the same chips and only loads that shared bundle. */
-

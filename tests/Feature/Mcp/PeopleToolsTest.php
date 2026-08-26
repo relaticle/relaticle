@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\GetPeopleTool;
@@ -13,6 +19,20 @@ use App\Models\People;
 use App\Models\Scopes\TeamScope;
 use App\Models\Team;
 use App\Models\User;
+
+mutates(
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreatePeopleTool::class,
+    DeletePeopleTool::class,
+    GetPeopleTool::class,
+    ListPeopleTool::class,
+    SerializesRelatedModels::class,
+    UpdatePeopleTool::class,
+);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();

@@ -152,13 +152,25 @@ final class Dashboard extends Page
 
     private function configureCreateTaskAction(CreateAction $action): CreateAction
     {
+        /** @var array<int, string> $submittedAssigneeIds */
+        $submittedAssigneeIds = [];
+
         return $action
             ->model(Task::class)
             ->icon('heroicon-o-plus')
             ->slideOver()
             ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-            ->after(function (Task $record): void {
-                resolve(NotifyTaskAssignees::class)->execute($record);
+            ->before(function () use ($action, &$submittedAssigneeIds): void {
+                $submittedAssignees = $action->getRawData()['assignees'] ?? [];
+
+                if (! is_array($submittedAssignees)) {
+                    $submittedAssignees = [];
+                }
+
+                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
+            })
+            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
+                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
             });
     }
 }

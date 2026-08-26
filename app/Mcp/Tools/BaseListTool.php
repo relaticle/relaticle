@@ -8,11 +8,13 @@ use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\User;
+use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -26,6 +28,18 @@ abstract class BaseListTool extends Tool
     use SerializesRelatedModels;
 
     private const int MAX_PER_PAGE = 25;
+
+    private const int MAX_PAGE = 1_000_000;
+
+    /** @var list<string> */
+    private const array TO_MANY_INCLUDES = [
+        'assignees',
+        'companies',
+        'notes',
+        'opportunities',
+        'people',
+        'tasks',
+    ];
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -51,6 +65,14 @@ abstract class BaseListTool extends Tool
         return [];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function additionalValidationRules(User $user): array
+    {
+        return [];
+    }
+
     public function schema(JsonSchema $schema): array
     {
         return array_merge(
@@ -61,9 +83,9 @@ abstract class BaseListTool extends Tool
                 'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
                 'filter' => $schema->object()->description('Filter by custom field values. Keys are field codes, values are operator objects (eq, gt, gte, lt, lte, contains, in, has_any).'),
                 'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
-                'include' => $schema->array()->description('Related records to expand in response.'),
+                'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
                 'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
-                'page' => $schema->integer()->description('Page number.')->default(1),
+                'page' => $schema->integer()->description('Page number (max 1,000,000).')->default(1),
             ],
         );
     }
@@ -89,10 +111,32 @@ abstract class BaseListTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $pagination = $request->validate([
+        $validated = $request->validate(array_merge([
+            'search' => ['sometimes', 'string', 'max:255'],
+            'created_after' => ['sometimes', Rule::date()->format('Y-m-d')],
+            'created_before' => ['sometimes', Rule::date()->format('Y-m-d'), 'after_or_equal:created_after'],
+            'filter' => ['sometimes', $this->objectRule(allowEmpty: true)],
+            'filter.*' => [$this->objectRule(allowEmpty: false)],
+            'sort' => ['sometimes', 'array:field,direction', 'required_array_keys:field'],
+            'sort.field' => ['string'],
+            'sort.direction' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
-            'page' => ['sometimes', 'integer', 'min:1'],
-        ]);
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
+            'include' => ['sometimes', 'array', 'list', 'max:20'],
+            'include.*' => ['string', 'distinct'],
+        ], $this->additionalValidationRules($user)));
+
+        $requestedIncludes = $request->get('include');
+        $toManyIncludes = is_array($requestedIncludes)
+            ? array_values(array_intersect($requestedIncludes, self::TO_MANY_INCLUDES))
+            : [];
+
+        if ($toManyIncludes !== []) {
+            return Response::error(sprintf(
+                'List tools do not expand to-many relationships [%s]. Use a show tool for one record, or request the corresponding Count include.',
+                implode(', ', $toManyIncludes),
+            ));
+        }
 
         $httpRequest = $this->buildHttpRequest($request);
 
@@ -100,8 +144,8 @@ abstract class BaseListTool extends Tool
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
-                perPage: (int) ($pagination['per_page'] ?? 15),
-                page: (int) ($pagination['page'] ?? 1),
+                perPage: (int) ($validated['per_page'] ?? 15),
+                page: (int) ($validated['page'] ?? 1),
                 request: $httpRequest,
             );
         } catch (InvalidQuery $e) {
@@ -156,6 +200,18 @@ abstract class BaseListTool extends Tool
         }
 
         return Response::structured($response);
+    }
+
+    private function objectRule(bool $allowEmpty): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($allowEmpty): void {
+            $isObject = is_array($value)
+                && ($allowEmpty && $value === [] || $value !== [] && ! array_is_list($value));
+
+            if (! $isObject) {
+                $fail("The {$attribute} field must be an object.");
+            }
+        };
     }
 
     private function buildHttpRequest(Request $mcpRequest): HttpRequest
