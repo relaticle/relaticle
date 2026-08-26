@@ -71,7 +71,15 @@
          list's own spacing. --}}
     <div x-ref="topSentinel" aria-hidden="true" class="h-px"></div>
 
-    <div class="mx-auto max-w-3xl space-y-5">
+    {{-- Fills the scroll viewport so the next-step strip below can be pushed to
+         its floor: on a short conversation the offer belongs just above the
+         composer, not orphaned under the last bubble with dead space beneath it.
+         Dropped while the empty state is up, since that sibling is already
+         h-full and the two together would scroll an empty conversation. --}}
+    <div
+        class="mx-auto flex max-w-3xl flex-col space-y-5"
+        :class="(messages.length === 0 && !isStreaming) ? '' : 'min-h-full'"
+    >
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">
                 <button
@@ -255,6 +263,7 @@
                                 <div class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                     <button
                                         type="button"
+                                        data-copy-button
                                         x-on:click="copyMessage(msg)"
                                         :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
                                         :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
@@ -363,18 +372,11 @@
                             </div>
                         </template>
 
-                        <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <template x-for="chip in msg.follow_ups" :key="chip.prompt">
-                                    @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'chip', 'click' => 'input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())'])
-                                </template>
-                            </div>
-                        </template>
-
                         <template x-if="msg.rendered && msg.content">
                             <div class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                 <button
                                     type="button"
+                                    data-copy-button
                                     x-on:click="copyMessage(msg)"
                                     :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
                                     :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
@@ -549,34 +551,83 @@
                 </div>
             </div>
         </template>
+
+        {{-- Next steps for the turn that just ended, drafted by NextStepSuggester
+             and cleared the moment the user sends anything. They sit at the
+             floor of the transcript rather than directly under the bubble they
+             came from: on a short conversation that puts the offer where the
+             eye already is, just above the composer, and on a long one it
+             scrolls away with its turn instead of hovering over older messages.
+             `margin-top: auto` is inline because the column's own `space-y-5`
+             out-specifies a margin utility on one of its children; x-show only
+             ever writes `display`, so it leaves this alone. --}}
+        <div
+            x-show="!hasPendingProposal && nextSteps.length > 0"
+            {{-- The panel ships no `[x-cloak]` rule (see the jump-to-latest
+                 button below), so the pre-Alpine hidden state is an inline
+                 style; x-show clears it when it flips true. --}}
+            style="display: none; margin-top: auto"
+            x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
+            x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
+            x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
+            class="flex flex-col items-start gap-0.5 pt-5"
+            role="group"
+            aria-label="{{ __('Suggested next steps') }}"
+        >
+            <template x-for="step in nextSteps" :key="step.prompt">
+                <button
+                    type="button"
+                    data-next-step
+                    x-on:click="sendNextStep(step)"
+                    class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
+                >
+                    <x-heroicon-m-arrow-turn-down-right class="h-4 w-4 shrink-0 text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" />
+
+                    <span class="truncate" x-text="step.label"></span>
+                </button>
+            </template>
+        </div>
     </div>
 
-    {{-- Jump-to-latest pill: sticky to the bottom of THIS scrollable transcript
+    {{-- Scroll-to-bottom button: sticky to the bottom of THIS scrollable transcript
          viewport, mirroring the sticky date pill above it (same zero-height-wrapper
          trick). Anchoring here rather than to the page means it can never land on
          top of the docked proposal card: the composer/dock sit entirely outside
          this scrolling box, whatever height they take, so there is nothing in this
-         container for the pill to overlap. --}}
+         container for the button to overlap.
+
+         Shown for the whole time the user is away from the bottom, not just when
+         new content lands (the old "New messages" pill): scrolling back down is
+         the same intent whether or not the assistant has replied since, and an
+         affordance that appears only on someone else's timing is one the user
+         cannot find when they want it. At the bottom there is nowhere to go, so
+         it hides rather than sitting there dead. x-show, not x-if, so it fades
+         both ways instead of popping in and out of the DOM on every scroll. --}}
     <div class="sticky bottom-2 z-20 flex h-0 items-end justify-center">
-        <template x-if="hasUnseenBelow">
-            <button
-                type="button"
-                x-on:click="scrollToBottom(true)"
-                aria-label="{{ __('New messages') }}"
-                title="{{ __('New messages') }}"
-                {{-- Icon-only circle, matching the Attio reference (user-directed,
-                     2026-08). Solid block tier, not the translucent card tier:
-                     this floats OVER the transcript, and at gray-50/80 the
-                     message bubble underneath read straight through it.
-                     `items-end` on the wrapper keeps the zero-height row from
-                     squashing the circle. --}}
-                class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
-                x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
-                x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
-                x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
-            >
-                <x-heroicon-m-arrow-down class="h-4 w-4" aria-hidden="true" />
-            </button>
-        </template>
+        <button
+            type="button"
+            {{-- The panel ships no `[x-cloak]` rule, so the pre-Alpine hidden
+                 state is an inline style; x-show clears it when it flips true. --}}
+            style="display: none"
+            x-show="!pinnedToBottom"
+            x-on:click="jumpToLatest()"
+            aria-label="{{ __('Scroll to latest messages') }}"
+            title="{{ __('Scroll to latest messages') }}"
+            {{-- Icon-only circle, matching the Attio reference (user-directed,
+                 2026-08). Solid block tier, not the translucent card tier:
+                 this floats OVER the transcript, and at gray-50/80 the
+                 message bubble underneath read straight through it.
+                 `items-end` on the wrapper keeps the zero-height row from
+                 squashing the circle. --}}
+            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
+            x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
+            x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
+            x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-100"
+            x-transition:leave-start="motion-safe:opacity-100 motion-safe:translate-y-0"
+            x-transition:leave-end="motion-safe:opacity-0 motion-safe:translate-y-1"
+        >
+            <x-heroicon-m-arrow-down class="h-4 w-4" aria-hidden="true" />
+        </button>
     </div>
 </div>

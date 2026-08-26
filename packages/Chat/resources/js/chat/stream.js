@@ -4,7 +4,7 @@
 // chat-interface.blade.php for the composition and the `pendingLabel`
 // accessor that stays inline there because a `get` property cannot survive
 // an object spread.
-export const streamModule = ({ texts = {} } = {}) => ({
+export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     channel: null,
     // Per-instance view of the shared (memoised) Echo channel. Never written onto the
     // channel object itself: siblings on the same conversation share one.
@@ -17,18 +17,56 @@ export const streamModule = ({ texts = {} } = {}) => ({
     // same pattern voice.js uses); the defaults keep the module standalone.
     streamTexts: {
         runningTool: 'Running tool…',
-        readingSummary: 'Reading CRM summary…',
-        searchingCrm: 'Searching CRM…',
         runningName: 'Running :name…',
-        searchingEntity: 'Searching :entity…',
-        lookingUpEntity: 'Looking up :entity…',
-        draftingEntity: 'Drafting :entity…',
-        updatingEntity: 'Preparing :entity changes…',
-        deletingEntity: 'Preparing :entity deletion…',
         streamError: 'The assistant encountered an error. Please try again.',
         timeout: 'The assistant took too long to respond.',
         retrying: 'Provider is busy, retrying (attempt :attempt of :max)…',
         ...texts,
+    },
+    // One human label per tool the agent can call, keyed by the snake_case form
+    // of its class basename (the wire name laravel/ai broadcasts). Explicit
+    // rather than derived from the name: an unmapped tool used to fall through
+    // to its raw identifier, so the shimmer read "Running add_custom_field_options…"
+    // at the user. Ship a label with every new tool.
+    toolLabels: {
+        list_companies: 'Searching companies…',
+        get_company: 'Reading company details…',
+        list_people: 'Searching contacts…',
+        get_person: 'Reading contact details…',
+        list_opportunities: 'Searching opportunities…',
+        get_opportunity: 'Reading opportunity details…',
+        list_tasks: 'Searching tasks…',
+        get_task: 'Reading task details…',
+        list_notes: 'Searching notes…',
+        get_note: 'Reading note details…',
+        search_crm: 'Searching your CRM…',
+        get_crm_summary: 'Reading CRM summary…',
+        aggregate_crm: 'Crunching the numbers…',
+        list_activity: 'Reading recent activity…',
+        list_team_members: 'Looking up team members…',
+        list_custom_fields: 'Reading custom fields…',
+        search_docs: 'Searching the documentation…',
+        guide_to_page: 'Finding the right page…',
+        create_company: 'Drafting a company…',
+        update_company: 'Preparing company changes…',
+        delete_company: 'Preparing company deletion…',
+        create_person: 'Drafting a contact…',
+        update_person: 'Preparing contact changes…',
+        delete_person: 'Preparing contact deletion…',
+        create_opportunity: 'Drafting an opportunity…',
+        update_opportunity: 'Preparing opportunity changes…',
+        delete_opportunity: 'Preparing opportunity deletion…',
+        create_task: 'Drafting a task…',
+        update_task: 'Preparing task changes…',
+        delete_task: 'Preparing task deletion…',
+        create_note: 'Drafting a note…',
+        update_note: 'Preparing note changes…',
+        delete_note: 'Preparing note deletion…',
+        invite_team_member: 'Preparing a team invitation…',
+        create_custom_field: 'Drafting a custom field…',
+        update_custom_field: 'Preparing custom field changes…',
+        add_custom_field_options: 'Preparing new field options…',
+        ...toolLabels,
     },
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
     // (window.Echo.leave) stops NEW events from being delivered but cannot cancel a
@@ -66,7 +104,6 @@ export const streamModule = ({ texts = {} } = {}) => ({
             sessionExpired: false,
             rendered: false,
             prerendered: false,
-            follow_ups: [],
             created_at: new Date().toISOString(),
             invocationId: null,
             streamError: null,
@@ -207,22 +244,36 @@ export const streamModule = ({ texts = {} } = {}) => ({
             .listen('.stream.retrying', (e) => this.handleStreamRetrying(e))
             .listen('.conversation.resolved', (e) => this.handleConversationResolved(e))
             .listen('.conversation.title', (e) => this.handleConversationTitle(e))
-            .listen('.follow_ups', (e) => this.handleFollowUps(e))
+            .listen('.next_steps', (e) => this.handleNextSteps(e))
             .listen('.pending_actions_superseded', (e) => this.handlePendingActionsSuperseded(e))
             .listen('.pending_action.resolved', (e) => this.handlePendingActionResolved(e));
 
         return readyPromise;
     },
 
-    handleFollowUps(event) {
+    // Next steps for the turn that just ended. Late by design: the suggester
+    // runs after the answer is already on screen, so this can land while the
+    // user is mid-sentence. Dropped in that case, because replacing the strip
+    // under a cursor that is about to click it is worse than showing nothing.
+    handleNextSteps(event) {
         if (!this.isForCurrentConversation()) return;
+        if (this.isStreaming) return;
 
-        const chips = Array.isArray(event?.chips) ? event.chips.slice(0, 3) : [];
-        // Chips belong to the turn that just COMPLETED. If a queued send
-        // already minted a fresh stub, the last assistant bubble is the wrong
-        // (unstarted) one, attach to the last rendered bubble instead.
-        const target = this.messages.findLast((m) => m.role === 'assistant' && m.rendered) ?? this.lastAssistantBubble();
-        if (target) target.follow_ups = chips;
+        const steps = Array.isArray(event?.steps) ? event.steps.slice(0, 3) : [];
+        this.nextSteps = steps;
+
+        // Also stamped onto the bubble the steps belong to. The strip itself
+        // reads `nextSteps`, but the conversation cache snapshots `messages`
+        // only, so without this a switch away and back would paint an empty
+        // strip until the remount re-read it from the server.
+        const target = this.messages.findLast((m) => m.role === 'assistant' && m.rendered);
+        if (target) target.next_steps = steps;
+
+        // The strip lives at the tail of the transcript, so it lands BELOW the
+        // answer and grows the scroll height after the turn already settled.
+        // Unforced: a user who scrolled up to read keeps their position and
+        // finds the strip waiting at the bottom.
+        this.scrollToBottom();
     },
 
     // Server marked pending actions as superseded (user sent a new message without
@@ -254,30 +305,19 @@ export const streamModule = ({ texts = {} } = {}) => ({
 
     friendlyToolStatus(toolName) {
         if (!toolName) return this.streamTexts.runningTool;
+
         const normalized = String(toolName)
             .replace(/Tool$/, '')
-            .replace(/([a-z])([A-Z])/g, '$1_$2')
+            .replace(/([a-z\d])([A-Z])/g, '$1_$2')
             .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
             .toLowerCase();
 
-        if (normalized === 'get_crm_summary') return this.streamTexts.readingSummary;
-        if (normalized === 'search_crm') return this.streamTexts.searchingCrm;
+        const label = this.toolLabels[normalized];
+        if (label) return label;
 
-        const m = normalized.match(/^(list|get|create|update|delete)_(.+)$/);
-        if (!m) return this.streamTexts.runningName.replace(':name', normalized);
-
-        const [, op, rest] = m;
-        const entity = rest.replace(/_/g, ' ');
-
-        const template = ({
-            list: this.streamTexts.searchingEntity,
-            get: this.streamTexts.lookingUpEntity,
-            create: this.streamTexts.draftingEntity,
-            update: this.streamTexts.updatingEntity,
-            delete: this.streamTexts.deletingEntity,
-        })[op];
-
-        return template.replace(':entity', entity);
+        // A tool shipped without a label must still never leak its identifier:
+        // read it back as words ("Running add custom field options…").
+        return this.streamTexts.runningName.replace(':name', normalized.replace(/_/g, ' '));
     },
 
     startStreamTimeout(timeoutMs = null) {
@@ -442,6 +482,14 @@ export const streamModule = ({ texts = {} } = {}) => ({
             // and a second reconcile of the same turn must not double it.
             if (Array.isArray(authoritative.display_blocks)) {
                 assistantMsg.display_blocks = authoritative.display_blocks;
+            }
+            // Picks up a `.next_steps` broadcast the client never received. The
+            // suggester usually finishes AFTER this reconcile, in which case the
+            // row carries none yet and the broadcast is what fills the strip, so
+            // an empty list here must not wipe one already on screen.
+            if (Array.isArray(authoritative.next_steps) && authoritative.next_steps.length > 0) {
+                assistantMsg.next_steps = authoritative.next_steps;
+                this.nextSteps = authoritative.next_steps;
             }
         } catch (e) {
             // Non-fatal: keep the streamed content if reconciliation fails.

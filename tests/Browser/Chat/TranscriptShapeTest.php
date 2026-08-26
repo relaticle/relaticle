@@ -414,7 +414,7 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
         (() => {
             {$resolveInterface}
 
-            const base = { role: 'assistant', rendered: true, editing: false, editText: '', follow_ups: [] };
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '' };
 
             data.messages.push({ ...base, content: {$markdownJson}, prerendered: false });
             data.messages.push({ ...base, content: {$serverHtmlJson}, prerendered: true });
@@ -448,12 +448,13 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
 });
 
 /**
- * Copying a reply has to hand over links someone can paste anywhere, so the
- * root-relative `/r/` citations are absolutized against the current origin.
- * Both message shapes are covered because `msg.content` is markdown for a reply
- * rendered in this session and server HTML for one rehydrated on reload.
+ * `msg.content` is markdown for a reply rendered in this session and server
+ * HTML for one rehydrated on reload, so copying it verbatim pasted raw tags
+ * for every message the reader had not personally watched arrive. Both shapes
+ * now serialize to the SAME plain text, with the root-relative `/r/` citation
+ * absolutized so the link is pasteable anywhere.
  */
-it('copies a cited record as an absolute url from both message shapes', function (): void {
+it('copies both message shapes as the same plain text with absolute record urls', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
@@ -477,7 +478,7 @@ it('copies a cited record as an absolute url from both message shapes', function
                 value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } },
             });
 
-            const base = { role: 'assistant', rendered: true, editing: false, editText: '', follow_ups: [] };
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '' };
             const streamed = { ...base, content: {$markdownJson}, prerendered: false };
             const reloaded = { ...base, content: {$serverHtmlJson}, prerendered: true };
 
@@ -491,12 +492,82 @@ it('copies a cited record as an absolute url from both message shapes', function
     JS), true, 512, JSON_THROW_ON_ERROR);
 
     $origin = $result['origin'];
+    $expected = "Closed [Acme Corporation]({$origin}/r/company/01ABCDEF) this morning.";
 
-    expect($result['copied'])->toHaveCount(2)
-        ->and($result['copied'][0])->toContain("]({$origin}/r/company/01ABCDEF)")
-        ->and($result['copied'][1])->toContain("href=\"{$origin}/r/company/01ABCDEF\"")
-        ->and($result['copied'][0])->not->toContain('](/r/')
-        ->and($result['copied'][1])->not->toContain('href="/r/');
+    expect($result['copied'])->toBe([$expected, $expected]);
+});
+
+/**
+ * The structure guard for the copy serializer. Copy runs off the SAME html the
+ * transcript paints (see messageCopyText), so a reply has to come back out as
+ * text that still carries its headings, list markers, code fence, quote and
+ * table - and has to come back out IDENTICAL from both pipelines, or a reply
+ * would copy one way while the reader watched it stream and another way after
+ * a reload.
+ */
+it('copies every markdown structure back as text, identically from both pipelines', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $markdown = <<<'MD'
+        ### Next steps
+
+        1. Review the **Q3** numbers
+           - `revenue` first
+        2. Send the deck
+
+        > Blocked until legal signs off.
+
+        | Stage | Count |
+        | --- | --- |
+        | Won | 3 |
+
+        ```php
+        echo 'hi';
+        ```
+        MD;
+
+    $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
+    $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
+
+    $page = ChatBrowser::logIn($user, $team->slug)
+        ->navigate("/app/{$team->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $copied = json_decode((string) $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '' };
+
+            return JSON.stringify([
+                data.messageCopyText({ ...base, content: {$markdownJson}, prerendered: false }),
+                data.messageCopyText({ ...base, content: {$serverHtmlJson}, prerendered: true }),
+            ]);
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    $expected = implode("\n", [
+        '### Next steps',
+        '',
+        '1. Review the **Q3** numbers',
+        '   - `revenue` first',
+        '2. Send the deck',
+        '',
+        '> Blocked until legal signs off.',
+        '',
+        '| Stage | Count |',
+        '| --- | --- |',
+        '| Won | 3 |',
+        '',
+        '```php',
+        "echo 'hi';",
+        '```',
+    ]);
+
+    expect($copied)->toBe([$expected, $expected]);
 });
 
 /** The chip anchor inside a rendered reply, or null when nothing was chipped. */
@@ -603,9 +674,9 @@ it('renders the sticky transcript pills at their natural height inside the zero-
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    // The real path that raises the jump pill: the user has scrolled up (so
-    // the transcript is no longer pinned) and new content lands below them.
-    // Scrolling past the day separator is what puts a label in the date pill.
+    // The real path that raises the jump button: the user has scrolled up, so
+    // the transcript is no longer pinned to the bottom. Scrolling past the day
+    // separator is what puts a label in the date pill.
     $page->script(<<<JS
         (() => {
             {$resolveInterface}
@@ -615,17 +686,20 @@ it('renders the sticky transcript pills at their natural height inside the zero-
             container.scrollTop = separator.offsetTop + separator.offsetHeight + 40;
             container.dispatchEvent(new Event('scroll'));
             data.updateStickyDateLabel();
-            data.scrollToBottom(false);
 
             return true;
         })();
     JS);
 
     $heights = $page->script(<<<'JS'
-        (() => {
+        (async () => {
+            // The jump button fades in, so let the enter transition land before
+            // measuring; mid-transition it is not laid out yet.
+            await new Promise((r) => setTimeout(r, 300));
+
             const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
             const jump = Array.from(container.querySelectorAll('button'))
-                .find((el) => el.getAttribute('title') === 'New messages');
+                .find((el) => el.getAttribute('title') === 'Scroll to latest messages');
             const date = Array.from(container.querySelectorAll('.sticky > span'))
                 .find((el) => el.textContent.trim().length > 0);
 
@@ -640,6 +714,86 @@ it('renders the sticky transcript pills at their natural height inside the zero-
     // anything at or under ~20 means the zero-height row squashed them again.
     expect($heights['jump'])->toBeGreaterThanOrEqual(26.0);
     expect($heights['date'])->toBeGreaterThanOrEqual(26.0);
+});
+
+/**
+ * The scroll-to-bottom button is tied to where the user is, not to whether the
+ * assistant happened to say something: it is hidden while they sit at the
+ * bottom (nowhere to go) and on screen the whole time they are scrolled up,
+ * with no new message needed to summon it.
+ */
+it('shows the scroll-to-bottom button whenever the transcript is scrolled up, with no new messages', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'scroll affordance', $conversationId);
+
+    transcriptShapeInsertSequencedMessages(
+        $conversationId,
+        $user,
+        40,
+        Carbon::parse('2026-08-19 08:00:00', 'UTC'),
+    );
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Seeded message 0040');
+
+    // The button fades both ways and the click scrolls smoothly, so measure
+    // after both the animation and the leave transition have had time to
+    // finish; reading it mid-flight sees a still-laid-out element.
+    $probe = <<<'JS'
+        (async () => {
+            await new Promise((r) => setTimeout(r, 900));
+
+            const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
+            const button = Array.from(container.querySelectorAll('button'))
+                .find((el) => el.getAttribute('title') === 'Scroll to latest messages');
+
+            return {
+                present: !! button,
+                visible: !! button && button.getBoundingClientRect().height > 0,
+                distanceFromBottom: container.scrollHeight - container.scrollTop - container.clientHeight,
+            };
+        })();
+    JS;
+
+    // Landing on the conversation puts the user at the newest message.
+    $atBottom = $page->script($probe);
+
+    expect($atBottom['present'])->toBeTrue()
+        ->and($atBottom['visible'])->toBeFalse();
+
+    // Scroll up and stop. Nothing else happens: no stream, no new message.
+    $page->script(<<<'JS'
+        (() => {
+            const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
+            container.scrollTop = 0;
+            container.dispatchEvent(new Event('scroll'));
+
+            return true;
+        })();
+    JS);
+
+    $scrolledUp = $page->script($probe);
+
+    expect($scrolledUp['visible'])->toBeTrue();
+
+    // Clicking it returns the user to the newest message and stands down.
+    $page->script(<<<'JS'
+        (() => {
+            const container = document.querySelector('[data-chat-context="conversation"] [role="log"]');
+            Array.from(container.querySelectorAll('button'))
+                .find((el) => el.getAttribute('title') === 'Scroll to latest messages')
+                .click();
+
+            return true;
+        })();
+    JS);
+
+    $backAtBottom = $page->script($probe);
+
+    expect($backAtBottom['visible'])->toBeFalse()
+        ->and($backAtBottom['distanceFromBottom'])->toBeLessThan(2);
 });
 
 /**

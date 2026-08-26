@@ -382,7 +382,6 @@ it('never paints a transcript cached under a different user', function (): void 
                 rendered: true,
                 prerendered: true,
                 pending_actions: [],
-                follow_ups: [],
                 feedback: null,
             }]);
             window.__chatConversationCache = { owner: 'someone-else-entirely', entries };

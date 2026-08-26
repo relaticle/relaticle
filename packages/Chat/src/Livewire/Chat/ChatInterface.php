@@ -14,6 +14,7 @@ use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
+use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TranscriptScope;
 
@@ -159,7 +160,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->where('m.role', 'assistant')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
-            ->first(['m.id', 'm.content', 'm.tool_results']);
+            ->first(['m.id', 'm.content', 'm.tool_results', 'm.meta']);
 
         if ($row === null) {
             return null;
@@ -172,6 +173,7 @@ final class ChatInterface extends BaseLivewireComponent
             'display_blocks' => DisplayBlocks::collect(
                 $row->tool_results === null ? null : (string) $row->tool_results,
             ),
+            'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }
 

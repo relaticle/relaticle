@@ -116,6 +116,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Next Steps
+    |--------------------------------------------------------------------------
+    |
+    | After a turn ends, a second cheap model reads what the user asked and what
+    | the assistant answered and drafts up to three things to do next. They sit
+    | at the tail of the transcript as one-click prompts. Switch this off to
+    | end the turn on the answer alone.
+    |
+    | Runs on the cheapest model of whichever provider served the turn, on the
+    | default queue, and is never charged against the workspace's AI credits.
+    */
+
+    'next_steps' => [
+        'enabled' => (bool) env('CHAT_NEXT_STEPS', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Voice Input
     |--------------------------------------------------------------------------
     |

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
+use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TranscriptScope;
 
@@ -21,7 +22,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -38,7 +39,7 @@ final readonly class ListConversationMessages
         $messages = $query
             ->orderByDesc('m.id')
             ->limit($limit)
-            ->get(['m.id', 'm.role', 'm.content', 'm.document', 'm.tool_results', 'm.created_at'])
+            ->get(['m.id', 'm.role', 'm.content', 'm.document', 'm.tool_results', 'm.meta', 'm.created_at'])
             ->reverse()
             ->values();
 
@@ -119,6 +120,7 @@ final readonly class ListConversationMessages
             'display_blocks' => DisplayBlocks::collect(
                 $msg->tool_results === null ? null : (string) $msg->tool_results,
             ),
+            'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
             'feedback' => isset($feedbackByMessage[$msg->id]) ? [
                 'rating' => (string) $feedbackByMessage[$msg->id]->rating,
                 'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
