@@ -117,8 +117,20 @@
                         </div>
 
                         {{-- Tab panels — grid stacking for Safari-smooth crossfade.
-                             min-height matches the live chat panel so switching to a
-                             shorter (16:10) image tab can't collapse the mockup frame. --}}
+                             min-height matches the live chat panel so switching to an
+                             image tab can't collapse the mockup frame.
+
+                             The image tabs FILL that frame (object-cover) rather than
+                             sitting in it at their own aspect: the frame is a constant
+                             826x640 from `lg` up, so the screenshots are captured at
+                             that ratio and land pixel-exact there. Below `lg` the frame
+                             narrows and finally turns portrait, and cover crops the
+                             right edge instead of leaving the dead band under the
+                             image that a plain `h-auto` used to (measured: 124px at
+                             desktop, over half the frame on a phone). object-left-top
+                             keeps the crop predictable -- you always see the app from
+                             its top-left corner, which is what the alt text
+                             describes. --}}
                         <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
                             {{-- AI Agent tab (default — featured) --}}
                             {{-- min-w-0: a grid item defaults to min-width:auto, so the
@@ -130,47 +142,47 @@
 
                             {{-- Pipeline tab --}}
                             <div id="panel-pipeline" role="tabpanel" aria-labelledby="tab-pipeline" x-ref="panel-pipeline" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
                                             data-dark-srcset="{{ asset('images/app-pipeline-preview-dark-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-dark-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-dark-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview-dark.webp') }} 1440w"
                                             srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
-                                            sizes="(max-width: 640px) 380px, (max-width: 1024px) 640px, 832px"
+                                            sizes="(max-width: 640px) 750px, 842px"
                                             type="image/webp">
                                     <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-pipeline-preview-dark.png') }}"
                                          src="{{ asset('images/app-pipeline-preview.png') }}"
                                          alt="{{ __('Relaticle opportunities board with deals grouped into pipeline stages, showing deal value and close date') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-companies" role="tabpanel" aria-labelledby="tab-companies" x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-companies-preview-dark.png') }}"
                                          src="{{ asset('images/app-companies-preview.png') }}"
                                          alt="{{ __('Relaticle companies list showing account owner, ICP status, and website domain for each company') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-custom-fields" role="tabpanel" aria-labelledby="tab-custom-fields" x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-custom-fields-preview-dark.png') }}"
                                          src="{{ asset('images/app-custom-fields-preview.png') }}"
                                          alt="{{ __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>

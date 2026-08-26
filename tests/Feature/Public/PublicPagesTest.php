@@ -45,6 +45,19 @@ describe('Home page', function () {
         $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
     });
 
+    it('fills the mockup frame with every hero screenshot rather than letting it letterbox', function () {
+        $html = (string) $this->get('/')->assertStatus(200)->getContent();
+
+        // The frame is a constant 826x640 from `lg` up and the screenshots are
+        // captured at that ratio, but the frame turns portrait on a phone. Without
+        // object-cover the image sits at its own aspect inside a taller box and
+        // leaves a dead band under it (measured: 124px at desktop, over half the
+        // frame on a phone). object-left-top keeps the crop off the right, so the
+        // sidebar the alt text describes is never the part that goes.
+        expect(substr_count($html, 'object-cover object-left-top'))->toBe(3)
+            ->and($html)->not->toContain('hero-preview-image w-full h-auto');
+    });
+
     it('uses an existing raster logo in the organization json-ld', function () {
         $html = (string) $this->get('/')->assertStatus(200)->getContent();
 
