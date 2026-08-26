@@ -25,7 +25,10 @@ final readonly class CustomFieldsRequestValidator
      * with either a clean payload (keys by code, values normalized for the
      * action layer) or an error string suitable for tool output.
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true): CustomFieldsValidationResult
+    /**
+     * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
+     */
+    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null): CustomFieldsValidationResult
     {
         $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
 
@@ -45,7 +48,7 @@ final readonly class CustomFieldsRequestValidator
             return $translated;
         }
 
-        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate)
+        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
             ->toRules($translated->cleanFields);
 
         $validator = Validator::make(['custom_fields' => $translated->cleanFields], $rules);
