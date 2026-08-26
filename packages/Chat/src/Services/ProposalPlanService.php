@@ -84,11 +84,18 @@ final readonly class ProposalPlanService
     /**
      * Proposal ids this step needs before it can run.
      *
+     * Bare ids, with any `#<index>` suffix stripped: a reference into a batched
+     * proposal still depends on that whole proposal, and two references into the
+     * same batch are one dependency, not two.
+     *
      * @return list<string>
      */
     public function dependencyIds(PendingAction $step): array
     {
-        return PlanReference::targetsIn($step->action_data);
+        return array_values(array_unique(array_map(
+            PlanReference::actionId(...),
+            PlanReference::targetsIn($step->action_data),
+        )));
     }
 
     /**

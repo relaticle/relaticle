@@ -74,7 +74,9 @@ final readonly class PlanReference
     }
 
     /**
-     * Every pending action id referenced anywhere inside the payload.
+     * Every reference target anywhere inside the payload, each still carrying any
+     * `#<index>` suffix. Callers that need the bare proposal id pass the target
+     * through actionId().
      *
      * @param  array<array-key, mixed>  $data
      * @return list<string>
