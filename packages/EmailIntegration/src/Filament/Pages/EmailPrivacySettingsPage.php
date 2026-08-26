@@ -9,11 +9,11 @@ use App\Features\EmailIntegration;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -132,37 +132,32 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     public function form(Schema $schema): Schema
     {
         return $schema->schema([
-            Section::make(__('filament/pages/email-privacy-settings.workspace_default.heading'))
-                ->description(__('filament/pages/email-privacy-settings.workspace_default.description'))
-                ->schema([
-                    Select::make('default_email_sharing_tier')
-                        ->label(__('filament/pages/email-privacy-settings.workspace_default.tier_label'))
-                        ->options(EmailPrivacyTier::class)
-                        ->required(),
-                ])->compact(),
+            Grid::make(2)->schema([
+                Section::make(__('filament/pages/email-privacy-settings.workspace_default.heading'))
+                    ->description(__('filament/pages/email-privacy-settings.workspace_default.description'))
+                    ->schema([
+                        ViewField::make('default_email_sharing_tier')
+                            ->label(__('filament/pages/email-privacy-settings.workspace_default.tier_label'))
+                            ->view('email-integration::forms.sharing-tier-cards')
+                            ->viewData([
+                                'ariaLabel' => __('filament/pages/email-privacy-settings.workspace_default.tier_label'),
+                            ]),
+                    ])->compact(),
 
-            Section::make(__('filament/pages/email-privacy-settings.auto_hide_internal.heading'))
-                ->description(__('filament/pages/email-privacy-settings.auto_hide_internal.description'))
-                ->compact()
-                ->schema([
-                    Placeholder::make('internal_emails_info')
-                        ->hiddenLabel()
-                        ->content(__('filament/pages/email-privacy-settings.auto_hide_internal.content')),
-                ]),
-
-            Section::make(__('filament/pages/email-privacy-settings.protected_recipients.heading'))
-                ->compact()
-                ->description(__('filament/pages/email-privacy-settings.protected_recipients.description'))
-                ->schema([
-                    TagsInput::make('protected_emails')
-                        ->label(__('filament/pages/email-privacy-settings.protected_recipients.emails_label'))
-                        ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.emails_placeholder'))
-                        ->afterLabel(__('filament/pages/email-privacy-settings.protected_recipients.emails_after_label')),
-                    TagsInput::make('protected_domains')
-                        ->label(__('filament/pages/email-privacy-settings.protected_recipients.domains_label'))
-                        ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.domains_placeholder'))
-                        ->afterLabel(__('filament/pages/email-privacy-settings.protected_recipients.domains_after_label')),
-                ]),
+                Section::make(__('filament/pages/email-privacy-settings.privacy_protections.heading'))
+                    ->description(__('filament/pages/email-privacy-settings.privacy_protections.description'))
+                    ->compact()
+                    ->schema([
+                        TagsInput::make('protected_emails')
+                            ->label(__('filament/pages/email-privacy-settings.protected_recipients.emails_label'))
+                            ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.emails_placeholder'))
+                            ->afterLabel(__('filament/pages/email-privacy-settings.protected_recipients.emails_after_label')),
+                        TagsInput::make('protected_domains')
+                            ->label(__('filament/pages/email-privacy-settings.protected_recipients.domains_label'))
+                            ->placeholder(__('filament/pages/email-privacy-settings.protected_recipients.domains_placeholder'))
+                            ->afterLabel(__('filament/pages/email-privacy-settings.protected_recipients.domains_after_label')),
+                    ]),
+            ]),
         ]);
     }
 }
