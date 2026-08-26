@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\User;
 use GuzzleHttp\Psr7\Response as Psr7Response;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +14,6 @@ use Laravel\Ai\Exceptions\StreamErrorException;
 use Laravel\Ai\Streaming\Events\Error;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
-
-uses(LazilyRefreshDatabase::class);
 
 function seedRateLimitConversation(string $id, User $user): void
 {

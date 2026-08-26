@@ -102,7 +102,7 @@ it('can detach all companies from a note via empty array', function (): void {
         ])
         ->assertOk();
 
-    expect($note->refresh()->companies)->toHaveCount(0);
+    expect($note->refresh()->companies)->toBeEmpty();
 });
 
 it('can get a note by ID', function (): void {
@@ -167,7 +167,7 @@ it('can detach a note from a company', function (): void {
         ])
         ->assertOk();
 
-    expect($note->refresh()->companies)->toHaveCount(0);
+    expect($note->refresh()->companies)->toBeEmpty();
 });
 
 it('attach does not remove existing links', function (): void {

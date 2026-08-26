@@ -11,7 +11,7 @@ use PHPStan\Testing\RuleTestCase;
 /**
  * @extends RuleTestCase<RelationAccessInPolicyRule>
  */
-abstract class RelationAccessInPolicyRuleTestCase extends RuleTestCase
+abstract class RelationAccessInPolicyRuleTest extends RuleTestCase
 {
     protected function getRule(): Rule
     {
@@ -22,7 +22,7 @@ abstract class RelationAccessInPolicyRuleTestCase extends RuleTestCase
     }
 }
 
-uses(RelationAccessInPolicyRuleTestCase::class);
+pest()->extend(RelationAccessInPolicyRuleTest::class);
 
 it('flags relation access on the authorized record', function (): void {
     $expectedMessage = 'Policy resolves the `%s` relation on %s — authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row.';

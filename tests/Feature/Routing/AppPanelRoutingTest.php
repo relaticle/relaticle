@@ -233,7 +233,7 @@ it('gives every chat route throttle its own bucket so limiters cannot starve eac
         ->map(fn (array $t): string => $t['route'].' '.$t['middleware'])
         ->values();
 
-    expect($unprefixed->all())->toBe([]);
+    expect($unprefixed->all())->toBeEmpty();
 });
 
 it('does not let one chat route consume another route\'s rate limit allowance', function (): void {

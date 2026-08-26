@@ -11,7 +11,7 @@ use PHPStan\Testing\RuleTestCase;
 /**
  * @extends RuleTestCase<HardcodedStaticPropertyRule>
  */
-abstract class HardcodedStaticPropertyRuleTestCase extends RuleTestCase
+abstract class HardcodedStaticPropertyRuleTest extends RuleTestCase
 {
     protected function getRule(): Rule
     {
@@ -21,7 +21,7 @@ abstract class HardcodedStaticPropertyRuleTestCase extends RuleTestCase
     }
 }
 
-uses(HardcodedStaticPropertyRuleTestCase::class);
+pest()->extend(HardcodedStaticPropertyRuleTest::class);
 
 it('flags a hardcoded static property', function (): void {
     $this->analyse([__DIR__.'/data/hardcoded-static-nav.php'], [

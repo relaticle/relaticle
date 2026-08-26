@@ -65,7 +65,7 @@ it('keeps compiled agent guidelines in sync with their .ai sources', function ()
 
     $sources = glob($root.'/.ai/guidelines/relaticle/*.md') ?: [];
 
-    expect($sources)->not->toBe([]);
+    expect($sources)->not->toBeEmpty();
 
     foreach (['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'] as $compiled) {
         $compiledContent = (string) file_get_contents($root.'/'.$compiled);

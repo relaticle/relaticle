@@ -11,7 +11,7 @@ use PHPStan\Testing\RuleTestCase;
 /**
  * @extends RuleTestCase<EloquentWriteOutsideActionRule>
  */
-abstract class EloquentWriteOutsideActionRuleTestCase extends RuleTestCase
+abstract class EloquentWriteOutsideActionRuleTest extends RuleTestCase
 {
     protected function getRule(): Rule
     {
@@ -22,7 +22,7 @@ abstract class EloquentWriteOutsideActionRuleTestCase extends RuleTestCase
     }
 }
 
-uses(EloquentWriteOutsideActionRuleTestCase::class);
+pest()->extend(EloquentWriteOutsideActionRuleTest::class);
 
 it('flags eloquent writes in guarded namespaces', function (): void {
     $expectedMessage = 'Eloquent write ->%s() in a UI/transport surface — route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md).';

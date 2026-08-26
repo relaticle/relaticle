@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\Plan;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\AnthropicSse;
-
-uses(LazilyRefreshDatabase::class);
 
 it('refunds the reservation when a job fails without ever streaming', function (): void {
     $user = User::factory()->withPersonalTeam()->create();

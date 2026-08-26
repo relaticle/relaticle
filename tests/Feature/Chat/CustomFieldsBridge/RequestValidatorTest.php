@@ -107,8 +107,8 @@ it('returns an empty clean payload when input is null or empty array', function 
     $user = User::factory()->withPersonalTeam()->create();
     $validator = resolve(CustomFieldsRequestValidator::class);
 
-    expect($validator->validate($user, 'task', null)->cleanFields)->toBe([])
-        ->and($validator->validate($user, 'task', [])->cleanFields)->toBe([]);
+    expect($validator->validate($user, 'task', null)->cleanFields)->toBeEmpty()
+        ->and($validator->validate($user, 'task', [])->cleanFields)->toBeEmpty();
 });
 
 it('enforces required custom fields on create but not on update', function (): void {

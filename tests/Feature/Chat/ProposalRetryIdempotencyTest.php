@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +14,6 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
-
-uses(LazilyRefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();

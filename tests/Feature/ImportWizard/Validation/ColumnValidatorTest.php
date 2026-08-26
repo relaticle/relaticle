@@ -80,8 +80,7 @@ it('returns per-item errors for invalid emails in multi-choice arbitrary field',
 
     $itemErrors = $error->getItemErrors();
     expect($itemErrors)
-        ->toHaveKey('not-an-email')
-        ->toHaveKey('another-bad')
+        ->toHaveKeys(['not-an-email', 'another-bad'])
         ->not->toHaveKey('valid@test.com');
 });
 
@@ -140,8 +139,7 @@ it('returns per-item errors for invalid options in multi-choice predefined field
 
     $itemErrors = $error->getItemErrors();
     expect($itemErrors)
-        ->toHaveKey('green')
-        ->toHaveKey('purple')
+        ->toHaveKeys(['green', 'purple'])
         ->not->toHaveKey('red');
 
     expect($itemErrors['green'])->toBe('Not a valid option');

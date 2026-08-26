@@ -588,7 +588,7 @@ it('provides sub-options for each use case', function (): void {
         ->and(OnboardingUseCase::Marketing->getSubOptions())->toHaveCount(4)
         ->and(OnboardingUseCase::Fundraising->getSubOptions())->toHaveCount(3)
         ->and(OnboardingUseCase::Investing->getSubOptions())->toHaveCount(3)
-        ->and(OnboardingUseCase::Other->getSubOptions())->toBe([]);
+        ->and(OnboardingUseCase::Other->getSubOptions())->toBeEmpty();
 });
 
 it('stores referral source', function (): void {
@@ -727,7 +727,7 @@ it('creates team without invitations when no emails are provided', function (): 
 
     $team = Team::query()->where('name', 'No Invite Team')->first();
 
-    expect($team->teamInvitations)->toHaveCount(0);
+    expect($team->teamInvitations)->toBeEmpty();
 });
 
 it('maps use case to correct fixture set', function (): void {

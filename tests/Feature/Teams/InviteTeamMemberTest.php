@@ -75,7 +75,7 @@ test('team member invitations can be revoked', function () {
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation));
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 test('team members cannot be invited with a disposable email address', function () {
@@ -87,7 +87,7 @@ test('team members cannot be invited with a disposable email address', function 
         ->call('addTeamMember', $this->team)
         ->assertNotified(__('validation.indisposable'));
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 test('invite returns the created invitation', function () {
@@ -130,7 +130,7 @@ test('the chat adapter action rejects an invitation for an existing team member'
         ['email' => $member->email, 'role' => TeamRole::Editor->value],
     ))->toThrow(ValidationException::class);
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 /**

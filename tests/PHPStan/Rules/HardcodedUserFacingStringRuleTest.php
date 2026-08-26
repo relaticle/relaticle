@@ -11,7 +11,7 @@ use PHPStan\Testing\RuleTestCase;
 /**
  * @extends RuleTestCase<HardcodedUserFacingStringRule>
  */
-abstract class HardcodedUserFacingStringRuleTestCase extends RuleTestCase
+abstract class HardcodedUserFacingStringRuleTest extends RuleTestCase
 {
     /**
      * Mirror the canonical allowlist from phpstan.neon's
@@ -39,7 +39,7 @@ abstract class HardcodedUserFacingStringRuleTestCase extends RuleTestCase
     }
 }
 
-uses(HardcodedUserFacingStringRuleTestCase::class);
+pest()->extend(HardcodedUserFacingStringRuleTest::class);
 
 it('keeps guarded methods aligned with PHPStan configuration', function (): void {
     $configPath = dirname(__DIR__, 3).'/phpstan.neon';
@@ -55,7 +55,7 @@ it('keeps guarded methods aligned with PHPStan configuration', function (): void
     $configMethods = $methodMatches[1];
 
     sort($configMethods);
-    $testMethods = HardcodedUserFacingStringRuleTestCase::GUARDED_METHODS;
+    $testMethods = HardcodedUserFacingStringRuleTest::GUARDED_METHODS;
     sort($testMethods);
 
     expect($configMethods)->toBe(
