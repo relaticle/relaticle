@@ -117,7 +117,7 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
         }
     }
 
-    expect($offenders)->toBe([]);
+    expect($offenders)->toBeEmpty();
 });
 
 it('lazy-loads article images', function (): void {

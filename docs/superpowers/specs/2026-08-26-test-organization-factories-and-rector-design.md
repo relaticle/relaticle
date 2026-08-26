@@ -111,14 +111,23 @@ Create `rector-tests.php` with `PestSetList::CODING_STYLE`.
 Skip these rules:
 
 - `ChainExpectCallsRector`
+- `EnsureTypeChecksFirstRector`
 - `UseToThrowRector`
 - `UseToBeInRector`
 
 The first reduces assertion locality across many files.
 
-The second changes an existing try-catch test's semantics.
+The second changes assertion order.
 
-The third removes custom failure diagnostics.
+The third changes an existing try-catch test's semantics.
+
+The fourth removes custom failure diagnostics.
+
+Skip `UseToMatchRector` for `TranscriptShapeTest.php`. Its replacement drops the
+regex capture that the next assertion reads.
+
+Skip `UseToContainRector` for `UlidMigrationTest.php`. Its replacements drop the
+table and column names from custom failure diagnostics.
 
 Review every applied Rector change. Do not accept behavioral assertion changes.
 

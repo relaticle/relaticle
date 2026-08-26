@@ -55,9 +55,7 @@ it('falls back to ClaudeSonnet when a Gemini model is requested', function (): v
     $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gemini-3-flash');
-
-    expect($resolved['provider'])->toBe('anthropic');
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
 });
 
 it('resolves an explicit Ollama request when Ollama is configured', function (): void {
@@ -67,9 +65,7 @@ it('resolves an explicit Ollama request when Ollama is configured', function ():
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
-
-    expect($resolved['provider'])->toBe('ollama');
-    expect($resolved['model'])->toBe('qwen3:14b');
+    expect($resolved)->toMatchArray(['provider' => 'ollama', 'model' => 'qwen3:14b']);
 });
 
 it('falls back to Sonnet when Ollama is requested but not configured', function (): void {
@@ -79,9 +75,7 @@ it('falls back to Sonnet when Ollama is requested but not configured', function 
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
-
-    expect($resolved['provider'])->toBe('anthropic');
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
 });
 
 it('resolves Auto to Ollama when no cloud provider is configured', function (): void {
@@ -93,9 +87,7 @@ it('resolves Auto to Ollama when no cloud provider is configured', function (): 
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-
-    expect($resolved['provider'])->toBe('ollama');
-    expect($resolved['model'])->toBe('qwen3:14b');
+    expect($resolved)->toMatchArray(['provider' => 'ollama', 'model' => 'qwen3:14b']);
 });
 
 it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', function (): void {
@@ -105,9 +97,7 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-
-    expect($resolved['provider'])->toBe('anthropic');
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
 });
 
 it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
@@ -118,9 +108,7 @@ it('falls back to an available plan-gated model when the plan allows no configur
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-
-    expect($resolved['provider'])->toBe('openai');
-    expect($resolved['model'])->toBe('gpt-5.5');
+    expect($resolved)->toMatchArray(['provider' => 'openai', 'model' => 'gpt-5.5']);
 });
 
 it('falls back to Sonnet when no provider is configured at all', function (): void {
@@ -132,9 +120,7 @@ it('falls back to Sonnet when no provider is configured at all', function (): vo
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-
-    expect($resolved['provider'])->toBe('anthropic');
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
 });
 
 it('honors an Ollama default-model preference when configured', function (): void {
@@ -147,9 +133,7 @@ it('honors an Ollama default-model preference when configured', function (): voi
     $user->refresh();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, null);
-
-    expect($resolved['provider'])->toBe('ollama');
-    expect($resolved['model'])->toBe('llama3.1:70b');
+    expect($resolved)->toMatchArray(['provider' => 'ollama', 'model' => 'llama3.1:70b']);
 });
 
 it('labels explicit and auto resolutions', function (): void {

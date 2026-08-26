@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,6 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
-
-uses(LazilyRefreshDatabase::class);
 
 function seedResolvedConv(string $id, User $user): void
 {
@@ -173,7 +170,7 @@ it('returns an empty list for another conversation', function (): void {
         'resolved_at' => now(), 'result_data' => ['id' => 'x'],
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv', null))->toBe([]);
+    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv', null))->toBeEmpty();
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
@@ -252,7 +249,7 @@ it('labels a delete by the record name from the card fields', function (): void 
     $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-D', null);
 
     expect($resolved[0]['label'])->toBe('Acme')
-        ->and($resolved[0]['records'])->toBe([]);
+        ->and($resolved[0]['records'])->toBeEmpty();
 });
 
 it('labels each record of an approved batch with its own title and url', function (): void {
@@ -300,7 +297,7 @@ it('leaves superseded proposals to their own block instead of listing them as de
         'resolved_at' => now(),
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S', null))->toBe([]);
+    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S', null))->toBeEmpty();
 });
 
 it('replays proposal tool results unmutated after a decision', function (): void {
@@ -406,7 +403,7 @@ it('keeps a proposal superseded on an earlier turn visible when a later turn sup
 
     // Turn 3: nothing is pending anymore, so this turn supersedes nothing new.
     $turn3 = $pendingActions->supersedePendingForConversation('conv-super');
-    expect($turn3)->toBe([]);
+    expect($turn3)->toBeEmpty();
 
     $context = $pendingActions->supersededForConversation('conv-super');
 

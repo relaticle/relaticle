@@ -199,8 +199,8 @@ it('truncates a label or prompt the model wrote too long for the strip', functio
 
     $steps = persistedNextSteps($messageId);
 
-    expect(mb_strlen($steps[0]['label']))->toBe(48)
-        ->and(mb_strlen($steps[0]['prompt']))->toBe(160);
+    expect($steps[0]['label'])->toHaveLength(48)
+        ->and($steps[0]['prompt'])->toHaveLength(160);
 });
 
 it('writes nothing when the model offers no steps', function (): void {
@@ -217,7 +217,7 @@ it('writes nothing when the model offers no steps', function (): void {
         provider: 'anthropic',
     ))->handle();
 
-    expect(persistedNextSteps($messageId))->toBe([]);
+    expect(persistedNextSteps($messageId))->toBeEmpty();
     Event::assertNotDispatched(NextStepsSuggested::class);
 });
 
@@ -235,7 +235,7 @@ it('leaves the message untouched when the model call fails', function (): void {
         provider: 'anthropic',
     ))->handle();
 
-    expect(persistedNextSteps($messageId))->toBe([]);
+    expect(persistedNextSteps($messageId))->toBeEmpty();
     Event::assertNotDispatched(NextStepsSuggested::class);
 });
 
@@ -295,7 +295,7 @@ it('never calls the model when suggestions are switched off', function (): void 
     ))->handle();
 
     NextStepSuggester::assertNeverPrompted();
-    expect(persistedNextSteps($messageId))->toBe([]);
+    expect(persistedNextSteps($messageId))->toBeEmpty();
 });
 
 it('dispatches the suggester at the end of a turn with what the turn produced', function (): void {
@@ -377,5 +377,5 @@ it('hands the persisted steps to the turn-end reconcile', function (): void {
 it('reads no steps off a message that predates the feature', function (): void {
     $messageId = seedSuggestibleMessage('assistant', 'An older reply.');
 
-    expect(persistedNextSteps($messageId))->toBe([]);
+    expect(persistedNextSteps($messageId))->toBeEmpty();
 });

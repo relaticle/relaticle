@@ -207,7 +207,7 @@ it('treats a lone proposal as a plan of one', function (): void {
 
     expect($plan->isPlan($company))->toBeFalse()
         ->and($plan->steps($company))->toHaveCount(1)
-        ->and($plan->unmetDependencies($company, $plan->steps($company)))->toBe([]);
+        ->and($plan->unmetDependencies($company, $plan->steps($company)))->toBeEmpty();
 
     $result = $plan->approveAll($company, $this->user);
 

@@ -347,7 +347,10 @@ Expected: no security advisories.
 declare(strict_types=1);
 
 use Pest\Rector\Rules\ChainExpectCallsRector;
+use Pest\Rector\Rules\EnsureTypeChecksFirstRector;
 use Pest\Rector\Rules\UseToBeInRector;
+use Pest\Rector\Rules\UseToContainRector;
+use Pest\Rector\Rules\UseToMatchRector;
 use Pest\Rector\Rules\UseToThrowRector;
 use Pest\Rector\Set\PestSetList;
 use Rector\Config\RectorConfig;
@@ -357,8 +360,15 @@ return RectorConfig::configure()
     ->withPaths([__DIR__.'/tests'])
     ->withSkip([
         ChainExpectCallsRector::class,
+        EnsureTypeChecksFirstRector::class,
         UseToBeInRector::class,
         UseToThrowRector::class,
+        UseToContainRector::class => [
+            __DIR__.'/tests/Feature/Migrations/UlidMigrationTest.php',
+        ],
+        UseToMatchRector::class => [
+            __DIR__.'/tests/Browser/Chat/TranscriptShapeTest.php',
+        ],
     ])
     ->withSets([
         PestSetList::CODING_STYLE,
@@ -371,11 +381,19 @@ return RectorConfig::configure()
 vendor/bin/rector process --config=rector-tests.php --dry-run > .context/pr3-rector-tests-dry-run.txt
 ```
 
-Expected: about 30 test files are proposed. No skipped rule appears.
+Expected: 45 test files are initially proposed. No preconfigured skipped rule appears.
 
 - [ ] Review every proposed hunk before applying.
 
 Reject any hunk that changes evaluated values, exception scope, diagnostics, or assertion order.
+
+The review must reject these three proposals through configuration:
+
+- `EnsureTypeChecksFirstRector` in `GitHubServiceTest.php` changes assertion order.
+- `UseToMatchRector` in `TranscriptShapeTest.php` removes a required regex capture.
+- `UseToContainRector` in `UlidMigrationTest.php` removes custom failure diagnostics.
+
+Expected after the review: 42 test files remain.
 
 - [ ] Apply the reviewed configuration.
 

@@ -6,7 +6,6 @@ use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -29,8 +28,6 @@ use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Tests\Helpers\AnthropicSse;
-
-uses(LazilyRefreshDatabase::class);
 
 mutates(TurnContinuationService::class);
 

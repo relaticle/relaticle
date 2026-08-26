@@ -397,5 +397,5 @@ it('keeps Eloquent models off the client-callable surface of Livewire components
         }
     }
 
-    expect(array_values(array_unique($offenders)))->toBe([]);
+    expect(array_values(array_unique($offenders)))->toBeEmpty();
 });

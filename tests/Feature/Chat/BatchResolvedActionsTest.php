@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +14,6 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
-
-uses(LazilyRefreshDatabase::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -109,7 +106,7 @@ it('returns an empty record_ids list and still emits record_id for a flat approv
 
     expect($results)->toHaveCount(1)
         ->and($results[0]['record_id'])->toBe('01cc0000000000000000000000')
-        ->and($results[0]['record_ids'])->toBe([]);
+        ->and($results[0]['record_ids'])->toBeEmpty();
 
     $agent = resolve(CrmAssistant::class)->withResolvedActions($results);
 
