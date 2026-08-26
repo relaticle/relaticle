@@ -23,7 +23,7 @@
 
                 {{-- Heading --}}
                 <h1 class="text-center text-lg font-semibold text-gray-950 dark:text-white">
-                    Your account is being deleted
+                    {{ __('profile.scheduled_deletion_interstitial.heading') }}
                 </h1>
 
                 {{-- Countdown --}}
@@ -42,11 +42,17 @@
                 {{-- Details --}}
                 <div class="mt-5 space-y-2 text-center text-sm text-gray-500 dark:text-gray-400">
                     <p>
-                        Your account and all associated data will be permanently deleted on
-                        <strong class="text-gray-950 dark:text-white">{{ $deletionDate->format('F j, Y') }}</strong>.
+                        {{ __('profile.scheduled_deletion_interstitial.details.account') }}
                     </p>
                     <p>
-                        This includes {{ $teamCount }} {{ Str::plural('workspace', $teamCount) }}, contacts, companies, opportunities, and notes.
+                        {{ __('profile.scheduled_deletion_interstitial.details.deletion_date') }}
+                        <strong class="text-gray-950 dark:text-white">{{ $deletionDate->format('F j, Y') }}</strong>
+                    </p>
+                    <p>
+                        {{ trans_choice('profile.scheduled_deletion_interstitial.details.workspaces', $teamCount, ['count' => $teamCount]) }}
+                    </p>
+                    <p>
+                        {{ __('profile.scheduled_deletion_interstitial.details.shared_records') }}
                     </p>
                 </div>
 
@@ -61,7 +67,7 @@
 
             {{-- Help text --}}
             <p class="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
-                Changed your mind? Cancel the deletion above and your account will be fully restored.
+                {{ __('profile.scheduled_deletion_interstitial.help') }}
             </p>
         </div>
     </div>

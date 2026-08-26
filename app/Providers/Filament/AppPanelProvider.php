@@ -251,14 +251,6 @@ final class AppPanelProvider extends PanelProvider
                 ],
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
-            ->userMenuItems([
-                Action::make('settings')
-                    ->label(__('filament/panel.user_menu.settings'))
-                    ->icon('heroicon-m-cog-6-tooth')
-                    ->url(fn (): string => $this->shouldRegisterMenuItem()
-                        ? url(Settings::getUrl())
-                        : url($panel->getPath())),
-            ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -369,18 +361,29 @@ final class AppPanelProvider extends PanelProvider
                 },
             );
 
+        $accountMenuItems = [
+            Action::make('settings')
+                ->label(__('filament/panel.user_menu.settings'))
+                ->icon('heroicon-m-cog-6-tooth')
+                ->url(fn (): string => $this->shouldRegisterMenuItem()
+                    ? url(Settings::getUrl())
+                    : url($panel->getPath())),
+        ];
+
         if (Features::hasApiFeatures()) {
-            $panel->userMenuItems([
-                Action::make('api_tokens')
-                    ->label(__('access-tokens.user_menu'))
-                    ->icon('heroicon-o-key')
-                    ->url(fn (): string => $this->shouldRegisterMenuItem()
-                        ? url(AccessTokens::getUrl())
-                        : url($panel->getPath())),
-            ]);
+            $accountMenuItems[] = Action::make('api_tokens')
+                ->label(__('access-tokens.user_menu'))
+                ->icon('heroicon-o-key')
+                ->url(fn (): string => $this->shouldRegisterMenuItem()
+                    ? url(AccessTokens::getUrl())
+                    : url($panel->getPath()));
         }
 
-        $panel->userMenuItems($this->supportMenuItems());
+        $panel->userMenuItems([
+            $accountMenuItems,
+            $this->supportMenuItems(),
+            [],
+        ]);
 
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')

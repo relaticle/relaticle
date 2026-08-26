@@ -6,11 +6,13 @@ use App\Enums\SupportFormType;
 use App\Features\SupportMenu;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
+use App\Providers\Filament\AppPanelProvider;
 use App\Support\SupportForms;
 use Filament\Facades\Filament;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\DomCrawler\Crawler;
 
-mutates(SupportForms::class);
+mutates(AppPanelProvider::class, SupportForms::class);
 mutates(SupportFormType::class);
 mutates(SupportMenu::class);
 
@@ -39,6 +41,30 @@ it('renders the help menu items for the configured support forms', function (): 
         ->assertSee('form.maxforms.com/relcontact', false)
         ->assertSee('form.maxforms.com/relbug', false)
         ->assertSee('form.maxforms.com/relfeature', false);
+});
+
+it('separates account, support, and logout actions into distinct menu groups', function (): void {
+    config([
+        'relaticle.features.support_menu' => true,
+        'support.forms.contact' => 'https://form.maxforms.com/relcontact',
+        'support.forms.bug' => null,
+        'support.forms.feature' => null,
+    ]);
+
+    $response = visitDashboard()->assertOk();
+    $groups = collect((new Crawler($response->getContent()))
+        ->filter('.fi-user-menu .fi-dropdown-list')
+        ->each(fn (Crawler $group): string => $group->text()));
+
+    $settingsGroup = $groups->search(fn (string $group): bool => str_contains($group, 'Settings'));
+    $supportGroup = $groups->search(fn (string $group): bool => str_contains($group, 'Contact / Help'));
+    $logoutGroup = $groups->search(fn (string $group): bool => str_contains($group, 'Sign out'));
+
+    expect($settingsGroup)->toBeInt()
+        ->and($supportGroup)->toBeInt()
+        ->and($logoutGroup)->toBeInt()
+        ->and($settingsGroup)->toBeLessThan($supportGroup)
+        ->and($supportGroup)->toBeLessThan($logoutGroup);
 });
 
 it('hides the entire help menu when the support_menu feature is disabled', function (): void {

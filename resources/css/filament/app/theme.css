@@ -441,6 +441,10 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply rounded-full;
 }
 
+.fi-user-avatar {
+    @apply ring-1 ring-gray-950/10 dark:ring-white/15;
+}
+
 /* User Menu */
 .fi-user-menu-trigger {
     @apply rounded-xl;
@@ -706,4 +710,3 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
 /* Chat record chips moved to resources/css/theme.css: the marketing hero
    mock renders the same chips and only loads that shared bundle. */
-
