@@ -60,7 +60,9 @@ return [
     */
 
     'skills' => [
-        'exclude' => [],
+        'exclude' => [
+            'pest-testing',
+        ],
     ],
 
     /*
