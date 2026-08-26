@@ -53,7 +53,7 @@ it('returns provider-specific options for parallel-tool-call control', function 
     $agent = resolve(CrmAssistant::class);
 
     expect($agent->providerOptions('openai'))->toBe(['parallel_tool_calls' => false]);
-    expect($agent->providerOptions('gemini'))->toBeEmpty();
+    expect($agent->providerOptions('gemini'))->toBe([]);
     expect($agent->providerOptions(Lab::Anthropic))->toHaveKey('tool_choice');
 });
 

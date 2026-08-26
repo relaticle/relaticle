@@ -279,7 +279,7 @@ it('provides sub-options for each use case', function (): void {
         ->and(OnboardingUseCase::Marketing->getSubOptions())->toHaveCount(4)
         ->and(OnboardingUseCase::Fundraising->getSubOptions())->toHaveCount(3)
         ->and(OnboardingUseCase::Investing->getSubOptions())->toHaveCount(3)
-        ->and(OnboardingUseCase::Other->getSubOptions())->toBeEmpty();
+        ->and(OnboardingUseCase::Other->getSubOptions())->toBe([]);
 });
 
 it('maps use case to correct fixture set', function (): void {

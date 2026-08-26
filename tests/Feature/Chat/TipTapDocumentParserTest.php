@@ -90,7 +90,7 @@ it('drops mentions whose entity belongs to a different team', function (): void 
 
     $result = $parser->parse($document, $this->team);
 
-    expect($result['mentions'])->toBeEmpty();
+    expect($result['mentions'])->toBe([]);
 });
 
 it('drops mentions of unknown entity types', function (): void {
@@ -112,7 +112,7 @@ it('drops mentions of unknown entity types', function (): void {
 
     $result = $parser->parse($document, $this->team);
 
-    expect($result['mentions'])->toBeEmpty();
+    expect($result['mentions'])->toBe([]);
 });
 
 it('builds a document from text without mentions', function (): void {

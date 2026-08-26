@@ -106,7 +106,7 @@ it('returns an empty record_ids list and still emits record_id for a flat approv
 
     expect($results)->toHaveCount(1)
         ->and($results[0]['record_id'])->toBe('01cc0000000000000000000000')
-        ->and($results[0]['record_ids'])->toBeEmpty();
+        ->and($results[0]['record_ids'])->toBe([]);
 
     $agent = resolve(CrmAssistant::class)->withResolvedActions($results);
 
