@@ -109,7 +109,11 @@ test('admin can resend a pending invitation', function () {
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
-    Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
+    Mail::assertNotSent(TeamInvitationMail::class);
+    Mail::assertQueued(
+        TeamInvitationMail::class,
+        fn (TeamInvitationMail $mail): bool => $mail->hasTo('pending@example.com') && $mail->afterCommit === true,
+    );
 });
 
 test('admin can revoke a pending invitation', function () {
