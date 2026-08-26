@@ -576,7 +576,7 @@ final readonly class PendingActionService
      *
      * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null}>
      */
-    public function resolvedForConversation(string $conversationId): array
+    public function resolvedForConversation(string $conversationId, ?string $justDecidedTurnId): array
     {
         $actions = PendingAction::query()
             ->where('conversation_id', $conversationId)
@@ -604,6 +604,10 @@ final readonly class PendingActionService
             'skipped' => $this->skippedItemLabels($action),
             'excluded' => $this->excludedFieldEntries($action),
             'failure' => is_string($action->result_data['last_error'] ?? null) ? $action->result_data['last_error'] : null,
+            // True for the proposals the user's decision JUST resolved, the one that
+            // started this resumed turn. Without it every decided proposal looks the
+            // same age to the model and a fresh approval gets reported as history.
+            'just_decided' => $justDecidedTurnId !== null && $action->turn_id === $justDecidedTurnId,
         ], $actions->all()));
     }
 

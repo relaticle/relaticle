@@ -212,7 +212,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $pendingActions->supersededForConversation($this->conversationId),
             );
             $agent->withResolvedActions(
-                $pendingActions->resolvedForConversation($this->conversationId),
+                $pendingActions->resolvedForConversation($this->conversationId, $this->resumesTurnId),
             );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");

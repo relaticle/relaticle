@@ -81,7 +81,7 @@ it('keeps actions resolved before the last assistant message in context', functi
         'resolved_at' => now()->subMinute(), 'result_data' => ['id' => 'new-id'],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1', null);
 
     expect($resolved)->toHaveCount(2)
         ->and($resolved[0]['label'])->toBe('Rejected before last turn')
@@ -109,7 +109,7 @@ it('caps the context at the configured message window, oldest first', function (
         ]);
     }
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-1', null);
 
     expect($resolved)->toHaveCount(20)
         ->and($resolved[0]['label'])->toBe('Task 2')
@@ -150,7 +150,7 @@ it('derives the resolved and superseded context cap from chat.max_conversation_m
         ]);
     }
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-cap');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-cap', null);
     $superseded = resolve(PendingActionService::class)->supersededForConversation('conv-cap');
 
     expect($resolved)->toHaveCount(3)
@@ -173,7 +173,7 @@ it('returns an empty list for another conversation', function (): void {
         'resolved_at' => now(), 'result_data' => ['id' => 'x'],
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv'))->toBe([]);
+    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv', null))->toBe([]);
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
@@ -194,7 +194,7 @@ it('surfaces an approval even when the continuation never journals it (Bug A)', 
 
     resolve(PendingActionService::class)->approve($pending, $user);
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-A');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-A', null);
 
     expect($resolved)->toHaveCount(1)
         ->and($resolved[0]['status'])->toBe('approved')
@@ -226,7 +226,7 @@ it('labels a task create and update by the record title, never by the card headi
         'resolved_at' => now()->subMinute(), 'result_data' => ['id' => 'note-1'],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-L');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-L', null);
 
     expect($resolved[0]['label'])->toBe('Review Q3 sales pipeline')
         ->and($resolved[0]['records'])->toBe([['id' => 'task-1', 'label' => 'Review Q3 sales pipeline', 'url' => '/r/task/task-1']])
@@ -249,7 +249,7 @@ it('labels a delete by the record name from the card fields', function (): void 
         'resolved_at' => now(), 'result_data' => [],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-D');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-D', null);
 
     expect($resolved[0]['label'])->toBe('Acme')
         ->and($resolved[0]['records'])->toBe([]);
@@ -277,7 +277,7 @@ it('labels each record of an approved batch with its own title and url', functio
         ],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-B');
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-B', null);
 
     expect($resolved[0]['label'])->toBe('Alpha, Beta, Gamma')
         ->and($resolved[0]['records'])->toBe([
@@ -300,7 +300,7 @@ it('leaves superseded proposals to their own block instead of listing them as de
         'resolved_at' => now(),
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S'))->toBe([]);
+    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S', null))->toBe([]);
 });
 
 it('replays proposal tool results unmutated after a decision', function (): void {

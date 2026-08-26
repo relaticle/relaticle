@@ -271,25 +271,45 @@ it('renders no workspace_state block when no team is bound', function (): void {
 });
 
 /**
- * A resumed turn is the one the user's approval started, so its resolved
- * actions are what that click just did. Without this the model reported a
- * freshly approved invitation as "already sent earlier in our conversation,
- * no new action was needed", which tells the user their own click did
- * nothing. Reproduced on two consecutive live turns before the fix.
+ * A resumed turn is the one the user's approval started, so the proposals it
+ * carries are the outcome of that click. The block used to open with "already
+ * decided by the user earlier in this conversation", and the model repeated
+ * that back verbatim: a freshly approved invitation was reported as "already
+ * sent earlier in our conversation, no new action was needed", which tells the
+ * user their own click did nothing. Reproduced live on three separate turns.
+ *
+ * Wording alone did not fix it, the marker is what carries the distinction, so
+ * this pins the marker rather than the prose.
  */
-it('tells the model a resumed turn reports what the decision just did', function (): void {
-    $instructions = resolve(CrmAssistant::class)->instructions();
+it('marks the proposals the resumed turn just decided', function (): void {
+    $agent = resolve(CrmAssistant::class);
+    $agent->resolvedActions = [
+        [
+            'operation' => 'create', 'entity_type' => 'team_invitations', 'status' => 'approved',
+            'label' => 'fresh@example.com', 'record_id' => '01JUSTNOW', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => true,
+        ],
+        [
+            'operation' => 'create', 'entity_type' => 'companies', 'status' => 'approved',
+            'label' => 'Older Co', 'record_id' => '01EARLIER', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => false,
+        ],
+    ];
 
-    expect($instructions)
-        ->toContain('what the user\'s decision JUST did')
-        ->toContain('already sent')
-        ->toContain('never as history');
+    $block = $agent->instructions();
+
+    expect($block)
+        ->toContain('JUST DECIDED, approved: create team_invitations')
+        ->not->toContain('JUST DECIDED, approved: create companies')
+        ->not->toContain('already decided by the user earlier in this conversation')
+        ->toContain('Never call it already done, already sent, already invited');
 });
 
 /**
- * The Writes rule used to say "already approved", which the model rendered
- * back to the user as "already ... earlier in our conversation". The phrasing
- * has to distinguish approvals that arrived on THIS turn from earlier ones.
+ * The Writes rule used to say "already approved", which the model rendered back
+ * to the user as "already ... earlier in our conversation".
  */
 it('does not tell the model the request is already approved without qualifying when', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();

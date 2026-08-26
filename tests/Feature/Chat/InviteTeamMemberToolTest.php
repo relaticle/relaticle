@@ -245,7 +245,7 @@ it('labels a resolved invitation by its email so the assistant can name it', fun
     // This is what the next turn re-injects so the assistant can say who it
     // invited. Without the email fallback in recordLabel() it is null, and the
     // transcript calls the invitation "the record".
-    $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId);
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null);
 
     expect($resolved[0]['label'] ?? null)->toBe('alex@example.com');
 });

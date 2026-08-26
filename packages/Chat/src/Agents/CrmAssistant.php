@@ -120,7 +120,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * transcript, whose tool results keep claiming the proposal is pending.
      * Superseded proposals are NOT here: see $supersededProposals above.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null, just_decided?: bool}>
      */
     public array $resolvedActions = [];
 
@@ -488,7 +488,9 @@ PROMPT;
         $lines = [
             '',
             '<resolved_actions>',
-            'These proposals were already decided by the user earlier in this conversation and their approval cards are gone.',
+            'These proposals have been decided by the user and their approval cards are gone.',
+            'An entry marked JUST DECIDED was resolved by the decision that started THIS turn, seconds ago: it is the outcome of the click you are replying to. Report it as just completed ("Invited X", "Created Y"). Never call it already done, already sent, already invited, or something that happened earlier in the conversation, and never say no action was needed: that tells the user their own click did nothing.',
+            'Entries without that marker were decided on an earlier turn and may be referred to as already done.',
             'NEVER describe a decided proposal as pending, awaiting approval, or "shown above". "expired" means the card timed out undecided.',
             'Do not re-propose them on your own initiative. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal.',
             'Use an approved record id to continue any multi-step request still in progress, and its url to link the record by name.',
@@ -501,7 +503,7 @@ PROMPT;
             $excluded = $action['excluded'] ?? [];
 
             if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
-                $lines[] = "- {$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
+                $lines[] = '- '.($action['just_decided'] ?? false ? 'JUST DECIDED, ' : '')."{$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
 
                 foreach ($records as $record) {
                     $lines[] = '    - '.$this->quotedLabel($record['label'])." (id: {$record['id']}, url: {$record['url']})";
@@ -522,7 +524,7 @@ PROMPT;
                 continue;
             }
 
-            $line = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
+            $line = '- '.($action['just_decided'] ?? false ? 'JUST DECIDED, ' : '')."{$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
 
             if ($skipped !== []) {
                 $skippedLabels = implode(', ', array_map($this->quotedLabel(...), $skipped));
