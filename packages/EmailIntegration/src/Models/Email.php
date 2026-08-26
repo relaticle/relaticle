@@ -33,6 +33,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Observers\EmailObserver;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 /**
  * @property string $id
@@ -246,6 +247,27 @@ final class Email extends Model
     public function aiLabel(): ?EmailLabel
     {
         return $this->labels->firstWhere('source', 'ai');
+    }
+
+    /**
+     * @return EloquentCollection<int, EmailAttachment>
+     */
+    public function inlineAttachments(): EloquentCollection
+    {
+        return $this->attachments->where('is_inline', true);
+    }
+
+    /**
+     * @return EloquentCollection<int, EmailAttachment>
+     */
+    public function downloadAttachments(): EloquentCollection
+    {
+        return $this->attachments->where('is_inline', false);
+    }
+
+    public function sanitizedBodyHtml(): ?string
+    {
+        return EmailHtmlSanitizer::sanitize($this->body?->body_html, $this->inlineAttachments());
     }
 
     /**

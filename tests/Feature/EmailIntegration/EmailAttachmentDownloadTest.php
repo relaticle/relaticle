@@ -125,6 +125,37 @@ it('streams a file the user attached here, which never went through a provider',
     expect($response->streamedContent())->toBe('locally stored bytes');
 });
 
+it('serves inline image attachments for email body cid references', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/logo.png', 'png-bytes');
+
+    $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/logo.png',
+        'filename' => 'logo.png',
+        'mime_type' => 'image/png',
+        'is_inline' => true,
+        'content_id' => 'logo@example.test',
+    ]);
+
+    $response = $this->get(route('email-attachments.inline', ['attachment' => $attachment->id]));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'image/png');
+
+    expect($response->content())->toBe('png-bytes');
+});
+
+it('does not serve non-inline attachments through the inline image route', function (): void {
+    $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
+        'mime_type' => 'image/png',
+        'is_inline' => false,
+    ]);
+
+    $this->get(route('email-attachments.inline', ['attachment' => $attachment->id]))
+        ->assertNotFound();
+});
+
 it('aborts 404 when the connected account is missing', function (): void {
     $attachment = makeAttachmentForUser($this->user, $this->team, $this->account);
     $this->account->delete();

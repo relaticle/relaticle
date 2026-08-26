@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string|null $storage_path
  * @property string|null $provider_attachment_id Gmail attachment ID (can exceed 255 chars, stored as text)
+ * @property bool $is_inline
  */
 #[WithoutTimestamps]
 final class EmailAttachment extends Model
@@ -41,11 +42,13 @@ final class EmailAttachment extends Model
         'size',
         'storage_path',
         'content_id',
+        'is_inline',
         'provider_attachment_id',
     ];
 
     protected $casts = [
         'size' => 'integer',
+        'is_inline' => 'boolean',
     ];
 
     /**

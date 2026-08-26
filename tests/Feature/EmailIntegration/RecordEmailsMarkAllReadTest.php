@@ -33,6 +33,10 @@ beforeEach(function (): void {
         'connected_account_id' => $this->account->getKey(),
         'sent_at' => now(),
     ]);
+    $this->newer->body()->create([
+        'body_text' => 'plain text',
+        'body_html' => '<p>Reader body</p>',
+    ]);
 
     $this->older = Email::factory()->inbound()->full()->create([
         'team_id' => $this->team->id,
@@ -93,6 +97,14 @@ it('shows sender and recipient metadata in the email list', function (): void {
     livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
         ->assertSee('Alex Sender')
         ->assertSee('Taylor Recipient');
+});
+
+it('fills the reader body while the email iframe is loading', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->call('selectEmail', $this->newer->getKey())
+        ->assertSeeHtml('x-bind:class="ready ? \'shrink-0\' : \'flex min-h-0 flex-1 flex-col\'"')
+        ->assertSeeHtml('x-bind:class="ready ? \'\' : \'min-h-0 flex-1\'"')
+        ->assertDontSeeHtml('max-w-3xl');
 });
 
 it('saves an email privacy tier from the sharing cards', function (): void {

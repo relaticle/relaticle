@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -17,7 +18,31 @@ final readonly class EmailAttachmentController
         private MailServiceFactoryInterface $mailServiceFactory,
     ) {}
 
-    public function __invoke(Request $request, string $attachmentId): StreamedResponse
+    public function __invoke(Request $request, string $attachmentId): Response|StreamedResponse
+    {
+        $attachment = $this->authorizedAttachment($request, $attachmentId);
+
+        if ($request->routeIs('email-attachments.inline')) {
+            return $this->inlineResponse($attachment);
+        }
+
+        return $this->stream($this->attachmentBinary($attachment), $attachment->filename ?? 'attachment');
+    }
+
+    private function inlineResponse(EmailAttachment $attachment): Response
+    {
+        abort_unless($attachment->is_inline, 404);
+        abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
+
+        return response($this->attachmentBinary($attachment), 200, [
+            'Content-Type' => (string) $attachment->mime_type,
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+            'Cache-Control' => 'private, max-age=3600',
+        ]);
+    }
+
+    private function authorizedAttachment(Request $request, string $attachmentId): EmailAttachment
     {
         /** @var EmailAttachment $attachment */
         $attachment = EmailAttachment::with('email.connectedAccount')->findOrFail($attachmentId);
@@ -29,14 +54,19 @@ final readonly class EmailAttachmentController
         /** @var User $user */
         $user = $request->user();
 
-        // Verify the user belongs to the same team as the email
+        // Verify the user belongs to the same team as the email.
         abort_unless($user->current_team_id === $email->team_id, 403);
 
-        // Respect privacy — body access is required to download attachments
+        // Respect privacy; body access is required to download or render attachments.
         abort_unless($user->can('viewBody', $email), 403);
 
+        return $attachment;
+    }
+
+    private function attachmentBinary(EmailAttachment $attachment): string
+    {
         // Files the user attached here (a draft's own uploads) never went through a
-        // provider, so there is no provider id to fetch them by — they are already on
+        // provider, so there is no provider id to fetch them by; they are already on
         // our disk and stream straight back.
         if (blank($attachment->provider_attachment_id)) {
             $storagePath = $attachment->storage_path;
@@ -47,19 +77,21 @@ final readonly class EmailAttachmentController
 
             abort_unless($disk->exists($storagePath), 404, 'Attachment is not available for download.');
 
-            return $this->stream($disk->get($storagePath) ?? '', $attachment->filename ?? 'attachment');
+            return $disk->get($storagePath) ?? '';
         }
+
+        $email = $attachment->email;
 
         // The provider download needs the parent message id; outbound/partially-synced
         // rows can have a null provider_message_id, so guard for a clean 404 rather than
-        // passing null into the string-typed downloadAttachment() (TypeError → 500).
-        abort_if(blank($email->provider_message_id), 404, 'Attachment is not available for download.');
+        // passing null into the string-typed downloadAttachment() (TypeError -> 500).
+        abort_if($email === null || blank($email->provider_message_id), 404, 'Attachment is not available for download.');
 
         $connectedAccount = $email->connectedAccount;
 
         abort_if($connectedAccount === null, 404, 'Email account is no longer connected.');
 
-        // File downloads may legitimately take longer than the default 30 s PHP limit —
+        // File downloads may legitimately take longer than the default 30 s PHP limit;
         // raise it before the provider API call so large attachments don't time out.
         set_time_limit(120);
 
@@ -68,9 +100,7 @@ final readonly class EmailAttachmentController
         // HTTP responses rather than mid-stream failures.
         $mailService = $this->mailServiceFactory->make($connectedAccount);
 
-        $binary = $mailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
-
-        return $this->stream($binary, $attachment->filename ?? 'attachment');
+        return $mailService->downloadAttachment($email->provider_message_id, $attachment->provider_attachment_id);
     }
 
     /**

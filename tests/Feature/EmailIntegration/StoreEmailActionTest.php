@@ -6,6 +6,7 @@ use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
@@ -14,7 +15,9 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Services\EmailClassifier;
 
 mutates(StoreEmailAction::class);
 
@@ -231,7 +234,69 @@ it('creates email attachments', function (): void {
     expect($attachment->filename)->toBe('invoice.pdf')
         ->and($attachment->mime_type)->toBe('application/pdf')
         ->and($attachment->size)->toBe(204800)
+        ->and($attachment->is_inline)->toBeFalse()
         ->and($attachment->provider_attachment_id)->toBe('att-001');
+});
+
+it('stores inline attachment metadata', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $data = makeFetchedEmailData([
+        'attachments' => [
+            [
+                'filename' => 'logo.png',
+                'mime_type' => 'image/png',
+                'size' => 1024,
+                'content_id' => 'logo@example.test',
+                'attachment_id' => null,
+                'inline_data' => rtrim(strtr(base64_encode('inline-image-bytes'), '+/', '-_'), '='),
+                'is_inline' => true,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->content_id)->toBe('logo@example.test')
+        ->and($attachment->is_inline)->toBeTrue()
+        ->and($attachment->provider_attachment_id)->toBeNull()
+        ->and($attachment->storage_path)->not->toBeNull();
+
+    Storage::disk(EmailAttachment::DISK)
+        ->assertExists((string) $attachment->storage_path);
+});
+
+it('cleans up stored inline files when storing the email rolls back', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    app()->bind(EmailClassifier::class, fn (): object => new class
+    {
+        public function classify(FetchedEmailData $data, bool $isInternal): EmailCategory
+        {
+            throw new RuntimeException('Classification failed.');
+        }
+    });
+
+    $data = makeFetchedEmailData([
+        'attachments' => [
+            [
+                'filename' => 'logo.png',
+                'mime_type' => 'image/png',
+                'size' => 1024,
+                'content_id' => 'logo@example.test',
+                'attachment_id' => null,
+                'inline_data' => rtrim(strtr(base64_encode('inline-image-bytes'), '+/', '-_'), '='),
+                'is_inline' => true,
+            ],
+        ],
+    ]);
+
+    expect(fn () => resolve(StoreEmailAction::class)->execute($this->account, $data))
+        ->toThrow(RuntimeException::class, 'Classification failed.');
+
+    expect(Storage::disk(EmailAttachment::DISK)->allFiles('email-inline-attachments'))->toBe([]);
 });
 
 it('marks email as internal when all participants are team members', function (): void {

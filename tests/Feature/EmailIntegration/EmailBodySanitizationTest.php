@@ -13,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 mutates(Email::class, EmailHtmlSanitizer::class);
@@ -161,6 +162,40 @@ it('wraps sanitized email html in a scriptless dark-mode preview document', func
         ->toContain('background-color: transparent !important')
         ->toContain('<p style="color:#111111;background:#ffffff">Body</p>')
         ->not->toContain('<script');
+});
+
+it('rewrites cid image references to authorized inline attachment urls', function (): void {
+    $email = makeEmailWithBody('<p><img src="cid:logo@example.test"></p>');
+    $attachment = EmailAttachment::factory()->inline()->create([
+        'email_id' => $email->getKey(),
+        'content_id' => 'logo@example.test',
+    ]);
+
+    $html = EmailHtmlSanitizer::sanitize($email->body?->body_html, collect([$attachment]));
+
+    expect($html)
+        ->toContain(route('email-attachments.inline', ['attachment' => $attachment->getKey()]))
+        ->not->toContain('cid:logo@example.test');
+});
+
+it('splits inline attachments and sanitizes body html from the email model', function (): void {
+    $email = makeEmailWithBody('<p><img src="cid:logo@example.test"></p>');
+    $inlineAttachment = EmailAttachment::factory()->inline()->create([
+        'email_id' => $email->getKey(),
+        'content_id' => 'logo@example.test',
+    ]);
+    EmailAttachment::factory()->create([
+        'email_id' => $email->getKey(),
+        'filename' => 'invoice.pdf',
+    ]);
+
+    $email->load('attachments');
+
+    expect($email->inlineAttachments())->toHaveCount(1)
+        ->and($email->downloadAttachments())->toHaveCount(1)
+        ->and($email->sanitizedBodyHtml())
+        ->toContain(route('email-attachments.inline', ['attachment' => $inlineAttachment->getKey()]))
+        ->not->toContain('cid:logo@example.test');
 });
 
 it('renders the email view iframe without a same-origin sandbox', function (): void {

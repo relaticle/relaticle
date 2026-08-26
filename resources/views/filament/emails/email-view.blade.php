@@ -35,6 +35,9 @@
         $bytes < 1_048_576     => round($bytes / 1_024, 1) . ' KB',
         default                => round($bytes / 1_048_576, 1) . ' MB',
     };
+
+    $inlineAttachments = $record->attachments->where('is_inline', true);
+    $downloadAttachments = $record->attachments->where('is_inline', false);
 @endphp
 
 <div class="flex flex-col">
@@ -167,7 +170,7 @@
             <div class="w-full max-w-3xl overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
                 @if ($record->body?->body_html)
                     @php
-                        $safeHtml = EmailHtmlSanitizer::sanitize($record->body->body_html);
+                        $safeHtml = EmailHtmlSanitizer::sanitize($record->body->body_html, $inlineAttachments);
                     @endphp
                     <iframe
                         srcdoc="{{ $safeHtml }}"
@@ -225,18 +228,18 @@
     @endif
 
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
-    @if ($canViewBody && $record->has_attachments && $record->attachments->isNotEmpty())
+    @if ($canViewBody && $downloadAttachments->isNotEmpty())
         <div class="border-t border-gray-100 dark:border-gray-800 px-6 py-5">
 
             <p class="mb-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
                 Attachments
                 <span class="ml-1 font-normal normal-case tracking-normal">
-                    ({{ $record->attachments->count() }})
+                    ({{ $downloadAttachments->count() }})
                 </span>
             </p>
 
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($record->attachments as $attachment)
+                @foreach ($downloadAttachments as $attachment)
                     @php
                         $downloadUrl = filled($attachment->provider_attachment_id)
                             ? route('email-attachments.download', $attachment->getKey())
