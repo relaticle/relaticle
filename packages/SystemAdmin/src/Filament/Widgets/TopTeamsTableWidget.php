@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Enums\CreationSource;
 use App\Enums\Plan;
 use App\Models\Team;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
@@ -14,12 +14,17 @@ use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 
+/**
+ * Ranks teams by the distinct records they worked on in the selected period,
+ * read from the activity log so edits and deletes count as activity, not only
+ * record creation. Seeded demo data never appears here: OnboardSeed runs
+ * inside Model::withoutEvents(), so it writes no activity rows.
+ */
 final class TopTeamsTableWidget extends BaseWidget
 {
     use InteractsWithPageFilters;
@@ -29,9 +34,6 @@ final class TopTeamsTableWidget extends BaseWidget
     protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';
-
-    /** @var array<int, string> */
-    private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
     public function table(Table $table): Table
     {
@@ -65,20 +67,29 @@ final class TopTeamsTableWidget extends BaseWidget
 
                 TextColumn::make('members_count')
                     ->label('Members')
-                    ->state(fn (Team $record): string => "{$this->countActiveMembers($record)} / {$record->members_count}")
+                    ->state(fn (Team $record): string => "{$record->active_members} / {$record->members_count}")
                     ->tooltip('Active in period / total members')
                     ->sortable()
                     ->alignCenter()
                     ->badge()
                     ->color('gray'),
 
-                TextColumn::make('records_count')
+                TextColumn::make('records_touched')
                     ->label('Records')
+                    ->tooltip('Distinct records with activity in the period')
                     ->numeric()
-                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('records_count', $direction))
+                    ->sortable()
                     ->alignCenter()
                     ->badge()
                     ->color('info'),
+
+                TextColumn::make('active_days')
+                    ->label('Active Days')
+                    ->numeric()
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('success'),
 
                 TextColumn::make('custom_fields_count')
                     ->label('Custom Fields')
@@ -106,122 +117,46 @@ final class TopTeamsTableWidget extends BaseWidget
                         'filters' => ['team_id' => ['value' => $record->id]],
                     ])),
             ])
-            ->defaultSort('records_count', 'desc')
+            ->defaultSort('records_touched', 'desc')
             ->paginated([10, 25])
             ->defaultPaginationPageOption(10)
             ->striped()
             ->emptyStateHeading('No Active Teams')
-            ->emptyStateDescription('Team activity will appear here once teams start creating records.')
+            ->emptyStateDescription('Team activity will appear here once teams start working with records.')
             ->emptyStateIcon('heroicon-o-user-group');
-    }
-
-    /**
-     * @return array{string, string}
-     */
-    private function getDateRange(): array
-    {
-        return once(function (): array {
-            $days = (int) ($this->pageFilters['period'] ?? 30);
-            $end = CarbonImmutable::now();
-            $start = $end->subDays($days);
-
-            return [$start->toDateTimeString(), $end->toDateTimeString()];
-        });
-    }
-
-    /**
-     * @return array{string, array<int, string>}
-     */
-    private function getRecordsCountExpression(): array
-    {
-        return once(function (): array {
-            [$startStr, $endStr] = $this->getDateRange();
-
-            return $this->buildRecordsCountExpression(CreationSource::SYSTEM->value, $startStr, $endStr);
-        });
-    }
-
-    /**
-     * Distinct users who created at least one record for the team inside the
-     * selected period. Runs per rendered row, which is fine at one page of
-     * ten teams.
-     */
-    private function countActiveMembers(Team $record): int
-    {
-        [$startStr, $endStr] = $this->getDateRange();
-        $systemSource = CreationSource::SYSTEM->value;
-
-        $unionParts = [];
-        $bindings = [];
-
-        foreach (self::ENTITY_TABLES as $table) {
-            $unionParts[] = "SELECT creator_id FROM {$table} WHERE team_id = ? AND creator_id IS NOT NULL AND deleted_at IS NULL AND creation_source != ? AND created_at BETWEEN ? AND ?";
-            $bindings[] = $record->id;
-            $bindings[] = $systemSource;
-            $bindings[] = $startStr;
-            $bindings[] = $endStr;
-        }
-
-        $sql = 'SELECT COUNT(DISTINCT creator_id) AS cnt FROM ('.implode(' UNION ALL ', $unionParts).') AS creators';
-
-        return (int) (DB::selectOne($sql, $bindings)->cnt ?? 0);
     }
 
     private function buildQuery(): Builder
     {
-        [$recordsCountSql, $recordsBindings] = $this->getRecordsCountExpression();
-        [$lastActivitySql, $lastActivityBindings] = $this->buildLastActivityExpression(CreationSource::SYSTEM->value);
-        [$startStr, $endStr] = $this->getDateRange();
-        $systemSource = CreationSource::SYSTEM->value;
+        $days = (int) ($this->pageFilters['period'] ?? 30);
+        $end = CarbonImmutable::now();
+        $start = $end->subDays($days);
+
+        $userMorphAlias = (new User)->getMorphClass();
+
+        $activity = DB::table('activity_log')
+            ->selectRaw(<<<'SQL'
+                team_id,
+                COUNT(DISTINCT (subject_type, subject_id)) AS records_touched,
+                COUNT(DISTINCT created_at::date) AS active_days,
+                COUNT(DISTINCT causer_id) FILTER (WHERE causer_type = ?) AS active_members,
+                MAX(created_at) AS last_activity
+            SQL, [$userMorphAlias])
+            ->whereNotNull('team_id')
+            ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
+            ->groupBy('team_id');
 
         return Team::query()
-            ->select(['teams.*'])
-            ->selectRaw("({$recordsCountSql}) as records_count", $recordsBindings)
+            ->select([
+                'teams.*',
+                'activity.records_touched',
+                'activity.active_days',
+                'activity.active_members',
+                'activity.last_activity',
+            ])
             // Jetstream keeps the owner out of team_user, hence the +1.
             ->selectRaw('(SELECT COUNT(*) + 1 FROM team_user WHERE team_user.team_id = teams.id) as members_count')
             ->selectRaw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = teams.id) as custom_fields_count')
-            ->selectRaw("{$lastActivitySql} as last_activity", $lastActivityBindings)
-            ->where(function (Builder $query) use ($startStr, $endStr, $systemSource): void {
-                foreach (self::ENTITY_TABLES as $table) {
-                    $query->orWhereExists(function (QueryBuilder $sub) use ($table, $startStr, $endStr, $systemSource): void {
-                        $sub->selectRaw('1')
-                            ->from($table)
-                            ->whereColumn("{$table}.team_id", 'teams.id')
-                            ->whereNull("{$table}.deleted_at")
-                            ->where("{$table}.creation_source", '!=', $systemSource)
-                            ->whereBetween("{$table}.created_at", [$startStr, $endStr]);
-                    });
-                }
-            });
-    }
-
-    /**
-     * @return array{string, array<int, string>}
-     */
-    private function buildRecordsCountExpression(string $systemSource, string $startStr, string $endStr): array
-    {
-        $subqueries = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "(SELECT COUNT(*) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != ? AND {$table}.created_at BETWEEN ? AND ?)"
-        );
-
-        $bindings = collect(self::ENTITY_TABLES)
-            ->flatMap(fn (): array => [$systemSource, $startStr, $endStr])
-            ->all();
-
-        return [$subqueries->implode(' + '), $bindings];
-    }
-
-    /**
-     * @return array{string, array<int, string>}
-     */
-    private function buildLastActivityExpression(string $systemSource): array
-    {
-        $coalesces = collect(self::ENTITY_TABLES)->map(
-            fn (string $table): string => "COALESCE((SELECT MAX(created_at) FROM {$table} WHERE {$table}.team_id = teams.id AND {$table}.deleted_at IS NULL AND {$table}.creation_source != ?), TIMESTAMP '1970-01-01')"
-        );
-
-        $bindings = array_fill(0, count(self::ENTITY_TABLES), $systemSource);
-
-        return ["GREATEST({$coalesces->implode(', ')})", $bindings];
+            ->joinSub($activity, 'activity', 'activity.team_id', '=', 'teams.id');
     }
 }
