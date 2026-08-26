@@ -104,7 +104,7 @@ it('can render the opportunities list page', function () {
 });
 
 it('can render the imports list page', function () {
-    $imports = collect(range(1, 3))->map(fn () => Import::create([
+    $imports = collect(range(1, 3))->map(fn () => Import::factory()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->teamOwner->id,
         'entity_type' => ImportEntityType::Company,

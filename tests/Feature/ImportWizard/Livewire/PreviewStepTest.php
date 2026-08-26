@@ -53,7 +53,7 @@ function createPreviewReadyStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): ImportStore {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
@@ -142,7 +142,7 @@ it('resolves rows as Update when email matches existing record', function (): vo
         ->first();
 
     if ($emailField) {
-        CustomFieldValue::create([
+        CustomFieldValue::factory()->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,

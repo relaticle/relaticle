@@ -107,7 +107,12 @@ Expected: no output.
 
 ```bash
 vendor/bin/pest --list-tests --no-tia > .context/pr3-tests-after-moves.txt
-diff -u .context/pr3-tests-before.txt .context/pr3-tests-after-moves.txt
+sed -E 's/^.*::__pest_evaluable_//' .context/pr3-tests-before.txt | sort \
+    > .context/pr3-test-descriptions-before.txt
+sed -E 's/^.*::__pest_evaluable_//' .context/pr3-tests-after-moves.txt | sort \
+    > .context/pr3-test-descriptions-after-moves.txt
+diff -u .context/pr3-test-descriptions-before.txt \
+    .context/pr3-test-descriptions-after-moves.txt
 ```
 
 Expected: paths may change in display output. Test descriptions and total count must match.
@@ -419,6 +424,8 @@ vendor/bin/pest --list-tests --no-tia > .context/pr3-tests-final.txt
 ```
 
 Compare descriptions and counts against `.context/pr3-tests-before.txt`.
+
+Normalize the generated class prefix as shown in Task 2 before comparing descriptions.
 
 Expected: names and counts match. Only file paths differ.
 

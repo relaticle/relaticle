@@ -48,7 +48,7 @@ function mountImportWizard(object $context, ?string $returnUrl = null): Testable
 
 function createFullTestStore(object $context): ImportStore
 {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => ImportEntityType::People,
@@ -293,7 +293,7 @@ it('resets storeId when store belongs to different team', function (): void {
     $otherUser = User::factory()->withTeam()->create();
     $otherTeam = $otherUser->currentTeam;
 
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $otherTeam->id,
         'user_id' => (string) $otherUser->id,
         'entity_type' => ImportEntityType::People,
