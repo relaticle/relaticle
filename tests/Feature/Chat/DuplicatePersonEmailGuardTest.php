@@ -13,6 +13,7 @@ use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
+use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(BaseWriteCreateTool::class);
@@ -110,6 +111,37 @@ it('proposes normally when the email is unused or absent', function (): void {
 
     expect($fresh)->toContain('pending_action_id')
         ->and($noEmail)->toContain('pending_action_id');
+});
+
+it('lets an update resubmit the record\'s own unique email', function (): void {
+    $person = seedPersonWithEmail($this->user, 'Test Person', 'test@example.com');
+
+    $tool = resolve(UpdatePersonTool::class);
+    $tool->setConversationId($this->convId);
+
+    $response = $tool->handle(new Request(['records' => [[
+        'id' => (string) $person->getKey(),
+        'custom_fields' => ['emails' => ['test@example.com'], 'job_title' => 'VP of Sales'],
+    ]]]));
+
+    expect($response)->toContain('pending_action_id')
+        ->not->toContain('already assigned');
+});
+
+it('still blocks an update that takes another record\'s unique email', function (): void {
+    seedPersonWithEmail($this->user, 'Test Person', 'test@example.com');
+    $other = seedPersonWithEmail($this->user, 'Other Person', 'other@example.com');
+
+    $tool = resolve(UpdatePersonTool::class);
+    $tool->setConversationId($this->convId);
+
+    $response = $tool->handle(new Request(['records' => [[
+        'id' => (string) $other->getKey(),
+        'custom_fields' => ['emails' => ['test@example.com']],
+    ]]]));
+
+    expect($response)->toContain('already assigned')
+        ->not->toContain('pending_action_id');
 });
 
 it('ignores matching emails on another team', function (): void {

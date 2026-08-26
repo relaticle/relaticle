@@ -120,7 +120,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * transcript, whose tool results keep claiming the proposal is pending.
      * Superseded proposals are NOT here: see $supersededProposals above.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null}>
      */
     public array $resolvedActions = [];
 
@@ -513,6 +513,10 @@ PROMPT;
                     $lines[] = '    - fields unchecked by the user on '.$this->quotedLabel($entry['record']).', NOT written: '.implode(', ', $entry['fields']);
                 }
 
+                if (is_string($action['failure'] ?? null) && $action['failure'] !== '') {
+                    $lines[] = '    - an approval attempt failed before this decision: '.$this->quotedLabel($action['failure']);
+                }
+
                 continue;
             }
 
@@ -530,6 +534,12 @@ PROMPT;
                 $line .= '; fields unchecked by the user'
                     .($entry['record'] === null ? '' : ' on '.$this->quotedLabel($entry['record']))
                     .', NOT written: '.implode(', ', $entry['fields']);
+            }
+
+            // A discard that followed a failed approval is not a plain change of
+            // mind; without the reason the model cannot answer "why did it fail?".
+            if (is_string($action['failure'] ?? null) && $action['failure'] !== '') {
+                $line .= '; an approval attempt failed before this decision: '.$this->quotedLabel($action['failure']);
             }
 
             $lines[] = $line;

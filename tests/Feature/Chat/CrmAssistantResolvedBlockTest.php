@@ -20,6 +20,34 @@ it('renders a resolved_actions block when set', function (): void {
         ->and($instructions)->toContain('when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal');
 });
 
+it('tells the model about unchecked fields and failed approval attempts', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withResolvedActions([
+            [
+                'operation' => 'create',
+                'entity_type' => 'person',
+                'status' => 'approved',
+                'label' => 'James',
+                'record_id' => '01DEF',
+                'excluded' => [['record' => null, 'fields' => ['Job title']]],
+                'failure' => null,
+            ],
+            [
+                'operation' => 'create',
+                'entity_type' => 'task',
+                'status' => 'rejected',
+                'label' => 'Follow up',
+                'record_id' => null,
+                'excluded' => [],
+                'failure' => 'The assignee is no longer part of this workspace.',
+            ],
+        ])
+        ->instructions();
+
+    expect($instructions)->toContain('fields unchecked by the user, NOT written: Job title')
+        ->and($instructions)->toContain('an approval attempt failed before this decision: "The assignee is no longer part of this workspace."');
+});
+
 it('omits the resolved_actions block when empty', function (): void {
     // The prose mentions the <resolved_actions> tag; the rendered block has a
     // unique content marker that must be absent when there are no resolved actions.

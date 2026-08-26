@@ -175,13 +175,13 @@ abstract class BaseWriteCreateTool implements Tool
         }
 
         if ($actionRecords === []) {
-            $reasons = implode('; ', array_map(
-                static fn (array $skip): string => "{$skip['record']}: {$skip['reason']}",
+            $reasons = implode(' ', array_map(
+                static fn (array $skip): string => "{$skip['record']}: ".rtrim($skip['reason'], '.').'.',
                 $skipped,
             ));
 
             return (string) json_encode([
-                'error' => "No proposal was created; every record failed validation. {$reasons}."
+                'error' => "No proposal was created; every record failed validation. {$reasons}"
                     .' Tell the user each reason. Do not retry with the same values.',
             ], JSON_UNESCAPED_SLASHES);
         }

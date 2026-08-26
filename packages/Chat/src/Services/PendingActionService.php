@@ -137,6 +137,27 @@ final readonly class PendingActionService
     }
 
     /**
+     * Remember why an approval attempt failed, on the still-pending row. The
+     * model reads it back through resolvedForConversation() once the proposal
+     * is decided, so a discard after a failed approval never reads as a plain
+     * user rejection. Best-effort: reporting a failure must never throw over
+     * the failure being reported. A later successful approval clears it.
+     */
+    public function recordResolveFailure(PendingAction $pendingAction, string $message): void
+    {
+        try {
+            $pendingAction->update([
+                'result_data' => [
+                    ...(is_array($pendingAction->result_data) ? $pendingAction->result_data : []),
+                    'last_error' => $message,
+                ],
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
      * @param  list<string>  $excludedFields  field codes the user unchecked on the card; stripped from the write, never persisted into action_data
      */
     public function approve(PendingAction $pendingAction, User $user, array $excludedFields = []): PendingAction
@@ -305,6 +326,11 @@ final readonly class PendingActionService
                 }
 
                 $model = $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type));
+
+                // A failure remembered from an earlier attempt is history the
+                // moment an item commits; leaving it would report a stale error
+                // on a batch that finalizes Approved.
+                unset($resultData['last_error']);
 
                 $items[$index] = ['status' => 'approved', 'id' => $model->getKey()];
 
@@ -548,7 +574,7 @@ final readonly class PendingActionService
      * proposals are left out: they travel in their own block (see
      * supersededForConversation()) and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null}>
      */
     public function resolvedForConversation(string $conversationId): array
     {
@@ -577,6 +603,7 @@ final readonly class PendingActionService
             'records' => $this->resolvedRecords($action),
             'skipped' => $this->skippedItemLabels($action),
             'excluded' => $this->excludedFieldEntries($action),
+            'failure' => is_string($action->result_data['last_error'] ?? null) ? $action->result_data['last_error'] : null,
         ], $actions->all()));
     }
 

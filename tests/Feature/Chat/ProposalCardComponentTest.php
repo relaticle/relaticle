@@ -1110,7 +1110,10 @@ it('surfaces a failure when the assignee left the workspace between proposal and
         ->assertHasErrors('resolve');
 
     expect(Task::query()->where('title', 'Follow up call')->exists())->toBeFalse()
-        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        // The reason survives on the row, so the model can explain the failure
+        // after the proposal is eventually decided.
+        ->and($action->fresh()->result_data['last_error'] ?? null)->toBeString()->not->toBe('');
 });
 
 it('renders the resolve failure in the dock so the approval is never a silent no-op', function (): void {

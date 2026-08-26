@@ -651,16 +651,19 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $display = $payload->displayAt($this->cursorFor($step));
+        $summary = $display['summary'] ?? null;
+
+        // The quoted record name from the summary ('Create person "Alice"')
+        // comes first: the real tools set each item's `title` to the generic
+        // entity title ("Create Person"), which is the eyebrow, not an identity.
+        if (is_string($summary) && preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
+            return $matches[1];
+        }
+
         $title = $display['title'] ?? null;
 
         if (is_string($title) && $title !== '') {
             return $title;
-        }
-
-        $summary = $display['summary'] ?? null;
-
-        if (is_string($summary) && preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
-            return $matches[1];
         }
 
         return is_string($summary) ? $summary : '';
@@ -1538,6 +1541,11 @@ final class ProposalCard extends BaseLivewireComponent
     private function reportResolveFailure(PendingAction $pendingAction, string $message): void
     {
         $this->addError('resolve', $message);
+
+        // Persisted so the model can explain the failure later: without this
+        // the card is the only witness, and a proposal discarded after a failed
+        // approval reads to the assistant as a plain user rejection.
+        resolve(PendingActionService::class)->recordResolveFailure($pendingAction, $message);
 
         $this->dispatch(
             'proposal:resolve-failed',
