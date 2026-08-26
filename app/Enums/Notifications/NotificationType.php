@@ -8,14 +8,12 @@ enum NotificationType: string
 {
     case TaskAssigned = 'task_assigned';
     case TaskDigest = 'task_digest';
-    case SetupNudge = 'setup_nudge';
 
     public function group(): NotificationGroup
     {
         return match ($this) {
             self::TaskAssigned => NotificationGroup::Collaboration,
             self::TaskDigest => NotificationGroup::Digest,
-            self::SetupNudge => NotificationGroup::Onboarding,
         };
     }
 
@@ -35,7 +33,6 @@ enum NotificationType: string
         return match ($this) {
             self::TaskAssigned => [NotificationChannel::InApp, NotificationChannel::Email],
             self::TaskDigest => [NotificationChannel::Email],
-            self::SetupNudge => [NotificationChannel::Email],
         };
     }
 
@@ -44,7 +41,6 @@ enum NotificationType: string
         return match ($this) {
             self::TaskAssigned => $channel === NotificationChannel::InApp,
             self::TaskDigest => true,
-            self::SetupNudge => true,
         };
     }
 
