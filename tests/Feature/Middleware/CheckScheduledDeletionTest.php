@@ -32,7 +32,21 @@ test('interstitial component renders for user with scheduled deletion', function
 
     livewire(ScheduledDeletionInterstitial::class)
         ->assertSuccessful()
-        ->assertSee('Your account is being deleted');
+        ->assertSee('Your account is scheduled for deletion')
+        ->assertSee('Your profile and sign-in account will be permanently deleted.')
+        ->assertSee('1 sole-owned workspace and its CRM data will also be deleted.')
+        ->assertSee('Records in shared workspaces will remain without your profile.');
+});
+
+test('cancel confirmation explains that account access will be restored', function () {
+    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+
+    $this->actingAs($user);
+
+    livewire(ScheduledDeletionInterstitial::class)
+        ->mountAction('cancelDeletion')
+        ->assertMountedActionModalSee('Your scheduled deletion will be cancelled.')
+        ->assertMountedActionModalSee('You will regain access to your account and workspaces.');
 });
 
 test('interstitial redirects non-scheduled user to home', function () {
