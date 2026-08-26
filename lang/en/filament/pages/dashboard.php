@@ -27,8 +27,10 @@ return [
             ],
             'ask_rela' => [
                 'label' => 'Ask Rela about your pipeline',
+                'label_empty' => 'Ask Rela how to get started',
                 'description' => 'Your assistant can read, draft, and update records for you',
                 'prompt' => "What's in my pipeline right now?",
+                'prompt_empty' => 'What can you do to help me set up this workspace?',
             ],
         ],
     ],

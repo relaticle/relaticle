@@ -33,10 +33,10 @@ beforeEach(function (): void {
  * The click handler the ask_rela row carries: it seeds the dashboard composer
  * instead of navigating, because an id-less chat URL is not a destination.
  */
-function composePromptUrl(): string
+function composePromptUrl(string $key = 'prompt_empty'): string
 {
     return ChatConversation::getUrl([
-        'prompt' => __('filament/pages/dashboard.activation.steps.ask_rela.prompt'),
+        'prompt' => __("filament/pages/dashboard.activation.steps.ask_rela.{$key}"),
     ]);
 }
 
@@ -277,6 +277,37 @@ it('seeds the composer with the ask_rela question rather than sending it', funct
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(composePromptUrl())
         ->assertDontSeeHtml('href="'.ChatConversation::getUrl().'"');
+});
+
+/**
+ * A workspace with no records cannot answer a pipeline question, and the
+ * assistant spends a tool round-trip discovering that. Only the personal
+ * workspace is seeded, so this is the normal state of a second one.
+ */
+it('asks what the assistant can do while the workspace holds no records', function (): void {
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(composePromptUrl('prompt_empty'))
+        ->assertDontSeeHtml(composePromptUrl('prompt'))
+        ->assertSee(__('filament/pages/dashboard.activation.steps.ask_rela.label_empty'));
+});
+
+/**
+ * Seeded demo records are not the team's own, but they are a pipeline the
+ * assistant can report on -- so the empty-workspace branch must not key off
+ * `hasOwnRecord()`, which is false here too.
+ */
+it('asks about the pipeline once the workspace holds records, seeded ones included', function (): void {
+    People::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($this->team);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(composePromptUrl('prompt'))
+        ->assertDontSeeHtml(composePromptUrl('prompt_empty'))
+        ->assertSee(__('filament/pages/dashboard.activation.steps.ask_rela.label'));
 });
 
 it('shows the invite row to a workspace admin and hides it from an editor', function (): void {

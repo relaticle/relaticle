@@ -88,7 +88,7 @@ final class ActivationChecklist extends Component
         return array_values($team->onboarding()->steps()
             ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
                 key: $this->stepKey($step)->value,
-                label: __((string) $step->attribute('label_key')),
+                label: $this->stepLabel($this->stepKey($step), $step),
                 description: __((string) $step->attribute('description_key')),
                 url: $this->stepUrl($this->stepKey($step)),
                 prompt: $this->stepPrompt($this->stepKey($step)),
@@ -128,6 +128,14 @@ final class ActivationChecklist extends Component
      * The question dropped into the dashboard composer for a step that has
      * nowhere to navigate. It is seeded, never sent: a checklist click must
      * not spend the workspace's credits on the user's behalf.
+     *
+     * A workspace holding no records cannot answer a pipeline question: the
+     * assistant spends a tool round-trip to report the zero this component
+     * already knows, then offers to create a deal in a workspace with no
+     * companies and no contacts. The capability question below answers the same
+     * workspace with a setup plan it can act on. Empty means no records at all,
+     * not `hasOwnRecord()` -- a freshly seeded workspace has no record of its
+     * own either, and that one has a real pipeline to talk about.
      */
     private function stepPrompt(ActivationStep $step): ?string
     {
@@ -135,7 +143,29 @@ final class ActivationChecklist extends Component
             return null;
         }
 
-        return __('filament/pages/dashboard.activation.steps.ask_rela.prompt');
+        return __($this->hasAnyRecord()
+            ? 'filament/pages/dashboard.activation.steps.ask_rela.prompt'
+            : 'filament/pages/dashboard.activation.steps.ask_rela.prompt_empty');
+    }
+
+    /**
+     * Follows the prompt: a row promising an answer about the pipeline must not
+     * type a question about setting the workspace up.
+     */
+    private function stepLabel(ActivationStep $key, OnboardingStep $step): string
+    {
+        if ($key === ActivationStep::AskRela && ! $this->hasAnyRecord()) {
+            return __('filament/pages/dashboard.activation.steps.ask_rela.label_empty');
+        }
+
+        return __((string) $step->attribute('label_key'));
+    }
+
+    private function hasAnyRecord(): bool
+    {
+        $team = $this->team();
+
+        return $team instanceof Team && resolve(WorkspaceActivationFacts::class)->hasAnyRecord($team);
     }
 
     #[Computed]

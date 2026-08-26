@@ -32,6 +32,17 @@ final class WorkspaceActivationFacts
         );
     }
 
+    /**
+     * Whether the workspace holds any record at all, seeded or the team's own.
+     * False only in a workspace that has never been written to: a second
+     * workspace (the seeder runs for the personal one only), or one whose demo
+     * records were deleted.
+     */
+    public function hasAnyRecord(Team $team): bool
+    {
+        return $this->creationSources($team) !== [];
+    }
+
     public function hasImportedRecord(Team $team): bool
     {
         return in_array(CreationSource::IMPORT->value, $this->creationSources($team), true);

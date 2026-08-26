@@ -67,6 +67,10 @@ it('shows greeting on the dashboard', function (): void {
  * dashboard-only compose event would have been a dead click on every other
  * page. It now navigates to the chat page with `?prompt=`, which seeds that
  * page's composer and stops: sending stays the user's decision.
+ *
+ * A factory workspace holds no records, so the row seeds the empty-workspace
+ * question -- asking a record-less workspace about its pipeline costs a tool
+ * round-trip to report zero.
  */
 it('seeds the chat composer from the ask_rela checklist step without sending', function (): void {
     $user = User::factory()->withTeam()->create();
@@ -81,7 +85,7 @@ it('seeds the chat composer from the ask_rela checklist step without sending', f
         ->assertPathBeginsWith("/app/{$team->slug}/chats")
         // TipTap mounts on a tick after navigation, so reading getText()
         // immediately returns the empty editor rather than the seeded one.
-        ->waitForText(__('filament/pages/dashboard.activation.steps.ask_rela.prompt'))
+        ->waitForText(__('filament/pages/dashboard.activation.steps.ask_rela.prompt_empty'))
         ->assertNoJavaScriptErrors();
 
     $state = json_decode((string) $page->script(<<<'JS'
@@ -93,6 +97,6 @@ it('seeds the chat composer from the ask_rela checklist step without sending', f
         })();
     JS), true, 512, JSON_THROW_ON_ERROR);
 
-    expect($state['text'])->toBe(__('filament/pages/dashboard.activation.steps.ask_rela.prompt'))
+    expect($state['text'])->toBe(__('filament/pages/dashboard.activation.steps.ask_rela.prompt_empty'))
         ->and($state['messageCount'])->toBe(0);
 });
