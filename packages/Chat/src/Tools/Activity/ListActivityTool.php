@@ -40,6 +40,13 @@ final readonly class ListActivityTool implements Tool
     private const int ENTRY_LIMIT = 50;
 
     /**
+     * How a save is identified in SQL: its batch, or its own id when the row
+     * carries none. Paired with subject_type/subject_id everywhere it is used,
+     * because one request can batch several records under one batch_uuid.
+     */
+    private const string SAVE_KEY_SQL = "coalesce(batch_uuid::text, 'row:' || id::text)";
+
+    /**
      * Characters kept in the "what changed" cell, matching the cell cap the
      * read list tools use.
      */
@@ -104,14 +111,18 @@ final readonly class ListActivityTool implements Tool
         $page = $this->page($request);
         $scope = $this->scopedQuery((string) $team->getKey(), $days, $recordType, $recordId);
 
-        $rows = $scope->clone()
-            ->with(['causer', 'subject'])
-            // `created_at` is second-precision, so several rows of one save tie
-            // on it; the auto-increment id breaks the tie deterministically.
-            ->latest()
-            ->orderByDesc('id')
-            ->forPage($page, self::ENTRY_LIMIT)
-            ->get();
+        // Paged by SAVE, never by row. A save that touches a native column and a
+        // custom field writes one row for each, and paging the rows put those two
+        // halves on either side of the boundary: the same record, at the same
+        // instant, rendered as the tail of one page and the head of the next, each
+        // showing half the change. Selecting the page's save keys first and then
+        // fetching their rows keeps every save whole, and asking for one key more
+        // than fits answers `has_more` without a second count over the window.
+        $keys = $this->saveKeysForPage($scope, $page);
+        $hasMore = count($keys) > self::ENTRY_LIMIT;
+        $keys = array_slice($keys, 0, self::ENTRY_LIMIT);
+
+        $rows = $keys === [] ? [] : $this->rowsForSaves($scope, $keys);
 
         $entries = [];
 
@@ -124,15 +135,6 @@ final readonly class ListActivityTool implements Tool
         }
 
         $totalEntries = $this->countEntries($scope);
-
-        // `has_more` and `next_page` compare against the RAW ROW count, not
-        // `total` (a grouped entry count): `forPage()` pages over rows, and a
-        // save that writes more than one row (a native column plus a custom
-        // field) means the two counts diverge -- comparing `total` against
-        // `page * ENTRY_LIMIT` would under-report pages whenever a window's
-        // saves average more than one row each. `total` still reports the true
-        // entry count for the footer; only the pagination check reads rows.
-        $hasMore = $this->countRows($scope) > $page * self::ENTRY_LIMIT;
 
         $payload = [
             'days' => $days,
@@ -203,22 +205,73 @@ final readonly class ListActivityTool implements Tool
     {
         return (int) $scope->clone()
             ->toBase()
-            ->selectRaw("count(distinct (coalesce(batch_uuid::text, 'row:' || id::text), subject_type, subject_id)) as aggregate")
+            ->selectRaw('count(distinct ('.self::SAVE_KEY_SQL.', subject_type, subject_id)) as aggregate')
             ->value('aggregate');
     }
 
     /**
-     * How many raw rows the window holds, before groupBySave() merges them.
-     * `forPage()` pages over this same row set, so this is the count pagination
-     * has to compare against; `countEntries()` answers a different question
-     * (how many saves those rows represent) and would misjudge whether another
-     * page exists whenever a save spans more than one row.
+     * The save keys on $page, newest first, plus one extra so the caller can tell
+     * whether another page exists without counting the whole window. A save is
+     * identified the way groupBySave() and countEntries() identify it, by its
+     * batch (or its own id, for a row that carries none) together with the record
+     * it touched: one request that saves several records writes one batch across
+     * all of them, so the batch alone would merge them into a single entry.
      *
      * @param  Builder<Activity>  $scope
+     * @return list<array{grp: string, subject_type: string, subject_id: string}>
      */
-    private function countRows(Builder $scope): int
+    private function saveKeysForPage(Builder $scope, int $page): array
     {
-        return $scope->clone()->toBase()->count();
+        $rows = $scope->clone()
+            ->toBase()
+            ->selectRaw(self::SAVE_KEY_SQL.' as grp')
+            ->addSelect('subject_type', 'subject_id')
+            // `created_at` is second-precision, so several saves tie on it; the
+            // auto-increment id breaks the tie deterministically.
+            ->selectRaw('max(created_at) as last_at, max(id) as last_id')
+            ->groupByRaw(self::SAVE_KEY_SQL.', subject_type, subject_id')
+            ->latest('last_at')
+            ->orderByDesc('last_id')
+            ->offset(($page - 1) * self::ENTRY_LIMIT)
+            ->limit(self::ENTRY_LIMIT + 1)
+            ->get();
+
+        return array_values(array_map(static fn (object $row): array => [
+            'grp' => (string) $row->grp,
+            'subject_type' => (string) $row->subject_type,
+            'subject_id' => (string) $row->subject_id,
+        ], $rows->all()));
+    }
+
+    /**
+     * Every row belonging to the given saves, in the same newest-first order the
+     * keys were chosen in, so groupBySave() rebuilds the page's entries in order.
+     *
+     * @param  Builder<Activity>  $scope
+     * @param  list<array{grp: string, subject_type: string, subject_id: string}>  $keys
+     * @return list<Activity>
+     */
+    private function rowsForSaves(Builder $scope, array $keys): array
+    {
+        $bindings = [];
+
+        foreach ($keys as $key) {
+            $bindings[] = $key['grp'];
+            $bindings[] = $key['subject_type'];
+            $bindings[] = $key['subject_id'];
+        }
+
+        $tuples = implode(', ', array_fill(0, count($keys), '(?, ?, ?)'));
+
+        $rows = $scope->clone()
+            ->with(['causer', 'subject'])
+            ->whereRaw('('.self::SAVE_KEY_SQL.', subject_type, subject_id) in ('.$tuples.')', $bindings)
+            ->latest()
+            ->orderByDesc('id')
+            ->get()
+            ->all();
+
+        return array_values($rows);
     }
 
     /**
