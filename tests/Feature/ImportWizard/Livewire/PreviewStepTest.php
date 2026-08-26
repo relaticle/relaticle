@@ -142,12 +142,11 @@ it('resolves rows as Update when email matches existing record', function (): vo
         ->first();
 
     if ($emailField) {
-        CustomFieldValue::factory()->create([
+        CustomFieldValue::factory()->withJsonValue(['existing@test.com'])->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
             'tenant_id' => $this->team->id,
-            'json_value' => ['existing@test.com'],
         ]);
     }
 

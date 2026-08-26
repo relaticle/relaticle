@@ -131,12 +131,11 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
             'team_id' => $this->team->id,
         ]);
 
-        CustomFieldValue::factory()->create([
+        CustomFieldValue::factory()->withJsonValue([$email])->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
             'tenant_id' => $this->team->id,
-            'json_value' => [$email],
         ]);
 
         $existingPeople[$email] = $person;
