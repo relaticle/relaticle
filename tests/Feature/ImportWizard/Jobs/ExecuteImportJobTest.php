@@ -90,27 +90,25 @@ function runImportJob(object $context): void
     $job->handle();
 }
 
-if (! function_exists('makeRow')) {
-    /** @param array<string, mixed> $overrides */
-    function makeRow(int $rowNumber, array $rawData, array $overrides = []): array
-    {
-        return array_merge([
-            'row_number' => $rowNumber,
-            'raw_data' => json_encode($rawData),
-            'validation' => null,
-            'corrections' => null,
-            'skipped' => null,
-            'match_action' => null,
-            'matched_id' => null,
-            'relationships' => null,
-        ], $overrides);
-    }
+/** @param array<string, mixed> $overrides */
+function makeExecuteImportRow(int $rowNumber, array $rawData, array $overrides = []): array
+{
+    return array_merge([
+        'row_number' => $rowNumber,
+        'raw_data' => json_encode($rawData),
+        'validation' => null,
+        'corrections' => null,
+        'skipped' => null,
+        'match_action' => null,
+        'matched_id' => null,
+        'relationships' => null,
+    ], $overrides);
 }
 
 it('creates new People records for rows with match_action=Create', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John Doe'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Jane Smith'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John Doe'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Jane Smith'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -130,7 +128,7 @@ it('creates new People records for rows with match_action=Create', function (): 
 
 it('creates new Company records for rows with match_action=Create', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Acme Corp'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Acme Corp'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ], ImportEntityType::Company);
@@ -144,7 +142,7 @@ it('creates new Company records for rows with match_action=Create', function ():
 
 it('sets custom field values on created records', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -206,7 +204,7 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
 
     $rows = [];
     foreach ($emails as $i => $email) {
-        $rows[] = makeRow($i + 2, ['Name' => "Updated {$email}", 'Email' => $email], [
+        $rows[] = makeExecuteImportRow($i + 2, ['Name' => "Updated {$email}", 'Email' => $email], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $existingPeople[$email]->id,
         ]);
@@ -238,7 +236,7 @@ it('updates existing People records for rows with match_action=Update', function
     ]);
 
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'New Name'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'New Name'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -261,7 +259,7 @@ it('preserves existing data when updating with partial fields', function (): voi
     ]);
 
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated Name'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated Name'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -280,7 +278,7 @@ it('preserves existing data when updating with partial fields', function (): voi
 
 it('skips rows with match_action=Skip', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
+        makeExecuteImportRow(2, ['Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -303,7 +301,7 @@ it('creates company relationship on People record via entity link', function ():
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -321,7 +319,7 @@ it('creates company relationship on People record via entity link', function ():
 
 it('uses corrected values over raw values', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Jhon'], [
+        makeExecuteImportRow(2, ['Name' => 'Jhon'], [
             'corrections' => json_encode(['Name' => 'John']),
             'match_action' => RowMatchAction::Create->value,
         ]),
@@ -339,7 +337,7 @@ it('uses corrected values over raw values', function (): void {
 
 it('skips individual values marked as skipped', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'bad-email'], [
+        makeExecuteImportRow(2, ['Name' => 'John', 'Email' => 'bad-email'], [
             'skipped' => json_encode(['Email' => true]),
             'match_action' => RowMatchAction::Create->value,
         ]),
@@ -356,7 +354,7 @@ it('skips individual values marked as skipped', function (): void {
 
 it('sets store status to Completed on success', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -369,8 +367,8 @@ it('sets store status to Completed on success', function (): void {
 
 it('skips rows with null match_action without crashing', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Null Action'], ['match_action' => null]),
+        makeExecuteImportRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Null Action'], ['match_action' => null]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -392,12 +390,12 @@ it('stores results with counts in meta', function (): void {
     ]);
 
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['ID' => (string) $person->id, 'Name' => 'Updated'], [
+        makeExecuteImportRow(2, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['ID' => (string) $person->id, 'Name' => 'Updated'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
-        makeRow(4, ['ID' => '99999', 'Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
+        makeExecuteImportRow(4, ['ID' => '99999', 'Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -414,7 +412,7 @@ it('stores results with counts in meta', function (): void {
 
 it('sets store status to Failed on exception', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ], ImportEntityType::People);
@@ -435,8 +433,8 @@ it('sets store status to Failed on exception', function (): void {
 
 it('handles empty import where all rows are skipped', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
-        makeRow(3, ['Name' => 'Phantom'], ['match_action' => RowMatchAction::Skip->value]),
+        makeExecuteImportRow(2, ['Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
+        makeExecuteImportRow(3, ['Name' => 'Phantom'], ['match_action' => RowMatchAction::Skip->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -454,7 +452,7 @@ it('handles empty import where all rows are skipped', function (): void {
 it('processes rows in chunks without issues', function (): void {
     $rows = [];
     for ($i = 2; $i <= 51; $i++) {
-        $rows[] = makeRow($i, ['Name' => "Person {$i}"], ['match_action' => RowMatchAction::Create->value]);
+        $rows[] = makeExecuteImportRow($i, ['Name' => "Person {$i}"], ['match_action' => RowMatchAction::Create->value]);
     }
 
     createImportReadyStore($this, ['Name'], $rows, [
@@ -475,7 +473,7 @@ it('auto-creates company when entity link value is unresolved', function (): voi
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'New Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'John', 'Company' => 'New Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -500,15 +498,15 @@ it('deduplicates auto-created companies across multiple rows', function (): void
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'Alice', 'Company' => 'Same Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'Alice', 'Company' => 'Same Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
-        makeRow(3, ['Name' => 'Bob', 'Company' => 'Same Corp'], [
+        makeExecuteImportRow(3, ['Name' => 'Bob', 'Company' => 'Same Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
-        makeRow(4, ['Name' => 'Carol', 'Company' => 'Same Corp'], [
+        makeExecuteImportRow(4, ['Name' => 'Carol', 'Company' => 'Same Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -536,7 +534,7 @@ it('skips auto-creation for entity links with only MatchOnly matchers', function
     ]);
 
     createImportReadyStore($this, ['Title', 'Opportunity'], [
-        makeRow(2, ['Title' => 'Follow up', 'Opportunity' => 'Big Deal'], [
+        makeExecuteImportRow(2, ['Title' => 'Follow up', 'Opportunity' => 'Big Deal'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -563,7 +561,7 @@ it('calls store() for MorphToMany entity links after record save', function (): 
     ]);
 
     createImportReadyStore($this, ['Title', 'Company'], [
-        makeRow(2, ['Title' => 'Follow up', 'Company' => 'Linked Corp'], [
+        makeExecuteImportRow(2, ['Title' => 'Follow up', 'Company' => 'Linked Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -587,7 +585,7 @@ it('auto-created records have correct team and creation source', function (): vo
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'Jane', 'Company' => 'Auto Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'Jane', 'Company' => 'Auto Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -607,11 +605,11 @@ it('auto-created records have correct team and creation source', function (): vo
 
 it('skips Update row when matched record no longer exists', function (): void {
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '99999', 'Name' => 'Ghost'], [
+        makeExecuteImportRow(2, ['ID' => '99999', 'Name' => 'Ghost'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => '99999',
         ]),
-        makeRow(3, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -635,7 +633,7 @@ it('processes row with multiple entity links', function (): void {
     ]);
 
     createImportReadyStore($this, ['Title', 'Company', 'Contact'], [
-        makeRow(2, ['Title' => 'Multi-link task', 'Company' => 'Multi Corp', 'Contact' => 'Contact Person'], [
+        makeExecuteImportRow(2, ['Title' => 'Multi-link task', 'Company' => 'Multi Corp', 'Contact' => 'Contact Person'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -670,7 +668,7 @@ it('handles nonexistent import gracefully', function (): void {
 
 it('filters out unexpected attributes from CSV data before saving', function (): void {
     createImportReadyStore($this, ['Name', 'Malicious'], [
-        makeRow(2, ['Name' => 'Safe Person', 'Malicious' => 'hacked'], [
+        makeExecuteImportRow(2, ['Name' => 'Safe Person', 'Malicious' => 'hacked'], [
             'match_action' => RowMatchAction::Create->value,
         ]),
     ], [
@@ -689,8 +687,8 @@ it('filters out unexpected attributes from CSV data before saving', function ():
 
 it('persists failed row details in store metadata', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Good Person 2'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Good Person 2'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -705,8 +703,8 @@ it('persists failed row details in store metadata', function (): void {
 
 it('sends success notification to user on import completion', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John Doe'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Jane Smith'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John Doe'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Jane Smith'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -729,12 +727,12 @@ it('includes result counts in completion notification body', function (): void {
     ]);
 
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['ID' => (string) $person->id, 'Name' => 'Updated'], [
+        makeExecuteImportRow(2, ['ID' => '', 'Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['ID' => (string) $person->id, 'Name' => 'Updated'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
-        makeRow(4, ['ID' => '', 'Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
+        makeExecuteImportRow(4, ['ID' => '', 'Name' => 'Ghost'], ['match_action' => RowMatchAction::Skip->value]),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -752,8 +750,8 @@ it('includes result counts in completion notification body', function (): void {
 
 it('records failed rows with row number and error message', function (): void {
     createImportReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '', 'Name' => 'Valid Person'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['ID' => '99999', 'Name' => 'Ghost Person'], [
+        makeExecuteImportRow(2, ['ID' => '', 'Name' => 'Valid Person'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['ID' => '99999', 'Name' => 'Ghost Person'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => '99999',
         ]),
@@ -773,8 +771,8 @@ it('records failed rows with row number and error message', function (): void {
 
 it('handles Japanese characters in name fields', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => '田中太郎'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => '佐藤花子'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => '田中太郎'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => '佐藤花子'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -790,7 +788,7 @@ it('handles Japanese characters in name fields', function (): void {
 
 it('handles Arabic characters in name fields', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'محمد أحمد'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'محمد أحمد'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -804,7 +802,7 @@ it('handles Arabic characters in name fields', function (): void {
 
 it('handles emoji characters in name fields', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'Test User 🚀'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Test User 🚀'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -818,8 +816,8 @@ it('handles emoji characters in name fields', function (): void {
 
 it('handles accented Latin characters in name fields', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'José García'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'François Müller'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'José García'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'François Müller'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -836,7 +834,7 @@ it('handles international data with entity link auto-creation', function (): voi
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => '田中太郎', 'Company' => '株式会社テスト'], [
+        makeExecuteImportRow(2, ['Name' => '田中太郎', 'Company' => '株式会社テスト'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -858,8 +856,8 @@ it('handles international data with entity link auto-creation', function (): voi
 it('persists results to Import model on completion', function (): void {
     $headers = ['Name', 'Email'];
     $rows = [
-        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Jane', 'Email' => 'jane@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Email' => 'john@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Jane', 'Email' => 'jane@test.com'], ['match_action' => RowMatchAction::Create->value]),
     ];
     $mappings = [
         ColumnData::toField('Name', 'name'),
@@ -882,7 +880,7 @@ it('persists results to Import model on completion', function (): void {
 it('processes 1000 row create import', function (): void {
     $rows = [];
     for ($i = 2; $i <= 1001; $i++) {
-        $rows[] = makeRow($i, ['Name' => "Person {$i}"], ['match_action' => RowMatchAction::Create->value]);
+        $rows[] = makeExecuteImportRow($i, ['Name' => "Person {$i}"], ['match_action' => RowMatchAction::Create->value]);
     }
 
     createImportReadyStore($this, ['Name'], $rows, [
@@ -907,20 +905,20 @@ it('processes 1000 row mixed operations import', function (): void {
     $rowNumber = 2;
 
     foreach ($existingPeople as $person) {
-        $rows[] = makeRow($rowNumber++, ['ID' => (string) $person->id, 'Name' => "Updated {$person->name}"], [
+        $rows[] = makeExecuteImportRow($rowNumber++, ['ID' => (string) $person->id, 'Name' => "Updated {$person->name}"], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]);
     }
 
     for ($i = 0; $i < 50; $i++) {
-        $rows[] = makeRow($rowNumber++, ['ID' => (string) (900000 + $i), 'Name' => "Ghost {$i}"], [
+        $rows[] = makeExecuteImportRow($rowNumber++, ['ID' => (string) (900000 + $i), 'Name' => "Ghost {$i}"], [
             'match_action' => RowMatchAction::Skip->value,
         ]);
     }
 
     for ($i = 0; $i < 850; $i++) {
-        $rows[] = makeRow($rowNumber++, ['ID' => '', 'Name' => "New Person {$i}"], [
+        $rows[] = makeExecuteImportRow($rowNumber++, ['ID' => '', 'Name' => "New Person {$i}"], [
             'match_action' => RowMatchAction::Create->value,
         ]);
     }
@@ -942,7 +940,7 @@ it('processes 1000 row mixed operations import', function (): void {
 
 it('marks import as Failed when job exhausts retries via failed() handler', function (): void {
     createImportReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -971,7 +969,7 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
             ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => $companyName, 'behavior' => MatchBehavior::Create->value],
         ]);
 
-        $rows[] = makeRow($i, ['Name' => "Person {$i}", 'Company' => $companyName], [
+        $rows[] = makeExecuteImportRow($i, ['Name' => "Person {$i}", 'Company' => $companyName], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]);
@@ -1039,7 +1037,7 @@ it('imports text custom field value', function (): void {
     $cf = createTestCustomField($this, 'website_notes', 'text');
 
     createImportReadyStore($this, ['Name', 'Notes'], [
-        makeRow(2, ['Name' => 'John', 'Notes' => 'Some important text'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Notes' => 'Some important text'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
@@ -1059,7 +1057,7 @@ it('imports number custom field as integer', function (): void {
     $cf = createTestCustomField($this, 'employee_count', 'number');
 
     createImportReadyStore($this, ['Name', 'Employees'], [
-        makeRow(2, ['Name' => 'Acme', 'Employees' => '42'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Acme', 'Employees' => '42'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Employees', target: "custom_fields_{$cf->code}"),
@@ -1077,7 +1075,7 @@ it('imports currency custom field with point decimal format', function (): void 
     $cf = createTestCustomField($this, 'revenue', 'currency');
 
     createImportReadyStore($this, ['Name', 'Revenue'], [
-        makeRow(2, ['Name' => 'Acme', 'Revenue' => '1234.56'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Acme', 'Revenue' => '1234.56'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Revenue', target: "custom_fields_{$cf->code}"),
@@ -1095,7 +1093,7 @@ it('imports currency custom field with comma decimal format', function (): void 
     $cf = createTestCustomField($this, 'revenue_eu', 'currency');
 
     createImportReadyStore($this, ['Name', 'Revenue'], [
-        makeRow(2, ['Name' => 'Acme', 'Revenue' => '1.234,56'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Acme', 'Revenue' => '1.234,56'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         (new ColumnData(
@@ -1117,7 +1115,7 @@ it('imports date custom field with ISO format', function (): void {
     $cf = createTestCustomField($this, 'start_date', 'date');
 
     createImportReadyStore($this, ['Name', 'Start'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '2024-05-15'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '2024-05-15'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
@@ -1135,7 +1133,7 @@ it('imports date custom field with European format', function (): void {
     $cf = createTestCustomField($this, 'start_date_eu', 'date');
 
     createImportReadyStore($this, ['Name', 'Start'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '15/05/2024'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '15/05/2024'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         (new ColumnData(
@@ -1157,7 +1155,7 @@ it('imports date custom field with American format', function (): void {
     $cf = createTestCustomField($this, 'start_date_us', 'date');
 
     createImportReadyStore($this, ['Name', 'Start'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '05/15/2024'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '05/15/2024'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         (new ColumnData(
@@ -1179,7 +1177,7 @@ it('imports datetime custom field with ISO format including time', function (): 
     $cf = createTestCustomField($this, 'meeting_at', 'date-time');
 
     createImportReadyStore($this, ['Name', 'Meeting'], [
-        makeRow(2, ['Name' => 'John', 'Meeting' => '2024-05-15 14:30:00'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Meeting' => '2024-05-15 14:30:00'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
@@ -1197,7 +1195,7 @@ it('imports datetime custom field with European format including time', function
     $cf = createTestCustomField($this, 'meeting_at_eu', 'date-time');
 
     createImportReadyStore($this, ['Name', 'Meeting'], [
-        makeRow(2, ['Name' => 'John', 'Meeting' => '15/05/2024 14:30'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Meeting' => '15/05/2024 14:30'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         (new ColumnData(
@@ -1219,7 +1217,7 @@ it('imports boolean custom field with truthy values', function (): void {
     $cf = createTestCustomField($this, 'is_vip', 'checkbox');
 
     createImportReadyStore($this, ['Name', 'VIP'], [
-        makeRow(2, ['Name' => 'John', 'VIP' => '1'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'VIP' => '1'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'VIP', target: "custom_fields_{$cf->code}"),
@@ -1238,7 +1236,7 @@ it('imports select custom field with option name resolved to ID', function (): v
     $mediumOption = $cf->options->firstWhere('name', 'Medium');
 
     createImportReadyStore($this, ['Name', 'Priority'], [
-        makeRow(2, ['Name' => 'John', 'Priority' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Priority' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
@@ -1258,7 +1256,7 @@ it('imports multi-select custom field with option names resolved to IDs', functi
     $vipOption = $cf->options->firstWhere('name', 'VIP');
 
     createImportReadyStore($this, ['Name', 'Tags'], [
-        makeRow(2, ['Name' => 'John', 'Tags' => 'Urgent, VIP'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Tags' => 'Urgent, VIP'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Tags', target: "custom_fields_{$cf->code}"),
@@ -1279,7 +1277,7 @@ it('imports tags-input custom field with comma-separated values', function (): v
     $cf = createTestCustomField($this, 'labels', 'tags-input');
 
     createImportReadyStore($this, ['Name', 'Labels'], [
-        makeRow(2, ['Name' => 'John', 'Labels' => 'tag1, tag2, tag3'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Labels' => 'tag1, tag2, tag3'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Labels', target: "custom_fields_{$cf->code}"),
@@ -1301,7 +1299,7 @@ it('persists a blank mapped custom field value on create as carried, not skipped
     $cf = createTestCustomField($this, 'optional_notes', 'text');
 
     createImportReadyStore($this, ['Name', 'Notes'], [
-        makeRow(2, ['Name' => 'John', 'Notes' => ''], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Notes' => ''], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
@@ -1334,7 +1332,7 @@ it('updates existing custom field value on record update', function (): void {
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Notes'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => 'new value'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => 'new value'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -1368,7 +1366,7 @@ it('clears existing custom field value when mapped column is blank on update', f
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Notes'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => ''], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => ''], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -1390,7 +1388,7 @@ it('stores a blank mapped date custom field as null instead of failing the impor
     $dateTime = createTestCustomField($this, 'blank_start_datetime', 'date-time');
 
     createImportReadyStore($this, ['Name', 'Start', 'StartAt'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '', 'StartAt' => ''], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '', 'StartAt' => ''], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Start', target: "custom_fields_{$date->code}"),
@@ -1424,7 +1422,7 @@ it('clears an existing date custom field value when the mapped column is blank o
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Start'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Start' => ''], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Start' => ''], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -1445,7 +1443,7 @@ it('stores a whitespace-only mapped date custom field as null instead of failing
     $cf = createTestCustomField($this, 'whitespace_start_date', 'date');
 
     createImportReadyStore($this, ['Name', 'Start'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '   '], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '   '], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
@@ -1477,7 +1475,7 @@ it('leaves an existing custom field value untouched when the cell was skipped in
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Notes'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => 'discarded'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'John', 'Notes' => 'discarded'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
             'skipped' => json_encode(['Notes' => true]),
@@ -1499,7 +1497,7 @@ it('imports email custom field with comma-separated addresses as array', functio
     $cf = createTestCustomField($this, 'contact_emails', 'email');
 
     createImportReadyStore($this, ['Name', 'Emails'], [
-        makeRow(2, ['Name' => 'John', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Emails', target: "custom_fields_{$cf->code}"),
@@ -1522,7 +1520,7 @@ it('imports select custom field with case-insensitive option name', function ():
     $mediumOption = $cf->options->firstWhere('name', 'Medium');
 
     createImportReadyStore($this, ['Name', 'Priority'], [
-        makeRow(2, ['Name' => 'John', 'Priority' => 'medium'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Priority' => 'medium'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
@@ -1541,7 +1539,7 @@ it('imports select custom field with value already being an option ID', function
     $mediumOption = $cf->options->firstWhere('name', 'Medium');
 
     createImportReadyStore($this, ['Name', 'Priority'], [
-        makeRow(2, ['Name' => 'John', 'Priority' => (string) $mediumOption->id], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Priority' => (string) $mediumOption->id], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Priority', target: "custom_fields_{$cf->code}"),
@@ -1561,7 +1559,7 @@ it('imports multi-select custom field with mixed option names resolved to IDs', 
     $gammaOption = $cf->options->firstWhere('name', 'Gamma');
 
     createImportReadyStore($this, ['Name', 'Categories'], [
-        makeRow(2, ['Name' => 'John', 'Categories' => 'Alpha, Gamma'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Categories' => 'Alpha, Gamma'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Categories', target: "custom_fields_{$cf->code}"),
@@ -1587,7 +1585,7 @@ it('imports phone custom field with comma-separated numbers as array', function 
     $cf = createTestCustomField($this, 'phones', 'phone');
 
     createImportReadyStore($this, ['Name', 'Phones'], [
-        makeRow(2, ['Name' => 'John', 'Phones' => '+1-555-0101, +44-20-7946-0958'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Phones' => '+1-555-0101, +44-20-7946-0958'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Phones', target: "custom_fields_{$cf->code}"),
@@ -1609,7 +1607,7 @@ it('imports link custom field with URL value', function (): void {
     $cf = createTestCustomField($this, 'website', 'link');
 
     createImportReadyStore($this, ['Name', 'Website'], [
-        makeRow(2, ['Name' => 'John', 'Website' => 'https://example.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Website' => 'https://example.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Website', target: "custom_fields_{$cf->code}"),
@@ -1629,7 +1627,7 @@ it('imports toggle custom field with truthy values', function (): void {
     $cf = createTestCustomField($this, 'is_active', 'toggle');
 
     createImportReadyStore($this, ['Name', 'Active'], [
-        makeRow(2, ['Name' => 'John', 'Active' => 'yes'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Active' => 'yes'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Active', target: "custom_fields_{$cf->code}"),
@@ -1647,7 +1645,7 @@ it('imports toggle custom field with falsy values', function (): void {
     $cf = createTestCustomField($this, 'opted_out', 'toggle');
 
     createImportReadyStore($this, ['Name', 'OptedOut'], [
-        makeRow(2, ['Name' => 'John', 'OptedOut' => '0'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'OptedOut' => '0'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'OptedOut', target: "custom_fields_{$cf->code}"),
@@ -1665,7 +1663,7 @@ it('imports textarea custom field value', function (): void {
     $cf = createTestCustomField($this, 'bio', 'textarea');
 
     createImportReadyStore($this, ['Name', 'Bio'], [
-        makeRow(2, ['Name' => 'John', 'Bio' => 'A long biography text that spans multiple lines conceptually.'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Bio' => 'A long biography text that spans multiple lines conceptually.'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Bio', target: "custom_fields_{$cf->code}"),
@@ -1683,7 +1681,7 @@ it('imports rich-editor custom field value as text', function (): void {
     $cf = createTestCustomField($this, 'detailed_notes', 'rich-editor');
 
     createImportReadyStore($this, ['Name', 'Notes'], [
-        makeRow(2, ['Name' => 'John', 'Notes' => '<p>Bold statement</p>'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Notes' => '<p>Bold statement</p>'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Notes', target: "custom_fields_{$cf->code}"),
@@ -1701,7 +1699,7 @@ it('imports markdown-editor custom field value as text', function (): void {
     $cf = createTestCustomField($this, 'readme', 'markdown-editor');
 
     createImportReadyStore($this, ['Name', 'Readme'], [
-        makeRow(2, ['Name' => 'John', 'Readme' => '# Heading\n\nSome **bold** text'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Readme' => '# Heading\n\nSome **bold** text'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Readme', target: "custom_fields_{$cf->code}"),
@@ -1721,7 +1719,7 @@ it('imports checkbox-list custom field with option names resolved to IDs', funct
     $techOption = $cf->options->firstWhere('name', 'Tech');
 
     createImportReadyStore($this, ['Name', 'Interests'], [
-        makeRow(2, ['Name' => 'John', 'Interests' => 'Sports, Tech'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Interests' => 'Sports, Tech'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Interests', target: "custom_fields_{$cf->code}"),
@@ -1744,7 +1742,7 @@ it('imports radio custom field with option name resolved to ID', function (): vo
     $mediumOption = $cf->options->firstWhere('name', 'Medium');
 
     createImportReadyStore($this, ['Name', 'Size'], [
-        makeRow(2, ['Name' => 'John', 'Size' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Size' => 'Medium'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Size', target: "custom_fields_{$cf->code}"),
@@ -1763,7 +1761,7 @@ it('imports toggle-buttons custom field with option name resolved to ID', functi
     $urgentOption = $cf->options->firstWhere('name', 'Urgent');
 
     createImportReadyStore($this, ['Name', 'Urgency'], [
-        makeRow(2, ['Name' => 'John', 'Urgency' => 'Urgent'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Urgency' => 'Urgent'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Urgency', target: "custom_fields_{$cf->code}"),
@@ -1781,7 +1779,7 @@ it('imports color-picker custom field value as text', function (): void {
     $cf = createTestCustomField($this, 'brand_color', 'color-picker');
 
     createImportReadyStore($this, ['Name', 'Color'], [
-        makeRow(2, ['Name' => 'John', 'Color' => '#ff5733'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Color' => '#ff5733'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Color', target: "custom_fields_{$cf->code}"),
@@ -1806,7 +1804,7 @@ it('imports company with account_owner resolved by email via entity link', funct
     ]);
 
     createImportReadyStore($this, ['Name', 'Owner Email'], [
-        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => $owner->email], [
+        makeExecuteImportRow(2, ['Name' => 'Test Corp', 'Owner Email' => $owner->email], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -1824,7 +1822,7 @@ it('imports company with account_owner resolved by email via entity link', funct
 
 it('imports company with unmatched account_owner email skipping silently', function (): void {
     createImportReadyStore($this, ['Name', 'Owner Email'], [
-        makeRow(2, ['Name' => 'Test Corp', 'Owner Email' => 'nonexistent@example.com'], [
+        makeExecuteImportRow(2, ['Name' => 'Test Corp', 'Owner Email' => 'nonexistent@example.com'], [
             'match_action' => RowMatchAction::Create->value,
         ]),
     ], [
@@ -1845,7 +1843,7 @@ it('imports company with account_owner resolved for team owner', function (): vo
     ]);
 
     createImportReadyStore($this, ['Name', 'Owner Email'], [
-        makeRow(2, ['Name' => 'Owner Corp', 'Owner Email' => $this->user->email], [
+        makeExecuteImportRow(2, ['Name' => 'Owner Corp', 'Owner Email' => $this->user->email], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -1870,7 +1868,7 @@ it('imports task with assignee resolved by email via entity link', function (): 
     ]);
 
     createImportReadyStore($this, ['Title', 'Assignee Email'], [
-        makeRow(2, ['Title' => 'Test Task', 'Assignee Email' => $assignee->email], [
+        makeExecuteImportRow(2, ['Title' => 'Test Task', 'Assignee Email' => $assignee->email], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -1890,7 +1888,7 @@ it('imports task with assignee resolved by email via entity link', function (): 
 
 it('imports task with unmatched assignee email skipping silently', function (): void {
     createImportReadyStore($this, ['Title', 'Assignee Email'], [
-        makeRow(2, ['Title' => 'Orphan Task', 'Assignee Email' => 'ghost@nowhere.com'], [
+        makeExecuteImportRow(2, ['Title' => 'Orphan Task', 'Assignee Email' => 'ghost@nowhere.com'], [
             'match_action' => RowMatchAction::Create->value,
         ]),
     ], [
@@ -1915,7 +1913,7 @@ it('imports opportunity with company and contact entity links', function (): voi
     ]);
 
     createImportReadyStore($this, ['Name', 'Company', 'Contact'], [
-        makeRow(2, ['Name' => 'Big Deal', 'Company' => 'Deal Corp', 'Contact' => 'Deal Contact'], [
+        makeExecuteImportRow(2, ['Name' => 'Big Deal', 'Company' => 'Deal Corp', 'Contact' => 'Deal Contact'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -1943,7 +1941,7 @@ it('imports note with polymorphic entity links to company and person', function 
     ]);
 
     createImportReadyStore($this, ['Title', 'Company', 'Person'], [
-        makeRow(2, ['Title' => 'Meeting Notes', 'Company' => 'Note Corp', 'Person' => 'Note Person'], [
+        makeExecuteImportRow(2, ['Title' => 'Meeting Notes', 'Company' => 'Note Corp', 'Person' => 'Note Person'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -1967,7 +1965,7 @@ it('imports note with polymorphic entity links to company and person', function 
 
 it('imports note with title field only', function (): void {
     createImportReadyStore($this, ['Title'], [
-        makeRow(2, ['Title' => 'Quick note'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Title' => 'Quick note'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Title', target: 'title'),
     ], ImportEntityType::Note);
@@ -1986,7 +1984,7 @@ it('imports task with custom field values for select fields', function (): void 
     $highOption = $priorityCf->options->firstWhere('name', 'High');
 
     createImportReadyStore($this, ['Title', 'Status', 'Priority'], [
-        makeRow(2, ['Title' => 'Urgent Task', 'Status' => 'In progress', 'Priority' => 'High'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Title' => 'Urgent Task', 'Status' => 'In progress', 'Priority' => 'High'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Title', target: 'title'),
         ColumnData::toField(source: 'Status', target: "custom_fields_{$statusCf->code}"),
@@ -2012,7 +2010,7 @@ it('imports company with custom field values for toggle and link', function (): 
     $linkedinCf = createTestCustomField($this, 'linkedin_url', 'link', 'company');
 
     createImportReadyStore($this, ['Name', 'ICP', 'LinkedIn'], [
-        makeRow(2, ['Name' => 'Great Corp', 'ICP' => 'true', 'LinkedIn' => 'https://linkedin.com/company/great'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Great Corp', 'ICP' => 'true', 'LinkedIn' => 'https://linkedin.com/company/great'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'ICP', target: "custom_fields_{$icpCf->code}"),
@@ -2037,8 +2035,8 @@ it('imports company with custom field values for toggle and link', function (): 
 
 it('deduplicates Create rows with same matchable email value', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'Lay', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Ray', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Lay', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Ray', 'Email' => 'same@acme.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -2061,8 +2059,8 @@ it('deduplicates Create rows with same matchable email value', function (): void
 
 it('does not dedup Create rows with different matchable values', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'Alice', 'Email' => 'alice@acme.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Bob', 'Email' => 'bob@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Alice', 'Email' => 'alice@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Bob', 'Email' => 'bob@acme.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -2080,8 +2078,8 @@ it('does not dedup Create rows with different matchable values', function (): vo
 
 it('deduplicates Create rows with multi-value matchable field', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'First', 'Email' => 'shared@acme.com, extra@acme.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Second', 'Email' => 'shared@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'First', 'Email' => 'shared@acme.com, extra@acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Second', 'Email' => 'shared@acme.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -2101,8 +2099,8 @@ it('deduplicates Create rows with multi-value matchable field', function (): voi
 
 it('deduplicates company Create rows by domain', function (): void {
     createImportReadyStore($this, ['Name', 'Domain'], [
-        makeRow(2, ['Name' => 'Acme Inc', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Acme Corp', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Acme Inc', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Acme Corp', 'Domain' => 'acme.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
@@ -2139,7 +2137,7 @@ it('merges multi-choice custom field values during update', function (): void {
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Email'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Merge Test', 'Email' => 'new@work.com'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'Merge Test', 'Email' => 'new@work.com'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -2173,8 +2171,8 @@ it('merges multi-choice custom field values during dedup', function (): void {
     }
 
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'Dedup A', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Dedup B', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Dedup A', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Dedup B', 'Email' => 'a@test.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -2211,7 +2209,7 @@ it('does not duplicate existing multi-choice values during merge', function (): 
     ]);
 
     createImportReadyStore($this, ['ID', 'Name', 'Email'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Dedup Merge', 'Email' => 'shared@work.com, new@work.com'], [
+        makeExecuteImportRow(2, ['ID' => (string) $person->id, 'Name' => 'Dedup Merge', 'Email' => 'shared@work.com, new@work.com'], [
             'match_action' => RowMatchAction::Update->value,
             'matched_id' => (string) $person->id,
         ]),
@@ -2238,7 +2236,7 @@ it('populates matching custom field when auto-creating person via email MatchOrC
     ]);
 
     createImportReadyStore($this, ['Name', 'Contact'], [
-        makeRow(2, ['Name' => 'Test Opportunity', 'Contact' => 'john@example.com'], [
+        makeExecuteImportRow(2, ['Name' => 'Test Opportunity', 'Contact' => 'john@example.com'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -2273,7 +2271,7 @@ it('populates matching custom field when auto-creating company via domain MatchO
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John Doe', 'Company' => 'example.com'], [
+        makeExecuteImportRow(2, ['Name' => 'John Doe', 'Company' => 'example.com'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -2308,7 +2306,7 @@ it('does not populate custom field when auto-creating via name matcher', functio
     ]);
 
     createImportReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John Doe', 'Company' => 'New Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'John Doe', 'Company' => 'New Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -2334,11 +2332,11 @@ it('deduplicates auto-created records while still populating matching custom fie
     ]);
 
     createImportReadyStore($this, ['Name', 'Contact'], [
-        makeRow(2, ['Name' => 'Opp One', 'Contact' => 'jane@example.com'], [
+        makeExecuteImportRow(2, ['Name' => 'Opp One', 'Contact' => 'jane@example.com'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
-        makeRow(3, ['Name' => 'Opp Two', 'Contact' => 'jane@example.com'], [
+        makeExecuteImportRow(3, ['Name' => 'Opp Two', 'Contact' => 'jane@example.com'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -2383,7 +2381,7 @@ it('does not auto-create record for custom field entity link', function (): void
     ]);
 
     createImportReadyStore($this, ['Name', 'Related Company'], [
-        makeRow(2, ['Name' => 'Test Person', 'Related Company' => 'Nonexistent Corp'], [
+        makeExecuteImportRow(2, ['Name' => 'Test Person', 'Related Company' => 'Nonexistent Corp'], [
             'match_action' => RowMatchAction::Create->value,
             'relationships' => $relationships,
         ]),
@@ -2404,7 +2402,7 @@ it('adds a new imported tags-input value to the field option list', function ():
     $cf = createTestCustomField($this, 'labels282', 'tags-input', 'company', ['Existing']);
 
     createImportReadyStore($this, ['Name', 'Labels'], [
-        makeRow(2, ['Name' => 'Tagged Co 282', 'Labels' => 'Existing, BrandNewTag'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Tagged Co 282', 'Labels' => 'Existing, BrandNewTag'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282'),
@@ -2429,7 +2427,7 @@ it('does not duplicate an imported tag that already exists as an option (case-in
     $cf = createTestCustomField($this, 'labels282b', 'tags-input', 'company', ['VIP']);
 
     createImportReadyStore($this, ['Name', 'Labels'], [
-        makeRow(2, ['Name' => 'Dup Co 282', 'Labels' => 'vip'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Dup Co 282', 'Labels' => 'vip'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Labels', target: 'custom_fields_labels282b'),
@@ -2444,7 +2442,7 @@ it('does not create options when importing an arbitrary email custom field', fun
     $cf = createTestCustomField($this, 'contact_emails282', 'email', 'company');
 
     createImportReadyStore($this, ['Name', 'Emails'], [
-        makeRow(2, ['Name' => 'Email Co 282', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Email Co 282', 'Emails' => 'a@b.com, c@d.com'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Emails', target: 'custom_fields_contact_emails282'),
@@ -2491,7 +2489,7 @@ it('creates a new company when re-importing a domain whose company was soft-dele
     $original->delete();
 
     createImportReadyStore($this, ['Name', 'Domain'], [
-        makeRow(2, ['Name' => 'Acme Reimport 282', 'Domain' => 'acme282.com']),
+        makeExecuteImportRow(2, ['Name' => 'Acme Reimport 282', 'Domain' => 'acme282.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
@@ -2518,7 +2516,7 @@ it('parses an imported datetime in the importer timezone, matching what the form
     $cf = createTestCustomField($this, 'meeting_tokyo', 'date-time');
 
     createImportReadyStore($this, ['Name', 'Meeting'], [
-        makeRow(2, ['Name' => 'John', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
@@ -2545,7 +2543,7 @@ it('does not shift a date-only custom field for an importer in another timezone'
     $cf = createTestCustomField($this, 'start_date_la', 'date');
 
     createImportReadyStore($this, ['Name', 'Start'], [
-        makeRow(2, ['Name' => 'John', 'Start' => '2026-08-19'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'John', 'Start' => '2026-08-19'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Start', target: "custom_fields_{$cf->code}"),
@@ -2569,8 +2567,8 @@ it('fails a row whose datetime cannot be parsed instead of dropping the value', 
     $cf = createTestCustomField($this, 'meeting_bad', 'date-time');
 
     createImportReadyStore($this, ['Name', 'Meeting'], [
-        makeRow(2, ['Name' => 'Valid Row', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => 'Bad Row', 'Meeting' => 'not-a-date'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Valid Row', 'Meeting' => '2026-08-19 08:30:00'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => 'Bad Row', 'Meeting' => 'not-a-date'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Meeting', target: "custom_fields_{$cf->code}"),
@@ -2598,8 +2596,8 @@ it('fails a row whose datetime cannot be parsed instead of dropping the value', 
  */
 it('fails a row that leaves a required field empty rather than creating a nameless record', function (): void {
     createImportReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'Has A Name', 'Email' => 'ok@example.test'], ['match_action' => RowMatchAction::Create->value]),
-        makeRow(3, ['Name' => '', 'Email' => 'blank@example.test'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(2, ['Name' => 'Has A Name', 'Email' => 'ok@example.test'], ['match_action' => RowMatchAction::Create->value]),
+        makeExecuteImportRow(3, ['Name' => '', 'Email' => 'blank@example.test'], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'emails'),
