@@ -94,7 +94,7 @@ it('returns an empty list when there are no pending actions on the conversation'
     $superseded = resolve(PendingActionService::class)
         ->supersedePendingForConversation('conv-empty');
 
-    expect($superseded)->toBeEmpty();
+    expect($superseded)->toBe([]);
 });
 
 it('exposes Superseded as a status with gray color and human label', function (): void {

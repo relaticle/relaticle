@@ -110,5 +110,5 @@ it('returns an empty array when no custom_fields are submitted', function (): vo
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: [], oldModel: null);
 
-    expect($rows)->toBeEmpty();
+    expect($rows)->toBe([]);
 });

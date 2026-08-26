@@ -170,7 +170,7 @@ it('returns an empty list for another conversation', function (): void {
         'resolved_at' => now(), 'result_data' => ['id' => 'x'],
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv', null))->toBeEmpty();
+    expect(resolve(PendingActionService::class)->resolvedForConversation('other-conv', null))->toBe([]);
 });
 
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
@@ -249,7 +249,7 @@ it('labels a delete by the record name from the card fields', function (): void 
     $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-D', null);
 
     expect($resolved[0]['label'])->toBe('Acme')
-        ->and($resolved[0]['records'])->toBeEmpty();
+        ->and($resolved[0]['records'])->toBe([]);
 });
 
 it('labels each record of an approved batch with its own title and url', function (): void {
@@ -297,7 +297,7 @@ it('leaves superseded proposals to their own block instead of listing them as de
         'resolved_at' => now(),
     ]);
 
-    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S', null))->toBeEmpty();
+    expect(resolve(PendingActionService::class)->resolvedForConversation('conv-S', null))->toBe([]);
 });
 
 it('replays proposal tool results unmutated after a decision', function (): void {
@@ -403,7 +403,7 @@ it('keeps a proposal superseded on an earlier turn visible when a later turn sup
 
     // Turn 3: nothing is pending anymore, so this turn supersedes nothing new.
     $turn3 = $pendingActions->supersedePendingForConversation('conv-super');
-    expect($turn3)->toBeEmpty();
+    expect($turn3)->toBe([]);
 
     $context = $pendingActions->supersededForConversation('conv-super');
 

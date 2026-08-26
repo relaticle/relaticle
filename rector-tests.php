@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Pest\Rector\Rules\ChainExpectCallsRector;
 use Pest\Rector\Rules\EnsureTypeChecksFirstRector;
+use Pest\Rector\Rules\SimplifyToLiteralBooleanRector;
+use Pest\Rector\Rules\UseToBeEmptyRector;
 use Pest\Rector\Rules\UseToBeInRector;
 use Pest\Rector\Rules\UseToContainRector;
 use Pest\Rector\Rules\UseToMatchRector;
@@ -17,6 +19,8 @@ return RectorConfig::configure()
     ->withSkip([
         ChainExpectCallsRector::class,
         EnsureTypeChecksFirstRector::class,
+        SimplifyToLiteralBooleanRector::class,
+        UseToBeEmptyRector::class,
         UseToBeInRector::class,
         UseToThrowRector::class,
         UseToContainRector::class => [

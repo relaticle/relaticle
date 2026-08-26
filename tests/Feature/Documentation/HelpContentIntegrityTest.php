@@ -138,8 +138,8 @@ it('gives every category a unique, length-bounded title and description, distinc
     $descriptions = $repo->pages()->pluck('description')->merge($categories->pluck('description'));
 
     expect($overLong)->toBeEmpty(offendersMessage('Category metadata over bounds', $overLong))
-        ->and($titles->duplicates()->values()->all())->toBeEmpty()
-        ->and($descriptions->duplicates()->values()->all())->toBeEmpty();
+        ->and($titles->duplicates()->values()->all())->toBe([])
+        ->and($descriptions->duplicates()->values()->all())->toBe([]);
 });
 
 it('gives every page exactly one h1-equivalent, which is its front-matter title', function (): void {
