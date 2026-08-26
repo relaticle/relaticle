@@ -55,11 +55,21 @@
         <div class="py-3 pe-3 ps-11">
             <div class="flex min-w-0 items-center gap-2">
                 <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
-                    <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
-                        </svg>
-                        <span class="chat-chip-label" x-text="proposalRecordLabel(action)"></span>
+                    <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip :data-record-type="action.entity_type">
+                        <span
+                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white"
+                            :class="{
+                                'bg-primary-600': action.operation === 'create',
+                                'bg-amber-500': action.operation === 'update',
+                                'bg-red-500': action.operation === 'delete',
+                            }"
+                            aria-hidden="true"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
+                            </svg>
+                        </span>
+                        <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="proposalRecordLabel(action)"></span>
                     </span>
                 </template>
 
@@ -69,13 +79,8 @@
 
                 <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
                     <span
-                        class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider"
-                        :class="{
-                            'text-blue-600 dark:text-blue-400': action.operation === 'create',
-                            'text-amber-600 dark:text-amber-400': action.operation === 'update',
-                            'text-red-600 dark:text-red-400': action.operation === 'delete',
-                        }"
-                        x-text="(@js($operationLabels))[action.operation] ?? action.operation"
+                        class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400"
+                        x-text="action.display?.title ?? ((@js($operationLabels))[action.operation] ?? action.operation)"
                     ></span>
                 </template>
             </div>
@@ -116,63 +121,38 @@
             ></button>
 
             <span class="pointer-events-none relative flex min-w-0 flex-1 items-center gap-2">
-                @if ($inPlan)
-                    {{-- A plan step keeps the chip + colored operation the dock's
-                         plan rows use, so a decided plan reads like the one it
-                         answered. --}}
-                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
-                        <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                {{-- The dock's identity, folded onto one line: operation-tinted
+                     entity tile, bold record label, then the card title as muted
+                     context ("Create Person"). No record pill here: chips are
+                     reserved for inline clickable references. --}}
+                <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
+                    <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip :data-record-type="action.entity_type">
+                        <span
+                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white"
+                            :class="{
+                                'bg-primary-600': action.operation === 'create',
+                                'bg-amber-500': action.operation === 'update',
+                                'bg-red-500': action.operation === 'delete',
+                            }"
+                            aria-hidden="true"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
                             </svg>
-                            <span class="chat-chip-label" x-text="proposalRecordLabel(action)"></span>
                         </span>
-                    </template>
-                @else
-                    {{-- The dock's standalone identity, folded onto one line:
-                         operation-tinted entity tile, bold record label, then the
-                         card title as muted context ("Create Person"). --}}
-                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
-                        <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip :data-record-type="action.entity_type">
-                            <span
-                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white"
-                                :class="{
-                                    'bg-primary-600': action.operation === 'create',
-                                    'bg-amber-500': action.operation === 'update',
-                                    'bg-red-500': action.operation === 'delete',
-                                }"
-                                aria-hidden="true"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
-                                </svg>
-                            </span>
-                            <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="proposalRecordLabel(action)"></span>
-                        </span>
-                    </template>
-                @endif
+                        <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white" x-text="proposalRecordLabel(action)"></span>
+                    </span>
+                </template>
 
                 <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalRecordLabel(action)">
                     <span class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="{{ $summaryExpression }}"></span>
                 </template>
 
                 <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalRecordLabel(action)">
-                    @if ($inPlan)
-                        <span
-                            class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider"
-                            :class="{
-                                'text-blue-600 dark:text-blue-400': action.operation === 'create',
-                                'text-amber-600 dark:text-amber-400': action.operation === 'update',
-                                'text-red-600 dark:text-red-400': action.operation === 'delete',
-                            }"
-                            x-text="(@js($operationLabels))[action.operation] ?? action.operation"
-                        ></span>
-                    @else
-                        <span
-                            class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400"
-                            x-text="action.display?.title ?? ((@js($operationLabels))[action.operation] ?? action.operation)"
-                        ></span>
-                    @endif
+                    <span
+                        class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400"
+                        x-text="action.display?.title ?? ((@js($operationLabels))[action.operation] ?? action.operation)"
+                    ></span>
                 </template>
 
                 {{-- The record, one click away and never in the row's own click
@@ -258,16 +238,18 @@
                     <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
                         <div class="py-3">
                             <div class="flex items-center justify-between gap-2">
-                                {{-- The item's record identity, in the same pill every other
-                                     card leads with; the summary text is the fallback for an
-                                     entity without a glyph or a quoted title. --}}
+                                {{-- The item's record identity as plain bold text (chips are
+                                     reserved for inline clickable references); the summary text
+                                     is the fallback for an entity without a glyph or a quoted
+                                     title. The data attributes stay: they mark identity, not a
+                                     pill. --}}
                                 <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalItemLabel(item)">
-                                    <span class="chat-chip min-w-0" data-proposal-record-chip :data-record-type="action.entity_type">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" :d="window.ChatModules.recordChipIcon(action.entity_type)"></path>
-                                        </svg>
-                                        <span class="chat-chip-label" x-text="proposalItemLabel(item)"></span>
-                                    </span>
+                                    <span
+                                        class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white"
+                                        data-proposal-record-chip
+                                        :data-record-type="action.entity_type"
+                                        x-text="proposalItemLabel(item)"
+                                    ></span>
                                 </template>
 
                                 <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalItemLabel(item)">

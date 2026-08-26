@@ -86,25 +86,30 @@
         <div class="min-w-0 flex-1">
             <div class="flex min-w-0 items-center gap-2">
                 @if ($entityIcon && $step['recordLabel'] !== '')
-                    <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="{{ $step['entity_type'] }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
-                        </svg>
-                        <span class="chat-chip-label">{{ $step['recordLabel'] }}</span>
+                    {{-- Same identity the standalone header leads with, at row
+                         scale: operation-tinted tile, bold label, muted title.
+                         No record pill: chips are reserved for inline clickable
+                         references. --}}
+                    <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip data-record-type="{{ $step['entity_type'] }}">
+                        <span
+                            @class([
+                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white',
+                                'bg-primary-600' => $step['operation'] === 'create',
+                                'bg-amber-500' => $step['operation'] === 'update',
+                                'bg-red-500' => $step['operation'] === 'delete',
+                            ])
+                            aria-hidden="true"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $entityIcon }}" />
+                            </svg>
+                        </span>
+                        <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['recordLabel'] }}</span>
                     </span>
+
+                    <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">{{ $stepTitle }}</span>
                 @else
                     <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
-                @endif
-
-                @if ($entityIcon && $step['recordLabel'] !== '')
-                    <span
-                        @class([
-                            'shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider',
-                            'text-blue-600 dark:text-blue-400' => $step['operation'] === 'create',
-                            'text-amber-600 dark:text-amber-400' => $step['operation'] === 'update',
-                            'text-red-600 dark:text-red-400' => $step['operation'] === 'delete',
-                        ])
-                    >{{ $operationLabel }}</span>
                 @endif
             </div>
 
