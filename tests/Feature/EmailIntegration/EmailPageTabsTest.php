@@ -126,6 +126,25 @@ it('does not mark an email as read when the page is loaded on another tab', func
     expect($email->reads()->where('user_id', $this->user->id)->exists())->toBeFalse();
 });
 
+it('saves an email privacy tier from the sharing cards', function (): void {
+    $email = Email::factory()->inbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+
+    Livewire::test(EmailInboxPage::class)
+        ->callAction('manageSharing', data: [
+            'privacy_tier' => EmailPrivacyTier::FULL->value,
+            'shares' => [],
+        ], arguments: ['emailId' => $email->id])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Sharing settings saved.');
+
+    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+});
+
 it('lists only the signed-in user\'s own drafts', function (): void {
     $mine = makeDraft($this->user, $this->account);
 

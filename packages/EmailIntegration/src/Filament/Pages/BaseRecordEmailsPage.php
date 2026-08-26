@@ -321,6 +321,7 @@ abstract class BaseRecordEmailsPage extends Page
                             ->schema([
                                 Radio::make('privacy_tier')
                                     ->hiddenLabel()
+                                    ->options(EmailPrivacyTier::class)
                                     ->view('email-integration::forms.sharing-tier-cards')
                                     ->viewData(['ariaLabel' => __('filament/pages/record-emails.fields.privacy_tier.label')])
                                     ->required(),
