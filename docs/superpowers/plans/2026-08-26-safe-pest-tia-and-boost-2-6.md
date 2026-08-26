@@ -384,6 +384,7 @@ git commit -m "test: make PHPStan rule tests TIA compatible"
 
 - Modify: `composer.lock`
 - Modify: `boost.json`
+- Modify: `config/boost.php`
 - Modify: generated agent guidance and skill files
 - Preserve: `.ai/rules/boost/**`
 - Preserve: `.ai/rules/index.md`
@@ -421,6 +422,11 @@ composer audit
 Expected: Boost 2.6.0 and no security advisories.
 
 - [ ] Replace `pest-testing` with `testing-best-practices` in `boost.json`.
+
+- [ ] Add `pest-testing` to `boost.skills.exclude` in `config/boost.php`.
+
+Pest 5.1.1 still advertises its bundled copy. The exclusion prevents future
+Boost updates from restoring the duplicate skill.
 
 - [ ] Regenerate Boost output.
 

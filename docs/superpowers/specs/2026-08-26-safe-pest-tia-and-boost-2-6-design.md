@@ -155,6 +155,9 @@ Restore `.ai/rules/boost` and `.ai/rules/index.md` from the branch after generat
 
 Replace `pest-testing` with `testing-best-practices` in `boost.json` and generated agent skills.
 
+Pest 5.1.1 still advertises its older `pest-testing` skill during Boost updates.
+Exclude that name in `config/boost.php` so regeneration does not restore the duplicate.
+
 Copy regenerated `AGENTS.md` to `GEMINI.md`. Boost does not generate Gemini skill output.
 
 Review every generated diff before keeping it.
