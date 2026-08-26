@@ -15,9 +15,9 @@ Measurements from 2026-08-26:
 
 | File | Tests | Assertions | Local duration | Historical shard duration |
 | --- | ---: | ---: | ---: | ---: |
-| `ExecuteImportJobTest.php` | 105 | 301 | 44.948s | 69.097s |
-| `ProposalCardComponentTest.php` | 59 | 264 | 21.717s | 42.161s |
-| `CreateTeamOnboardingTest.php` | 62 | 336 | 29.552s | 40.535s |
+| `ExecuteImportJobTest.php` | 105 | 301 | 40.12s | 69.097s |
+| `ProposalCardComponentTest.php` | 59 | 264 | 21.24s | 42.161s |
+| `CreateTeamOnboardingTest.php` | 62 | 336 | 27.01s | 40.535s |
 
 Each file is one scheduling unit. Large files limit shard balancing and TIA selection.
 
@@ -40,6 +40,7 @@ It owns reusable setup for ready imports, row construction, custom fields, job e
 Split `ExecuteImportJobTest.php` into:
 
 - `ExecuteImportJobCoreTest.php`
+- `ExecuteImportJobScaleTest.php`
 - `ExecuteImportJobCustomFieldsTest.php`
 - `ExecuteImportJobFieldTypeTest.php`
 - `ExecuteImportJobEntityTest.php`
@@ -47,6 +48,8 @@ Split `ExecuteImportJobTest.php` into:
 - `ExecuteImportJobRegressionTest.php`
 
 Use existing section boundaries. Keep every test title unchanged.
+
+Keep the three scale cases together. This gives the remaining core cases and the scale cases separate scheduling units.
 
 Keep the pure create scalability case at 1,000 rows.
 
