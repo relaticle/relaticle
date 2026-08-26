@@ -38,4 +38,21 @@ final class CustomFieldValueFactory extends Factory
             'string_value' => $this->faker->word(),
         ];
     }
+
+    /**
+     * @param  list<string>  $values
+     */
+    public function withJsonValue(array $values): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'string_value' => null,
+            'text_value' => null,
+            'boolean_value' => null,
+            'integer_value' => null,
+            'float_value' => null,
+            'date_value' => null,
+            'datetime_value' => null,
+            'json_value' => $values,
+        ]);
+    }
 }

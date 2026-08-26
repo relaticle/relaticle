@@ -138,12 +138,11 @@ it('merges multi-choice custom field values during update', function (): void {
         'team_id' => $this->team->id,
     ]);
 
-    CustomFieldValue::factory()->create([
+    CustomFieldValue::factory()->withJsonValue(['old@work.com'])->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
         'tenant_id' => $this->team->id,
-        'json_value' => ['old@work.com'],
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name', 'Email'], [
@@ -210,12 +209,11 @@ it('does not duplicate existing multi-choice values during merge', function (): 
         'team_id' => $this->team->id,
     ]);
 
-    CustomFieldValue::factory()->create([
+    CustomFieldValue::factory()->withJsonValue(['shared@work.com'])->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
         'tenant_id' => $this->team->id,
-        'json_value' => ['shared@work.com'],
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name', 'Email'], [
