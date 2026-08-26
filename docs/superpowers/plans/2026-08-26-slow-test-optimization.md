@@ -523,10 +523,12 @@ Expected: no style errors.
 - [ ] Confirm PR4 production files are untouched.
 
 ```bash
-git diff --name-only 3f66ea580...HEAD | rg -v '^(tests/|docs/)'
+git diff --name-only 3f66ea580...ac2d0069c | rg -v '^(tests/|docs/)'
 ```
 
-Expected: no output. The full branch also contains the approved Boost and test-runner configuration changes from PR1.
+Expected: no output. Later commits only correct shared test diagnostics and their exact-message tests.
+
+The full branch also contains the approved Boost and test-runner configuration changes from PR1.
 
 - [ ] Run `git diff --check` and inspect the complete pull request diff.
 
