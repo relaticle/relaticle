@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 
 abstract class BaseDeleteTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasExplicitToolAnnotations;
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -38,7 +41,18 @@ abstract class BaseDeleteTool extends Tool
         ];
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'deleted' => $schema->boolean()->required(),
+            'type' => $schema->string()->required(),
+            'id' => $schema->string()->required(),
+            'name' => $schema->string()->required(),
+            'message' => $schema->string()->required(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('delete')) instanceof Response) {
             return $denied;
@@ -68,6 +82,12 @@ abstract class BaseDeleteTool extends Tool
         $label = $this->entityLabel();
         $entityName = $model->{$this->nameAttribute()};
 
-        return Response::text("{$label} '{$entityName}' has been deleted.");
+        return Response::structured([
+            'deleted' => true,
+            'type' => strtolower($label),
+            'id' => (string) $model->getKey(),
+            'name' => (string) $entityName,
+            'message' => "{$label} '{$entityName}' has been deleted.",
+        ]);
     }
 }

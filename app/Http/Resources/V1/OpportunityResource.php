@@ -43,6 +43,8 @@ final class OpportunityResource extends JsonApiResource
             'creator' => UserResource::class,
             'company' => CompanyResource::class,
             'contact' => PeopleResource::class,
+            'tasks' => TaskResource::class,
+            'notes' => NoteResource::class,
         ];
     }
 }

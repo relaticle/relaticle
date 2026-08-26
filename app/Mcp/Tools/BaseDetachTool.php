@@ -6,18 +6,21 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\BuildsRelationshipResponse;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 
 abstract class BaseDetachTool extends Tool
 {
     use BuildsRelationshipResponse;
     use ChecksTokenAbility;
+    use HasExplicitToolAnnotations;
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -27,14 +30,14 @@ abstract class BaseDetachTool extends Tool
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
 
+    /** @return class-string */
+    abstract protected function actionClass(): string;
+
     /** @return array<string, mixed> */
     abstract protected function relationshipSchema(JsonSchema $schema): array;
 
     /** @return array<string, array<int, mixed>> */
     abstract protected function relationshipRules(User $user): array;
-
-    /** @param array<string, mixed> $data */
-    abstract protected function detachRelationships(Model $model, array $data): void;
 
     /** @return array<int, string> */
     protected function relationshipsToLoad(): array
@@ -52,7 +55,15 @@ abstract class BaseDetachTool extends Tool
         );
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'data' => $schema->object()->required(),
+            'relationship_counts' => $schema->object(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('update')) instanceof Response) {
             return $denied;
@@ -85,7 +96,8 @@ abstract class BaseDetachTool extends Tool
             return Response::error("You do not have permission to update this {$this->entityLabel()}.");
         }
 
-        $this->detachRelationships($model, $validated);
+        $action = app()->make($this->actionClass());
+        $model = $action->execute($user, $model, $validated);
 
         return $this->buildRelationshipResponse($model);
     }

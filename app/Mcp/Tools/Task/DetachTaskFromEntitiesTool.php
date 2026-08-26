@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Task;
 
+use App\Actions\Task\DetachTaskRelationships;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseDetachTool;
 use App\Models\Task;
@@ -11,7 +12,6 @@ use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
@@ -35,6 +35,11 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
     protected function resourceClass(): string
     {
         return TaskResource::class;
+    }
+
+    protected function actionClass(): string
+    {
+        return DetachTaskRelationships::class;
     }
 
     /** @return array<int, string> */
@@ -70,25 +75,5 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
             'assignee_ids' => ['sometimes', 'array'],
             'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
         ];
-    }
-
-    public function detachRelationships(Model $model, array $data): void
-    {
-        /** @var Task $model */
-        if (isset($data['company_ids'])) {
-            $model->companies()->detach($data['company_ids']);
-        }
-
-        if (isset($data['people_ids'])) {
-            $model->people()->detach($data['people_ids']);
-        }
-
-        if (isset($data['opportunity_ids'])) {
-            $model->opportunities()->detach($data['opportunity_ids']);
-        }
-
-        if (isset($data['assignee_ids'])) {
-            $model->assignees()->detach($data['assignee_ids']);
-        }
     }
 }

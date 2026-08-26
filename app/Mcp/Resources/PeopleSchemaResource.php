@@ -48,7 +48,7 @@ final class PeopleSchemaResource extends Resource
             ],
             'custom_fields' => $this->resolveCustomFields($user, 'people'),
             'filterable_fields' => $this->resolveFilterableFields($user, 'people'),
-            'relationships' => ['creator', 'company'],
+            'relationships' => ['creator', 'company', 'tasks', 'notes'],
             'aggregate_includes' => [
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',

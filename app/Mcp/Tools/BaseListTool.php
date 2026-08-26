@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -14,13 +15,17 @@ use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseListTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
     use SerializesRelatedModels;
+
+    private const int MAX_PER_PAGE = 25;
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -57,13 +62,25 @@ abstract class BaseListTool extends Tool
                 'filter' => $schema->object()->description('Filter by custom field values. Keys are field codes, values are operator objects (eq, gt, gte, lt, lte, contains, in, has_any).'),
                 'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
                 'include' => $schema->array()->description('Related records to expand in response.'),
-                'per_page' => $schema->integer()->description('Results per page (default 15, max 100).')->default(15),
+                'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
                 'page' => $schema->integer()->description('Page number.')->default(1),
             ],
         );
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'items' => $schema->array()->items($schema->object())->required(),
+            'page' => $schema->integer()->required(),
+            'per_page' => $schema->integer()->required(),
+            'total' => $schema->integer()->required(),
+            'has_more' => $schema->boolean()->required(),
+            'next_page' => $schema->integer()->nullable()->required(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
             return $denied;
@@ -72,14 +89,19 @@ abstract class BaseListTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
+        $pagination = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
         $httpRequest = $this->buildHttpRequest($request);
 
         try {
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
-                perPage: max(1, min((int) $request->get('per_page', 15), 100)),
-                page: $request->get('page') ? (int) $request->get('page') : null,
+                perPage: (int) ($pagination['per_page'] ?? 15),
+                page: (int) ($pagination['page'] ?? 1),
                 request: $httpRequest,
             );
         } catch (InvalidQuery $e) {
@@ -121,18 +143,19 @@ abstract class BaseListTool extends Tool
             }
         }
 
-        $response = (object) ['data' => $items];
+        $response = ['items' => $items];
 
         if ($results instanceof LengthAwarePaginator) {
-            $response->meta = (object) [
-                'current_page' => $results->currentPage(),
+            $response = array_merge($response, [
+                'page' => $results->currentPage(),
                 'per_page' => $results->perPage(),
                 'total' => $results->total(),
-                'last_page' => $results->lastPage(),
-            ];
+                'has_more' => $results->hasMorePages(),
+                'next_page' => $results->hasMorePages() ? $results->currentPage() + 1 : null,
+            ]);
         }
 
-        return Response::text((string) json_encode($response, JSON_PRETTY_PRINT));
+        return Response::structured($response);
     }
 
     private function buildHttpRequest(Request $mcpRequest): HttpRequest

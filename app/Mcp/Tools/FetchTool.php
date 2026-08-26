@@ -9,6 +9,8 @@ use App\Http\Resources\V1\NoteResource;
 use App\Http\Resources\V1\OpportunityResource;
 use App\Http\Resources\V1\PeopleResource;
 use App\Http\Resources\V1\TaskResource;
+use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -36,7 +38,8 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsOpenWorld(false)]
 final class FetchTool extends Tool
 {
-    use Concerns\ChecksTokenAbility;
+    use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
 
     /** @var array<string, array{0: class-string<Model>, 1: class-string<JsonResource>}> */
     private const array TYPE_MAP = [
@@ -53,6 +56,15 @@ final class FetchTool extends Tool
     {
         return [
             'url' => $schema->string()->description('Canonical record URL produced by the search tool, or any Relaticle record URL copied from the browser.')->required(),
+        ];
+    }
+
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'type' => $schema->string()->required(),
+            'url' => $schema->string()->required(),
+            'data' => $schema->object()->required(),
         ];
     }
 
@@ -96,10 +108,9 @@ final class FetchTool extends Tool
         $resource = new $resourceClass($model);
 
         /** @var array<string, mixed> $envelope */
-        $envelope = json_decode((string) $resource->toJson(), true);
+        $envelope = (array) json_decode((string) $resource->toJson(), flags: JSON_THROW_ON_ERROR);
 
-        /** @var array<string, mixed> $data */
-        $data = $envelope['data'] ?? $envelope;
+        $data = $envelope['data'] ?? (object) $envelope;
 
         return Response::structured([
             'type' => $type,

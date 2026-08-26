@@ -44,10 +44,11 @@ final class CompanySchemaResource extends Resource
             'description' => 'Organizations and businesses tracked in the CRM.',
             'fields' => [
                 'name' => ['type' => 'string', 'required' => true],
+                'account_owner_id' => ['type' => 'string', 'required' => false, 'description' => 'Team member ID from whoami.'],
             ],
             'custom_fields' => $this->resolveCustomFields($user, 'company'),
             'filterable_fields' => $this->resolveFilterableFields($user, 'company'),
-            'relationships' => ['creator', 'accountOwner', 'people', 'opportunities'],
+            'relationships' => ['creator', 'accountOwner', 'people', 'opportunities', 'tasks', 'notes'],
             'aggregate_includes' => [
                 'peopleCount' => 'Count of related people',
                 'opportunitiesCount' => 'Count of related opportunities',

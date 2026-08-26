@@ -6,17 +6,25 @@ namespace App\Mcp\Tools;
 
 use App\Enums\CreationSource;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 
 abstract class BaseCreateTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasExplicitToolAnnotations;
+
+    protected function destructiveHint(): bool
+    {
+        return false;
+    }
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -46,7 +54,12 @@ abstract class BaseCreateTool extends Tool
         );
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return ['data' => $schema->object()->required()];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('create')) instanceof Response) {
             return $denied;
@@ -68,8 +81,11 @@ abstract class BaseCreateTool extends Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        return Response::text(
-            new $resourceClass($model->loadMissing('customFieldValues.customField.options'))->toJson(JSON_PRETTY_PRINT)
+        $payload = (array) json_decode(
+            new $resourceClass($model->loadMissing('customFieldValues.customField.options'))->toJson(),
+            flags: JSON_THROW_ON_ERROR,
         );
+
+        return Response::structured($payload);
     }
 }

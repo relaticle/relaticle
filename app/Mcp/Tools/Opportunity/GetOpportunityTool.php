@@ -38,6 +38,6 @@ final class GetOpportunityTool extends BaseShowTool
     /** @return array<int, string> */
     protected function allowedIncludes(): array
     {
-        return ['creator', 'company', 'contact', 'tasksCount', 'notesCount'];
+        return ['creator', 'company', 'contact', 'tasks', 'notes', 'tasksCount', 'notesCount'];
     }
 }

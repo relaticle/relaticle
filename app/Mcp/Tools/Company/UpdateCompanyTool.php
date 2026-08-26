@@ -10,6 +10,7 @@ use App\Mcp\Tools\BaseUpdateTool;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
@@ -48,6 +49,7 @@ final class UpdateCompanyTool extends BaseUpdateTool
     {
         return [
             'name' => $schema->string()->description('The company name.'),
+            'account_owner_id' => $schema->string()->nullable()->description('Team member ID responsible for this company. Pass null to clear it. Use whoami to discover valid IDs.'),
         ];
     }
 
@@ -55,6 +57,7 @@ final class UpdateCompanyTool extends BaseUpdateTool
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
+            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentTeam->allUsers()->pluck('id')->all())],
         ];
     }
 }

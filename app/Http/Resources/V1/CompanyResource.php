@@ -23,6 +23,7 @@ final class CompanyResource extends JsonApiResource
     {
         return [
             'name' => $this->name,
+            'account_owner_id' => $this->account_owner_id,
             'creation_source' => $this->creation_source,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
@@ -44,6 +45,8 @@ final class CompanyResource extends JsonApiResource
             'accountOwner' => UserResource::class,
             'people' => PeopleResource::class,
             'opportunities' => OpportunityResource::class,
+            'tasks' => TaskResource::class,
+            'notes' => NoteResource::class,
         ];
     }
 }

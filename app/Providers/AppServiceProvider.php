@@ -506,6 +506,19 @@ final class AppServiceProvider extends ServiceProvider
 
         CustomField::saved($invalidate);
         CustomField::deleted($invalidate);
+
+        $invalidateOption = function (CustomFieldOption $option) use ($invalidate): void {
+            $field = CustomField::query()
+                ->withoutGlobalScopes()
+                ->find($option->getAttribute('custom_field_id'));
+
+            if ($field instanceof CustomField) {
+                $invalidate($field);
+            }
+        };
+
+        CustomFieldOption::saved($invalidateOption);
+        CustomFieldOption::deleted($invalidateOption);
     }
 
     /**

@@ -11,15 +11,16 @@ use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Models\Company;
 use App\Models\Scopes\TeamScope;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     Company::clearBootedModels();
 });
 
@@ -32,8 +33,62 @@ it('can get a company by ID', function (): void {
         ->assertSee('Acme Corp');
 });
 
-describe('team scoping', function () {
-    beforeEach(function () {
+it('returns bounded related tasks with count and truncation metadata', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $tasks = Task::factory()->count(27)->recycle([$this->user, $this->team])->create();
+    $company->tasks()->attach($tasks);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCompanyTool::class, [
+            'id' => $company->id,
+            'include' => ['tasks'],
+        ])
+        ->assertOk()
+        ->assertSee('"returned":25')
+        ->assertSee('"total":27')
+        ->assertSee('"truncated":true');
+});
+
+it('can create, update, and clear a company account owner', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateCompanyTool::class, [
+            'name' => 'Owned Company',
+            'account_owner_id' => $member->id,
+        ])
+        ->assertOk()
+        ->assertSee($member->id);
+
+    $company = Company::query()->where('name', 'Owned Company')->firstOrFail();
+    expect($company->account_owner_id)->toBe($member->id);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateCompanyTool::class, [
+            'id' => $company->id,
+            'account_owner_id' => null,
+        ])
+        ->assertOk();
+
+    expect($company->refresh()->account_owner_id)->toBeNull();
+});
+
+it('rejects a company account owner from another team', function (): void {
+    $outsider = User::factory()->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateCompanyTool::class, [
+            'name' => 'Invalid Owner Company',
+            'account_owner_id' => $outsider->id,
+        ])
+        ->assertHasErrors();
+
+    expect(Company::query()->where('name', 'Invalid Owner Company')->exists())->toBeFalse();
+});
+
+describe('team scoping', function (): void {
+    beforeEach(function (): void {
         // Apply team scope as SetApiTeamContext middleware does in production
         Company::addGlobalScope(new TeamScope);
     });
@@ -103,7 +158,7 @@ describe('team scoping', function () {
     });
 });
 
-describe('pagination', function () {
+describe('pagination', function (): void {
     it('can paginate companies via MCP tool', function (): void {
         Company::factory(3)->recycle([$this->user, $this->team])->create();
 
@@ -124,7 +179,7 @@ describe('pagination', function () {
         $page2->assertOk();
     });
 
-    it('includes pagination metadata in list responses', function (): void {
+    it('includes bounded pagination metadata in list responses', function (): void {
         Company::factory(3)->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
@@ -133,24 +188,31 @@ describe('pagination', function () {
                 'page' => 1,
             ])
             ->assertOk()
-            ->assertSee('"meta"')
-            ->assertSee('"current_page": 1')
-            ->assertSee('"per_page": 2');
+            ->assertSee('"page":1')
+            ->assertSee('"per_page":2')
+            ->assertSee('"has_more":true')
+            ->assertSee('"next_page":2');
+    });
+
+    it('rejects list page sizes above the MCP payload cap', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, ['per_page' => 26])
+            ->assertHasErrors();
     });
 });
 
-describe('custom fields serialization', function () {
+describe('custom fields serialization', function (): void {
     it('returns empty custom_fields as object not array', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(GetCompanyTool::class, ['id' => $company->id])
             ->assertOk()
-            ->assertSee('"custom_fields": {}');
+            ->assertSee('"custom_fields":{}');
     });
 });
 
-describe('validation', function () {
+describe('validation', function (): void {
     it('rejects empty name on create', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(CreateCompanyTool::class, [])
@@ -177,7 +239,7 @@ describe('validation', function () {
     });
 });
 
-describe('date filtering', function () {
+describe('date filtering', function (): void {
     it('filters companies by created_after', function (): void {
         $old = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Ancient Corp']);
         $old->forceFill(['created_at' => now()->subMonth()])->saveQuietly();

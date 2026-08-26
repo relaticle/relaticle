@@ -38,6 +38,6 @@ final class GetPeopleTool extends BaseShowTool
     /** @return array<int, string> */
     protected function allowedIncludes(): array
     {
-        return ['creator', 'company', 'tasksCount', 'notesCount'];
+        return ['creator', 'company', 'tasks', 'notes', 'tasksCount', 'notesCount'];
     }
 }

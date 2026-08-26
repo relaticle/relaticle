@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Note;
 
+use App\Actions\Note\DetachNoteRelationships;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseDetachTool;
 use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
@@ -33,6 +33,11 @@ final class DetachNoteFromEntitiesTool extends BaseDetachTool
     protected function resourceClass(): string
     {
         return NoteResource::class;
+    }
+
+    protected function actionClass(): string
+    {
+        return DetachNoteRelationships::class;
     }
 
     /** @return array<int, string> */
@@ -62,21 +67,5 @@ final class DetachNoteFromEntitiesTool extends BaseDetachTool
             'opportunity_ids' => ['sometimes', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
         ];
-    }
-
-    public function detachRelationships(Model $model, array $data): void
-    {
-        /** @var Note $model */
-        if (isset($data['company_ids'])) {
-            $model->companies()->detach($data['company_ids']);
-        }
-
-        if (isset($data['people_ids'])) {
-            $model->people()->detach($data['people_ids']);
-        }
-
-        if (isset($data['opportunity_ids'])) {
-            $model->opportunities()->detach($data['opportunity_ids']);
-        }
     }
 }

@@ -91,11 +91,7 @@ it('filters by currency field with gte operator', function (): void {
         ->and($results->first()->name)->toBe('Big Deal');
 });
 
-it('silently ignores unknown field codes', function (): void {
-    $countBefore = Opportunity::query()->count();
-
-    Opportunity::factory()->recycle([$this->user, $this->team])->create();
-
+it('rejects unknown field codes', function (): void {
     $request = new Request([
         'filter' => [
             'custom_fields' => [
@@ -104,14 +100,35 @@ it('silently ignores unknown field codes', function (): void {
         ],
     ]);
 
-    $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+    QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
             AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
         )
         ->get();
+})->throws(HttpException::class, 'Unknown custom field filter codes: nonexistent_field.');
 
-    expect($results)->toHaveCount($countBefore + 1);
-});
+it('rejects unknown operators', function (): void {
+    $amountField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'amount')
+        ->firstOrFail();
+
+    $request = new Request([
+        'filter' => [
+            'custom_fields' => [
+                $amountField->code => ['approximately' => 50000],
+            ],
+        ],
+    ]);
+
+    QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+        ->allowedFilters(
+            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+        )
+        ->get();
+})->throws(HttpException::class, 'Unknown custom field filter operator [approximately] for [amount].');
 
 it('rejects more than 10 filter conditions', function (): void {
     $filters = [];
