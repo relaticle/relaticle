@@ -269,3 +269,43 @@ it('renders no workspace_state block when no team is bound', function (): void {
 
     expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
 });
+
+/**
+ * A resumed turn is the one the user's approval started, so its resolved
+ * actions are what that click just did. Without this the model reported a
+ * freshly approved invitation as "already sent earlier in our conversation,
+ * no new action was needed", which tells the user their own click did
+ * nothing. Reproduced on two consecutive live turns before the fix.
+ */
+it('tells the model a resumed turn reports what the decision just did', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('what the user\'s decision JUST did')
+        ->toContain('already sent')
+        ->toContain('never as history');
+});
+
+/**
+ * The Writes rule used to say "already approved", which the model rendered
+ * back to the user as "already ... earlier in our conversation". The phrasing
+ * has to distinguish approvals that arrived on THIS turn from earlier ones.
+ */
+it('does not tell the model the request is already approved without qualifying when', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->not->toContain('When everything requested is already approved')
+        ->toContain('If those approvals arrived on THIS turn');
+});
+
+/**
+ * House style bans the em dash everywhere, and the sanitiser that used to
+ * strip it from assistant prose left with the welcome conversation. Live
+ * replies were shipping "..., no further action is needed" with one.
+ */
+it('bans the em dash in assistant prose', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('Never use an em dash');
+});
