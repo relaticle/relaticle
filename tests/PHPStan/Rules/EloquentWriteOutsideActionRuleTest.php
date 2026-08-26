@@ -25,7 +25,7 @@ abstract class EloquentWriteOutsideActionRuleTest extends RuleTestCase
 pest()->extend(EloquentWriteOutsideActionRuleTest::class);
 
 it('flags eloquent writes in guarded namespaces', function (): void {
-    $expectedMessage = 'Eloquent write ->%s() in a UI/transport surface — route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md).';
+    $expectedMessage = 'Eloquent write ->%s() in a UI/transport surface: route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md).';
 
     $this->analyse([__DIR__.'/data/eloquent-write-in-controller.php'], [
         [sprintf($expectedMessage, 'create'), 9],

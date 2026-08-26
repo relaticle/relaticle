@@ -67,7 +67,7 @@ it('keeps guarded methods aligned with PHPStan configuration', function (): void
 it('flags a hardcoded label', function (): void {
     $this->analyse([__DIR__.'/data/hardcoded-label.php'], [
         [
-            'Hardcoded user-facing string in ->label() — wrap in __() and add a key under lang/en/.',
+            'Hardcoded user-facing string in ->label(): wrap in __() and add a key under lang/en/.',
             7,
         ],
     ]);
