@@ -25,7 +25,7 @@ pest()->extend(HardcodedStaticPropertyRuleTest::class);
 
 it('flags a hardcoded static property', function (): void {
     $this->analyse([__DIR__.'/data/hardcoded-static-nav.php'], [
-        ['Hardcoded user-facing string in $navigationGroup — set property to null and override getNavigationGroup() with __().', 9],
+        ['Hardcoded user-facing string in $navigationGroup: set property to null and override getNavigationGroup() with __().', 9],
     ]);
 });
 

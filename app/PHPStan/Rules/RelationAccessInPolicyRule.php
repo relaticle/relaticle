@@ -119,7 +119,7 @@ final readonly class RelationAccessInPolicyRule implements Rule
         $shortName = basename(str_replace('\\', '/', $className));
 
         return RuleErrorBuilder::message(
-            "Policy resolves the `{$property}` relation on {$shortName} — authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row."
+            "Policy resolves the `{$property}` relation on {$shortName}: authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row."
         )
             ->identifier('app.architecture.relationAccessInPolicy')
             ->build();
