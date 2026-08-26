@@ -158,7 +158,7 @@ it('wraps sanitized email html in a scriptless dark-mode preview document', func
         ->toContain('<meta name="color-scheme" content="light dark">')
         ->toContain('@media (prefers-color-scheme: dark)')
         ->toContain('background: #17181a')
-        ->toContain('padding: clamp(20px, 4vw, 44px)')
+        ->toContain('padding: 0')
         ->toContain('background-color: transparent !important')
         ->toContain('<p style="color:#111111;background:#ffffff">Body</p>')
         ->not->toContain('<script');

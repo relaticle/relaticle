@@ -7,6 +7,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -104,6 +105,18 @@ it('fills the reader body while the email iframe is loading', function (): void 
         ->assertSeeHtml('x-bind:class="ready ? \'shrink-0\' : \'flex min-h-0 flex-1 flex-col\'"')
         ->assertSeeHtml('x-bind:class="ready ? \'\' : \'min-h-0 flex-1\'"')
         ->assertDontSeeHtml('max-w-3xl');
+});
+
+it('saves an email privacy tier from the sharing cards', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('manageSharing', data: [
+            'privacy_tier' => EmailPrivacyTier::SUBJECT->value,
+            'shares' => [],
+        ], arguments: ['emailId' => $this->newer->id])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Sharing settings saved.');
+
+    expect($this->newer->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('does not mark emails belonging to other records', function (): void {

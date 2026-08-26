@@ -20,6 +20,8 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -84,6 +86,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
                             ->columns()
                             ->compact()
                             ->schema([
+                                Select::make('tier')
+                                    ->label(__('filament/relation-managers/emails.fields.tier.label'))
+                                    ->options(EmailPrivacyTier::class)
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                    ->required(),
+
                                 Select::make('shared_with')
                                     ->label(__('filament/relation-managers/emails.fields.shared_with.label'))
                                     ->options(function (): array {
@@ -95,12 +103,9 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                             ->pluck('name', 'id')
                                             ->all();
                                     })
-                                    ->required()
-                                    ->distinct(),
-
-                                Select::make('tier')
-                                    ->label(__('filament/relation-managers/emails.fields.tier.label'))
-                                    ->options(EmailPrivacyTier::class)
+                                    ->multiple()
+                                    ->searchable()
+                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                     ->required(),
                             ]),
                     ])
@@ -110,19 +115,21 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         $sharingService->setTierForAllOnRecord($record, $owner, $data['privacy_tier']);
 
                         foreach ($data['shares'] ?? [] as $share) {
-                            $sharedWithUser = User::query()
-                                ->inTeam($owner->current_team_id)
-                                ->whereKey((string) $share['shared_with'])
-                                ->first();
+                            foreach (Arr::wrap($share['shared_with']) as $sharedWith) {
+                                $sharedWithUser = User::query()
+                                    ->inTeam($owner->current_team_id)
+                                    ->whereKey($sharedWith)
+                                    ->first();
 
-                            abort_if($sharedWithUser === null, 403);
+                                abort_if($sharedWithUser === null, 403);
 
-                            $sharingService->shareAllOnRecord(
-                                $record,
-                                $owner,
-                                $sharedWithUser,
-                                $share['tier'],
-                            );
+                                $sharingService->shareAllOnRecord(
+                                    $record,
+                                    $owner,
+                                    $sharedWithUser,
+                                    $share['tier'],
+                                );
+                            }
                         }
 
                         Notification::make()
@@ -229,6 +236,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                 ->addActionLabel('Add teammate')
                                 ->columns(2)
                                 ->schema([
+                                    Select::make('tier')
+                                        ->label(__('filament/relation-managers/emails.fields.tier.label'))
+                                        ->options(EmailPrivacyTier::class)
+                                        ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                        ->required(),
+
                                     Select::make('shared_with')
                                         ->label(__('filament/relation-managers/emails.fields.shared_with.label'))
                                         ->options(function (): array {
@@ -240,25 +253,15 @@ abstract class BaseEmailsRelationManager extends RelationManager
                                                 ->pluck('name', 'id')
                                                 ->all();
                                         })
+                                        ->multiple()
+                                        ->searchable()
                                         ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                        ->required()
-                                        ->distinct(),
-
-                                    Select::make('tier')
-                                        ->label(__('filament/relation-managers/emails.fields.tier.label'))
-                                        ->options(EmailPrivacyTier::class)
                                         ->required(),
                                 ]),
                         ])
                         ->fillForm(fn (Email $record): array => [
                             'privacy_tier' => $record->privacy_tier->value,
-                            'shares' => $record->shares()
-                                ->get()
-                                ->map(fn (EmailShare $share): array => [
-                                    'shared_with' => $share->shared_with,
-                                    'tier' => $share->tier,
-                                ])
-                                ->all(),
+                            'shares' => $this->shareFormRows($record),
                         ])
                         ->action(function (Email $record, array $data): void {
                             abort_unless($this->authUser()->can('share', $record), 403);
@@ -344,6 +347,35 @@ abstract class BaseEmailsRelationManager extends RelationManager
     {
         /** @var User */
         return auth()->user();
+    }
+
+    /**
+     * @return array<int, array{tier: string, shared_with: array<int, int|string>}>
+     */
+    private function shareFormRows(Email $email): array
+    {
+        return $email->shares()
+            ->get()
+            ->groupBy(fn (EmailShare $share): string => $this->tierValue($share->tier))
+            ->map(fn (Collection $shares, string $tier): array => [
+                'tier' => $tier,
+                'shared_with' => $shares->pluck('shared_with')->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function tierValue(mixed $tier): string
+    {
+        if ($tier instanceof EmailPrivacyTier) {
+            return $tier->value;
+        }
+
+        if (is_string($tier) || is_int($tier)) {
+            return (string) $tier;
+        }
+
+        return '';
     }
 
     private function buildThreadSummaryView(Email $email): View
