@@ -834,9 +834,78 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     visiblePendingActions() {
+        const now = Date.now();
         return this.messages
             .flatMap((m) => m.pending_actions || [])
-            .filter((a) => a.status === 'pending');
+            .filter((a) => a.status === 'pending' && !this.proposalHasLapsed(a, now));
+    },
+
+    // A proposal the server will refuse, seen from the client. The composer is
+    // hidden while one is docked, so getting this wrong strands the user with no
+    // way to type: the server sweeps lapsed proposals on a five-minute schedule
+    // and broadcasts nothing, and ProposalCard's own query already excludes them,
+    // so a tab that trusted `status` alone kept an empty card docked forever.
+    // A payload without the instant (a card rendered before this shipped) is
+    // never treated as lapsed -- the server stays the authority either way.
+    proposalHasLapsed(action, now = Date.now()) {
+        if (!action?.expires_at) return false;
+        const at = Date.parse(action.expires_at);
+        return Number.isFinite(at) && at <= now;
+    },
+
+    // Marks what has lapsed so the card reads "Expired" instead of vanishing, and
+    // re-arms for the next one. Status is what the transcript renders from, so
+    // writing it here is also what releases the composer.
+    sweepLapsedProposals() {
+        const now = Date.now();
+
+        for (const message of this.messages) {
+            for (const action of (message.pending_actions || [])) {
+                if (action.status === 'pending' && this.proposalHasLapsed(action, now)) {
+                    action.status = 'expired';
+                }
+            }
+        }
+
+        this.scheduleProposalExpirySweep();
+    },
+
+    // Fires ON the earliest expiry rather than polling, so the composer comes
+    // back at the moment it becomes usable. Background tabs are throttled and may
+    // fire late, which is why installProposalExpiryWatch() also sweeps on focus:
+    // late is harmless (the server refuses either way), invisible is not.
+    scheduleProposalExpirySweep() {
+        clearTimeout(this._proposalExpiryTimer);
+
+        const now = Date.now();
+        const next = this.messages
+            .flatMap((m) => m.pending_actions || [])
+            .filter((a) => a.status === 'pending' && a.expires_at)
+            .map((a) => Date.parse(a.expires_at))
+            .filter((at) => Number.isFinite(at) && at > now)
+            .sort((a, b) => a - b)[0];
+
+        if (next === undefined) return;
+
+        // setTimeout overflows past ~24.8 days and fires immediately; clamping to
+        // a day means a longer TTL just re-arms instead of spinning.
+        const delay = Math.min(next - now + 250, 86_400_000);
+        this._proposalExpiryTimer = setTimeout(() => this.sweepLapsedProposals(), delay);
+    },
+
+    installProposalExpiryWatch() {
+        this._onProposalExpiryFocus = () => {
+            if (document.visibilityState === 'visible') this.sweepLapsedProposals();
+        };
+        document.addEventListener('visibilitychange', this._onProposalExpiryFocus);
+    },
+
+    uninstallProposalExpiryWatch() {
+        clearTimeout(this._proposalExpiryTimer);
+        if (this._onProposalExpiryFocus) {
+            document.removeEventListener('visibilitychange', this._onProposalExpiryFocus);
+            this._onProposalExpiryFocus = null;
+        }
     },
 
     activePendingActionId() {
@@ -853,6 +922,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const signature = pending.map((a) => a.pending_action_id).join(',');
         if (signature === this._lastActiveProposalSignature) return;
         this._lastActiveProposalSignature = signature;
+        this.scheduleProposalExpirySweep();
 
         const id = pending.length > 0 ? pending[0].pending_action_id : null;
         this._lastActiveProposalId = id;
