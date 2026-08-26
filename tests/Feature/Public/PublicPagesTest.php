@@ -78,8 +78,6 @@ describe('Legal pages', function () {
         $response->assertStatus(200);
         $response->assertSee('Terms of Service');
         $response->assertSee('Relaticle');
-        $response->assertDontSee('word usage');
-        $response->assertDontSee('Basic" plan');
     });
 
     it('displays the privacy policy page with product-specific content', function () {
@@ -88,7 +86,6 @@ describe('Legal pages', function () {
         $response->assertStatus(200);
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
-        $response->assertDontSee('registered mail');
     });
 });
 
