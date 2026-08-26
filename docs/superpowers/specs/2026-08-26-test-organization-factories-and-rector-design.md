@@ -55,7 +55,7 @@ Behavioral rewrites need separate domain decisions. Record the audit outcome in 
 
 ## 4. Factory migration
 
-The current suite contains 95 static `create` calls, including one nested dynamic model call.
+The current suite contains 95 reviewed `create` calls: 94 static calls and one nested dynamic model call.
 
 Convert 69 Eloquent model calls to factories:
 

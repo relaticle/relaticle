@@ -50,7 +50,7 @@ Expected: 21 files appear.
 rg -n '\b[A-Za-z_][A-Za-z0-9_]*::create\(' tests > .context/pr3-static-create-before.txt
 ```
 
-Expected: 95 calls.
+Expected: 94 static calls. One reviewed dynamic model call brings the total to 95.
 
 Keep `.context` evidence uncommitted.
 
@@ -245,7 +245,7 @@ Preserve every explicit attribute array. Remove attributes only when the new def
 rg -n '\b[A-Za-z_][A-Za-z0-9_]*::create\(' tests > .context/pr3-static-create-after.txt
 ```
 
-Expected: 26 reviewed calls remain. No target Eloquent model appears.
+Expected: 25 static calls remain. The reviewed dynamic model call brings the total to 26. No target Eloquent model appears.
 
 - [ ] Run all factory consumers.
 
