@@ -114,6 +114,8 @@ Skip these rules:
 - `EnsureTypeChecksFirstRector`
 - `UseToThrowRector`
 - `UseToBeInRector`
+- `SimplifyToLiteralBooleanRector`
+- `UseToBeEmptyRector`
 
 The first reduces assertion locality across many files.
 
@@ -122,6 +124,10 @@ The second changes assertion order.
 The third changes an existing try-catch test's semantics.
 
 The fourth removes custom failure diagnostics.
+
+The fifth converts strict empty-array assertions to generic emptiness checks.
+
+The sixth replaces exact zero-count assertions with generic emptiness checks.
 
 Skip `UseToMatchRector` for `TranscriptShapeTest.php`. Its replacement drops the
 regex capture that the next assertion reads.

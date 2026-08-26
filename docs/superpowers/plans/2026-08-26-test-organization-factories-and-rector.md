@@ -348,6 +348,8 @@ declare(strict_types=1);
 
 use Pest\Rector\Rules\ChainExpectCallsRector;
 use Pest\Rector\Rules\EnsureTypeChecksFirstRector;
+use Pest\Rector\Rules\SimplifyToLiteralBooleanRector;
+use Pest\Rector\Rules\UseToBeEmptyRector;
 use Pest\Rector\Rules\UseToBeInRector;
 use Pest\Rector\Rules\UseToContainRector;
 use Pest\Rector\Rules\UseToMatchRector;
@@ -361,6 +363,8 @@ return RectorConfig::configure()
     ->withSkip([
         ChainExpectCallsRector::class,
         EnsureTypeChecksFirstRector::class,
+        SimplifyToLiteralBooleanRector::class,
+        UseToBeEmptyRector::class,
         UseToBeInRector::class,
         UseToThrowRector::class,
         UseToContainRector::class => [
@@ -381,19 +385,23 @@ return RectorConfig::configure()
 vendor/bin/rector process --config=rector-tests.php --dry-run > .context/pr3-rector-tests-dry-run.txt
 ```
 
-Expected: 45 test files are initially proposed. No preconfigured skipped rule appears.
+Historical execution result: 45 test files were initially proposed before the
+final review added the two strict-assertion exclusions.
 
 - [ ] Review every proposed hunk before applying.
 
 Reject any hunk that changes evaluated values, exception scope, diagnostics, or assertion order.
 
-The review must reject these three proposals through configuration:
+The review must reject these five proposals through configuration:
 
 - `EnsureTypeChecksFirstRector` in `GitHubServiceTest.php` changes assertion order.
+- `SimplifyToLiteralBooleanRector` weakens strict empty-array assertions.
+- `UseToBeEmptyRector` replaces exact zero-count assertions with generic emptiness checks.
 - `UseToMatchRector` in `TranscriptShapeTest.php` removes a required regex capture.
 - `UseToContainRector` in `UlidMigrationTest.php` removes custom failure diagnostics.
 
-Expected after the review: 42 test files remain.
+Historical execution result: 42 test files remained before the final review.
+The final clean-tree requirement is zero proposed changes.
 
 - [ ] Apply the reviewed configuration.
 
