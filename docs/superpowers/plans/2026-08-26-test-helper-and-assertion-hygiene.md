@@ -78,6 +78,7 @@ If another collision appears, inspect it. Do not expand scope without documentin
 
 - Modify: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobTest.php`
 - Modify: `tests/Feature/ImportWizard/Livewire/PreviewStepTest.php`
+- Modify: `tests/Helpers/PestTiaRuntime.php`
 
 - [ ] In `ExecuteImportJobTest.php`, rename `makeRow` to `makeExecuteImportRow`.
 
@@ -87,10 +88,14 @@ Update every call in that file. Remove its surrounding `function_exists` guard.
 
 Update every call in that file. Remove its surrounding `function_exists` guard.
 
+- [ ] Remove the redundant `xdebug_info` guard from `PestTiaRuntime`.
+
+Keep the `extension_loaded('xdebug')` check. PHP 8.5 requires Xdebug 3.5 or newer, which provides `xdebug_info`.
+
 - [ ] Verify the old helper and guard are absent.
 
 ```bash
-rg -n 'function makeRow|function_exists' tests
+rg -n 'function makeRow|function_exists\(' tests --glob '!GlobalTestHelperIntegrityTest.php'
 ```
 
 Expected: no matches.
@@ -114,12 +119,21 @@ php artisan test --compact tests/Arch/GlobalTestHelperIntegrityTest.php --no-tia
 
 Expected: duplicate and guard checks pass.
 
+- [ ] Run the focused TIA runtime test.
+
+```bash
+php artisan test --compact tests/Arch/PestTiaRuntimeTest.php --no-tia
+```
+
+Expected: driver detection and all runtime modes pass.
+
 - [ ] Commit helper enforcement and fixes together.
 
 ```bash
 git add tests/Arch/GlobalTestHelperIntegrityTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobTest.php \
-    tests/Feature/ImportWizard/Livewire/PreviewStepTest.php
+    tests/Feature/ImportWizard/Livewire/PreviewStepTest.php \
+    tests/Helpers/PestTiaRuntime.php
 git commit -m "test: enforce unique global helpers"
 ```
 

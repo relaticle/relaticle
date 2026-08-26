@@ -208,12 +208,10 @@ final class PestTiaRuntime
             return false;
         }
 
-        if (function_exists('xdebug_info')) {
-            $modes = @xdebug_info('mode');
+        $modes = @xdebug_info('mode');
 
-            if (is_array($modes) && in_array('coverage', $modes, true)) {
-                return true;
-            }
+        if (is_array($modes) && in_array('coverage', $modes, true)) {
+            return true;
         }
 
         $environmentMode = getenv('XDEBUG_MODE');

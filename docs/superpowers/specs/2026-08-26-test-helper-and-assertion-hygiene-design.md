@@ -15,6 +15,8 @@ Two ImportWizard test files declare a guarded global `makeRow` helper.
 
 The `function_exists` guards hide the collision. Test load order decides which implementation wins.
 
+The PR1 TIA runtime also guards `xdebug_info`. PHP 8.5 requires Xdebug 3.5 or newer, which always provides that function.
+
 A broad text search also identified 47 negative string assertions whose literal text is absent from source.
 
 That heuristic produces many false positives. Rendered output, dynamic payloads, and regression guards remain valid coverage.
@@ -47,6 +49,8 @@ Class and trait methods use different node types. They will not trigger this rul
 Fail duplicate names with each file path and source line.
 
 Also reject every `function_exists` call under `tests`.
+
+Remove the redundant TIA runtime guard while preserving its extension check.
 
 The rule will inspect syntax trees. It will not assert against source text.
 
@@ -84,6 +88,7 @@ Run the complete Arch suite to verify the enforcement rule.
 
 - No duplicate global function name exists under `tests`.
 - No `function_exists` call exists under `tests`.
+- TIA coverage-driver detection still passes its focused tests.
 - Both ImportWizard test files pass together.
 - The three obsolete legal-template checks are gone.
 - Every other reviewed negative assertion remains unchanged.
