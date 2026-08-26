@@ -2,12 +2,13 @@
      packages/Chat/resources/views/livewire/chat/partials/, which is the ONLY
      source of truth for how a message, a result block or a proposal looks:
 
-       user bubble      _transcript.blade.php  (soft primary tint, never solid)
+       user bubble      _transcript.blade.php  (neutral gray, never brand)
        assistant reply  _transcript.blade.php  (flat prose, no bubble)
        records table    _block-records-table.blade.php
        record card      _block-record-card.blade.php
        proposal row     _proposal-card-body.blade.php (decided = ONE line)
        plan card        _proposal-plan-card.blade.php
+       next steps       _transcript.blade.php  (the strip at the floor)
 
      Those partials are Alpine-driven; this file is their rendered shape frozen
      as markup. When one of them changes, this file changes with it -- a hero
@@ -27,11 +28,11 @@
 
 {{-- ── Exchange 1: read overdue tasks ── --}}
 
-{{-- User bubble. Soft brand tint + inset ring, NOT solid primary-600: see the
-     comment on _transcript.blade.php's bubble. A wall of saturated bubbles
-     overpowers the transcript, which is why the product moved off it. --}}
+{{-- User bubble. Neutral gray, NOT a brand tint: see _transcript.blade.php's
+     bubble. Only the docked proposal carries brand color in this panel, so a
+     wall of tinted bubbles would compete with the one thing asking to be read. --}}
 <div class="mcp-el mcp-user mcp-user-1 flex justify-end">
-    <div class="max-w-[85%] rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15">
+    <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
         What's overdue this week?
     </div>
 </div>
@@ -118,7 +119,7 @@
      approved it collapses into the transcript as a ONE-LINE decided row, and
      the agent's own reply lands under it. --}}
 <div class="mcp-el mcp-user mcp-user-2 flex justify-end">
-    <div class="max-w-[85%] rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15">
+    <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
         Mark the Kovra demo as done.
     </div>
 </div>
@@ -132,18 +133,22 @@
         </div>
     </div>
 
-    {{-- Decided proposal, collapsed to one line: record pill, operation, record
-         link, outcome chip, and Details disclosure. --}}
+    {{-- Decided proposal, collapsed to one line: the dock's identity folded flat
+         (operation-tinted entity tile, bold record label, muted card title),
+         then the record link, the outcome chip and the Details disclosure. No
+         record pill here -- chips are reserved for inline clickable references. --}}
     <div class="mcp-el mcp-audit-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
             <span class="relative flex min-w-0 flex-1 items-center gap-2">
-                <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="task">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
-                    </svg>
-                    <span class="chat-chip-label">Schedule demo with Kovra Systems</span>
+                <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip data-record-type="task">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
+                        </svg>
+                    </span>
+                    <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">Schedule demo with Kovra Systems</span>
                 </span>
-                <span class="shrink-0 text-micro font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Update</span>
+                <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Update Task</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
@@ -178,7 +183,7 @@
      must NOT show a write landing unattended. It resolves into the same decided
      row + record card the real transcript renders. --}}
 <div class="mcp-el mcp-user mcp-user-3 flex justify-end">
-    <div class="max-w-[85%] rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm leading-relaxed text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15">
+    <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
         Add Sarah Chen as a contact at <span class="chat-chip" data-record-type="company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['company'] }}"/></svg><span class="chat-chip-label">Kovra Systems</span></span>. She's VP of Engineering.
     </div>
 </div>
@@ -196,13 +201,15 @@
     <div class="mcp-el mcp-create-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
         <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
             <span class="relative flex min-w-0 flex-1 items-center gap-2">
-                <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="people">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
-                    </svg>
-                    <span class="chat-chip-label">Sarah Chen</span>
+                <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip data-record-type="people">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-600 text-white" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
+                        </svg>
+                    </span>
+                    <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">Sarah Chen</span>
                 </span>
-                <span class="shrink-0 text-micro font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">Create</span>
+                <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Create Person</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
@@ -250,10 +257,27 @@
                 ['label' => 'Company', 'value' => 'Kovra Systems'],
             ] as $heroField)
                 <div class="flex items-start gap-3 px-4 py-2.5">
-                    <span class="w-24 shrink-0 text-micro font-medium leading-5 text-gray-400 dark:text-gray-500">{{ $heroField['label'] }}</span>
-                    <span class="min-w-0 flex-1 text-sm text-gray-700 dark:text-gray-300">{{ $heroField['value'] }}</span>
+                    <span class="w-32 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-40 dark:text-gray-300">{{ $heroField['label'] }}</span>
+                    <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-gray-700 dark:text-gray-300">{{ $heroField['value'] }}</span>
                 </div>
             @endforeach
         </div>
+    </div>
+
+    {{-- Next steps for the turn that just ended (NextStepSuggester). They sit at
+         the floor of the transcript, just above the composer, and are hidden
+         while a proposal is docked -- which is why they only appear here, on
+         the last beat of the demo, once every write has been decided. --}}
+    <div class="mcp-el mcp-next-steps flex w-full flex-col items-start gap-0.5 pt-5" aria-hidden="true">
+        @foreach ([
+            'Link Sarah to an opportunity',
+            'Create a task for Sarah',
+            'Add a note about Sarah',
+        ] as $heroNextStep)
+            <span class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 dark:text-gray-400">
+                <x-heroicon-m-arrow-turn-down-right class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"/>
+                <span class="truncate">{{ $heroNextStep }}</span>
+            </span>
+        @endforeach
     </div>
 </div>

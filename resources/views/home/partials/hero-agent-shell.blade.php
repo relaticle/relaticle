@@ -17,6 +17,11 @@
             <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">Northwind</div>
         </div>
         <x-heroicon-o-chevron-down class="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500"/>
+
+        {{-- Sidebar collapse toggle — chat-sidebar-toggle-hook.blade.php renders
+             it into this row from lg: up. Remix Icon here, unlike the Heroicons
+             around it, because the hook uses one too. --}}
+        <x-ri-side-bar-line class="hidden lg:block w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
     </div>
 
     {{-- Global search + notifications row — mirrors the real sidebar's

@@ -595,7 +595,14 @@
                 animate(root.querySelector('.mcp-card'),        { opacity: [0, 1], transform: ['scale(0.97)', 'scale(1)'] }, { delay: (approve3At + 950) / 1000, duration: 0.35, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-card'); }, approve3At + 980));
 
-                var cycleEnd = approve3At + 1400;
+                // The next-step strip is the last thing to land, exactly as in the
+                // product: SuggestNextSteps runs in its own job after the answer is
+                // already on screen, and the strip stays hidden while anything is
+                // still docked for review.
+                animate(root.querySelector('.mcp-next-steps'), { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (approve3At + 1300) / 1000, duration: 0.3, ease: ease });
+                this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-next-steps'); }, approve3At + 1330));
+
+                var cycleEnd = approve3At + 1800;
                 var totalMs = cycleEnd + this.holdMs;
                 this.nextCycleTimer = setTimeout(function() {
                     self.animateChat();
