@@ -520,13 +520,13 @@ composer test:lint
 
 Expected: no style errors.
 
-- [ ] Confirm production files are untouched.
+- [ ] Confirm PR4 production files are untouched.
 
 ```bash
-git diff --name-only origin/main...HEAD | rg -v '^(tests/|docs/)'
+git diff --name-only 3f66ea580...HEAD | rg -v '^(tests/|docs/)'
 ```
 
-Expected: no output.
+Expected: no output. The full branch also contains the approved Boost and test-runner configuration changes from PR1.
 
 - [ ] Run `git diff --check` and inspect the complete pull request diff.
 
