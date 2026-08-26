@@ -19,6 +19,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
@@ -96,7 +97,7 @@ final class ActivityResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer', 'subject']))
             ->columns([
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -116,7 +117,15 @@ final class ActivityResource extends Resource
                     ->label('Subject')
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (?string $state): string => $state === null ? '—' : ucfirst($state))
+                    ->formatStateUsing(function (?string $state, Activity $record): string {
+                        if ($state === null) {
+                            return '—';
+                        }
+
+                        $name = self::subjectName($record);
+
+                        return $name === null ? ucfirst($state) : ucfirst($state).': '.$name;
+                    })
                     ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                 TextColumn::make('event')
                     ->badge()
@@ -205,9 +214,17 @@ final class ActivityResource extends Resource
                         ->url(RecordLink::toMorph(self::causerResources(), 'causer_type', 'causer_id')),
                     TextEntry::make('subject_type')
                         ->label('Subject')
-                        ->formatStateUsing(fn (?string $state, Activity $record): string => $state === null
-                            ? '—'
-                            : ucfirst($state).' #'.$record->subject_id)
+                        ->formatStateUsing(function (?string $state, Activity $record): string {
+                            if ($state === null) {
+                                return '—';
+                            }
+
+                            $name = self::subjectName($record);
+
+                            return $name === null
+                                ? ucfirst($state).' #'.$record->subject_id
+                                : ucfirst($state).': '.$name;
+                        })
                         ->color('primary')
                         ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                     TextEntry::make('description')->columnSpanFull(),
@@ -224,6 +241,25 @@ final class ActivityResource extends Resource
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * The subject's display name: CRM records and teams/users use `name`,
+     * tasks and notes use `title`. Soft-deleted subjects still resolve
+     * (the activity relation loads trashed models); null only when the
+     * subject was hard-deleted or has neither attribute.
+     */
+    public static function subjectName(Activity $record): ?string
+    {
+        $subject = $record->subject;
+
+        if ($subject === null) {
+            return null;
+        }
+
+        $name = $subject->getAttribute('name') ?? $subject->getAttribute('title');
+
+        return is_string($name) && $name !== '' ? Str::limit($name, 40) : null;
     }
 
     /**

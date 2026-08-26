@@ -12,6 +12,7 @@ use Filament\Widgets\WidgetConfiguration;
 use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\FunnelWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\GoneQuietTeamsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\UserRetentionChartWidget;
 
 final class EngagementDashboard extends BaseDashboard
@@ -41,6 +42,7 @@ final class EngagementDashboard extends BaseDashboard
             FunnelWidget::class,
             ActivationRateWidget::class,
             UserRetentionChartWidget::class,
+            GoneQuietTeamsWidget::class,
             AiSpendStatsWidget::class,
         ];
     }

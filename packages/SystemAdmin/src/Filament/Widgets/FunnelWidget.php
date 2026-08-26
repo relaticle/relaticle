@@ -48,10 +48,18 @@ final class FunnelWidget extends StatsOverviewWidget
         $currentSubscribedTeams = $this->countSubscribedTeams($currentStart, $currentEnd);
         $previousSubscribedTeams = $this->countSubscribedTeams($previousStart, $previousEnd);
 
+        $activatedDescription = $currentSignups > 0
+            ? round($currentActivatedTeams / $currentSignups * 100, 1).'% of sign-ups'
+            : 'created a record';
+
+        $subscribedDescription = $currentActivatedTeams > 0
+            ? round($currentSubscribedTeams / $currentActivatedTeams * 100, 1).'% of activated'
+            : 'this period';
+
         return [
             $this->buildCountStat('Organic Sign-ups', 'this period', $currentSignups, $previousSignups),
-            $this->buildCountStat('Activated Teams', 'created a record', $currentActivatedTeams, $previousActivatedTeams),
-            $this->buildCountStat('Subscribed Teams', 'this period', $currentSubscribedTeams, $previousSubscribedTeams),
+            $this->buildCountStat('Activated Teams', $activatedDescription, $currentActivatedTeams, $previousActivatedTeams),
+            $this->buildCountStat('Subscribed Teams', $subscribedDescription, $currentSubscribedTeams, $previousSubscribedTeams),
         ];
     }
 
