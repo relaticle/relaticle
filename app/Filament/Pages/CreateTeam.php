@@ -497,6 +497,25 @@ final class CreateTeam extends RegisterTenant
     {
         session()->forget(self::COMPLETING_SESSION_KEY);
 
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        // Flagged here rather than at either CreateTeamAction call site: this
+        // runs once per finished wizard whichever path made the row, and
+        // getRedirectUrl() sends the user to the dashboard next, so the one
+        // event marks the workspace as created AND the user as landed. Flagging
+        // at the copyInviteLink call site instead would count a workspace the
+        // user pre-created for the link and then abandoned.
+        //
+        // First workspace only. A later one is expansion, not conversion: its
+        // referrer is whatever brought the user back that day rather than the
+        // channel that acquired them, so counting it would misattribute the
+        // channel AND push signup-to-workspace above 100%. How many workspaces
+        // a user owns is a question the teams table already answers exactly.
+        if ($user->ownedTeams()->count() === 1) {
+            session()->put('fathom.track_workspace_created', true);
+        }
+
         /** @var Team $tenant */
         $tenant = $this->tenant;
 

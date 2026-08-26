@@ -48,6 +48,18 @@ window.addEventListener('load', function() {
     }, 150);
     @endif
 
+    @if(session()->pull('fathom.track_workspace_created'))
+    // One-time conversion event, flagged when the onboarding wizard finishes.
+    // The teams table already records that a workspace exists; what this adds
+    // is the referrer still attached to the session, so a channel can be
+    // credited with an activated workspace and not just a signup.
+    setTimeout(function () {
+        if (typeof fathom !== 'undefined') {
+            fathom.trackEvent('workspace_created');
+        }
+    }, 150);
+    @endif
+
     // SPA navigation
     document.addEventListener('livewire:navigated', track);
 });
