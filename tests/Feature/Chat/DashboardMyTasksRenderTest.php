@@ -7,6 +7,7 @@ use App\Actions\Task\NotifyTaskAssignees;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Mail\TaskAssignedMail;
+use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -15,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Models\CustomFieldValue;
 
 mutates(CompleteTask::class, Dashboard::class, NotifyTaskAssignees::class);
 
