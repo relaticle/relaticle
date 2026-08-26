@@ -45,7 +45,7 @@ final readonly class CustomFieldFilterSchema
         $schema = [];
 
         foreach ($fields as $field) {
-            $operators = $this->operatorsForType($field->type);
+            $operators = self::operatorsForType($field->type);
 
             if ($operators === []) {
                 continue;
@@ -74,7 +74,7 @@ final readonly class CustomFieldFilterSchema
     /**
      * @return array<string, array<string, string|array<string, mixed>>>
      */
-    private function operatorsForType(string $type): array
+    public static function operatorsForType(string $type): array
     {
         $fieldType = CustomFieldType::tryFrom($type);
 
@@ -83,26 +83,39 @@ final readonly class CustomFieldFilterSchema
         }
 
         return match ($fieldType) {
-            CustomFieldType::TEXT, CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => $this->buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::CURRENCY => $this->buildOperators(self::NUMERIC_OPERATORS, 'number'),
-            CustomFieldType::NUMBER => $this->buildOperators(self::NUMERIC_OPERATORS, 'integer'),
-            CustomFieldType::DATE => $this->buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::DATE_TIME => $this->buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => $this->buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
+            CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
+            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
+            CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
+            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
             CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
-                $this->buildOperators(['eq'], 'string'),
+                self::buildOperators(['eq'], 'string'),
                 ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
             ),
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => $this->buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(self::MULTI_OPERATORS, 'string'),
             default => [],
         };
+    }
+
+    /** @return list<string> */
+    public static function operatorNames(): array
+    {
+        $operators = [];
+
+        foreach (CustomFieldType::cases() as $fieldType) {
+            $operators = [...$operators, ...array_keys(self::operatorsForType($fieldType->value))];
+        }
+
+        return array_values(array_unique($operators));
     }
 
     /**
      * @param  array<int, string>  $operators
      * @return array<string, array<string, string>>
      */
-    private function buildOperators(array $operators, string $jsonType): array
+    private static function buildOperators(array $operators, string $jsonType): array
     {
         $result = [];
 

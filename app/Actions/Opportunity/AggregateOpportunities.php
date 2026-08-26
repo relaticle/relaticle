@@ -79,7 +79,7 @@ final readonly class AggregateOpportunities
              WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY stage_cfv.string_value
              ORDER BY count DESC
-             LIMIT ".self::MAX_GROUPS,
+             LIMIT ".(self::MAX_GROUPS + 1),
             [$stageFieldId, ...$amountBindings, $teamId, ...$dateBindings],
         );
 
@@ -129,7 +129,7 @@ final readonly class AggregateOpportunities
              WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY c.id, c.name
              ORDER BY count DESC
-             LIMIT ".self::MAX_GROUPS,
+             LIMIT ".(self::MAX_GROUPS + 1),
             [...$amountBindings, $teamId, ...$dateBindings],
         );
 
@@ -231,12 +231,14 @@ final readonly class AggregateOpportunities
      */
     private function buildResult(string $groupBy, array $rows, int $totalCount, float $totalAmount): array
     {
+        $truncated = count($rows) > self::MAX_GROUPS;
+
         return [
             'group_by' => $groupBy,
-            'rows' => $rows,
+            'rows' => array_slice($rows, 0, self::MAX_GROUPS),
             'total_count' => $totalCount,
             'total_amount' => $totalAmount,
-            'truncated' => count($rows) >= self::MAX_GROUPS,
+            'truncated' => $truncated,
         ];
     }
 }

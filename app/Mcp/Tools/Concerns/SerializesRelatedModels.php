@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Concerns;
 
+use App\Http\Resources\V1\NoteResource;
+use App\Http\Resources\V1\TaskResource;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -25,7 +27,11 @@ trait SerializesRelatedModels
         /** @var array<string, class-string<JsonApiResource>> $map */
         $map = $resourceInstance->toRelationships(request());
 
-        return $map;
+        return [
+            ...$map,
+            'notes' => NoteResource::class,
+            'tasks' => TaskResource::class,
+        ];
     }
 
     /**

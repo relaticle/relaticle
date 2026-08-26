@@ -17,9 +17,11 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Relaticle\CustomFields\Services\ValidationService;
 
+#[Title('List Custom Fields')]
 #[Description('List workspace custom-field definitions, including inactive fields and configured option labels. Use get-crm-schema for the active write schema.')]
 final class ListCustomFieldsTool extends Tool
 {
@@ -29,6 +31,8 @@ final class ListCustomFieldsTool extends Tool
     private const array ENTITY_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
 
     private const int MAX_PER_PAGE = 25;
+
+    private const int MAX_PAGE = 1_000_000;
 
     public function __construct(
         private readonly ValidationService $validation,
@@ -40,7 +44,7 @@ final class ListCustomFieldsTool extends Tool
             'entity_type' => $schema->string()->description('Optional entity type: company, people, opportunity, task, or note.'),
             'active' => $schema->boolean()->description('Optional active-status filter. Omit to include both active and inactive fields.'),
             'per_page' => $schema->integer()->description('Results per page (default 25, max 25).')->default(self::MAX_PER_PAGE),
-            'page' => $schema->integer()->description('Page number (default 1).')->default(1),
+            'page' => $schema->integer()->description('Page number (default 1, max 1,000,000).')->default(1),
         ];
     }
 
@@ -66,7 +70,7 @@ final class ListCustomFieldsTool extends Tool
             'entity_type' => ['sometimes', 'string', Rule::in(self::ENTITY_TYPES)],
             'active' => ['sometimes', 'boolean'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
         ]);
 
         /** @var User $user */

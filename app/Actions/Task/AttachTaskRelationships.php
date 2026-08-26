@@ -24,6 +24,7 @@ final readonly class AttachTaskRelationships
     public function execute(User $user, Task $task, array $data): Task
     {
         abort_unless($user->can('update', $task), 403);
+        abort_unless($task->team_id === $user->current_team_id, 403);
 
         TenantFkValidator::assertOwnedMany($user, $data, [
             'company_ids' => Company::class,
@@ -32,25 +33,32 @@ final readonly class AttachTaskRelationships
         ]);
         TenantFkValidator::assertUsersInWorkspace($user, $data, ['assignee_ids']);
 
-        $previousAssigneeIds = $task->assignees()->pluck('users.id')->all();
+        /** @var array<int, string> $newAssigneeIds */
+        $newAssigneeIds = [];
 
-        DB::transaction(function () use ($task, $data): void {
+        DB::transaction(function () use ($task, $data, &$newAssigneeIds): void {
+            $lockedTask = Task::query()
+                ->whereKey($task->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if (array_key_exists('company_ids', $data)) {
-                $task->companies()->syncWithoutDetaching($data['company_ids']);
+                $lockedTask->companies()->syncWithoutDetaching($data['company_ids']);
             }
             if (array_key_exists('people_ids', $data)) {
-                $task->people()->syncWithoutDetaching($data['people_ids']);
+                $lockedTask->people()->syncWithoutDetaching($data['people_ids']);
             }
             if (array_key_exists('opportunity_ids', $data)) {
-                $task->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
+                $lockedTask->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
             }
             if (array_key_exists('assignee_ids', $data)) {
-                $task->assignees()->syncWithoutDetaching($data['assignee_ids']);
+                $changes = $lockedTask->assignees()->syncWithoutDetaching($data['assignee_ids']);
+                $newAssigneeIds = $changes['attached'];
             }
         });
 
         $task->refresh();
-        $this->notifyAssignees->execute($task, $previousAssigneeIds);
+        $this->notifyAssignees->execute($task, $newAssigneeIds);
 
         return $task;
     }

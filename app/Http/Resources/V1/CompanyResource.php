@@ -45,8 +45,6 @@ final class CompanyResource extends JsonApiResource
             'accountOwner' => UserResource::class,
             'people' => PeopleResource::class,
             'opportunities' => OpportunityResource::class,
-            'tasks' => TaskResource::class,
-            'notes' => NoteResource::class,
         ];
     }
 }

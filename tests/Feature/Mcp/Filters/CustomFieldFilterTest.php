@@ -3,14 +3,31 @@
 declare(strict_types=1);
 
 use App\Mcp\Filters\CustomFieldFilter;
+use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\GetCrmSchemaTool;
+use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
+use App\Mcp\Tools\People\ListPeopleTool;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Scopes\TeamScope;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Testing\Fluent\AssertableJson;
+use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+
+mutates(
+    BaseListTool::class,
+    CustomFieldFilter::class,
+    CustomFieldFilterSchema::class,
+    GetCrmSchemaTool::class,
+    ListOpportunitiesTool::class,
+    ListPeopleTool::class,
+);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -105,7 +122,7 @@ it('rejects unknown field codes', function (): void {
             AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
         )
         ->get();
-})->throws(HttpException::class, 'Unknown custom field filter codes: nonexistent_field.');
+})->throws(ValidationException::class, 'Unknown custom field filter codes: nonexistent_field.');
 
 it('rejects unknown operators', function (): void {
     $amountField = CustomField::query()
@@ -128,7 +145,7 @@ it('rejects unknown operators', function (): void {
             AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
         )
         ->get();
-})->throws(HttpException::class, 'Unknown custom field filter operator [approximately] for [amount].');
+})->throws(ValidationException::class, 'Unknown custom field filter operator [approximately] for [amount].');
 
 it('rejects more than 10 filter conditions', function (): void {
     $filters = [];
@@ -146,7 +163,66 @@ it('rejects more than 10 filter conditions', function (): void {
             AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
         )
         ->get();
-})->throws(HttpException::class);
+})->throws(ValidationException::class);
+
+it('returns an actionable MCP error for an operator incompatible with the field type', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => [
+                'amount' => ['contains' => '500'],
+            ],
+        ])
+        ->assertHasErrors(['does not support operator [contains]']);
+});
+
+it('returns an actionable MCP error for an invalid operand shape', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => [
+                'stage' => ['in' => 'Qualification'],
+            ],
+        ])
+        ->assertHasErrors(['must be an array']);
+});
+
+it('publishes only array-compatible operators for email, phone, and link fields', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('filterable_fields.emails.properties', ['has_any' => ['type' => 'string']])
+            ->where('filterable_fields.phone_number.properties', ['has_any' => ['type' => 'string']])
+            ->where('filterable_fields.linkedin.properties', ['has_any' => ['type' => 'string']])
+            ->etc());
+});
+
+it('filters json array custom fields through the people list tool', function (string $fieldCode, mixed $matchingValue, mixed $otherValue, string $operand): void {
+    $matchingPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Matching Person']);
+    $otherPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Other Person']);
+    $field = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', $fieldCode)
+        ->firstOrFail();
+
+    $matchingPerson->saveCustomFieldValue($field, $matchingValue);
+    $otherPerson->saveCustomFieldValue($field, $otherValue);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListPeopleTool::class, [
+            'filter' => [
+                $fieldCode => ['has_any' => $operand],
+            ],
+        ])
+        ->assertOk()
+        ->assertSee('Matching Person')
+        ->assertDontSee('Other Person');
+})->with([
+    'email' => ['emails', ['match@example.com'], ['other@example.com'], 'match@example.com'],
+    'phone' => ['phone_number', '+15550000001', '+15550000002', '+15550000001'],
+    'link' => ['linkedin', 'https://example.com/match', 'https://example.com/other', 'https://example.com/match'],
+]);
 
 it('handles empty filter object as no-op', function (): void {
     $countBefore = Opportunity::query()->count();

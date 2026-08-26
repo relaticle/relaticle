@@ -32,6 +32,25 @@ final class ManageTasks extends ManageRecords
     #[Override]
     protected function getHeaderActions(): array
     {
+        /** @var array<int, string> $submittedAssigneeIds */
+        $submittedAssigneeIds = [];
+        $createTaskAction = CreateAction::make()
+            ->icon('heroicon-o-plus')
+            ->size(Size::Small)
+            ->slideOver()
+            ->before(function () use (&$createTaskAction, &$submittedAssigneeIds): void {
+                $submittedAssignees = $createTaskAction->getRawData()['assignees'] ?? [];
+
+                if (! is_array($submittedAssignees)) {
+                    $submittedAssignees = [];
+                }
+
+                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
+            })
+            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
+                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
+            });
+
         return [
             ActionGroup::make([
                 Action::make('import')
@@ -45,13 +64,7 @@ final class ManageTasks extends ManageRecords
                 ->button()
                 ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
                 ->size(Size::Small),
-            CreateAction::make()
-                ->icon('heroicon-o-plus')
-                ->size(Size::Small)
-                ->slideOver()
-                ->after(function (Task $record): void {
-                    resolve(NotifyTaskAssignees::class)->execute($record);
-                }),
+            $createTaskAction,
         ];
     }
 

@@ -41,8 +41,6 @@ final class PeopleResource extends JsonApiResource
         return [
             'creator' => UserResource::class,
             'company' => CompanyResource::class,
-            'tasks' => TaskResource::class,
-            'notes' => NoteResource::class,
         ];
     }
 }

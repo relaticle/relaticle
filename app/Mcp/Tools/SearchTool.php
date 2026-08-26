@@ -23,12 +23,14 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('search')]
+#[Title('Search CRM')]
 #[Description('Search across companies, people, opportunities, tasks, and notes. Returns canonical URLs suitable for ChatGPT Company Knowledge citation.')]
 #[IsReadOnly]
 #[IsIdempotent]
@@ -107,6 +109,7 @@ final class SearchTool extends Tool
 
         foreach (self::ENTITY_MAP as $type => [$modelClass, $field, $table, $entityType]) {
             $hits = $modelClass::query()
+                ->where('team_id', $team->getKey())
                 ->where(function (Builder $builder) use ($field, $query, $team, $entityType, $table): void {
                     $builder->where($field, 'ilike', "%{$query}%");
                     $builder->orWhereExists(function (QueryBuilder $sub) use ($entityType, $table, $query, $team): void {

@@ -8,6 +8,11 @@ use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
+use App\Models\Company;
+use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -23,9 +28,11 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Relaticle\ActivityLog\Support\ActivityLogDiffRow;
 
+#[Title('List CRM Activity')]
 #[Description('List who changed which CRM records, when they changed them, and the field-level differences. Results use the caller timezone.')]
 final class ListActivityTool extends Tool
 {
@@ -36,10 +43,18 @@ final class ListActivityTool extends Tool
 
     private const int MAX_DAYS = 30;
 
+    private const int MAX_PAGE = 1_000_000;
+
     private const string SAVE_KEY_SQL = "coalesce(batch_uuid::text, 'row:' || id::text)";
 
-    /** @var list<string> */
-    private const array RECORD_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
+    /** @var array<string, class-string<Model>> */
+    private const array RECORD_MODELS = [
+        'company' => Company::class,
+        'people' => People::class,
+        'opportunity' => Opportunity::class,
+        'task' => Task::class,
+        'note' => Note::class,
+    ];
 
     public function __construct(
         private readonly CanonicalRecordUrl $urls,
@@ -51,7 +66,7 @@ final class ListActivityTool extends Tool
             'record_type' => $schema->string()->description('Optional entity type: company, people, opportunity, task, or note.'),
             'record_id' => $schema->string()->description('Optional record ID. Requires record_type.'),
             'days' => $schema->integer()->description('Days of history to include (default 7, max 30).')->default(7),
-            'page' => $schema->integer()->description('Page number (default 1, 25 complete saves per page).')->default(1),
+            'page' => $schema->integer()->description('Page number (default 1, max 1,000,000, 25 complete saves per page).')->default(1),
         ];
     }
 
@@ -74,10 +89,10 @@ final class ListActivityTool extends Tool
         }
 
         $validated = $request->validate([
-            'record_type' => ['sometimes', 'string', Rule::in(self::RECORD_TYPES)],
-            'record_id' => ['sometimes', 'string', 'required_with:record_type'],
+            'record_type' => ['string', 'required_with:record_id', Rule::in(array_keys(self::RECORD_MODELS))],
+            'record_id' => ['sometimes', 'string'],
             'days' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_DAYS],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
         ]);
 
         /** @var User $user */
@@ -86,6 +101,16 @@ final class ListActivityTool extends Tool
         $recordId = isset($validated['record_id']) ? (string) $validated['record_id'] : null;
         $days = (int) ($validated['days'] ?? 7);
         $page = (int) ($validated['page'] ?? 1);
+
+        $recordModels = $recordType !== null
+            ? [self::RECORD_MODELS[$recordType]]
+            : array_values(self::RECORD_MODELS);
+
+        foreach ($recordModels as $recordModel) {
+            if ($user->cannot('viewAny', $recordModel)) {
+                return Response::error('You do not have permission to view CRM activity.');
+            }
+        }
 
         if ($recordId !== null) {
             $record = $this->visibleRecord($user, (string) $recordType, $recordId);
@@ -129,7 +154,7 @@ final class ListActivityTool extends Tool
             ->where('created_at', '>=', now()->subDays($days))
             ->whereHasMorph(
                 'subject',
-                $recordType !== null ? [$recordType] : self::RECORD_TYPES,
+                $recordType !== null ? [$recordType] : array_keys(self::RECORD_MODELS),
                 static fn (Builder $subject): Builder => $subject->withoutGlobalScope(SoftDeletingScope::class),
             );
 

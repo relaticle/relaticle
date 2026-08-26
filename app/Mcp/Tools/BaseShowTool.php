@@ -30,6 +30,16 @@ abstract class BaseShowTool extends Tool
 
     private const int RELATED_RECORD_LIMIT = 25;
 
+    /** @var list<string> */
+    private const array TO_MANY_INCLUDES = [
+        'assignees',
+        'companies',
+        'notes',
+        'opportunities',
+        'people',
+        'tasks',
+    ];
+
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
 
@@ -49,7 +59,7 @@ abstract class BaseShowTool extends Tool
 
         return [
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
-            'include' => $schema->array()->description('Related records to expand in response. Tasks and notes are limited to 25 each and include truncation metadata.'),
+            'include' => $schema->array()->description('Related records to expand in response. To-many relationships return at most 25 records with truncation metadata.'),
         ];
     }
 
@@ -103,7 +113,7 @@ abstract class BaseShowTool extends Tool
             }
         }
 
-        $boundedIncludes = array_values(array_intersect($relationIncludes, ['tasks', 'notes']));
+        $boundedIncludes = array_values(array_intersect($relationIncludes, self::TO_MANY_INCLUDES));
         $regularIncludes = array_values(array_diff($relationIncludes, $boundedIncludes));
 
         if ($regularIncludes !== []) {
@@ -114,10 +124,14 @@ abstract class BaseShowTool extends Tool
 
         foreach ($boundedIncludes as $relation) {
             $model->loadMissing([
-                $relation => fn (Relation $query): Relation => $query
-                    ->orderByDesc("{$relation}.created_at")
-                    ->orderByDesc("{$relation}.id")
-                    ->limit(self::RELATED_RECORD_LIMIT + 1),
+                $relation => function (Relation $query): void {
+                    $related = $query->getRelated();
+
+                    $query
+                        ->orderByDesc($related->qualifyColumn('created_at'))
+                        ->orderByDesc($related->qualifyColumn('id'))
+                        ->limit(self::RELATED_RECORD_LIMIT + 1);
+                },
             ]);
             $model->loadCount($relation);
 

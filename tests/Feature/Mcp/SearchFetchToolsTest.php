@@ -10,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -124,6 +125,23 @@ it('reports per-entity truncation and orders results deterministically', functio
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
             ->where('results.0.title', 'Match Alpha')
+            ->where('truncated.person', true)
+            ->etc());
+});
+
+it('applies the current team predicate before limiting and truncating matches', function (): void {
+    $otherTeam = Team::factory()->create();
+
+    People::factory()->for($otherTeam)->create(['name' => 'Match Aardvark']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Zebra']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Zulu']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'Match', 'limit' => 1])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 1)
+            ->where('results.0.title', 'Match Zebra')
             ->where('truncated.person', true)
             ->etc());
 });

@@ -17,9 +17,11 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\Tool;
 
+#[Title('Get CRM Schema')]
 #[Description('Get the current workspace schema for one CRM entity, including active custom fields, choice options, filters, and relationships.')]
 final class GetCrmSchemaTool extends Tool
 {
@@ -51,6 +53,8 @@ final class GetCrmSchemaTool extends Tool
             'custom_fields' => $schema->object()->required(),
             'filterable_fields' => $schema->object()->required(),
             'relationships' => $schema->array()->items($schema->string())->required(),
+            'writable_relationships' => $schema->object(),
+            'tools_hint' => $schema->string(),
             'aggregate_includes' => $schema->object(),
             'usage' => $schema->string()->required(),
         ];
@@ -68,6 +72,8 @@ final class GetCrmSchemaTool extends Tool
 
         $resource = resolve(self::RESOURCE_MAP[$validated['entity_type']]);
         $payload = json_decode((string) $resource->handle($request)->content(), true, flags: JSON_THROW_ON_ERROR);
+        $payload['custom_fields'] = (object) ($payload['custom_fields'] ?? []);
+        $payload['filterable_fields'] = (object) ($payload['filterable_fields'] ?? []);
 
         return Response::structured($payload);
     }

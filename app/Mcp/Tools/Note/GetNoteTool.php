@@ -9,10 +9,12 @@ use App\Mcp\Tools\BaseShowTool;
 use App\Models\Note;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[Title('Get Note')]
 #[Description('Get a single note by ID with full details and relationships.')]
 #[IsReadOnly]
 #[IsIdempotent]
