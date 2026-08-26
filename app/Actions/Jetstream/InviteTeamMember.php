@@ -45,7 +45,14 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
             'expires_at' => now()->addDays($expiryDays),
         ]);
 
-        Mail::to($email)->send(new TeamInvitation($invitation));
+        // Queued, and deferred to after the transaction commits. The chat
+        // approval path runs this inside PendingActionService::approve()'s
+        // transaction while it holds lockForUpdate() on the pending action, so
+        // a synchronous send made a third-party SMTP round trip decide how long
+        // that row stayed locked. afterCommit() is what keeps the queue push
+        // itself out of the transaction too: a rolled back approval must not
+        // leave a real invitation email on its way.
+        Mail::to($email)->queue(new TeamInvitation($invitation)->afterCommit());
 
         return $invitation;
     }

@@ -81,14 +81,14 @@ it('approving a single invitation proposal writes the row and sends the invite m
         ->where('email', 'new-teammate@example.com')
         ->exists())->toBeTrue();
 
-    Mail::assertSent(TeamInvitationMail::class);
+    Mail::assertQueued(TeamInvitationMail::class);
 });
 
 it('keeps the mail transport failure off the card when the invite email cannot be sent', function (): void {
     $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
 
     Mail::shouldReceive('to')->andReturnSelf();
-    Mail::shouldReceive('send')->andThrow(new TransportException($transportMessage));
+    Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
 
     app(InviteTeamMemberTool::class)->handle(new Request([
         'records' => [['email' => 'undeliverable@example.com', 'role' => 'editor']],
@@ -268,7 +268,7 @@ it('keeps the mail transport failure off the card on the batch path too', functi
     $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
 
     Mail::shouldReceive('to')->andReturnSelf();
-    Mail::shouldReceive('send')->andThrow(new TransportException($transportMessage));
+    Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
 
     app(InviteTeamMemberTool::class)->handle(new Request([
         'records' => [

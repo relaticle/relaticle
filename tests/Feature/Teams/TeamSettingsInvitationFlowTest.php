@@ -73,7 +73,7 @@ test('admin invites by email and the invitation appears in the pending list', fu
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->assertCanSeeTableRecords([$invitation]);
 
-    Mail::assertSent(TeamInvitationMail::class);
+    Mail::assertQueued(TeamInvitationMail::class);
 });
 
 test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
