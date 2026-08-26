@@ -64,7 +64,7 @@ it('returns valid note schema with correct fields', function (): void {
 it('includes custom fields in schema when they exist', function (): void {
     $team = $this->user->personalTeam();
 
-    $section = CustomFieldSection::create([
+    $section = CustomFieldSection::factory()->create([
         'tenant_id' => $team->id,
         'entity_type' => 'company',
         'name' => 'Test Section',
@@ -74,7 +74,7 @@ it('includes custom fields in schema when they exist', function (): void {
         'active' => true,
     ]);
 
-    CustomField::create([
+    CustomField::factory()->create([
         'tenant_id' => $team->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
@@ -96,7 +96,7 @@ it('includes custom fields in schema when they exist', function (): void {
 it('reports a required custom field as required in the schema', function (): void {
     $team = $this->user->personalTeam();
 
-    $section = CustomFieldSection::create([
+    $section = CustomFieldSection::factory()->create([
         'tenant_id' => $team->id,
         'entity_type' => 'company',
         'name' => 'Required Section',
@@ -106,7 +106,7 @@ it('reports a required custom field as required in the schema', function (): voi
         'active' => true,
     ]);
 
-    CustomField::create([
+    CustomField::factory()->create([
         'tenant_id' => $team->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',

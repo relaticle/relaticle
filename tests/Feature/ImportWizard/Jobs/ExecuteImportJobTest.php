@@ -60,7 +60,7 @@ function createImportReadyStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): array {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
@@ -191,7 +191,7 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
             'team_id' => $this->team->id,
         ]);
 
-        CustomFieldValue::create([
+        CustomFieldValue::factory()->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
@@ -2128,7 +2128,7 @@ it('merges multi-choice custom field values during update', function (): void {
         'team_id' => $this->team->id,
     ]);
 
-    CustomFieldValue::create([
+    CustomFieldValue::factory()->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
@@ -2200,7 +2200,7 @@ it('does not duplicate existing multi-choice values during merge', function (): 
         'team_id' => $this->team->id,
     ]);
 
-    CustomFieldValue::create([
+    CustomFieldValue::factory()->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
