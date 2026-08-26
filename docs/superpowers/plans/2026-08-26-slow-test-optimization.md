@@ -304,6 +304,7 @@ Expected: 105 tests pass before any case moves or row-count changes.
 **Files:**
 
 - Create: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobCoreTest.php`
+- Create: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobScaleTest.php`
 - Create: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobCustomFieldsTest.php`
 - Create: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobFieldTypeTest.php`
 - Create: `tests/Feature/ImportWizard/Jobs/ExecuteImportJobEntityTest.php`
@@ -318,6 +319,8 @@ Keep event fakes, user setup, authentication, Filament tenant setup, store destr
 - [ ] Move the opening block before the custom-field marker into `ExecuteImportJobCoreTest.php`.
 
 The source boundary is the marker formerly at line 999.
+
+- [ ] Move the three scale cases from the opening block into `ExecuteImportJobScaleTest.php` when the core profile exceeds 15 seconds.
 
 - [ ] Move normal custom-field cases into `ExecuteImportJobCustomFieldsTest.php`.
 
@@ -349,6 +352,7 @@ Keep `ExecuteImportJob::class` where the job runs. Keep `EntityLinkResolver::cla
 
 ```bash
 vendor/bin/pest tests/Feature/ImportWizard/Jobs/ExecuteImportJobCoreTest.php \
+    tests/Feature/ImportWizard/Jobs/ExecuteImportJobScaleTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobCustomFieldsTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobFieldTypeTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobEntityTest.php \
@@ -391,8 +395,7 @@ The production chunk size is 500. Do not lower either case to 500.
 - [ ] Run the three scalability tests by exact filter.
 
 ```bash
-php artisan test --compact tests/Feature/ImportWizard/Jobs/ExecuteImportJobCoreTest.php \
-    tests/Feature/ImportWizard/Jobs/ExecuteImportJobEntityTest.php \
+php artisan test --compact tests/Feature/ImportWizard/Jobs/ExecuteImportJobScaleTest.php \
     --filter='1000|1,000|large|chunk' --no-tia
 ```
 
@@ -402,6 +405,7 @@ Expected: the 1,000-row case and both 501-row cases pass.
 
 ```bash
 php artisan test --compact tests/Feature/ImportWizard/Jobs/ExecuteImportJobCoreTest.php \
+    tests/Feature/ImportWizard/Jobs/ExecuteImportJobScaleTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobCustomFieldsTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobFieldTypeTest.php \
     tests/Feature/ImportWizard/Jobs/ExecuteImportJobEntityTest.php \
