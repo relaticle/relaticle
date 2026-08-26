@@ -89,7 +89,10 @@ it('rejects a linked record from another workspace at proposal time', function (
 
     $result = json_decode(proposeTasks($this->convId, [['title' => 'Call', 'company_ids' => [(string) $foreign->getKey()]]]), true);
 
-    expect($result['error'])->toContain('records[0]')->toContain('company_ids')
+    // A rejected record is named by whatever identity the model gave it, not by
+    // its index: the reason is relayed to the user, and "records[0]" means
+    // nothing to them.
+    expect($result['error'])->toContain('Call')->toContain('company_ids')
         ->and(PendingAction::query()->count())->toBe(0);
 });
 
@@ -98,7 +101,8 @@ it('rejects a missing, blank, or over-length title at proposal time instead of a
     $blank = json_decode(proposeTasks($this->convId, [['title' => '  ']]), true);
     $tooLong = json_decode(proposeTasks($this->convId, [['title' => str_repeat('x', 256)]]), true);
 
-    expect($missing['error'])->toContain('records[0]')->toContain('title is required')
+    // No title to name it by, so it falls back to a 1-based position.
+    expect($missing['error'])->toContain('record 1')->toContain('title is required')
         ->and($blank['error'])->toContain('title is required')
         ->and($tooLong['error'])->toContain('longer than 255')
         ->and(PendingAction::query()->count())->toBe(0);

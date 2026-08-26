@@ -8,4 +8,5 @@ enum NotificationGroup: string
 {
     case Collaboration = 'collaboration';
     case Digest = 'digest';
+    case Onboarding = 'onboarding';
 }

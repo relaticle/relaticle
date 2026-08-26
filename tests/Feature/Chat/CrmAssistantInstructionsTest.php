@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Models\People;
+use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
 use Relaticle\Chat\Agents\CrmAssistant;
 
 mutates(CrmAssistant::class);
@@ -189,4 +193,139 @@ it('tells the model how to fetch the next page of a list result', function (): v
 
     expect($instructions)
         ->toContain('page` set to the result\'s `next_page`');
+});
+
+it('tells the model to end every answer with exactly one offered next action', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('exactly one concrete offered next action or question')
+        ->toContain('the next action is mandatory and must offer to create or import the missing data');
+});
+
+it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('<workspace_state>')
+        ->toContain('must say plainly that these are seeded sample data');
+});
+
+it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->count(2)->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->toContain('only sample records');
+});
+
+it('stops claiming only sample records once the user has a record of their own', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($team);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->not->toContain('only sample records')
+        ->toContain("alongside the user's own records");
+});
+
+it('renders no workspace_state block for a workspace with no seeded sample data at all', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
+});
+
+it('renders no workspace_state block when no team is bound', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
+});
+
+/**
+ * A resumed turn is the one the user's approval started, so the proposals it
+ * carries are the outcome of that click. The block used to open with "already
+ * decided by the user earlier in this conversation", and the model repeated
+ * that back verbatim: a freshly approved invitation was reported as "already
+ * sent earlier in our conversation, no new action was needed", which tells the
+ * user their own click did nothing. Reproduced live on three separate turns.
+ *
+ * Wording alone did not fix it, the marker is what carries the distinction, so
+ * this pins the marker rather than the prose.
+ */
+it('marks the proposals the resumed turn just decided', function (): void {
+    $agent = resolve(CrmAssistant::class);
+    $agent->resolvedActions = [
+        [
+            'operation' => 'create', 'entity_type' => 'team_invitations', 'status' => 'approved',
+            'label' => 'fresh@example.com', 'record_id' => '01JUSTNOW', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => true,
+        ],
+        [
+            'operation' => 'create', 'entity_type' => 'companies', 'status' => 'approved',
+            'label' => 'Older Co', 'record_id' => '01EARLIER', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => false,
+        ],
+    ];
+
+    $block = $agent->instructions();
+
+    expect($block)
+        ->toContain('JUST DECIDED, approved: create team_invitations')
+        ->not->toContain('JUST DECIDED, approved: create companies')
+        ->not->toContain('already decided by the user earlier in this conversation')
+        ->toContain('Never call it already done, already sent, already invited');
+});
+
+/**
+ * The Writes rule used to say "already approved", which the model rendered back
+ * to the user as "already ... earlier in our conversation".
+ */
+it('does not tell the model the request is already approved without qualifying when', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->not->toContain('When everything requested is already approved')
+        ->toContain('If those approvals arrived on THIS turn');
+});
+
+/**
+ * House style bans the em dash everywhere, and the sanitiser that used to
+ * strip it from assistant prose left with the welcome conversation. Live
+ * replies were shipping "..., no further action is needed" with one.
+ */
+it('bans the em dash in assistant prose', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('Never use an em dash');
 });

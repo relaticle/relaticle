@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\Team\CustomFields;
+use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
@@ -134,6 +135,17 @@ it('redirects to the management page for an own custom field', function (): void
 
     $this->actingAs($user)
         ->get("/r/custom_field/{$field->getKey()}")
+        ->assertRedirect($expectedUrl);
+});
+
+it('redirects a team invitation reference straight to the Members page', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    $expectedUrl = Members::getUrl(panel: 'app', tenant: $team);
+
+    $this->actingAs($user)
+        ->get('/r/team_invitations/'.(string) Str::ulid())
         ->assertRedirect($expectedUrl);
 });
 

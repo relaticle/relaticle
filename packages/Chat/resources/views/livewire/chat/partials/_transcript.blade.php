@@ -1,7 +1,7 @@
 {{-- Messages --}}
 @php
     // Keep streamed and persisted Markdown styling identical.
-    $proseClasses = 'prose prose-sm dark:prose-invert w-full max-w-none [overflow-wrap:anywhere] px-1 py-1 text-gray-900 dark:text-gray-100 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 prose-headings:text-gray-900 dark:prose-headings:text-white prose-table:my-2 prose-table:border-collapse prose-thead:border-b prose-thead:border-gray-300 dark:prose-thead:border-gray-600 prose-th:px-2 prose-th:py-2 prose-th:text-left prose-td:border-t prose-td:border-gray-100 prose-td:px-2 prose-td:py-2 dark:prose-td:border-gray-700 prose-code:rounded prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[length:var(--text-micro)] prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-gray-900 prose-pre:rounded-lg prose-pre:bg-gray-900 prose-pre:text-gray-100 first:prose-headings:mt-0';
+    $proseClasses = \Relaticle\Chat\Support\ChatProse::MESSAGE;
 @endphp
 <div
     x-ref="messages"
@@ -44,11 +44,12 @@
     {{-- Sticky date pill: shows the calendar day the user has scrolled past
          (updated via IntersectionObserver over the inline separators below).
          The wrapper is `sticky` + zero-height so toggling the pill never
-         shifts scroll content; the pill itself overflows above/below that
-         0px box. Purely a supplementary visual aid: the inline separators
-         already carry the same information in reading order, so it stays
-         out of the accessibility tree. --}}
-    <div class="sticky top-2 z-20 flex h-0 justify-center" aria-hidden="true">
+         shifts scroll content; the pill hangs below that 0px box. `items-start`
+         is load-bearing: a flex child of a zero-height row stretches to 0 and
+         the label spills out of its own capsule. Purely a supplementary visual
+         aid: the inline separators already carry the same information in
+         reading order, so it stays out of the accessibility tree. --}}
+    <div class="sticky top-2 z-20 flex h-0 items-start justify-center" aria-hidden="true">
         <span
             x-show="stickyDateLabel"
             x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
@@ -59,7 +60,7 @@
             x-transition:leave-end="motion-safe:opacity-0"
             x-text="stickyDateLabel"
             style="display: none;"
-            class="rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg dark:text-gray-200"
+            class="inline-flex h-7 items-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 text-xs font-medium text-gray-700 shadow-md dark:text-gray-200"
         ></span>
     </div>
 
@@ -70,7 +71,15 @@
          list's own spacing. --}}
     <div x-ref="topSentinel" aria-hidden="true" class="h-px"></div>
 
-    <div class="mx-auto max-w-3xl space-y-5">
+    {{-- Fills the scroll viewport so the next-step strip below can be pushed to
+         its floor: on a short conversation the offer belongs just above the
+         composer, not orphaned under the last bubble with dead space beneath it.
+         Dropped while the empty state is up, since that sibling is already
+         h-full and the two together would scroll an empty conversation. --}}
+    <div
+        class="mx-auto flex max-w-3xl flex-col space-y-5"
+        :class="(messages.length === 0 && !isStreaming) ? '' : 'min-h-full'"
+    >
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">
                 <button
@@ -121,14 +130,22 @@
                 {{-- User message --}}
                 <template x-if="msg.role === 'user'">
                     <div class="flex justify-end" data-user-bubble :data-grouped="decorations(index).grouped" :data-send-state="msg.sendState ?? 'sent'">
-                        <div class="flex max-w-[85%] flex-col items-end gap-1">
+                        {{-- Reading width is the bubble's shrink-to-fit 85%; editing
+                             width is the whole message column. Rewriting a long
+                             message inside a bubble-sized box is the thing this
+                             widening fixes. --}}
+                        <div
+                            class="flex flex-col items-end gap-1"
+                            :class="msg.editing ? 'w-full max-w-full' : 'max-w-[85%]'"
+                        >
                             <template x-if="!msg.editing">
-                                {{-- Soft brand tint, not solid primary-600: a wall of
-                                     saturated bubbles overpowered the transcript; the
-                                     tint keeps who-said-what without shouting. --}}
+                                {{-- Neutral gray pill, matching the Attio reference
+                                     (user-directed, 2026-08): the flat assistant
+                                     column opposite keeps who-said-what scanning
+                                     without a brand tint. --}}
                                 <div
                                     :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
-                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-primary-50 px-4 py-2.5 text-sm text-gray-900 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:text-gray-100 dark:ring-primary-400/15"
+                                    class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100"
                                 >
                                     <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
                                 </div>
@@ -146,60 +163,72 @@
                                 </a>
                             </template>
 
-                            {{-- Telegram-style send-state glyph: only rendered for a bubble sent THIS
-                                 session. Reloaded (persisted) messages carry no sendState and stay
-                                 silent rather than showing a permanent checkmark on every past message. --}}
-                            <template x-if="msg.sendState && !msg.editing">
-                                <div
-                                    class="flex items-center gap-1 px-1 text-[length:var(--text-micro)]"
-                                    :class="msg.sendState === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'"
-                                >
-                                    <template x-if="msg.sendState === 'sending'">
-                                        <span role="status" class="inline-flex">
-                                            <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span class="sr-only">{{ __('Sending') }}</span>
-                                        </span>
-                                    </template>
-                                    <template x-if="msg.sendState === 'sent'">
-                                        <span role="status" class="inline-flex">
-                                            <x-heroicon-o-check class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span class="sr-only">{{ __('Sent') }}</span>
-                                        </span>
-                                    </template>
-                                    <template x-if="msg.sendState === 'failed'">
-                                        <span class="inline-flex items-center gap-1" role="alert">
-                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                            <span>{{ __('Not sent') }}</span>
-                                            <button
-                                                type="button"
-                                                data-resend-button
-                                                x-on:click="resendMessage(msg)"
-                                                :disabled="isStreaming"
-                                                class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
-                                            >
-                                                {{ __('Resend') }}
-                                            </button>
-                                        </span>
-                                    </template>
+                            {{-- Failure notice only. There is no delivery receipt on a
+                                 sent message: the assistant's reply is the confirmation,
+                                 so a clock or checkmark under every bubble was noise.
+                                 A send that did NOT land still has to say so, and carry
+                                 the retry. --}}
+                            <template x-if="msg.sendState === 'failed' && !msg.editing">
+                                <div class="flex items-center gap-1 px-1 text-[length:var(--text-micro)] text-red-500 dark:text-red-400">
+                                    <span class="inline-flex items-center gap-1" role="alert">
+                                        <x-heroicon-o-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        <span>{{ __('Not sent') }}</span>
+                                        <button
+                                            type="button"
+                                            data-resend-button
+                                            x-on:click="resendMessage(msg)"
+                                            :disabled="isStreaming"
+                                            class="font-medium text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:text-red-300"
+                                        >
+                                            {{ __('Resend') }}
+                                        </button>
+                                    </span>
                                 </div>
                             </template>
 
                             <template x-if="msg.editing">
-                                <div class="w-full min-w-[16rem] rounded-2xl rounded-br-md bg-primary-50 p-2 ring-1 ring-inset ring-primary-600/10 dark:bg-primary-500/15 dark:ring-primary-400/15">
-                                    <textarea
-                                        :id="'chat-edit-' + index"
-                                        x-ref="editArea"
-                                        x-model="msg.editText"
-                                        @input="autosize($event.target)"
-                                        @keydown.escape.prevent="cancelEdit(msg)"
-                                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); saveEdit(msg, index) }"
-                                        rows="1"
-                                        maxlength="5000"
-                                        aria-label="{{ __('Edit message') }}"
-                                        class="block min-h-[28px] w-full resize-none rounded-xl border-0 bg-white px-3 py-2 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:bg-gray-900 dark:text-gray-100"
-                                        style="max-height: 200px;"
-                                    ></textarea>
-                                    <div class="mt-2 flex items-center justify-between gap-2 px-1">
+                                <div class="w-full">
+                                    {{-- Same frame as the composer bar below: editing a
+                                         message and writing a new one are the same act,
+                                         so they get the same control, not a tinted
+                                         read-mode bubble with an input dropped in it. --}}
+                                    <div class="ms-auto grid w-fit min-w-[12rem] max-w-full rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">
+                                        <textarea
+                                            :id="'chat-edit-' + index"
+                                            {{-- Focus on mount, not from startEdit(): the click
+                                                 that opens the editor destroys the hover action
+                                                 row it came from, and that teardown lands after
+                                                 startEdit()'s $nextTick and blew the focus away. --}}
+                                            x-init="$nextTick(() => { $el.focus(); $el.setSelectionRange($el.value.length, $el.value.length); autosize($el) })"
+                                            x-model="msg.editText"
+                                            {{-- Deferred: the mirror below has to repaint the new
+                                                 width first, or autosize() measures the wrapped
+                                                 height of the box as it was one keystroke ago. --}}
+                                            @input="$nextTick(() => autosize($event.target))"
+                                            @keydown.escape.prevent="cancelEdit(msg)"
+                                            @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); saveEdit(msg, index) }"
+                                            rows="1"
+                                            cols="1"
+                                            maxlength="5000"
+                                            aria-label="{{ __('Edit message') }}"
+                                            class="col-start-1 row-start-1 block min-h-[28px] w-full resize-none rounded-2xl border-0 bg-transparent px-4 py-3 text-sm leading-6 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100"
+                                            style="max-height: 200px;"
+                                        ></textarea>
+                                        {{-- Width mirror. A textarea has no intrinsic width of
+                                             its own beyond `cols`, so an invisible copy of the
+                                             text shares the grid cell and lends the box its
+                                             max-content width: the frame tracks what is typed
+                                             up to the column edge, then wraps. Zero height, so
+                                             only the width is borrowed; autosize() still owns
+                                             the height. Padding/type must stay in sync with the
+                                             textarea above or the two measure differently. --}}
+                                        <span
+                                            aria-hidden="true"
+                                            x-text="(msg.editText || '') + ' '"
+                                            class="invisible col-start-1 row-start-1 max-h-0 overflow-hidden whitespace-pre-wrap px-4 py-3 text-sm leading-6 [overflow-wrap:anywhere]"
+                                        ></span>
+                                    </div>
+                                    <div class="mt-2 flex items-center justify-between gap-2">
                                         <span
                                             class="text-[length:var(--text-micro)]"
                                             :class="{
@@ -234,6 +263,7 @@
                                 <div class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                     <button
                                         type="button"
+                                        data-copy-button
                                         x-on:click="copyMessage(msg)"
                                         :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
                                         :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
@@ -342,18 +372,11 @@
                             </div>
                         </template>
 
-                        <template x-if="msg.rendered && Array.isArray(msg.follow_ups) && msg.follow_ups.length > 0">
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <template x-for="chip in msg.follow_ups" :key="chip.prompt">
-                                    @include('chat::livewire.chat.partials._prompt-chip', ['item' => 'chip', 'click' => 'input = chip.prompt; localEditor()?.setText(chip.prompt); $nextTick(() => sendMessage())'])
-                                </template>
-                            </div>
-                        </template>
-
                         <template x-if="msg.rendered && msg.content">
                             <div class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
                                 <button
                                     type="button"
+                                    data-copy-button
                                     x-on:click="copyMessage(msg)"
                                     :aria-label="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
                                     :title="copiedKey === msg.clientKey ? @js(__('Copied')) : @js(__('Copy message'))"
@@ -371,7 +394,7 @@
                                 <button
                                     type="button"
                                     data-regenerate-button
-                                    x-show="!isStreaming"
+                                    x-show="!isStreaming && hasUserPrompt(index)"
                                     x-on:click="regenerateMessage(index)"
                                     :disabled="!canRegenerate(index) || rateLimit !== null"
                                     :aria-label="regenerateButtonLabel(index)"
@@ -528,30 +551,83 @@
                 </div>
             </div>
         </template>
+
+        {{-- Next steps for the turn that just ended, drafted by NextStepSuggester
+             and cleared the moment the user sends anything. They sit at the
+             floor of the transcript rather than directly under the bubble they
+             came from: on a short conversation that puts the offer where the
+             eye already is, just above the composer, and on a long one it
+             scrolls away with its turn instead of hovering over older messages.
+             `margin-top: auto` is inline because the column's own `space-y-5`
+             out-specifies a margin utility on one of its children; x-show only
+             ever writes `display`, so it leaves this alone. --}}
+        <div
+            x-show="!hasPendingProposal && nextSteps.length > 0"
+            {{-- The panel ships no `[x-cloak]` rule (see the jump-to-latest
+                 button below), so the pre-Alpine hidden state is an inline
+                 style; x-show clears it when it flips true. --}}
+            style="display: none; margin-top: auto"
+            x-transition:enter="motion-safe:transition motion-safe:duration-[var(--duration-base)] motion-safe:ease-[var(--ease-out-expo)]"
+            x-transition:enter-start="motion-safe:translate-y-1 motion-safe:opacity-0"
+            x-transition:enter-end="motion-safe:translate-y-0 motion-safe:opacity-100"
+            class="flex flex-col items-start gap-0.5 pt-5"
+            role="group"
+            aria-label="{{ __('Suggested next steps') }}"
+        >
+            <template x-for="step in nextSteps" :key="step.prompt">
+                <button
+                    type="button"
+                    data-next-step
+                    x-on:click="sendNextStep(step)"
+                    class="group/step flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 transition hover:bg-[var(--surface-card-bg)] hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-gray-100"
+                >
+                    <x-heroicon-m-arrow-turn-down-right class="h-4 w-4 shrink-0 text-gray-400 transition group-hover/step:text-primary-500 dark:text-gray-500" aria-hidden="true" />
+
+                    <span class="truncate" x-text="step.label"></span>
+                </button>
+            </template>
+        </div>
     </div>
 
-    {{-- Jump-to-latest pill: sticky to the bottom of THIS scrollable transcript
+    {{-- Scroll-to-bottom button: sticky to the bottom of THIS scrollable transcript
          viewport, mirroring the sticky date pill above it (same zero-height-wrapper
          trick). Anchoring here rather than to the page means it can never land on
          top of the docked proposal card: the composer/dock sit entirely outside
          this scrolling box, whatever height they take, so there is nothing in this
-         container for the pill to overlap. --}}
-    <div class="sticky bottom-2 z-20 flex h-0 justify-center">
-        <template x-if="hasUnseenBelow">
-            <button
-                type="button"
-                x-on:click="scrollToBottom(true)"
-                {{-- Solid block tier, not the translucent card tier: this floats
-                     OVER the transcript, and at gray-50/80 the message bubble
-                     underneath read straight through it. --}}
-                class="flex items-center gap-1.5 rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
-                x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
-                x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
-                x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
-            >
-                <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
-                {{ __('New messages') }}
-            </button>
-        </template>
+         container for the button to overlap.
+
+         Shown for the whole time the user is away from the bottom, not just when
+         new content lands (the old "New messages" pill): scrolling back down is
+         the same intent whether or not the assistant has replied since, and an
+         affordance that appears only on someone else's timing is one the user
+         cannot find when they want it. At the bottom there is nowhere to go, so
+         it hides rather than sitting there dead. x-show, not x-if, so it fades
+         both ways instead of popping in and out of the DOM on every scroll. --}}
+    <div class="sticky bottom-2 z-20 flex h-0 items-end justify-center">
+        <button
+            type="button"
+            {{-- The panel ships no `[x-cloak]` rule, so the pre-Alpine hidden
+                 state is an inline style; x-show clears it when it flips true. --}}
+            style="display: none"
+            x-show="!pinnedToBottom"
+            x-on:click="jumpToLatest()"
+            aria-label="{{ __('Scroll to latest messages') }}"
+            title="{{ __('Scroll to latest messages') }}"
+            {{-- Icon-only circle, matching the Attio reference (user-directed,
+                 2026-08). Solid block tier, not the translucent card tier:
+                 this floats OVER the transcript, and at gray-50/80 the
+                 message bubble underneath read straight through it.
+                 `items-end` on the wrapper keeps the zero-height row from
+                 squashing the circle. --}}
+            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 motion-safe:active:scale-[0.98] dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-150"
+            x-transition:enter-start="motion-safe:opacity-0 motion-safe:translate-y-1"
+            x-transition:enter-end="motion-safe:opacity-100 motion-safe:translate-y-0"
+            x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-100"
+            x-transition:leave-start="motion-safe:opacity-100 motion-safe:translate-y-0"
+            x-transition:leave-end="motion-safe:opacity-0 motion-safe:translate-y-1"
+        >
+            <x-heroicon-m-arrow-down class="h-4 w-4" aria-hidden="true" />
+        </button>
     </div>
 </div>

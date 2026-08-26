@@ -132,7 +132,10 @@
                         {{ __('Step 1: you ask') }}
                     </p>
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        <div class="rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] px-3.5 py-2.5">
+                        {{-- Neutral gray, like the shipped user bubble
+                             (_transcript.blade.php): in the transcript the brand
+                             color belongs to the docked proposal alone. --}}
+                        <div class="rounded-lg bg-gray-100 px-3.5 py-2.5 dark:bg-white/10">
                             <p class="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
                                 {{ __('Mark the Northwind renewal as won and set the close date to today') }}
                             </p>
@@ -149,28 +152,47 @@
                     <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
                         {{ __('Step 2: :name proposes', ['name' => $assistantName]) }}
                     </p>
-                    <div class="overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] flex-1">
-                        <div class="flex min-w-0 items-center gap-2 px-4 py-2.5">
-                            <span class="chat-chip min-w-0" data-proposal-record-chip data-record-type="opportunity">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    {{-- The docked proposal card, as _dock-step.blade.php and
+                         proposal-card.blade.php ship it: a primary halo marks the
+                         one card asking for a decision, the operation title leads
+                         as a muted eyebrow, and the record identity sits under it
+                         behind an operation-tinted entity tile. --}}
+                    <div class="flex-1 overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
+                        <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            <span class="min-w-0 flex-1 truncate">{{ __('Update Opportunity') }}</span>
+                        </div>
+
+                        <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5" data-proposal-record-chip data-record-type="opportunity">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
                                 </svg>
-                                <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>
                             </span>
-                            <span class="shrink-0 text-[length:var(--text-micro)] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">{{ __('Update') }}</span>
+                            <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</p>
                         </div>
 
                         <dl class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+                            <div class="flex items-center gap-3 px-4 py-2 text-xs font-medium text-gray-400 dark:text-gray-500">
+                                <x-home.hero-dock-checkbox/>
+                                <dt class="w-20 shrink-0 sm:w-24">{{ __('Attribute') }}</dt>
+                                <dd>{{ __('New value') }}</dd>
+                            </div>
+
                             @foreach([
                                 [__('Stage'), __('Negotiation'), __('Won')],
                                 [__('Close date'), __('Not set'), __('Today')],
                             ] as [$field, $before, $after])
-                                <div class="flex items-center gap-3 px-4 py-2.5 text-sm">
-                                    <dt class="w-24 shrink-0 text-[length:var(--text-micro)] font-medium text-gray-400 sm:w-28 dark:text-gray-500">{{ $field }}</dt>
-                                    <dd class="flex min-w-0 items-center gap-1.5">
-                                        <span class="text-gray-400 dark:text-gray-500 line-through truncate">{{ $before }}</span>
+                                {{-- items-start + a wrapping value column, like
+                                     _proposal-field.blade.php: an old -> new pair
+                                     in a third of the row wraps onto two lines
+                                     rather than truncating both halves away. --}}
+                                <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
+                                    <x-home.hero-dock-checkbox class="mt-0.5"/>
+                                    <dt class="w-20 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-24 dark:text-gray-300">{{ $field }}</dt>
+                                    <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                        <span class="text-gray-400 line-through dark:text-gray-500">{{ $before }}</span>
                                         <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
-                                        <span class="font-medium text-gray-900 dark:text-white truncate">{{ $after }}</span>
+                                        <span class="text-gray-700 dark:text-gray-300">{{ $after }}</span>
                                     </dd>
                                 </div>
                             @endforeach
@@ -185,12 +207,16 @@
                         {{ __('Step 3: you decide') }}
                     </p>
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
+                        {{-- The dock's own footer, in its order and its weights
+                             (proposal-card.blade.php): a plain-text discard beside
+                             a brand-colored confirm whose label follows the
+                             operation -- an update reads "Save changes". --}}
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex h-7 items-center rounded-md bg-gray-900 px-2.5 text-xs font-medium text-white shadow-sm dark:bg-white dark:text-gray-900">
-                                {{ __('Approve') }}
+                            <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {{ __('Discard') }}
                             </span>
-                            <span class="inline-flex h-7 items-center rounded-md border border-gray-200 bg-white px-2.5 text-xs font-medium text-gray-700 shadow-sm dark:border-white/[0.08] dark:bg-white/5 dark:text-gray-300">
-                                {{ __('Reject') }}
+                            <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm">
+                                {{ __('Save changes') }}
                             </span>
                         </div>
 
@@ -203,7 +229,7 @@
                         </div>
 
                         <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            {{ __('Reject and nothing is written. The proposal expires on its own after :duration.', ['duration' => $pendingActionExpiry]) }}
+                            {{ __('Discard and nothing is written. The proposal expires on its own after :duration.', ['duration' => $pendingActionExpiry]) }}
                         </p>
                     </div>
                 </li>

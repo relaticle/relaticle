@@ -213,22 +213,6 @@ it('loads and renders the active pending action summary', function (): void {
         ->assertSee('Acme Corp');
 });
 
-it('renders the duplicate-creation warning in the docked card', function (): void {
-    $action = proposalCardPa($this->user,
-        ['name' => 'Acme'],
-        [
-            'title' => 'Create Company',
-            'summary' => 'Create company "Acme"',
-            'fields' => [['label' => 'Name', 'value' => 'Acme']],
-            'duplicate_warning' => 'A company named "Acme" may already exist.',
-        ],
-    );
-
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
-        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->assertSee('may already exist');
-});
-
 it('refuses a pending action from another tenant', function (): void {
     $other = User::factory()->withPersonalTeam()->create();
     $foreign = proposalCardPa($other, ['name' => 'Foreign'], ['title' => 'x', 'summary' => 'x', 'fields' => []]);
@@ -281,18 +265,25 @@ it('does not surface an expired pending action', function (): void {
         ->assertSet('pendingActionId', null);
 });
 
-it('creates every remaining batch record with one click', function (): void {
+it('creates only the active batch record and advances to the next', function (): void {
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
-        ->assertDispatched('proposal:resolved')
+        ->assertDispatched('proposal:resolved');
+
+    // Only the record on screen was committed; the card advanced to Beta.
+    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toBe(['Alpha']);
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    $component->assertSet('cursor', 1);
+
+    $component->call('createCurrent')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())
-        ->toContain('Alpha')->toContain('Beta');
+    expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
+        ->toBe(['Alpha', 'Beta']);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
 
@@ -328,14 +319,19 @@ it('finalizes the batch on the last item and collapses the dock', function (): v
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
 
-it('discards every remaining batch record with one click', function (): void {
+it('discards only the active batch record and advances to the next', function (): void {
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('discardCurrent')
-        ->assertDispatched('proposal:resolved')
+        ->assertDispatched('proposal:resolved');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+    $component->assertSet('cursor', 1);
+
+    $component->call('discardCurrent')
         ->assertSet('pendingActionId', null);
 
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
@@ -363,6 +359,7 @@ it('marks a fully-discarded batch as rejected', function (): void {
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('discardCurrent')
         ->call('discardCurrent');
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
@@ -405,8 +402,9 @@ it('drops a skipped item from the dock queue and cannot re-decide it', function 
     $component->call('skipItem', (string) $action->getKey(), 0)
         ->assertSet('cursor', 1);
 
-    // Create-all commits only the records still in the queue.
-    $component->call('createCurrent');
+    // Each per-record Create commits only the record on screen.
+    $component->call('createCurrent')
+        ->call('createCurrent');
 
     expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
         ->toBe(['Beta', 'Gamma']);
@@ -426,17 +424,21 @@ it('does nothing when createCurrent is called while a field edit is open', funct
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
 
-it('routes the create-current shortcut to the whole batch for the matching context', function (): void {
+it('routes the create-current shortcut to the active batch record for the matching context', function (): void {
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
 
-    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->dispatch('proposal:create-current', context: 'conversation')
+        ->dispatch('proposal:create-current', context: 'conversation');
+
+    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toBe(['Alpha']);
+
+    $component->dispatch('proposal:create-current', context: 'conversation')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())
-        ->toContain('Alpha')->toContain('Beta');
+    expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
+        ->toBe(['Alpha', 'Beta']);
 });
 
 it('ignores the create-current shortcut for a different context', function (): void {
@@ -451,17 +453,169 @@ it('ignores the create-current shortcut for a different context', function (): v
     expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
 
-it('lists every undecided batch record as its own row with the create-all footer', function (): void {
+it('paginates a batch one record at a time with a per-record footer', function (): void {
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta', 'Gamma']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->assertSee('Alpha')
+        ->assertDontSee('Beta')
+        ->assertDontSee('Gamma')
+        ->assertSee('1/3')
+        ->assertSee('Create')
+        ->assertSee('Discard')
+        ->assertDontSee('Create all')
+        ->call('nextItem')
         ->assertSee('Beta')
-        ->assertSee('Gamma')
-        ->assertSee('Create all 3')
-        ->assertSee('Discard all')
-        ->assertSee('Skip this record');
+        ->assertDontSee('Alpha')
+        ->assertSee('2/3');
+});
+
+it('clamps pagination at both ends of the undecided records', function (): void {
+    $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('prevItem')
+        ->assertSet('cursor', 0)
+        ->call('nextItem')
+        ->assertSet('cursor', 1)
+        ->call('nextItem')
+        ->assertSet('cursor', 1)
+        ->call('prevItem')
+        ->assertSet('cursor', 0);
+});
+
+it('excludes an unchecked field from the write and records it in result_data', function (): void {
+    Bus::fake();
+    $action = proposalCardPa($this->user,
+        ['name' => 'Acme Corp', 'account_owner_id' => $this->user->getKey()],
+        ['title' => 'Create Company', 'summary' => 'Create company "Acme Corp"', 'fields' => [
+            ['label' => 'Name', 'code' => 'name', 'value' => 'Acme Corp'],
+            ['label' => 'Account owner', 'code' => 'account_owner_id', 'value' => 'Someone'],
+        ]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('toggleField', 'account_owner_id')
+        ->assertSet('excludedFields', ['account_owner_id'])
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolved');
+
+    $company = Company::query()->where('team_id', $this->team->getKey())->where('name', 'Acme Corp')->first();
+
+    expect($company)->not->toBeNull()
+        ->and($company->account_owner_id)->toBeNull()
+        ->and($action->fresh()->result_data['excluded'] ?? null)->toBe(['account_owner_id'])
+        ->and($action->fresh()->action_data)->toHaveKey('account_owner_id');
+});
+
+it('never lets the title field be unchecked', function (): void {
+    $action = proposalCardPa($this->user,
+        ['name' => 'Acme Corp', 'account_owner_id' => $this->user->getKey()],
+        ['title' => 'Create Company', 'summary' => 'Create company "Acme Corp"', 'fields' => [
+            ['label' => 'Name', 'code' => 'name', 'value' => 'Acme Corp'],
+        ]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('toggleField', 'name')
+        ->assertSet('excludedFields', []);
+});
+
+it('applies exclusions per batch record and resets them on every navigation', function (): void {
+    Bus::fake();
+    $records = [
+        ['name' => 'Alpha', 'account_owner_id' => $this->user->getKey()],
+        ['name' => 'Beta', 'account_owner_id' => $this->user->getKey()],
+    ];
+    $items = array_map(static fn (array $record): array => [
+        'title' => $record['name'],
+        'summary' => "Create company \"{$record['name']}\"",
+        'fields' => [
+            ['label' => 'Name', 'code' => 'name', 'value' => $record['name']],
+            ['label' => 'Account owner', 'code' => 'account_owner_id', 'value' => 'Someone'],
+        ],
+    ], $records);
+    $action = proposalCardPa(
+        $this->user,
+        ['_batch' => true, 'records' => $records],
+        ['title' => 'Create Companies', 'summary' => 'Create 2 companies', 'items' => $items],
+    );
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('toggleField', 'account_owner_id')
+        ->assertSet('excludedFields', ['account_owner_id']);
+
+    // Paging away and back clears the exclusion: it belonged to Alpha's card.
+    $component->call('nextItem')
+        ->assertSet('excludedFields', [])
+        ->call('prevItem')
+        ->call('toggleField', 'account_owner_id')
+        ->call('createCurrent')
+        ->call('createCurrent');
+
+    $owners = Company::query()
+        ->where('team_id', $this->team->getKey())
+        ->orderBy('name')
+        ->pluck('account_owner_id', 'name')
+        ->all();
+
+    expect($owners['Alpha'])->toBeNull()
+        ->and($owners['Beta'])->not->toBeNull()
+        ->and($action->fresh()->result_data['items'][0]['excluded'] ?? null)->toBe(['account_owner_id'])
+        ->and($action->fresh()->result_data['items'][1]['excluded'] ?? null)->toBeNull();
+});
+
+it('unchecks and rechecks everything through the master toggle', function (): void {
+    $action = proposalCardPa($this->user,
+        ['name' => 'Acme Corp', 'account_owner_id' => $this->user->getKey()],
+        ['title' => 'Create Company', 'summary' => 'Create company "Acme Corp"', 'fields' => [
+            ['label' => 'Name', 'code' => 'name', 'value' => 'Acme Corp'],
+            ['label' => 'Account owner', 'code' => 'account_owner_id', 'value' => 'Someone'],
+        ]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('toggleAllFields')
+        ->assertSet('excludedFields', ['account_owner_id'])
+        ->call('toggleAllFields')
+        ->assertSet('excludedFields', []);
+});
+
+it('refuses to approve an update whose every change is unchecked', function (): void {
+    Bus::fake();
+    $company = Company::factory()->for($this->team)->create(['name' => 'Stable Inc', 'account_owner_id' => null]);
+
+    $action = PendingAction::query()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Company\\UpdateCompany',
+        'operation' => PendingActionOperation::Update,
+        'entity_type' => 'company',
+        'action_data' => ['_record_id' => (string) $company->getKey(), '_model_class' => Company::class, 'account_owner_id' => $this->user->getKey()],
+        'display_data' => [
+            'title' => 'Update Company',
+            'summary' => 'Update company "Stable Inc"',
+            'fields' => [['label' => 'Account owner', 'code' => 'account_owner_id', 'old' => 'Nobody', 'new' => 'Someone']],
+        ],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('toggleField', 'account_owner_id')
+        ->call('createCurrent')
+        ->assertNotDispatched('proposal:resolved');
+
+    expect($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and($company->fresh()->account_owner_id)->toBeNull();
 });
 
 it('renders a single (non-batch) proposal without a stepper', function (): void {
@@ -805,22 +959,22 @@ it('ignores skipItem while a field edit is open', function (): void {
     expect($action->fresh()->result_data)->toBeNull();
 });
 
-it('shrinks the create-all footer count as records are skipped', function (): void {
+it('shrinks the pagination count as records are skipped and hides it for the last one', function (): void {
     Bus::fake();
     $action = makeBatchCompanyProposal($this->user, ['Alpha', 'Beta', 'Gamma']);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
-        ->assertSee('Create all 3')
+        ->assertSee('1/3')
         ->call('skipItem', (string) $action->getKey(), 2)
-        ->assertSee('Create all 2')
+        ->assertSee('1/2')
         ->assertDontSee('Gamma')
         ->call('skipItem', (string) $action->getKey(), 1)
         ->assertSee('Create')
-        ->assertDontSee('Create all');
+        ->assertDontSee('1/1');
 });
 
-it('stops create-all at the first failing record and keeps the earlier commits', function (): void {
+it('keeps a batch open when the active record fails and keeps the earlier commits', function (): void {
     Bus::fake();
     $company = Company::factory()->for($this->team)->create(['name' => 'Old name']);
 
@@ -854,10 +1008,11 @@ it('stops create-all at the first failing record and keeps the earlier commits',
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->call('createCurrent')
         ->assertDispatched('proposal:resolved')
+        ->call('createCurrent')
         ->assertDispatched('proposal:resolve-failed');
 
-    // The first record committed; the vanished one failed the run without
-    // undoing it, and the batch stays open on the failing record.
+    // The first record committed; the vanished one failed its own approval
+    // without undoing it, and the batch stays open on the failing record.
     expect($company->fresh()->name)->toBe('New name')
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
         ->and($action->fresh()->result_data['items'][0]['status'] ?? null)->toBe('approved');
@@ -955,7 +1110,10 @@ it('surfaces a failure when the assignee left the workspace between proposal and
         ->assertHasErrors('resolve');
 
     expect(Task::query()->where('title', 'Follow up call')->exists())->toBeFalse()
-        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        // The reason survives on the row, so the model can explain the failure
+        // after the proposal is eventually decided.
+        ->and($action->fresh()->result_data['last_error'] ?? null)->toBeString()->not->toBe('');
 });
 
 it('renders the resolve failure in the dock so the approval is never a silent no-op', function (): void {

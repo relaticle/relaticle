@@ -1145,3 +1145,72 @@ it('still refuses a brand new wizard once the user is at the limit', function ()
 
     expect($user->refresh()->ownedTeams()->count())->toBe(3);
 });
+
+/**
+ * The teams table already records that a workspace exists. What only the
+ * client-side event carries is the referrer still on the session, so a channel
+ * can be credited with an activated workspace and not just a signup.
+ *
+ * Flagged in afterRegister() so it fires once per finished wizard whichever
+ * path created the row, and because getRedirectUrl() sends the user to the
+ * dashboard next, the same event marks them as landed.
+ */
+it('flags the workspace created event when the wizard finishes', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Tracked Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(session()->get('fathom.track_workspace_created'))->toBeTrue();
+});
+
+/**
+ * Copying the invite link pre-creates the workspace so the URL can exist. A
+ * user who stops there has not finished onboarding, and counting them would
+ * inflate the very conversion this event measures.
+ */
+it('does not flag the workspace created event when the invite link only pre-creates the workspace', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Abandoned Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->callAction(TestAction::make('copyInviteLink')->schemaComponent());
+
+    expect(Team::query()->where('name', 'Abandoned Corp')->exists())->toBeTrue()
+        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+});
+
+/**
+ * A second workspace is expansion, not acquisition. Its Fathom referrer is
+ * whatever brought the user back that day, so crediting a channel with it
+ * would be wrong, and counting it alongside first workspaces would push the
+ * signup-to-workspace rate past 100%.
+ */
+it('does not flag the workspace created event for an additional workspace', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Second Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Team::query()->where('name', 'Second Corp')->exists())->toBeTrue()
+        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+});

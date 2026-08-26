@@ -3,7 +3,6 @@
         x-data="dashboardChatInput(@js(\App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
         class="mx-auto w-full max-w-3xl py-16"
     >
-        {{-- Greeting --}}
         <div class="text-center">
             <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
                 {{ $this->getGreeting() }}
@@ -106,6 +105,7 @@
                     sessionStorage.setItem('chat:bootstrap', JSON.stringify({
                         document: editor.getDocument(),
                         model: this.selectedModel,
+                        conversationId: null,
                     }));
                 } catch (_) {
                     this.error = @js(__('Could not save message. Try again.'));

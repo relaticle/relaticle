@@ -29,6 +29,8 @@ use Laravel\Jetstream\Team as JetstreamTeam;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\ImportWizard\Models\Import;
+use Spatie\Onboard\Concerns\GetsOnboarded;
+use Spatie\Onboard\Concerns\Onboardable;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -62,9 +64,10 @@ use Spatie\Sluggable\SlugOptions;
 #[Hidden([
     'invite_link_token',
 ])]
-final class Team extends JetstreamTeam implements HasAvatar
+final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 {
     use Billable;
+    use GetsOnboarded;
 
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
@@ -162,6 +165,8 @@ final class Team extends JetstreamTeam implements HasAvatar
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
+            'activation_checklist_dismissed_at' => 'datetime',
+            'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'trial_ends_at' => 'datetime',

@@ -41,13 +41,13 @@
                      the pointer, so the row's own hover and click cover its gutter
                      instead of stopping at it. --}}
                 <span
-                    class="pointer-events-none absolute start-3.5 top-3 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[length:var(--text-pico)] font-semibold tabular-nums text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                    class="pointer-events-none absolute start-4 top-3 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-[length:var(--text-pico)] font-semibold tabular-nums text-gray-500 ring-2 ring-[var(--surface-block-bg)] dark:bg-white/10 dark:text-gray-400"
                     aria-hidden="true"
                     x-text="stepIdx + 1"
                 ></span>
 
                 <span
-                    class="pointer-events-none absolute bottom-0 start-[1.45rem] top-8 z-10 w-px bg-gray-200 dark:bg-white/10"
+                    class="pointer-events-none absolute bottom-0 start-[1.6rem] top-8 z-10 w-px bg-gray-200 dark:bg-white/10"
                     :class="stepIdx === group.actions.length - 1 ? 'hidden' : ''"
                     aria-hidden="true"
                 ></span>
@@ -57,7 +57,7 @@
                 {{-- A step cancelled by a rejection above it explains itself, rather
                      than reading as an unexplained "Rejected". --}}
                 <template x-if="action.cancelled_by">
-                    <p class="ps-9 pe-4 pb-3 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
+                    <p class="ps-11 pe-3 pb-3 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
                         {{ __('Cancelled with the step it depended on.') }}
                     </p>
                 </template>

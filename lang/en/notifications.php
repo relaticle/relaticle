@@ -11,6 +11,15 @@ return [
         'description' => 'Includes tasks overdue and due today. Sent every morning if any tasks are due or overdue.',
     ],
 
+    'onboarding' => [
+        'heading' => 'Getting started',
+        'title' => 'Setup reminders',
+        'description' => 'One reminder a couple of days after you create a workspace, if it is still empty.',
+        'subject' => 'Your workspace is waiting',
+        'mail_heading' => ':name, your workspace is still waiting',
+        'mail_button' => 'Continue in Rela',
+    ],
+
     'collaboration' => [
         'heading' => 'Collaboration notifications',
         'notify_me_about' => 'Notify me about',
@@ -29,6 +38,10 @@ return [
         'task_digest' => [
             'label' => 'Daily Digest',
             'description' => 'Notify me every morning about tasks overdue and due today.',
+        ],
+        'setup_nudge' => [
+            'label' => 'Setup Reminder',
+            'description' => 'Remind me about workspace setup steps I have not finished.',
         ],
     ],
 

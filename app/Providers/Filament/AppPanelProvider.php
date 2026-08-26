@@ -341,6 +341,17 @@ final class AppPanelProvider extends PanelProvider
                 fn (): View|Factory => view('filament.app.analytics')
             )
             /**
+             * The activation checklist lives here rather than on the dashboard
+             * so it follows the user into People or Opportunities instead of
+             * existing only on Home. SIDEBAR_FOOTER renders after the nav and
+             * outside Filament's own conditional footer, so it does not depend
+             * on the user menu or notifications being in the sidebar.
+             */
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_FOOTER,
+                fn (): View|Factory => view('filament.app.sidebar-footer')
+            )
+            /**
              * Only rendered for a signed-in user who has no timezone yet. The guest
              * check matters: the panel's own login and registration pages render this
              * hook too, and there the endpoint could only ever answer 401.

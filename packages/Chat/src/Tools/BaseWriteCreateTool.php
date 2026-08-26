@@ -52,7 +52,7 @@ abstract class BaseWriteCreateTool implements Tool
 
     /**
      * Entity-specific per-record validation beyond custom fields. Return an
-     * error message to abort the proposal, or null to proceed.
+     * error message to skip the record, or null to proceed.
      *
      * @param  array<string, mixed>  $record
      */
@@ -114,7 +114,13 @@ abstract class BaseWriteCreateTool implements Tool
 
         $actionRecords = [];
         $items = [];
+        $skipped = [];
 
+        // Per-record validation failures skip the record, never the whole call:
+        // the real field rules (including unique-value checks, which is how a
+        // duplicate person email is rejected) run here, the valid records still
+        // become ONE proposal, and the skipped ones are reported back with their
+        // reasons so the model can tell the user exactly what was left out.
         foreach (array_values($records) as $index => $record) {
             if (! is_array($record)) {
                 return (string) json_encode(['error' => "records[{$index}] must be an object."], JSON_UNESCAPED_SLASHES);
@@ -123,26 +129,34 @@ abstract class BaseWriteCreateTool implements Tool
             $nameError = $this->nameError($record, required: true);
 
             if ($nameError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
+                $skipped[] = $this->skippedRecord($record, $index, $nameError);
+
+                continue;
             }
 
             $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false);
 
             if ($validation->error !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
+                $skipped[] = $this->skippedRecord($record, $index, $validation->error);
+
+                continue;
             }
 
             $recordError = $this->validateRecord($record, $user);
 
             if ($recordError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$recordError}"], JSON_UNESCAPED_SLASHES);
+                $skipped[] = $this->skippedRecord($record, $index, $recordError);
+
+                continue;
             }
 
             $data = $this->extractRecordData($record);
             $foreignKeyError = $this->foreignKeyError($user, $data);
 
             if ($foreignKeyError !== null) {
-                return (string) json_encode(['error' => "records[{$index}]: {$foreignKeyError}"], JSON_UNESCAPED_SLASHES);
+                $skipped[] = $this->skippedRecord($record, $index, $foreignKeyError);
+
+                continue;
             }
 
             if ($validation->cleanFields !== []) {
@@ -160,6 +174,18 @@ abstract class BaseWriteCreateTool implements Tool
             $items[] = $display;
         }
 
+        if ($actionRecords === []) {
+            $reasons = implode(' ', array_map(
+                static fn (array $skip): string => "{$skip['record']}: ".rtrim($skip['reason'], '.').'.',
+                $skipped,
+            ));
+
+            return (string) json_encode([
+                'error' => "No proposal was created; every record failed validation. {$reasons}"
+                    .' Tell the user each reason. Do not retry with the same values.',
+            ], JSON_UNESCAPED_SLASHES);
+        }
+
         $isBatch = count($actionRecords) > 1;
 
         $actionData = $isBatch
@@ -169,7 +195,7 @@ abstract class BaseWriteCreateTool implements Tool
         $displayData = $isBatch
             ? [
                 'title' => __('Create :entities', ['entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
-                'summary' => sprintf('Create %d %s', count($items), Str::plural($this->entityType(), count($items))),
+                'summary' => sprintf('Create %d %s', count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
                 'items' => $items,
             ]
             : $items[0];
@@ -185,7 +211,7 @@ abstract class BaseWriteCreateTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        return (string) json_encode([
+        $envelope = [
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
             'turn_id' => $pending->turn_id,
@@ -195,6 +221,39 @@ abstract class BaseWriteCreateTool implements Tool
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_UNESCAPED_SLASHES);
+        ];
+
+        if ($skipped !== []) {
+            $envelope['skipped_records'] = $skipped;
+            $envelope['skipped_note'] = 'These records failed validation and are NOT part of the proposal.'
+                .' Tell the user each skipped record and its reason.';
+        }
+
+        return (string) json_encode($envelope, JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * The label a skipped record is reported under: whatever identity the model
+     * gave it, or its position when it has none.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array{record: string, reason: string}
+     */
+    private function skippedRecord(array $record, int $index, string $reason): array
+    {
+        $label = null;
+
+        foreach (['name', 'title', 'email'] as $key) {
+            if (is_string($record[$key] ?? null) && trim($record[$key]) !== '') {
+                $label = trim($record[$key]);
+
+                break;
+            }
+        }
+
+        return [
+            'record' => $label ?? 'record '.($index + 1),
+            'reason' => $reason,
+        ];
     }
 }

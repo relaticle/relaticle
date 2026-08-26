@@ -24,7 +24,7 @@ use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Exceptions\StreamErrorException;
-use Laravel\Ai\Responses\Data\ToolResult;
+use Laravel\Ai\Responses\Data\ToolCall as ToolCallData;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
@@ -32,15 +32,14 @@ use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
-use Relaticle\Chat\Events\FollowUpsSuggested;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
-use Relaticle\Chat\Services\FollowUpService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
@@ -50,6 +49,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -199,6 +199,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
+            $agent->withTeam($this->team);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
@@ -211,7 +212,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $pendingActions->supersededForConversation($this->conversationId),
             );
             $agent->withResolvedActions(
-                $pendingActions->resolvedForConversation($this->conversationId),
+                $pendingActions->resolvedForConversation($this->conversationId, $this->resumesTurnId),
             );
 
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
@@ -339,8 +340,8 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->persistMentions();
                 $this->persistUserDocument();
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
-                $this->broadcastFollowUps($streamedResponse);
                 $this->maybeTitleFromTurn($streamedResponse);
+                $this->suggestNextSteps($streamedResponse);
             });
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
@@ -561,7 +562,7 @@ final class ProcessChatMessage implements ShouldQueue
      * The ConversationStore writes the user row then the assistant row,
      * back-to-back, only once the stream fully succeeds. `handle()`'s
      * post-stream `then()` callback (settleReservation / persistMentions /
-     * persistUserDocument / materializeAssistantDocument / broadcastFollowUps)
+     * persistUserDocument / materializeAssistantDocument / maybeTitleFromTurn)
      * then runs synchronously and un-guarded — if any of those steps throws,
      * the job still fails even though both real rows already exist. Inspecting
      * only the single latest row can't tell that case apart from "the stream
@@ -842,32 +843,6 @@ final class ProcessChatMessage implements ShouldQueue
         return resolve(TipTapDocumentParser::class);
     }
 
-    private function broadcastFollowUps(StreamedAgentResponse $streamedResponse): void
-    {
-        $conversationId = $streamedResponse->conversationId;
-        if ($conversationId === null) {
-            return;
-        }
-
-        $toolCalls = $streamedResponse->toolResults
-            ->map(static fn (ToolResult $toolResult): array => [
-                'name' => $toolResult->name,
-                'result' => $toolResult->result,
-            ])
-            ->all();
-
-        $chips = resolve(FollowUpService::class)->suggest($toolCalls);
-
-        if ($chips === []) {
-            return;
-        }
-
-        $this->broadcastSafely(new FollowUpsSuggested(
-            conversationId: $conversationId,
-            chips: $chips,
-        ));
-    }
-
     /**
      * Last chance to name a conversation the opening dispatch could not.
      *
@@ -912,6 +887,60 @@ final class ProcessChatMessage implements ShouldQueue
         ));
     }
 
+    /**
+     * Ask a second, far cheaper model what the user might want next, off the
+     * turn that just ended.
+     *
+     * Skipped when the turn ends on a proposal: the composer is replaced by the
+     * decision dock at that moment, so the strip would have nowhere to render,
+     * and the one thing to do next is already on screen as Approve or Reject.
+     *
+     * A continuation turn (the assistant resuming after a decision) runs on a
+     * synthetic prompt the user never typed, so it contributes no message, only
+     * its reply. That is the moment suggestions are worth the most: the record
+     * was just written and what follows it is genuinely open.
+     */
+    private function suggestNextSteps(StreamedAgentResponse $streamedResponse): void
+    {
+        $reply = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
+
+        if (trim($reply) === '') {
+            return;
+        }
+
+        if ($this->turnLeftAProposal()) {
+            return;
+        }
+
+        $messageId = $this->latestMessageId('assistant');
+
+        if ($messageId === null) {
+            return;
+        }
+
+        dispatch(new SuggestNextSteps(
+            conversationId: $this->conversationId,
+            messageId: $messageId,
+            message: $this->isContinuation ? '' : $this->message,
+            reply: $reply,
+            provider: $this->resolved['provider'],
+            toolNames: array_values(array_unique(
+                $streamedResponse->toolCalls
+                    ->map(static fn (ToolCallData $toolCall): string => $toolCall->name)
+                    ->all()
+            )),
+        ));
+    }
+
+    private function turnLeftAProposal(): bool
+    {
+        return PendingAction::query()
+            ->where('conversation_id', $this->conversationId)
+            ->where('status', PendingActionStatus::Pending)
+            ->where('expires_at', '>', now())
+            ->exists();
+    }
+
     private function broadcastSafely(object $event): void
     {
         try {
@@ -923,14 +952,30 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
+    /**
+     * The custom-fields tenant id in force before this job bound its own,
+     * restored by releaseAuth() so the override never outlives the job.
+     */
+    private null|int|string $previousTenantId = null;
+
     private function bindAuth(): void
     {
         Auth::guard('web')->setUser($this->user);
+
+        // The job runs with no Filament panel request, so the custom-fields
+        // package has no ambient tenant. Without one its TenantScope no-ops:
+        // per-field validation rules that query other records (unique values,
+        // above all) silently pass during tool validation, which is how a
+        // duplicate unique email sailed through chat while the panel form
+        // rejected it. Same contract as SetApiTeamContext on the API path.
+        $this->previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($this->team->getKey());
     }
 
     private function releaseAuth(): void
     {
         Auth::guard('web')->forgetUser();
+        TenantContextService::setTenantId($this->previousTenantId);
     }
 
     private function resolutionKey(): string

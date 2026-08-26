@@ -249,6 +249,11 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         if (!text) return;
         if (text.length > 5000) return;
 
+        // The strip described what to do after the PREVIOUS answer. The moment
+        // the user says something, whatever they said is the next step, and
+        // leaving the old offers up would have them act on a finished turn.
+        this.nextSteps = [];
+
         // If a previous turn is still streaming, queue this message and clear
         // the editor so the user sees their intent was accepted. handleStreamEnd
         // (or cancel / failure) will flush this queue.

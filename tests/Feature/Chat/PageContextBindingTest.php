@@ -274,6 +274,29 @@ it('writes both a mention row and a page_context row when a message has each', f
         ->and($rows['page_context']->label)->toBe('Acme');
 });
 
+it('binds the job\'s team onto the agent so the workspace_state block can resolve it', function (): void {
+    seedCreditBalance($this->team);
+    CrmAssistant::fake(['ok']);
+
+    $captured = null;
+    app()->resolving(CrmAssistant::class, function (CrmAssistant $agent) use (&$captured): void {
+        $captured = $agent;
+    });
+
+    (new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'hello',
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        mentions: [],
+        pageContext: null,
+    ))->handle(resolve(CreditService::class));
+
+    expect($captured)->not->toBeNull()
+        ->and($captured->team?->getKey())->toBe($this->team->getKey());
+});
+
 it('writes no page_context row when no record is bound', function (): void {
     seedCreditBalance($this->team);
     CrmAssistant::fake(['ok']);

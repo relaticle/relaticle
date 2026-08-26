@@ -1,10 +1,56 @@
 {{-- One field row of a docked proposal step.
 
-     Expects: $row (display row), $isEditable, $isEditing, $stepId.
+     Expects: $row (display row), $isEditable, $isEditing, $stepId, plus the
+     checkbox column flags $hasCheckboxColumn / $isExcludable / $isExcluded.
      The label column is fixed so values align down the card, and a change
-     renders as old → new rather than as the new value alone. --}}
+     renders as old → new rather than as the new value alone.
+
+     The checkbox includes/excludes the attribute from the write (Attio): an
+     unchecked field is simply not written. The required identity field shows a
+     locked checked box, and rows without a code get a spacer so columns align. --}}
+@php
+    $hasCheckboxColumn = $hasCheckboxColumn ?? false;
+    $isExcludable = $isExcludable ?? false;
+    $isExcluded = $isExcluded ?? false;
+@endphp
 <div class="group/field flex items-start gap-3">
-    <span class="w-24 shrink-0 text-[length:var(--text-micro)] font-medium leading-5 text-gray-400 sm:w-28 dark:text-gray-500">{{ $row['label'] ?? '' }}</span>
+    @if ($hasCheckboxColumn)
+        @if ($isExcludable)
+            <button
+                type="button"
+                wire:click="toggleField(@js($row['code'] ?? ''))"
+                role="checkbox"
+                aria-checked="{{ $isExcluded ? 'false' : 'true' }}"
+                aria-label="{{ __('Include :field', ['field' => $row['label'] ?? '']) }}"
+                title="{{ $isExcluded ? __('Excluded: will not be written') : __('Included') }}"
+                @class([
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500',
+                    'border-primary-600 bg-primary-600 text-white' => ! $isExcluded,
+                    'border-gray-300 bg-white hover:border-gray-400 dark:border-white/20 dark:bg-white/5' => $isExcluded,
+                ])
+            >
+                @if (! $isExcluded)
+                    <x-heroicon-m-check class="h-3 w-3" aria-hidden="true" />
+                @endif
+            </button>
+        @elseif (($row['code'] ?? null) !== null)
+            {{-- The identity field: always written, a create without it fails. --}}
+            <span
+                class="mt-0.5 flex h-4 w-4 shrink-0 cursor-not-allowed items-center justify-center rounded border border-primary-600/40 bg-primary-600/40 text-white"
+                title="{{ __('Required') }}"
+                aria-hidden="true"
+            >
+                <x-heroicon-m-check class="h-3 w-3" aria-hidden="true" />
+            </span>
+        @else
+            <span class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></span>
+        @endif
+    @endif
+
+    <span @class([
+        'w-32 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-40 dark:text-gray-300',
+        'opacity-50' => $isExcluded,
+    ])>{{ $row['label'] ?? '' }}</span>
 
     @if ($isEditing)
         <div class="w-full min-w-0">
@@ -36,7 +82,10 @@
             </div>
         </div>
     @else
-        <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm">
+        <span @class([
+            'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm',
+            'opacity-50' => $isExcluded,
+        ])>
             @if (! in_array($row['value'] ?? $row['new'] ?? null, [null, ''], true) || ! empty($row['old']) || ! empty($row['values']))
                 @if (! empty($row['old']))
                     <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">{{ $row['old'] }}</span>

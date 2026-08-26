@@ -33,6 +33,10 @@ final readonly class CallbackController
             $socialUser = $this->retrieveSocialUser($provider);
             $user = $this->resolveUser($provider, $socialUser, $creator);
 
+            if ($user->wasRecentlyCreated) {
+                $this->flagSignupForAnalytics();
+            }
+
             return $this->loginAndRedirect($user);
         } catch (InvalidStateException) {
             return $this->handleError('Authentication state mismatch. Please try again.');
@@ -93,6 +97,24 @@ final readonly class CallbackController
             'email' => $this->extractEmail($socialUser, $provider),
             'terms' => 'on',
         ]);
+    }
+
+    /**
+     * The signup conversion event, matching what the registration form flags.
+     *
+     * Social sign-ups reached the panel without this, so the event counted the
+     * email form alone and every OAuth provider was missing from it. The count
+     * itself was never the point: the users table has that, exactly. What only
+     * the client-side event carries is the referrer that brought the person
+     * here, and a whole signup channel was arriving unattributed.
+     *
+     * Flagged out here rather than inside resolveUser(): written in there it
+     * would outlive a rolled back transaction, because the session saves at the
+     * end of the request either way, and report a signup that never happened.
+     */
+    private function flagSignupForAnalytics(): void
+    {
+        session()->put('fathom.track_signup', true);
     }
 
     private function linkSocialAccount(User $user, string $provider, string|int $providerId): void

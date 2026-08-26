@@ -128,7 +128,7 @@ it('does not duplicate a completed turn or add an error note when a post-stream 
     ]);
 
     // The stream itself completed successfully -- both real rows already
-    // exist -- but a post-stream step (settleReservation / broadcastFollowUps
+    // exist -- but a post-stream step (settleReservation / maybeTitleFromTurn
     // / ...) threw afterward, so the job still fails.
     seedFailedTurnMessage($conversationId, $user, 'user', 'Create a task titled BR-Foo', now()->subSecond());
     seedFailedTurnMessage($conversationId, $user, 'assistant', 'Done, I created the task.', now());

@@ -6,6 +6,7 @@
 // `get` property cannot survive an object spread.
 
 import { MENTION_CHIP_CLASS } from './mention-chip';
+import { htmlToText } from './copy';
 
 const CONVERSATION_CACHE_MAX_MESSAGES = 200;
 const CONVERSATION_CACHE_LIMIT = 5;
@@ -196,9 +197,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     _highlightTimer: null,
 
     // Scroll ownership (see scrollToBottom): streaming only autoscrolls while
-    // the user is pinned near the bottom; otherwise the jump pill shows.
+    // the user is pinned near the bottom. The jump-to-latest button keys off
+    // this alone, so it is there the whole time the user is reading back, not
+    // only in the moment new content happens to land.
     pinnedToBottom: true,
-    hasUnseenBelow: false,
+    // Held while jumpToLatest()'s animation is in flight; see the comment there.
+    scrollAnimating: false,
+    _scrollAnimationTimer: null,
 
     // Stable identity for the x-for key: server id when persisted, otherwise a
     // minted client uuid that survives reconciliation (never reassigned).
@@ -207,6 +212,25 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             m.clientKey = m.id || ('c-' + (window.crypto?.randomUUID?.() ?? (Date.now() + '-' + Math.random())));
         }
         return m;
+    },
+
+    // The strip belongs to the last answer in the transcript, so a reload (or a
+    // paint from the conversation cache) restores it from that row's persisted
+    // next_steps. Anything older is stale by definition: its turn has already
+    // been followed by another one.
+    nextStepsFromTranscript() {
+        const last = this.messages.findLast((m) => m.role === 'assistant');
+        return Array.isArray(last?.next_steps) ? last.next_steps : [];
+    },
+
+    // Fills the composer and sends in one go. The prompt is what the model
+    // wrote for this step, never the label: the label is shorthand for the
+    // reader, the prompt is the sentence the assistant needs.
+    sendNextStep(step) {
+        if (!step?.prompt || this.isStreaming || this.rateLimit) return;
+        this.input = step.prompt;
+        this.localEditor()?.setText(step.prompt);
+        this.$nextTick(() => this.sendMessage());
     },
 
     // Normalizes a server-fetched message row for the transcript: stable
@@ -219,8 +243,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         if (m.role === 'assistant') {
             m.rendered = true;
             m.prerendered = true;
-            if (!Array.isArray(m.follow_ups)) {
-                m.follow_ups = [];
+            if (!Array.isArray(m.next_steps)) {
+                m.next_steps = [];
             }
             m.feedback = m.feedback ?? null;
             m.feedbackPanelOpen = false;
@@ -677,6 +701,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         // Hits and the highlight belong to the conversation being left: a
         // message id from it will never appear in the one being painted, so
         // carrying either over would just leave a dead result list open.
+        // Belongs to the conversation being left, exactly like the search state
+        // below it. The paint re-seeds it from the transcript it just painted.
+        this.nextSteps = this.nextStepsFromTranscript();
+
         this.dismissMessageSearch();
         this.searchResults = [];
         this.searchActiveIndex = 0;
@@ -1011,19 +1039,104 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     // Record citations are stored root-relative (`/r/{type}/{id}`) so a
     // transcript renders on whatever host serves it. Pasted anywhere else they
-    // have to carry the origin. Both forms are rewritten because `msg.content`
-    // is markdown for a message rendered in this session and server HTML for
-    // one rehydrated on reload (see `prerendered` in chat-interface.blade.php).
+    // have to carry the origin. Only the markdown form is rewritten: what
+    // reaches the clipboard is always text built by messageCopyText(), never
+    // the markup the transcript happens to be painting.
     absolutizeRecordLinks(text) {
-        const origin = window.location.origin;
+        return text.replaceAll('](/r/', `](${window.location.origin}/r/`);
+    },
 
-        return text
-            .replaceAll('](/r/', `](${origin}/r/`)
-            .replaceAll('href="/r/', `href="${origin}/r/`);
+    // The copy payload for one message. A user message is stored as plain text
+    // already (its mentions are painted from `document`, see
+    // renderMessageContent). An assistant reply goes through the same segment
+    // plan the transcript paints from, so the copy carries its display blocks
+    // in the order they are shown and reads identically whether the reply just
+    // streamed (markdown in `content`) or came back on a reload (server HTML).
+    messageCopyText(msg) {
+        if (msg?.role !== 'assistant') {
+            return (msg?.content || '').trim();
+        }
+
+        const parts = this.messageSegments(msg)
+            .map((segment) => (segment.type === 'html' ? htmlToText(segment.html) : this.blockCopyText(segment.block)))
+            .filter((part) => part !== '');
+
+        return this.absolutizeRecordLinks(parts.join('\n\n')).trim();
+    },
+
+    // A display block is a painted object, not prose, so it is serialized from
+    // its payload rather than from the DOM. A block type with no serializer
+    // here copies as nothing rather than as an empty placeholder, matching
+    // displayBlocks()'s own drop-the-unknown rule.
+    blockCopyText(block) {
+        if (block?.block === 'records_table') return this.recordsTableCopyText(block);
+        if (block?.block === 'record_card') return this.recordCardCopyText(block);
+
+        return '';
+    },
+
+    // Every row on the page, not blockVisibleRows(): the collapse toggle is
+    // paint state (see expandedBlocks), so honoring it here would hand two
+    // readers of the same transcript two different tables.
+    recordsTableCopyText(block) {
+        const columns = block?.columns || [];
+        const rows = block?.rows || [];
+        const title = this.blockTitle(block);
+
+        if (columns.length === 0 || rows.length === 0) return title;
+
+        const cell = (row, column) => {
+            const value = this.blockCell(row, column);
+
+            if (Array.isArray(value)) {
+                return value.map((chip) => this.linkCopyText(chip?.label, chip?.url)).join(', ');
+            }
+
+            return this.blockCellLinksRecord(block, row, column)
+                ? this.linkCopyText(value, row.url)
+                : String(value);
+        };
+
+        const line = (cells) => `| ${cells.map((value) => String(value).replaceAll('|', '\\|')).join(' | ')} |`;
+
+        return [
+            title,
+            line(columns.map((column) => this.blockColumnLabel(block, column))),
+            line(columns.map(() => '---')),
+            ...rows.map((row) => line(columns.map((column) => cell(row, column)))),
+        ].join('\n');
+    },
+
+    recordCardCopyText(block) {
+        const fields = Array.isArray(block?.fields) ? block.fields : [];
+
+        return [
+            this.linkCopyText(block?.title, block?.url),
+            ...fields.map((field) => `${field?.label ?? ''}: ${this.fieldCopyText(field)}`),
+        ].join('\n');
+    },
+
+    // Mirrors _proposal-field.blade.php: a badges/link field paints one chip
+    // per entry, and an update row paints the value it replaces alongside it.
+    fieldCopyText(field) {
+        const values = Array.isArray(field?.values) ? field.values : [];
+        const value = values.length > 0 && (field?.type === 'badges' || field?.type === 'link')
+            ? values.join(', ')
+            : String(field?.new ?? field?.value ?? '');
+
+        return field?.old ? `${field.old} → ${value}` : value;
+    },
+
+    linkCopyText(label, url) {
+        const text = String(label ?? '').trim();
+
+        if (!url) return text;
+
+        return text === '' ? String(url) : `[${text}](${url})`;
     },
 
     async copyMessage(msg) {
-        const text = this.absolutizeRecordLinks(msg?.content || '').replace(/\{\{block:\d+\}\}/g, '').trim();
+        const text = this.messageCopyText(msg);
         if (!text) return;
 
         try {
@@ -1122,12 +1235,20 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
     },
 
+    // Whether this message came from a prompt at all. A reply with no user
+    // message before it has nothing to regenerate FROM: the button is hidden
+    // rather than disabled, because every disabled reason the UI can offer is
+    // about a pending approval and would be a lie here.
+    hasUserPrompt(index) {
+        return this.messages.slice(0, index).some((m) => m.role === 'user');
+    },
+
     canRegenerate(index) {
         const msg = this.messages[index];
         if (msg?.pending_actions?.some((a) => a.status === 'pending')) {
             return false;
         }
-        return this.messages.slice(0, index).some((m) => m.role === 'user');
+        return this.hasUserPrompt(index);
     },
 
     canEdit(index) {
@@ -1153,14 +1274,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         });
         msg.editText = msg.content;
         msg.editing = true;
-
-        this.$nextTick(() => {
-            const el = this.$refs.editArea;
-            if (!el) return;
-            el.focus();
-            el.setSelectionRange(el.value.length, el.value.length);
-            this.autosize(el);
-        });
+        // Focus/caret/autosize live on the textarea's own x-init (see
+        // _transcript.blade.php): doing it from here raced the teardown of the
+        // hover action row the edit click came from, which blurred it back out.
     },
 
     cancelEdit(msg) {
@@ -1317,29 +1433,56 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     // The user owns the scroll position. Streaming autoscrolls ONLY while they
     // are already pinned near the bottom; once they scroll up to read, new
-    // content raises the "Jump to latest" pill instead of yanking them down.
-    // force=true is for actions the user just took themselves (sending, the
-    // pill, initial load).
+    // content lands below them and the jump-to-latest button (already on screen
+    // the moment they left the bottom) takes them back. force=true is for
+    // actions the user just took themselves (sending, that button, initial load).
     scrollToBottom(force = false) {
-        if (!force && !this.pinnedToBottom) {
-            this.hasUnseenBelow = true;
-            return;
-        }
+        if (!force && !this.pinnedToBottom) return;
+
         this.$nextTick(() => {
             const el = this.$refs.messages;
             if (el) el.scrollTop = el.scrollHeight;
             this.pinnedToBottom = true;
-            this.hasUnseenBelow = false;
         });
     },
 
+    // Travelling back to the newest message on the user's own click, animated:
+    // this is the one scroll they asked for as a movement, so it reads as one
+    // instead of teleporting them past everything they had scrolled through.
+    // Every other caller stays instant (scrollToBottom): animating an autoscroll
+    // would chase its own tail against arriving tokens.
+    jumpToLatest() {
+        const el = this.$refs.messages;
+        if (!el) return;
+
+        // Pin up front and hold it for the length of the animation. A smooth
+        // scroll fires scroll events the whole way down, and re-deriving the
+        // pin from those would drop it mid-flight and flash the button back on
+        // under the user's cursor.
+        this.pinnedToBottom = true;
+        this.scrollAnimating = true;
+
+        el.scrollTo({
+            top: el.scrollHeight,
+            behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        });
+
+        clearTimeout(this._scrollAnimationTimer);
+        this._scrollAnimationTimer = setTimeout(() => {
+            if (this.destroyed) return;
+            this.scrollAnimating = false;
+            // A wheel/trackpad gesture cancels a smooth scroll mid-flight, so
+            // re-derive rather than assume we landed at the bottom.
+            this.trackScrollPosition();
+        }, 700);
+    },
+
     trackScrollPosition() {
+        if (this.scrollAnimating) return;
+
         const el = this.$refs.messages;
         if (!el) return;
         this.pinnedToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        if (this.pinnedToBottom) {
-            this.hasUnseenBelow = false;
-        }
     },
 
     // Keyboard layer. Bound via `x-on:keydown` directly on the chat root

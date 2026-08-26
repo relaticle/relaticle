@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
+use App\Models\Team;
+use App\Services\WorkspaceActivationFacts;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Temperature;
@@ -53,6 +55,7 @@ use Relaticle\Chat\Tools\Task\DeleteTaskTool as ChatDeleteTaskTool;
 use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
+use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
 
 // Only a fallback: every chat turn passes an explicit provider resolved by
 // AiModelResolver, and laravel/ai reads this attribute only when the prompt's
@@ -117,7 +120,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * transcript, whose tool results keep claiming the proposal is pending.
      * Superseded proposals are NOT here: see $supersededProposals above.
      *
-     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>}>
+     * @var list<array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null, just_decided?: bool}>
      */
     public array $resolvedActions = [];
 
@@ -134,6 +137,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * @var array{name: string, id: string, role: string}|null
      */
     public ?array $currentUser = null;
+
+    /**
+     * The team whose workspace this conversation belongs to. Drives the
+     * <workspace_state> block: without it the model has no signal that a
+     * workspace still holds only seeded sample data.
+     */
+    public ?Team $team = null;
 
     /**
      * The id of the turn being streamed. Every proposal this turn creates carries
@@ -168,6 +178,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public function withCurrentUser(?array $user): self
     {
         $this->currentUser = $user;
+
+        return $this;
+    }
+
+    public function withTeam(?Team $team): self
+    {
+        $this->team = $team;
 
         return $this;
     }
@@ -233,6 +250,8 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 14. If the user's request is ambiguous, ask for clarification rather than guessing, but ask ONCE: batch every clarifying question into a single message. Never ask about something you can resolve yourself: when only one record can match, proceed with it and state the assumption. "Me", "my" and "mine" are the Current user. When the user accepts an offer you just made ("yes", "do it", "go ahead"), execute exactly what you offered; never re-ask for details your own offer already named. When you deliver less than the user asked for (one item of a requested "all"), say so in your first sentence.
 15. Be concise. Don't over-explain CRM concepts the user likely knows.
 16. Never narrate tool usage ("Let me fetch that", "I'll now look it up", "First, let me find the notes"). Anything you write before a tool call joins the same reply. Call tools silently and write once, after the results are in.
+17. End every answer with exactly one concrete offered next action or question: the single most useful thing to do next, phrased as an offer ("Want me to ...?"). Never end on a bare statement, and never offer more than one thing. When a list, search, or summary comes back empty, the next action is mandatory and must offer to create or import the missing data: a bare "there are none" is a wrong answer. Exception: a turn that ends awaiting a proposal decision already has its offer, the card itself (see Writes), and a resumed turn after one either continues the request or stops when it is done (see Resuming); do not add another offer in either case.
+18. When the <workspace_state> block says the workspace holds only sample records, every summary or overview answer must say plainly that these are seeded sample data before presenting them, and the offered next action (Rule 17) must be importing or creating the user's real data, not exploring the samples further.
 
 ## Writes
 - To create, update, or delete MANY records of one type, call the tool ONCE with every record: `records: [{..}, {..}]` on create and update tools, `ids: [..]` on delete tools. That produces a single proposal listing all of them, approved item by item. Never loop one tool call per record, and never ask the user to approve one record at a time.
@@ -241,7 +260,7 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 - Never call the same write tool twice in one turn for the same entity type: batch those records into one call instead. Chain a second write tool only when the entity type differs, or a link needs a `$ref`.
 - After the LAST write of the request, STOP your turn. Do NOT tell the user anything was created, nothing is, until they approve. Acknowledge the proposal in ONE short sentence and end the turn. Never ask them to say "continue" or "next", and never offer to: deciding the card resumes you by itself (see Resuming).
 - Only when a later step genuinely needs data you cannot know yet (a read whose result depends on an approval) do you stop early; the turn their decision starts is where you pick it up, from <resolved_actions>.
-- When everything requested is already approved (see <resolved_actions>), the request is DONE: confirm in ONE short sentence naming each record by its title as a link, and never propose it again. "continue" or "next" after the last step means there is nothing left; say so. Do not re-list: never re-list field values or render a table of data the user just approved.
+- When every write the user asked for now appears in <resolved_actions>, the request is DONE: confirm in ONE short sentence naming each record by its title as a link, and never propose it again. If those approvals arrived on THIS turn, they are what the user just did (see Resuming): report them as just completed, never as already done before now. "continue" or "next" after the last step means there is nothing left; say so. Do not re-list: never re-list field values or render a table of data the user just approved.
 
 ## Field Truth
 Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND team-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
@@ -262,7 +281,8 @@ Some actions cannot be performed here but ARE available elsewhere in the workspa
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools); this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
 - Exporting records to a CSV or XLSX file -> the matching "export_*" destination.
-- Inviting or managing team members -> "team_members".
+- Inviting a new team member by email -> you CAN propose it directly via InviteTeamMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
+- Managing existing team members (changing a role, removing someone) -> "team_members".
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)."
 
 ## Formatting
@@ -270,7 +290,8 @@ GuideToPageTool returns a page URL (not a record id). You MAY render that URL as
 - Never write a markdown table of records except the sanctioned join table above: read results that render as a block, and proposals, already list every record (the no-block tools in Rule 3 get a short list, never a table)
 - Never write a heading or bold label naming a set of results ("**Companies**", "## People"): every block prints its own title, and yours cannot sit next to it
 - No emoji of any kind: not celebratory, not decorative, not as status or priority markers. Express priority and status in words.
-- Do not end replies offering a next step ("say next", "want me to continue?"). You are resumed automatically after a decision, so an offer to continue is both noise and wrong.
+- Never offer to "continue" or ask the user to say "next" or "continue" after a proposal: you are resumed automatically after a decision, so that specific offer is both noise and wrong.
+- Never use an em dash. Use a comma, a colon, parentheses, or two sentences instead.
 - Keep responses focused and actionable
 
 ## Superseded Proposals
@@ -279,6 +300,7 @@ A <superseded_proposals> block lists proposals auto-cancelled when the user sent
 ## Resuming
 Deciding a proposal starts a turn on its own: the moment nothing in the conversation is still awaiting a decision, you are resumed with the outcome in <resolved_actions>. That turn's prompt is written by the system, not typed by the user, and the user never sees it, so never quote it, never call it a message they sent, and never thank them for it.
 On a resumed turn:
+- The items in <resolved_actions> are what the user's decision JUST did, this second. Report them as just completed ("Invited X", "Created Y"), never as history and never as something that had already happened: "already sent", "already invited", "earlier in our conversation" and "no further action was needed" are all wrong on a resumed turn, and telling the user nothing new happened when their click is what made it happen is a lie about their own action. Items decided in an EARLIER turn are the only ones you may call already done.
 - Confirm what happened in ONE short sentence, naming each record as a markdown link. The card above your reply already lists every field, so do not restate values or draw a table.
 - If a step of the request is still outstanding and you can act on it now, do it in the same turn.
 - If nothing is outstanding, say the request is done and stop. Do not invent more work, and never re-propose anything already in <resolved_actions>.
@@ -301,7 +323,7 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->currentUserBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
+        return $this->dateBlock().$this->currentUserBlock().$this->workspaceStateBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
     }
 
     /**
@@ -331,6 +353,33 @@ PROMPT;
         return "\n\n## Current user\n"
             ."{$name} (user id: {$this->currentUser['id']}, {$role}). "
             .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.';
+    }
+
+    /**
+     * Tells the model whether the workspace still holds only the sample
+     * records seeded on signup. Absent entirely once the workspace has real
+     * data, so an established workspace's prompt carries no sample-data noise.
+     */
+    private function workspaceStateBlock(): string
+    {
+        if (! $this->team instanceof Team) {
+            return '';
+        }
+
+        $facts = resolve(WorkspaceActivationFacts::class);
+
+        if (! $facts->hasSampleData($this->team)) {
+            return '';
+        }
+
+        $count = $facts->sampleRecordCount($this->team);
+        $qualifier = $facts->hasOwnRecord($this->team)
+            ? "alongside the user's own records"
+            : 'and the workspace holds only sample records so far';
+
+        return "\n\n<workspace_state>\n"
+            ."This workspace contains {$count} seeded sample records (creation source \"system\") {$qualifier}.\n"
+            .'</workspace_state>';
     }
 
     private function mentionsBlock(): string
@@ -439,7 +488,9 @@ PROMPT;
         $lines = [
             '',
             '<resolved_actions>',
-            'These proposals were already decided by the user earlier in this conversation and their approval cards are gone.',
+            'These proposals have been decided by the user and their approval cards are gone.',
+            'An entry marked JUST DECIDED was resolved by the decision that started THIS turn, seconds ago: it is the outcome of the click you are replying to. Report it as just completed ("Invited X", "Created Y"). Never call it already done, already sent, already invited, or something that happened earlier in the conversation, and never say no action was needed: that tells the user their own click did nothing.',
+            'Entries without that marker were decided on an earlier turn and may be referred to as already done.',
             'NEVER describe a decided proposal as pending, awaiting approval, or "shown above". "expired" means the card timed out undecided.',
             'Do not re-propose them on your own initiative. But when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal.',
             'Use an approved record id to continue any multi-step request still in progress, and its url to link the record by name.',
@@ -449,9 +500,10 @@ PROMPT;
         foreach ($this->resolvedActions as $action) {
             $records = $action['records'] ?? [];
             $skipped = $action['skipped'] ?? [];
+            $excluded = $action['excluded'] ?? [];
 
             if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
-                $lines[] = "- {$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
+                $lines[] = '- '.($action['just_decided'] ?? false ? 'JUST DECIDED, ' : '')."{$action['status']}: {$action['operation']} ".count($records)." {$action['entity_type']} records:";
 
                 foreach ($records as $record) {
                     $lines[] = '    - '.$this->quotedLabel($record['label'])." (id: {$record['id']}, url: {$record['url']})";
@@ -461,14 +513,37 @@ PROMPT;
                     $lines[] = '    - skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").': '.$this->quotedLabel($label);
                 }
 
+                foreach ($excluded as $entry) {
+                    $lines[] = '    - fields unchecked by the user on '.$this->quotedLabel($entry['record']).', NOT written: '.implode(', ', $entry['fields']);
+                }
+
+                if (is_string($action['failure'] ?? null) && $action['failure'] !== '') {
+                    $lines[] = '    - an approval attempt failed before this decision: '.$this->quotedLabel($action['failure']);
+                }
+
                 continue;
             }
 
-            $line = "- {$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
+            $line = '- '.($action['just_decided'] ?? false ? 'JUST DECIDED, ' : '')."{$action['status']}: {$action['operation']} {$action['entity_type']} {$this->resolvedRecordsText($action)}";
 
             if ($skipped !== []) {
                 $skippedLabels = implode(', ', array_map($this->quotedLabel(...), $skipped));
                 $line .= '; skipped by the user, NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d").": {$skippedLabels}";
+            }
+
+            // A field the user unchecked was NOT written even though the replayed
+            // proposal still lists it; without this line the model reports values
+            // it never set.
+            foreach ($excluded as $entry) {
+                $line .= '; fields unchecked by the user'
+                    .($entry['record'] === null ? '' : ' on '.$this->quotedLabel($entry['record']))
+                    .', NOT written: '.implode(', ', $entry['fields']);
+            }
+
+            // A discard that followed a failed approval is not a plain change of
+            // mind; without the reason the model cannot answer "why did it fail?".
+            if (is_string($action['failure'] ?? null) && $action['failure'] !== '') {
+                $line .= '; an approval attempt failed before this decision: '.$this->quotedLabel($action['failure']);
             }
 
             $lines[] = $line;
@@ -687,6 +762,7 @@ PROMPT;
             ChatCreateNoteTool::class,
             ChatUpdateNoteTool::class,
             ChatDeleteNoteTool::class,
+            InviteTeamMemberTool::class,
 
             // Schema management tools (admin-only, proposal-gated)
             CreateCustomFieldTool::class,

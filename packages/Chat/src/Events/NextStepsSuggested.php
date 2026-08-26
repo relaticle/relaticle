@@ -8,16 +8,16 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
-final class FollowUpsSuggested implements ShouldBroadcastNow
+final class NextStepsSuggested implements ShouldBroadcastNow
 {
     use InteractsWithSockets;
 
     /**
-     * @param  array<int, array{label: string, prompt: string}>  $chips
+     * @param  list<array{label: string, prompt: string}>  $steps
      */
     public function __construct(
         public readonly string $conversationId,
-        public readonly array $chips,
+        public readonly array $steps,
     ) {}
 
     /**
@@ -32,7 +32,7 @@ final class FollowUpsSuggested implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'follow_ups';
+        return 'next_steps';
     }
 
     /**
@@ -40,6 +40,6 @@ final class FollowUpsSuggested implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return ['chips' => $this->chips];
+        return ['steps' => $this->steps];
     }
 }

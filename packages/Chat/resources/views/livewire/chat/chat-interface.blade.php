@@ -1,5 +1,5 @@
 <div
-    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
+    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null))"
     x-on:keydown="onChatRootKeydown($event)"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     x-on:chat:editor-arrow-up.window="if ($event.detail?.context === @js($context ?? 'conversation')) maybeEditLastUserMessage()"
@@ -29,7 +29,7 @@
 
 @script
 <script>
-Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel) => ({
+Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt) => ({
     ...window.ChatModules.transcriptModule({
         messagesUrl: @js(url('/chat/messages')),
         {{-- Templated on the conversation id for the same reason the switcher's
@@ -105,17 +105,53 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     ...window.ChatModules.streamModule({
         texts: @js([
             'runningTool' => __('Running tool…'),
-            'readingSummary' => __('Reading CRM summary…'),
-            'searchingCrm' => __('Searching CRM…'),
             'runningName' => __('Running :name…'),
-            'searchingEntity' => __('Searching :entity…'),
-            'lookingUpEntity' => __('Looking up :entity…'),
-            'draftingEntity' => __('Drafting :entity…'),
-            'updatingEntity' => __('Preparing :entity changes…'),
-            'deletingEntity' => __('Preparing :entity deletion…'),
             'streamError' => __('The assistant encountered an error. Please try again.'),
             'timeout' => __('The assistant took too long to respond.'),
             'retrying' => __('Provider is busy, retrying (attempt :attempt of :max)…'),
+        ]),
+        {{-- The shimmer label for each tool the agent can call, keyed by the
+             snake_case class basename laravel/ai broadcasts as `tool_name`.
+             Every tool registered in CrmAssistant::tools() needs an entry here,
+             or the user reads a raw identifier while it runs. --}}
+        toolLabels: @js([
+            'list_companies' => __('Searching companies…'),
+            'get_company' => __('Reading company details…'),
+            'list_people' => __('Searching contacts…'),
+            'get_person' => __('Reading contact details…'),
+            'list_opportunities' => __('Searching opportunities…'),
+            'get_opportunity' => __('Reading opportunity details…'),
+            'list_tasks' => __('Searching tasks…'),
+            'get_task' => __('Reading task details…'),
+            'list_notes' => __('Searching notes…'),
+            'get_note' => __('Reading note details…'),
+            'search_crm' => __('Searching your CRM…'),
+            'get_crm_summary' => __('Reading CRM summary…'),
+            'aggregate_crm' => __('Crunching the numbers…'),
+            'list_activity' => __('Reading recent activity…'),
+            'list_team_members' => __('Looking up team members…'),
+            'list_custom_fields' => __('Reading custom fields…'),
+            'search_docs' => __('Searching the documentation…'),
+            'guide_to_page' => __('Finding the right page…'),
+            'create_company' => __('Drafting a company…'),
+            'update_company' => __('Preparing company changes…'),
+            'delete_company' => __('Preparing company deletion…'),
+            'create_person' => __('Drafting a contact…'),
+            'update_person' => __('Preparing contact changes…'),
+            'delete_person' => __('Preparing contact deletion…'),
+            'create_opportunity' => __('Drafting an opportunity…'),
+            'update_opportunity' => __('Preparing opportunity changes…'),
+            'delete_opportunity' => __('Preparing opportunity deletion…'),
+            'create_task' => __('Drafting a task…'),
+            'update_task' => __('Preparing task changes…'),
+            'delete_task' => __('Preparing task deletion…'),
+            'create_note' => __('Drafting a note…'),
+            'update_note' => __('Preparing note changes…'),
+            'delete_note' => __('Preparing note deletion…'),
+            'invite_team_member' => __('Preparing a team invitation…'),
+            'create_custom_field' => __('Drafting a custom field…'),
+            'update_custom_field' => __('Preparing custom field changes…'),
+            'add_custom_field_options' => __('Preparing new field options…'),
         ]),
     }),
 
@@ -134,6 +170,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     messages: initialMessages || [],
     hasMoreMessages: !!initialHasMoreMessages,
     isStreaming: false,
+    // Next steps for the LATEST turn only, so this is conversation state rather
+    // than per-message state: the strip sits at the floor of the transcript,
+    // and only one of them can be on screen. Seeded from the last assistant row
+    // on mount, replaced by the `.next_steps` broadcast, emptied on every send.
+    nextSteps: [],
     @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),
@@ -205,6 +246,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.selectedModel = validModels.includes(candidate) ? candidate : 'auto';
 
         this.messages.forEach((m) => this.hydrateServerMessage(m));
+        this.nextSteps = this.nextStepsFromTranscript();
 
         if (this.conversationId) {
             this.subscribeToConversation(this.conversationId);
@@ -230,22 +272,31 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         let ranBootstrapSend = false;
         try {
             const raw = sessionStorage.getItem('chat:bootstrap');
-            if (raw && !this.conversationId) {
+            if (raw) {
+                // Clear it whatever happens next. A payload that cannot be
+                // delivered here must not survive to fire into the next chat
+                // the user opens, which is how a first-run reply ended up
+                // starting a second conversation.
                 sessionStorage.removeItem('chat:bootstrap');
                 const parsed = JSON.parse(raw);
-                const bootstrapDoc = parsed?.document;
-                const bootstrapModel = parsed?.model;
 
-                if (bootstrapModel && this.modelOptions.some((o) => o.value === bootstrapModel)) {
-                    this.selectedModel = bootstrapModel;
-                }
+                // The payload names the conversation it was typed for, so a
+                // stale handoff cannot fire into whichever chat is opened next.
+                if ((parsed?.conversationId ?? null) === (this.conversationId ?? null)) {
+                    const bootstrapDoc = parsed?.document;
+                    const bootstrapModel = parsed?.model;
 
-                if (bootstrapDoc) {
-                    ranBootstrapSend = true;
-                    this.$nextTick(() => {
-                        this.localEditor()?.setDocument?.(bootstrapDoc);
-                        this.sendMessage();
-                    });
+                    if (bootstrapModel && this.modelOptions.some((o) => o.value === bootstrapModel)) {
+                        this.selectedModel = bootstrapModel;
+                    }
+
+                    if (bootstrapDoc) {
+                        ranBootstrapSend = true;
+                        this.$nextTick(() => {
+                            this.localEditor()?.setDocument?.(bootstrapDoc);
+                            this.sendMessage();
+                        });
+                    }
                 }
             }
         } catch (_) { /* sessionStorage unavailable or malformed payload */ }
@@ -255,6 +306,17 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.input = initialMessage;
                 this.localEditor()?.setText(initialMessage);
                 this.sendMessage();
+            });
+        }
+
+        // Seeded, never sent: the user reads it and presses send themselves.
+        // Skipped when a bootstrap handoff already filled the composer, so a
+        // ?prompt= in the URL cannot overwrite what the user just typed.
+        if (initialPrompt && !initialMessage && !ranBootstrapSend) {
+            this.$nextTick(() => {
+                this.input = initialPrompt;
+                this.localEditor()?.setText(initialPrompt);
+                this.localEditor()?.focus();
             });
         }
 
@@ -389,6 +451,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.teardownMessageSearch();
         this.clearStreamTimeout();
         clearTimeout(this._copiedTimer);
+        clearTimeout(this._scrollAnimationTimer);
         this.clearRateLimit();
         // Without this, a pending saveDraft() debounce outlives this instance
         // (e.g. a fragment typed here, then the user switches conversations

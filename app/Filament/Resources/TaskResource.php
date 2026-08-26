@@ -41,7 +41,7 @@ final class TaskResource extends Resource
 
     protected static ?string $navigationLabel = null;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-check-circle';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
 
     protected static ?string $recordTitleAttribute = 'title';
 

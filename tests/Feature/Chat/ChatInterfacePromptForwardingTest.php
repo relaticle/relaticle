@@ -16,21 +16,44 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
-it('picks up the prompt query parameter on mount', function (): void {
+/**
+ * `?prompt=` seeds the composer and stops. It used to feed initialMessage,
+ * which sends itself on arrival, so any link from anywhere could spend a
+ * workspace credit before its owner had read what was typed.
+ */
+it('seeds the composer from the prompt query parameter without sending it', function (): void {
     Livewire::withQueryParams(['prompt' => 'Show my overdue tasks'])
         ->test(ChatInterface::class)
-        ->assertSet('initialMessage', 'Show my overdue tasks');
+        ->assertSet('initialPrompt', 'Show my overdue tasks')
+        ->assertSet('initialMessage', null);
 });
 
-it('prefers explicit initialMessage prop over prompt query', function (): void {
+it('leaves an explicit initialMessage prop untouched by a prompt query', function (): void {
     Livewire::withQueryParams(['prompt' => 'from query'])
         ->test(ChatInterface::class, ['initialMessage' => 'from prop'])
         ->assertSet('initialMessage', 'from prop');
 });
 
-it('leaves initialMessage null when no prompt query and no prop', function (): void {
+it('leaves both null when no prompt query and no prop', function (): void {
     Livewire::test(ChatInterface::class)
-        ->assertSet('initialMessage', null);
+        ->assertSet('initialMessage', null)
+        ->assertSet('initialPrompt', null);
+});
+
+it('ignores a blank prompt query rather than seeding whitespace', function (): void {
+    Livewire::withQueryParams(['prompt' => '   '])
+        ->test(ChatInterface::class)
+        ->assertSet('initialPrompt', null);
+});
+
+/**
+ * The composer refuses anything longer, so a crafted link cannot paste an
+ * essay into somebody's editor.
+ */
+it('caps a prompt at the composer limit', function (): void {
+    Livewire::withQueryParams(['prompt' => str_repeat('a', 6000)])
+        ->test(ChatInterface::class)
+        ->assertSet('initialPrompt', str_repeat('a', 5000));
 });
 
 it('keeps the side panel empty state to its record-aware greeting', function (): void {

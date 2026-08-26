@@ -32,10 +32,13 @@ use App\Models\People;
 use App\Models\PersonalAccessToken;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Onboarding\ActivationSteps;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
+use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\Markdown\TableAwareLeagueDriver;
@@ -77,6 +80,7 @@ use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
+use Spatie\Onboard\OnboardingSteps;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -106,6 +110,26 @@ final class AppServiceProvider extends ServiceProvider
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them — the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
+
+        // Caches creation-source facts per team for the lifetime of a
+        // request/job — scoped so a queue worker resets it between jobs.
+        $this->app->scoped(WorkspaceActivationFacts::class);
+
+        // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
+        // makes every team share one OnboardingStep instance. Its complete()
+        // memoizes through once(), keyed on that shared object rather than the
+        // model, so the first team evaluated in a process poisons the answer for
+        // every later one — wrong onboarding state in any request or Horizon
+        // worker that touches two workspaces. Rebinding per resolve gives each
+        // lookup its own step objects, so once() memoizes within one lookup as
+        // intended. Registration lives here because a fresh registry starts empty.
+        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+            $steps = new OnboardingSteps;
+
+            ActivationSteps::registerOn($steps);
+
+            return $steps;
+        });
 
         // Spatie's LeagueDriver never registers TableConverter, so <table>
         // markup collapses to a run-on line in the markdown-response channel.
@@ -438,6 +462,7 @@ final class AppServiceProvider extends ServiceProvider
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
+            'team_invitation' => TeamInvitation::class,
         ]);
 
         // Use custom models for custom-fields package

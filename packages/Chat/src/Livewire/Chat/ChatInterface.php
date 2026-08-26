@@ -7,12 +7,14 @@ namespace Relaticle\Chat\Livewire\Chat;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
+use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TranscriptScope;
 
@@ -21,6 +23,12 @@ final class ChatInterface extends BaseLivewireComponent
     public ?string $conversationId = null;
 
     public ?string $initialMessage = null;
+
+    /**
+     * Text placed in the composer on arrival and left there. Unlike
+     * `initialMessage`, which sends itself, this waits for the user.
+     */
+    public ?string $initialPrompt = null;
 
     public ?string $initialModel = null;
 
@@ -39,6 +47,12 @@ final class ChatInterface extends BaseLivewireComponent
     private const int PAGE_SIZE = 50;
 
     /**
+     * The composer refuses anything longer, so a crafted link cannot paste an
+     * essay into somebody's editor.
+     */
+    private const int MAX_PROMPT_LENGTH = 5000;
+
+    /**
      * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, pending_actions?: array<int, mixed>, mentions?: list<array{type: string, id: string, label: string}>}>
      */
     public array $messages = [];
@@ -53,7 +67,15 @@ final class ChatInterface extends BaseLivewireComponent
 
         /** @var string|null $promptQuery */
         $promptQuery = request()->query('prompt');
-        $this->initialMessage = $initialMessage ?? $promptQuery;
+        $this->initialMessage = $initialMessage;
+
+        // `?prompt=` seeds the composer and stops. It used to feed
+        // initialMessage, which sends on arrival: any link, from anywhere,
+        // could spend a workspace credit before its owner had read what was
+        // typed. Seeding is what every caller actually wanted.
+        $this->initialPrompt = is_string($promptQuery) && trim($promptQuery) !== ''
+            ? Str::limit(trim($promptQuery), self::MAX_PROMPT_LENGTH, '')
+            : null;
 
         /** @var string|null $modelQuery */
         $modelQuery = request()->query('model');
@@ -138,7 +160,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->where('m.role', 'assistant')
             ->latest('m.created_at')
             ->orderByDesc('m.id')
-            ->first(['m.id', 'm.content', 'm.tool_results']);
+            ->first(['m.id', 'm.content', 'm.tool_results', 'm.meta']);
 
         if ($row === null) {
             return null;
@@ -151,6 +173,7 @@ final class ChatInterface extends BaseLivewireComponent
             'display_blocks' => DisplayBlocks::collect(
                 $row->tool_results === null ? null : (string) $row->tool_results,
             ),
+            'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }
 

@@ -676,3 +676,65 @@ it('keeps a table expanded across a second stream-end reconcile that replaces th
         ->and($afterReconcile['toggleLabel'])->toBe('Show fewer')
         ->and($afterReconcile['toggleExpanded'])->toBe('true');
 });
+
+/**
+ * The copy button hands over the reply as text someone can paste anywhere.
+ * This is the reload path on purpose: `msg.content` is server-rendered HTML
+ * for a rehydrated message, which the button used to copy verbatim, and the
+ * display blocks were stripped out with their `{{block:N}}` markers, so a
+ * reply built around a table copied as tags wrapped around nothing.
+ */
+it('copies a rehydrated reply as plain text with its blocks serialized in reading order', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+
+    displayBlockInsertAssistantMessage(
+        $conversationId,
+        $user,
+        "## Pipeline\n\nHere is what I found for [Acme Corporation](/r/company/01ACME):\n\n{{block:1}}\n\n- Follow up on **Friday**\n- Send the deck",
+        [displayBlockTableFixture(), displayBlockCardFixture('https://example.com/acme')],
+        60,
+    );
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSourceHas('Send the deck');
+
+    // Clicking the real button rather than calling copyMessage() directly:
+    // the wiring is half of what regressed.
+    $result = json_decode((string) $page->script(<<<'JS'
+        (async () => {
+            const copied = [];
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } },
+            });
+
+            document.querySelector('[data-assistant-bubble] [data-copy-button]').click();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            return JSON.stringify({ origin: window.location.origin, copied });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    $origin = $result['origin'];
+    $citation = "[Acme Corporation]({$origin}/r/company/01ACME)";
+
+    expect($result['copied'])->toBe([implode("\n", [
+        '## Pipeline',
+        '',
+        "Here is what I found for {$citation}:",
+        '',
+        'Companies',
+        '| Deal Source | Name | Segment |',
+        '| --- | --- | --- |',
+        "| Referral | {$citation} |  |",
+        '',
+        '- Follow up on **Friday**',
+        '- Send the deck',
+        '',
+        $citation,
+        'Segment: Enterprise, Manufacturing',
+        'Domains: https://example.com/acme',
+    ])]);
+});

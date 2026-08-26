@@ -25,10 +25,10 @@
             x-transition:leave-end="motion-safe:translate-y-1 motion-safe:opacity-0"
             class="mb-3"
         >
-            <div class="mb-2 flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400" role="status">
-                <x-heroicon-o-sparkles class="h-3.5 w-3.5 text-primary-500 dark:text-primary-400" aria-hidden="true" />
-                <span>{{ __('Review before continuing') }}</span>
-            </div>
+            {{-- No visible eyebrow above the card (Attio): the halo marks it as
+                 the pending decision, and the wrapper's aria-label plus this
+                 status line announce it to screen readers without taking space. --}}
+            <span class="sr-only" role="status">{{ __('Review before continuing') }}</span>
             {{-- Bounded, but NOT a scroller: the card scrolls its own steps and keeps
                  the decision buttons pinned. Scrolling here instead would push
                  Approve below the fold on any plan taller than the dock. --}}

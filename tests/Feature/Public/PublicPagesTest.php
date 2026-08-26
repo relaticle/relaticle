@@ -45,6 +45,19 @@ describe('Home page', function () {
         $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
     });
 
+    it('fills the mockup frame with every hero screenshot rather than letting it letterbox', function () {
+        $html = (string) $this->get('/')->assertStatus(200)->getContent();
+
+        // The frame is a constant 826x640 from `lg` up and the screenshots are
+        // captured at that ratio, but the frame turns portrait on a phone. Without
+        // object-cover the image sits at its own aspect inside a taller box and
+        // leaves a dead band under it (measured: 124px at desktop, over half the
+        // frame on a phone). object-left-top keeps the crop off the right, so the
+        // sidebar the alt text describes is never the part that goes.
+        expect(substr_count($html, 'object-cover object-left-top'))->toBe(3)
+            ->and($html)->not->toContain('hero-preview-image w-full h-auto');
+    });
+
     it('uses an existing raster logo in the organization json-ld', function () {
         $html = (string) $this->get('/')->assertStatus(200)->getContent();
 
@@ -238,6 +251,9 @@ describe('Hero AI tab — conversation', function () {
         // a create landing unattended.
         $response->assertSee('Review the proposal below to add her to Kovra Systems');
         $response->assertSee('has been created and linked to');
+        // The turn ends on the next-step strip (NextStepSuggester), which is
+        // what the shipped transcript puts at its floor once nothing is docked.
+        $response->assertSee('Create a task for Sarah');
     });
 
     it('gates every write in the demo behind a review, like the real tools do', function () {
@@ -263,10 +279,19 @@ describe('Hero AI tab — conversation', function () {
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
         $body = (string) $this->get('/')->assertSuccessful()->getContent();
 
-        // The user bubble is a soft tint, never solid primary-600: see the
-        // comment on _transcript.blade.php's bubble.
-        expect($body)->toContain('rounded-br-md bg-primary-50')
+        // The user bubble is neutral gray, never brand-tinted: see the comment
+        // on _transcript.blade.php's bubble. In this panel the only brand color
+        // belongs to the docked proposal, which is what the eye should find.
+        expect($body)->toContain('rounded-br-md bg-gray-100')
+            ->and($body)->not->toContain('rounded-br-md bg-primary-50')
             ->and($body)->not->toContain('rounded-br-md bg-primary-600');
+
+        // A decided proposal collapses to one line carrying the dock's identity:
+        // an operation-tinted entity tile and the record label in bold, NOT a
+        // record pill (chips are reserved for inline clickable references).
+        expect($body)->toContain('Create Person')
+            ->and($body)->toContain('Update Task')
+            ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
 
         // Read results render as a records_table with a chip-linked core column,
         // not the deleted chat/data-table component.

@@ -227,3 +227,29 @@ it('does not expose a fortify registration endpoint', function (): void {
 it('redirects the bare register path to the panel register page', function (): void {
     $this->get('/register')->assertRedirect(url()->getAppUrl('register'));
 });
+
+it('renders the workspace created event once and clears the flag', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => 'TESTSITE']);
+    session()->put('fathom.track_workspace_created', true);
+
+    $html = view('filament.app.analytics')->render();
+
+    expect($html)->toContain("fathom.trackEvent('workspace_created')")
+        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+
+    $again = view('filament.app.analytics')->render();
+
+    expect($again)->not->toContain("trackEvent('workspace_created')");
+});
+
+it('renders each conversion event only for its own flag', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => 'TESTSITE']);
+    session()->put('fathom.track_signup', true);
+
+    $html = view('filament.app.analytics')->render();
+
+    expect($html)->toContain("fathom.trackEvent('signup')")
+        ->and($html)->not->toContain("trackEvent('workspace_created')");
+});

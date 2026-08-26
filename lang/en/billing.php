@@ -30,6 +30,13 @@ return [
         'fulfilling_title' => 'Payment received — credits are on their way',
         'fulfilling_body' => 'It can take a minute for your new credits to appear. Refresh this page if the balance below still looks unchanged shortly.',
     ],
+    'sidebar' => [
+        'trial_days_left' => ':days day left on trial!|:days days left on trial!',
+        'keep_pro' => 'Keep Pro',
+        'paused' => 'Your workspace is paused',
+        'subscribe' => 'Subscribe',
+    ],
+
     'trial' => [
         'start_button' => 'Start 14-day Pro trial — no card needed',
         'active_title' => 'Pro trial active',

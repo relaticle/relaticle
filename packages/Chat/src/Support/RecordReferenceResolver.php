@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use App\Filament\Pages\Team\CustomFields;
+use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
@@ -115,6 +116,10 @@ final readonly class RecordReferenceResolver
                 // Custom field definitions have no per-record route — the management page
                 // is the destination, deep-linked to the tab the field lives on.
                 'custom_field' => $this->customFieldUrl($recordId, $team),
+                // Team invitations have no per-record view either — the pending invitation
+                // lives in the Members page's list, so every invitation resolves there
+                // regardless of id.
+                'team_invitations' => Members::getUrl(panel: 'app', tenant: $team),
                 'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'people' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
                 'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),

@@ -118,13 +118,14 @@ it('carries the optimistic bubble through sending then sent on a real send', fun
 });
 
 /*
- * The sent glyph's sr-only label uses absolute positioning.
- * Its containing block must remain inside the visible transcript scroller.
+ * A delivered message carries no receipt: no clock, no checkmark, no status
+ * label. The assistant's reply is the confirmation. Only a send that FAILED
+ * gets a visible notice, and that one has to keep its Resend.
  */
-it('keeps the sent glyph sr-only label inside the transcript scroll container', function (): void {
+it('renders no delivery receipt on a sending or sent bubble', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'sent glyph containment');
+    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'receipt-free transcript');
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -134,23 +135,33 @@ it('keeps the sent glyph sr-only label inside the transcript scroll container', 
     $page->script(<<<JS
         (() => {
             {$resolveInterface}
-            data.messages.push(data.ensureClientKey({
-                role: 'user',
-                content: 'containment probe',
-                sendState: 'sent',
-                created_at: new Date().toISOString(),
-            }));
+            ['sending', 'sent', 'failed'].forEach((sendState) => {
+                data.messages.push(data.ensureClientKey({
+                    role: 'user',
+                    content: 'receipt probe ' + sendState,
+                    sendState,
+                    editing: false,
+                    editText: '',
+                    created_at: new Date().toISOString(),
+                }));
+            });
             return true;
         })();
     JS);
 
-    $page->assertScript(<<<'JS'
-        (() => {
-            const span = document.querySelector('[data-user-bubble][data-send-state="sent"] .sr-only');
-            const scroller = span?.closest('[x-ref="messages"]');
-            return !!(span && scroller && scroller.contains(span.offsetParent));
-        })()
-    JS, true);
+    $receipts = $page->script(<<<'JS'
+        (() => ({
+            sending: document.querySelectorAll('[data-user-bubble][data-send-state="sending"] [role="status"]').length,
+            sent: document.querySelectorAll('[data-user-bubble][data-send-state="sent"] [role="status"]').length,
+            failedNotices: document.querySelectorAll('[data-user-bubble][data-send-state="failed"] [role="alert"]').length,
+            failedResends: document.querySelectorAll('[data-user-bubble][data-send-state="failed"] [data-resend-button]').length,
+        }))();
+    JS);
+
+    expect($receipts['sending'])->toBe(0)
+        ->and($receipts['sent'])->toBe(0)
+        ->and($receipts['failedNotices'])->toBe(1)
+        ->and($receipts['failedResends'])->toBe(1);
 });
 
 /**
@@ -364,7 +375,7 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
             // user message to resend.
             data.messages = [
                 data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
             ];
             return true;
         })();
@@ -464,7 +475,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
 
             data.messages = [
                 data.ensureClientKey({ id: {$targetMessageIdJson}, role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
                 data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
@@ -535,7 +546,7 @@ it('leaves the transcript untouched when retryTurn is triggered while an earlier
 
             data.messages = [
                 data.ensureClientKey({ role: 'user', content: 'first attempt', sendState: 'sent', editing: false, editText: '', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
                 data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
@@ -633,7 +644,7 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
 
             data.messages = [
                 data.ensureClientKey({ id: {$editedMessageIdJson}, role: 'user', content: 'first attempt', editing: true, editText: 'edited while rate limited', sendState: 'sent', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: 'first reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
                 data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
             ];
 
@@ -776,9 +787,9 @@ it('disables Regenerate/Edit and hides Retry while rate-limited, so the affordan
 
             data.messages = [
                 data.ensureClientKey({ role: 'user', content: 'editable message', sendState: 'sent', editing: false, editText: '', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: 'a reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: 'a reply', pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
                 data.ensureClientKey({ role: 'user', content: 'second attempt', sendState: 'failed', editing: false, editText: '', page_context: null }),
-                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true, follow_ups: [] }),
+                data.ensureClientKey({ role: 'assistant', content: '', streamError: 'The assistant took too long to respond.', retryable: true, pending_actions: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true }),
             ];
 
             const failedMsg = data.messages[2];
