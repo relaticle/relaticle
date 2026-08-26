@@ -586,6 +586,7 @@ final class EmailInboxPage extends Page
                             ->schema([
                                 Radio::make('privacy_tier')
                                     ->hiddenLabel()
+                                    ->options(EmailPrivacyTier::class)
                                     ->view('email-integration::forms.sharing-tier-cards')
                                     ->viewData(['ariaLabel' => __('filament/pages/email-inbox.sharing.fields.privacy_tier.label')])
                                     ->required(),

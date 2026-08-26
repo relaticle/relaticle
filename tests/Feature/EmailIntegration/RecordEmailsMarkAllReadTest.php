@@ -7,6 +7,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -92,6 +93,18 @@ it('shows sender and recipient metadata in the email list', function (): void {
     livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
         ->assertSee('Alex Sender')
         ->assertSee('Taylor Recipient');
+});
+
+it('saves an email privacy tier from the sharing cards', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('manageSharing', data: [
+            'privacy_tier' => EmailPrivacyTier::SUBJECT->value,
+            'shares' => [],
+        ], arguments: ['emailId' => $this->newer->id])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Sharing settings saved.');
+
+    expect($this->newer->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('does not mark emails belonging to other records', function (): void {
