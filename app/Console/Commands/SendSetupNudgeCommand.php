@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\ActivationStep;
-use App\Enums\Notifications\NotificationChannel;
-use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\Team;
@@ -117,10 +115,6 @@ final class SendSetupNudgeCommand extends Command
             return false;
         }
 
-        if (! $user->wantsNotification(NotificationType::SetupNudge, NotificationChannel::Email)) {
-            return false;
-        }
-
         $stepKey = $this->topUnfinishedStep($team);
 
         if (! $stepKey instanceof ActivationStep) {
@@ -130,7 +124,7 @@ final class SendSetupNudgeCommand extends Command
         $conversationUrl = $this->continueUrl($team);
 
         Mail::to($user)
-            ->send(new SetupNudgeMail($user, $team, $stepKey->value, $conversationUrl));
+            ->send(new SetupNudgeMail($user, $stepKey->value, $conversationUrl));
 
         $team->forceFill(['setup_nudge_sent_at' => now()])->save();
 

@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Actions\User\UpdateNotificationPreferences;
 use App\Enums\ActivationStep;
 use App\Enums\CreationSource;
-use App\Enums\Notifications\NotificationChannel;
-use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
@@ -16,9 +13,8 @@ use Illuminate\Support\Facades\Mail;
 
 it('renders the nudge naming the unfinished step', function (): void {
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
-    $team = $owner->currentTeam;
 
-    $mail = new SetupNudgeMail($owner, $team, ActivationStep::FirstRecord->value, 'https://example.test/chat');
+    $mail = new SetupNudgeMail($owner, ActivationStep::FirstRecord->value, 'https://example.test/chat');
 
     $rendered = $mail->render();
 
@@ -36,10 +32,9 @@ it('renders the nudge naming the unfinished step', function (): void {
 
 it('never lets an unresolved step label reach the rendered body', function (): void {
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
-    $team = $owner->currentTeam;
 
     foreach (ActivationStep::cases() as $step) {
-        $mail = new SetupNudgeMail($owner, $team, $step->value, 'https://example.test/chat');
+        $mail = new SetupNudgeMail($owner, $step->value, 'https://example.test/chat');
 
         expect($mail->render())->not->toContain('filament/pages/dashboard.');
     }
@@ -71,26 +66,6 @@ it('skips a workspace that already has its own record', function (): void {
 
     $team->forceFill(['created_at' => now()->subDays(2)])->save();
     Company::factory()->for($team)->create(['creation_source' => CreationSource::WEB]);
-
-    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
-
-    Mail::assertNothingQueued();
-});
-
-it('skips an owner who turned setup reminders off', function (): void {
-    Mail::fake();
-
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
-
-    $this->travelTo(now()->setTime(9, 0));
-
-    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
-    resolve(UpdateNotificationPreferences::class)->execute(
-        $owner,
-        NotificationType::SetupNudge,
-        NotificationChannel::Email,
-        false,
-    );
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
