@@ -69,17 +69,18 @@ final readonly class ListConversationMessages
 
         $pendingIds = array_values(array_unique($pendingIds));
 
-        /** @var array<string, array{status: string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}> $records */
+        /** @var array<string, array{status: string, expires_at: ?string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}> $records */
         $records = $pendingIds === []
             ? []
             : DB::table('pending_actions')
                 ->whereIn('id', $pendingIds)
                 ->where('user_id', $user->getKey())
                 ->where('team_id', $user->current_team_id)
-                ->get(['id', 'status', 'entity_type', 'turn_id', 'result_data'])
+                ->get(['id', 'status', 'entity_type', 'turn_id', 'result_data', 'expires_at'])
                 ->keyBy('id')
                 ->map(fn (object $row): array => [
                     'status' => (string) $row->status,
+                    'expires_at' => $row->expires_at === null ? null : Date::parse((string) $row->expires_at)->toIso8601String(),
                     'entity_type' => $row->entity_type === null ? null : (string) $row->entity_type,
                     'turn_id' => $row->turn_id === null ? null : (string) $row->turn_id,
                     'result_data' => $row->result_data === null ? null : (function (mixed $raw): ?array {
@@ -182,7 +183,7 @@ final readonly class ListConversationMessages
 
     /**
      * @param  list<array<string, mixed>>  $envelopes
-     * @param  array<string, array{status: string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}>  $records
+     * @param  array<string, array{status: string, expires_at: ?string, entity_type: ?string, turn_id: ?string, result_data: ?array<string, mixed>}>  $records
      * @return array<int, mixed>
      */
     private function extractPendingActions(array $envelopes, array $records): array
@@ -193,6 +194,10 @@ final readonly class ListConversationMessages
             $pendingId = (string) ($inner['pending_action_id'] ?? '');
             $info = $records[$pendingId] ?? null;
             $inner['status'] = $info['status'] ?? 'expired';
+            // The client hides the composer while a proposal is pending and has no
+            // other way to learn this one lapsed: the sweeper is a bulk update that
+            // broadcasts nothing, so a tab left open would dock it forever.
+            $inner['expires_at'] = $info['expires_at'] ?? null;
             // The turn groups the proposals of one chained request into a single
             // plan card; the stored row is authoritative, since a tool result
             // written before plans existed carries no turn.

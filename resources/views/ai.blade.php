@@ -8,7 +8,10 @@
 
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
     $maxBatchSize = (int) config('chat.max_batch_size');
-    $pendingActionExpiry = (int) config('chat.pending_action_expiry_minutes');
+    // Rendered as a human duration so raising the config never leaks "1440 minutes" into the page.
+    $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))
+        ->cascade()
+        ->forHumans(short: false, parts: 1);
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
 
     $title = __(':name: AI Assistant for Relaticle CRM', ['name' => $assistantName]).' - Relaticle';
@@ -200,7 +203,7 @@
                         </div>
 
                         <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            {{ __('Reject and nothing is written. The proposal expires on its own after :minutes minutes.', ['minutes' => $pendingActionExpiry]) }}
+                            {{ __('Reject and nothing is written. The proposal expires on its own after :duration.', ['duration' => $pendingActionExpiry]) }}
                         </p>
                     </div>
                 </li>
@@ -267,7 +270,7 @@
                             {{ __('Nothing writes without your approval') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :minutes minutes.', ['minutes' => $pendingActionExpiry]) }}
+                            {{ __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]) }}
                         </p>
                     </div>
                 </div>

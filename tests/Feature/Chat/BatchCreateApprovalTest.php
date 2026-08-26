@@ -455,3 +455,19 @@ it('refuses every mutating entry point when the actor belongs to another workspa
     expect($action->refresh()->status)->toBe(PendingActionStatus::Pending)
         ->and(Task::query()->count())->toBe(0);
 });
+
+it('gives the user a full day to decide a proposal', function (): void {
+    $this->freezeTime();
+
+    $action = resolve(PendingActionService::class)->createProposal(
+        user: $this->user,
+        conversationId: $this->convId,
+        actionClass: CreateTask::class,
+        operation: PendingActionOperation::Create,
+        entityType: 'task',
+        actionData: ['title' => 'Decide tomorrow'],
+        displayData: ['summary' => 'Create task "Decide tomorrow"'],
+    );
+
+    expect($action->expires_at->format('Y-m-d H:i:s'))->toBe(now()->addMinutes(1440)->format('Y-m-d H:i:s'));
+});

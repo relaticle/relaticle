@@ -36,7 +36,7 @@ final readonly class PlanReferenceResolver
     private function recordIdFor(string $target, PendingAction $context): string
     {
         $referenced = PendingAction::query()
-            ->whereKey($target)
+            ->whereKey(PlanReference::actionId($target))
             ->where('team_id', $context->team_id)
             ->first();
 
@@ -51,7 +51,16 @@ final readonly class PlanReferenceResolver
             throw new RuntimeException(__('Approve the earlier step this one links to first.'));
         }
 
-        $recordId = is_array($referenced->result_data) ? ($referenced->result_data['id'] ?? null) : null;
+        $resultData = is_array($referenced->result_data) ? $referenced->result_data : [];
+        $index = PlanReference::index($target);
+
+        if ($index === null) {
+            $recordId = $resultData['id'] ?? null;
+        } else {
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+            $item = is_array($items[$index] ?? null) ? $items[$index] : [];
+            $recordId = $item['id'] ?? null;
+        }
 
         throw_unless(
             (is_string($recordId) || is_int($recordId)) && $recordId !== '',

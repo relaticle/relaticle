@@ -245,7 +245,7 @@ describe('reference validation', function (): void {
         expect($result)->toContain('but a Company is required here');
     });
 
-    it('rejects a reference to a multi-record proposal', function (): void {
+    it('rejects a bare reference to a multi-record proposal', function (): void {
         ($this->tool)(CreateCompanyTool::class)->handle(new Request([
             'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
         ]));
@@ -257,6 +257,141 @@ describe('reference validation', function (): void {
         ]));
 
         expect($result)->toContain('ambiguous');
+    });
+
+    it('resolves a reference to one record inside a batched proposal', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        $result = ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        expect($result)->not->toContain('ambiguous')
+            ->and($result)->not->toContain('error');
+    });
+
+    it('rejects an indexed reference outside the batch bounds', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        $result = ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 7)]],
+        ]));
+
+        expect($result)->toContain('only has 2 records');
+    });
+
+    it('resolves an indexed reference to the real id once every batch item is decided', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        // Proposed before either batch item is decided: an indexed reference only
+        // needs the record it points at, not the whole plan resolved in order.
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        $person = ($this->proposalFor)('people');
+
+        // The batch action only finalizes to Approved once every item is decided,
+        // so index 0 is rejected here rather than left pending. Rejecting it also
+        // proves the resolver reads items[1]['id'] specifically, not ids[1]: with
+        // index 0 rejected, ids holds only Globex's id at position 0.
+        resolve(PendingActionService::class)->rejectItem($companies->refresh(), $this->user, 0);
+        resolve(PendingActionService::class)->approveItem($companies->refresh(), $this->user, 1);
+
+        resolve(PendingActionService::class)->approve($person->refresh(), $this->user);
+
+        $globex = Company::query()->where('name', 'Globex')->firstOrFail();
+        $createdPerson = People::query()->where('name', 'Jane Doe')->firstOrFail();
+
+        expect((string) $createdPerson->company_id)->toBe((string) $globex->getKey())
+            ->and((string) $createdPerson->company_id)->toBe((string) $companies->refresh()->result_data['items'][1]['id']);
+    });
+
+    it('shows the referenced batch record on the card instead of dropping the row', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        $fields = collect(($this->proposalFor)('people')->display_data['fields'] ?? []);
+
+        expect($fields->firstWhere('label', 'Company')['value'] ?? null)->toBe('Globex (step 1)');
+    });
+
+    it('counts an indexed reference as an unmet dependency until its batch is approved', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        $person = ($this->proposalFor)('people');
+        $plan = resolve(ProposalPlanService::class);
+
+        expect($plan->dependencyIds($person))->toBe([(string) $companies->getKey()])
+            ->and($plan->unmetDependencies($person, $plan->steps($person)))->toHaveCount(1);
+    });
+
+    it('counts two references into the same batch as one dependency', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [
+                ['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 0)],
+                ['name' => 'John Roe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)],
+            ],
+        ]));
+
+        $person = ($this->proposalFor)('people');
+        $plan = resolve(ProposalPlanService::class);
+
+        expect($plan->dependencyIds($person))->toBe([(string) $companies->getKey()])
+            ->and($plan->unmetDependencies($person, $plan->steps($person)))->toHaveCount(1);
+    });
+
+    it('cancels the step that referenced a rejected batch', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        $person = ($this->proposalFor)('people');
+
+        $cancelled = resolve(ProposalPlanService::class)->reject($companies, $this->user);
+
+        expect($cancelled)->toHaveCount(1)
+            ->and($person->refresh()->status)->toBe(PendingActionStatus::Rejected)
+            ->and($person->result_data['cancelled_by'] ?? null)->toBe((string) $companies->getKey());
     });
 
     it('rejects a reference to an already decided proposal', function (): void {

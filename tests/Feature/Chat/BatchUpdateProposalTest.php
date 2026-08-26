@@ -18,6 +18,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\BaseWriteUpdateTool;
+use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
@@ -199,7 +200,8 @@ it('refuses a re-proposed update whose values already match the record', functio
 
     $result = proposeNoteUpdates($this->convId, [['id' => (string) $note->getKey(), 'title' => 'Same']]);
 
-    expect($result['error'])->toContain('Already up to date')
+    expect($result['error'])->toContain('Nothing to update')
+        ->and($result['skipped'][0]['reason'])->toContain('Already up to date')
         ->and(PendingAction::query()->count())->toBe(0);
 });
 
@@ -238,6 +240,47 @@ it('still refuses an update whose raw values already match, and ignores link ord
         'people_ids' => [(string) $bob->getKey(), (string) $alice->getKey()],
     ]]])), true);
 
-    expect($result['error'])->toContain('Already up to date')
+    expect($result['error'])->toContain('Nothing to update')
+        ->and($result['skipped'][0]['reason'])->toContain('Already up to date')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('skips a no-op record and proposes the rest', function (): void {
+    $keep = Company::factory()->for($this->team)->create(['name' => 'Unchanged']);
+    $change = Company::factory()->for($this->team)->create(['name' => 'Before']);
+
+    $tool = resolve(UpdateCompanyTool::class);
+    $tool->setConversationId($this->convId);
+    $result = json_decode($tool->handle(new Request([
+        'records' => [
+            ['id' => (string) $keep->getKey(), 'name' => 'Unchanged'],
+            ['id' => (string) $change->getKey(), 'name' => 'After'],
+        ],
+    ])), true);
+
+    expect($result)->not->toHaveKey('error')
+        ->and($result['skipped'][0])->toBe(['index' => 0, 'reason' => 'Already up to date: every value matches what the Company has now.']);
+
+    $pending = latestPending($this->user);
+
+    expect($pending->action_data['_batch'] ?? null)->toBeNull()
+        ->and($pending->action_data['_record_id'])->toBe((string) $change->getKey());
+});
+
+it('errors and proposes nothing when every record in the batch is a no-op', function (): void {
+    $first = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $second = Company::factory()->for($this->team)->create(['name' => 'Globex']);
+
+    $tool = resolve(UpdateCompanyTool::class);
+    $tool->setConversationId($this->convId);
+    $result = json_decode($tool->handle(new Request([
+        'records' => [
+            ['id' => (string) $first->getKey(), 'name' => 'Acme'],
+            ['id' => (string) $second->getKey(), 'name' => 'Globex'],
+        ],
+    ])), true);
+
+    expect($result['error'])->toContain('Nothing to update')
+        ->and($result['skipped'])->toHaveCount(2)
         ->and(PendingAction::query()->count())->toBe(0);
 });

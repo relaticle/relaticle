@@ -193,6 +193,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     init() {
         this.context = this.$root?.dataset?.chatContext ?? 'conversation';
         this.installConversationSwitchWatch();
+        this.installProposalExpiryWatch();
         this.initDaySeparatorObserver();
 
         const validModels = this.modelOptions
@@ -382,6 +383,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.destroyed = true;
         this.stashConversationCache();
         this.uninstallConversationSwitchWatch();
+        this.uninstallProposalExpiryWatch();
         this.teardownDaySeparatorObserver();
         this.teardownLoadEarlierObserver();
         this.teardownMessageSearch();

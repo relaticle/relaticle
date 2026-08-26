@@ -75,6 +75,23 @@ it('returns a descriptive error for an unknown field code', function (): void {
         ->toContain('does_not_exist');
 });
 
+it('rejects a write naming a deactivated custom field code', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    CustomField::query()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->update(['active' => false]);
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', ['priority' => 'High']);
+
+    expect($result->error)
+        ->not->toBeNull()
+        ->toContain('priority');
+});
+
 it('returns a descriptive error for an unknown single-choice label', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 

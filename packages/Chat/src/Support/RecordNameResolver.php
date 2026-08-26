@@ -101,14 +101,18 @@ final readonly class RecordNameResolver
             $query->where('team_id', $team->getKey());
         }
 
-        $action = $query->find($target);
+        $action = $query->find(PlanReference::actionId($target));
 
         if (! $action instanceof PendingAction) {
             return '';
         }
 
         $titleKey = ProposalCoreFields::titleKey($action->entity_type);
-        $title = $action->action_data[$titleKey] ?? null;
+        // A batched proposal keeps its records under `records`, so the title lives on
+        // the referenced record, not on action_data. recordAtOrEmpty() answers both
+        // shapes: a single-record proposal is its own record at index 0.
+        $record = ProposalPayload::from($action)->recordAtOrEmpty(PlanReference::index($target) ?? 0);
+        $title = $record[$titleKey] ?? null;
 
         if (! is_string($title) || $title === '') {
             return '';

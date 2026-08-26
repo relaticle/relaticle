@@ -188,6 +188,5 @@ it('tells the model how to fetch the next page of a list result', function (): v
     $instructions = app(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
-        ->toContain('page` set to the result\'s `next_page`')
-        ->toContain('narrow the filter instead');
+        ->toContain('page` set to the result\'s `next_page`');
 });

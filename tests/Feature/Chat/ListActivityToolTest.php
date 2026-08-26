@@ -85,7 +85,7 @@ it('reports a name change with its old and new value', function (): void {
         ])
         ->and($payload['data'][1]['event'])->toBe('created')
         ->and($payload['has_more'])->toBeFalse()
-        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload['next_page'])->toBeNull()
         ->and($payload)->not->toHaveKey('open_url');
 
     $block = $payload['display_block'];
@@ -316,12 +316,12 @@ it('reports the true entry count when the window holds more than one fetch', fun
         ->and($payload['total'])->toBe(51)
         ->and($payload['showing'])->toBe(count($payload['data']))
         ->and($payload['has_more'])->toBeTrue()
-        ->and($payload)->not->toHaveKey('next_page')
+        ->and($payload['next_page'])->toBe(2)
         ->and($payload)->not->toHaveKey('open_url')
         ->and($payload['display_block'])->not->toHaveKey('open_url');
 });
 
-it('reports has_more from merged entry counts, not the fetched row count', function (): void {
+it('counts a page in saves, not rows, so multi-row saves are never truncated', function (): void {
     $user = $this->user;
 
     // Created well outside the default 7-day window so these 30 `created`
@@ -359,17 +359,15 @@ it('reports has_more from merged entry counts, not the fetched row count', funct
 
     $payload = activityPayload();
 
-    // 60 rows (2 per save) collapse to 30 entries; the SQL fetch is capped at
-    // ENTRY_LIMIT (50) ROWS, so only the most recent 25 saves' rows (50 rows)
-    // survive the fetch and merge down to 25 entries here. `showing` therefore
-    // sits well under ENTRY_LIMIT even though more entries exist beyond it --
-    // exactly the case `count($entries) >= self::ENTRY_LIMIT` gets wrong: that
-    // expression reads 25 < 50 and reports no more entries exist, when 5 more
-    // saves' worth of entries were dropped by the row-level fetch limit.
-    expect($payload['data'])->toHaveCount(25)
-        ->and($payload['showing'])->toBe(25)
+    // 60 rows (2 per save) collapse to 30 entries, and a page is ENTRY_LIMIT
+    // SAVES, not rows, so all 30 fit. Paging by row capped this at the 25 saves
+    // whose 50 rows fitted the budget and silently dropped the other 5, which is
+    // the truncation `showing` could never describe: it read 25 and looked
+    // complete. `total` and `showing` now agree whenever a window fits one page.
+    expect($payload['data'])->toHaveCount(30)
+        ->and($payload['showing'])->toBe(30)
         ->and($payload['total'])->toBe(30)
-        ->and($payload['has_more'])->toBeTrue();
+        ->and($payload['has_more'])->toBeFalse();
 });
 
 it('ignores activity older than the requested window', function (): void {
@@ -392,4 +390,68 @@ it('renders no table when nothing changed in the window', function (): void {
         ->and($payload['total'])->toBe(0)
         ->and($payload['showing'])->toBe(0)
         ->and($payload)->not->toHaveKey('display_block');
+});
+
+it('keeps a save whole instead of splitting it across the page boundary', function (): void {
+    $user = $this->user;
+
+    app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Lead source',
+        'code' => 'lead_source',
+        'type' => 'text',
+    ]);
+
+    $company = app(CreateCompany::class)->execute($user, ['name' => 'Acme']);
+
+    // The two-row save goes FIRST so that, newest-first, its rows sit either side
+    // of the ENTRY_LIMIT boundary: exactly where row paging used to tear it in half.
+    nextActivityRequest();
+    app(UpdateCompany::class)->execute($user, $company, [
+        'name' => 'Acme Inc',
+        'custom_fields' => ['lead_source' => 'Referral'],
+    ]);
+
+    foreach (range(1, 49) as $n) {
+        nextActivityRequest();
+        app(CreateCompany::class)->execute($user, ['name' => "Filler {$n}"]);
+    }
+
+    $first = activityPayload(['days' => 30]);
+    $second = activityPayload(['days' => 30, 'page' => 2]);
+
+    $acme = collect([...$first['data'], ...$second['data']])
+        ->filter(fn (array $e): bool => $e['record']['id'] === (string) $company->getKey())
+        ->values();
+
+    // The update wrote a native-column row and a custom-field row. Row paging put
+    // them on either side of the boundary, so the save surfaced twice, once as
+    // `updated` carrying only Name and once as `custom_field_changes` carrying only
+    // Lead source. One save is one entry, whichever page it lands on.
+    $updates = $acme->where('event', 'updated')->values();
+
+    expect($updates)->toHaveCount(1)
+        ->and(array_column($updates[0]['changes'], 'field'))->toContain('Name')
+        ->and(array_column($updates[0]['changes'], 'field'))->toContain('Lead source')
+        ->and($acme->where('event', 'custom_field_changes'))->toBeEmpty();
+});
+
+it('returns a second page of activity entries', function (): void {
+    // ENTRY_LIMIT is 50 and entries are grouped per save, so 55 separate
+    // requests produce more than one page.
+    foreach (range(1, 55) as $n) {
+        nextActivityRequest();
+        resolve(CreateCompany::class)->execute($this->user, ['name' => "Paged Co {$n}"]);
+    }
+
+    $first = activityPayload(['days' => 30]);
+
+    expect($first['has_more'])->toBeTrue()
+        ->and($first['next_page'])->toBe(2);
+
+    $second = activityPayload(['days' => 30, 'page' => 2]);
+
+    expect($second['data'])->not->toBeEmpty()
+        ->and($second['data'])->not->toEqual($first['data'])
+        ->and($second['next_page'])->toBeNull();
 });

@@ -180,6 +180,12 @@ final class ChatInterface extends BaseLivewireComponent
             'data' => $action->action_data,
             'display' => $action->display_data,
             'status' => 'pending',
+            // The client hides the composer while a proposal is pending, so it has
+            // to know when this one stops being pending on its own. Without the
+            // instant, an open tab keeps a lapsed proposal docked forever and the
+            // user can never type again (ChatInterface's own query already filters
+            // these out, so nothing already-lapsed reaches here).
+            'expires_at' => $action->expires_at->toIso8601String(),
         ], $actions->all()));
     }
 
