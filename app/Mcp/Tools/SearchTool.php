@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -14,7 +15,9 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -33,16 +36,26 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 final class SearchTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
 
-    /**
-     * @var array<string, array{0: class-string<Model>, 1: string}>
-     */
+    /** @var list<string> */
+    private const array EXCLUDED_CUSTOM_FIELD_TYPES = [
+        'select',
+        'multi-select',
+        'radio',
+        'checkbox-list',
+        'tags-input',
+        'rich-editor',
+        'markdown-editor',
+    ];
+
+    /** @var array<string, array{0: class-string<Model>, 1: string, 2: string, 3: string}> */
     private const array ENTITY_MAP = [
-        'company' => [Company::class, 'name'],
-        'person' => [People::class, 'name'],
-        'opportunity' => [Opportunity::class, 'name'],
-        'task' => [Task::class, 'title'],
-        'note' => [Note::class, 'title'],
+        'company' => [Company::class, 'name', 'companies', 'company'],
+        'person' => [People::class, 'name', 'people', 'people'],
+        'opportunity' => [Opportunity::class, 'name', 'opportunities', 'opportunity'],
+        'task' => [Task::class, 'title', 'tasks', 'task'],
+        'note' => [Note::class, 'title', 'notes', 'note'],
     ];
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}
@@ -50,8 +63,17 @@ final class SearchTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'query' => $schema->string()->description('Search query (case-insensitive substring match across name/title fields). Max 255 chars.')->required(),
+            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and searchable custom-field values). Max 255 chars.')->required(),
             'limit' => $schema->integer()->description('Max results per entity (default 5, max 20). Total payload up to 5×limit across companies, people, opportunities, tasks, and notes.')->default(5),
+        ];
+    }
+
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'results' => $schema->array()->items($schema->object())->required(),
+            'count' => $schema->integer()->required(),
+            'truncated' => $schema->object()->required(),
         ];
     }
 
@@ -70,7 +92,7 @@ final class SearchTool extends Tool
         ]);
 
         $limit = (int) ($validated['limit'] ?? 5);
-        $query = $validated['query'];
+        $query = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $validated['query']);
         $team = $user->currentTeam;
 
         if (! $team instanceof Team) {
@@ -80,13 +102,40 @@ final class SearchTool extends Tool
         /** @var array<int, array{type: string, url: string, title: string, snippet: string}> $results */
         $results = [];
 
-        foreach (self::ENTITY_MAP as $type => [$modelClass, $field]) {
+        /** @var array<string, bool> $truncated */
+        $truncated = [];
+
+        foreach (self::ENTITY_MAP as $type => [$modelClass, $field, $table, $entityType]) {
             $hits = $modelClass::query()
-                ->where($field, 'ilike', '%'.$query.'%')
-                ->limit($limit)
+                ->where(function (Builder $builder) use ($field, $query, $team, $entityType, $table): void {
+                    $builder->where($field, 'ilike', "%{$query}%");
+                    $builder->orWhereExists(function (QueryBuilder $sub) use ($entityType, $table, $query, $team): void {
+                        $sub->selectRaw('1')
+                            ->from('custom_field_values as cfv')
+                            ->join('custom_fields as cf', 'cf.id', '=', 'cfv.custom_field_id')
+                            ->whereColumn('cfv.entity_id', "{$table}.id")
+                            ->where('cfv.entity_type', $entityType)
+                            ->where('cfv.tenant_id', (string) $team->getKey())
+                            ->where('cf.active', true)
+                            ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
+                            ->where(function (QueryBuilder $values) use ($query): void {
+                                $values->where('cfv.text_value', 'ilike', "%{$query}%")
+                                    ->orWhere('cfv.string_value', 'ilike', "%{$query}%")
+                                    ->orWhereRaw(
+                                        "cfv.json_value is not null and json_typeof(cfv.json_value) = 'array' and exists (select 1 from json_array_elements_text(cfv.json_value) as elem(val) where elem.val ilike ?)",
+                                        ["%{$query}%"],
+                                    );
+                            });
+                    });
+                })
+                ->orderBy($field)
+                ->orderBy('id')
+                ->limit($limit + 1)
                 ->get();
 
-            foreach ($hits as $hit) {
+            $truncated[$type] = $hits->count() > $limit;
+
+            foreach ($hits->take($limit) as $hit) {
                 if ($user->cannot('view', $hit)) {
                     continue;
                 }
@@ -108,6 +157,10 @@ final class SearchTool extends Tool
             }
         }
 
-        return Response::structured(['results' => $results, 'count' => count($results)]);
+        return Response::structured([
+            'results' => $results,
+            'count' => count($results),
+            'truncated' => $truncated,
+        ]);
     }
 }

@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
@@ -21,7 +25,10 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 abstract class BaseShowTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
     use SerializesRelatedModels;
+
+    private const int RELATED_RECORD_LIMIT = 25;
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -42,11 +49,19 @@ abstract class BaseShowTool extends Tool
 
         return [
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
-            'include' => $schema->array()->description('Related records to expand in response.'),
+            'include' => $schema->array()->description('Related records to expand in response. Tasks and notes are limited to 25 each and include truncation metadata.'),
         ];
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'data' => $schema->object()->required(),
+            'relationship_meta' => $schema->object(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
             return $denied;
@@ -88,8 +103,39 @@ abstract class BaseShowTool extends Tool
             }
         }
 
-        if ($relationIncludes !== []) {
-            $model->loadMissing($relationIncludes);
+        $boundedIncludes = array_values(array_intersect($relationIncludes, ['tasks', 'notes']));
+        $regularIncludes = array_values(array_diff($relationIncludes, $boundedIncludes));
+
+        if ($regularIncludes !== []) {
+            $model->loadMissing($regularIncludes);
+        }
+
+        $relationshipMeta = [];
+
+        foreach ($boundedIncludes as $relation) {
+            $model->loadMissing([
+                $relation => fn (Relation $query): Relation => $query
+                    ->orderByDesc("{$relation}.created_at")
+                    ->orderByDesc("{$relation}.id")
+                    ->limit(self::RELATED_RECORD_LIMIT + 1),
+            ]);
+            $model->loadCount($relation);
+
+            $related = $model->getRelation($relation);
+
+            if (! $related instanceof Collection) {
+                continue;
+            }
+
+            $totalKey = "{$relation}_count";
+            $total = (int) $model->getAttribute($totalKey);
+            $model->setRelation($relation, $related->take(self::RELATED_RECORD_LIMIT));
+
+            $relationshipMeta[$relation] = [
+                'returned' => min($related->count(), self::RELATED_RECORD_LIMIT),
+                'total' => $total,
+                'truncated' => $total > self::RELATED_RECORD_LIMIT,
+            ];
         }
 
         if ($countIncludes !== []) {
@@ -103,7 +149,10 @@ abstract class BaseShowTool extends Tool
         $json = $resource->toJson(JSON_PRETTY_PRINT);
 
         if ($relationIncludes === []) {
-            return Response::text($json);
+            /** @var array<string, mixed> $payload */
+            $payload = (array) json_decode($json, flags: JSON_THROW_ON_ERROR);
+
+            return Response::structured($payload);
         }
 
         $response = json_decode($json);
@@ -115,6 +164,13 @@ abstract class BaseShowTool extends Tool
             }
         }
 
-        return Response::text((string) json_encode($response, JSON_PRETTY_PRINT));
+        if ($relationshipMeta !== []) {
+            $response->relationship_meta = $relationshipMeta;
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = (array) $response;
+
+        return Response::structured($payload);
     }
 }

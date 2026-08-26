@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Mail\TaskAssignedMail;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Task\AttachTaskToEntitiesTool;
 use App\Mcp\Tools\Task\CreateTaskTool;
@@ -15,13 +16,14 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     Task::clearBootedModels();
 });
 
@@ -141,6 +143,27 @@ it('can attach assignees to a task', function (): void {
     expect($task->refresh()->assignees)->toHaveCount(1);
 });
 
+it('notifies assignees added through the MCP attach tool', function (): void {
+    Mail::fake();
+
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $member = User::factory()->create([
+        'notification_preferences' => ['task_assigned' => ['email' => true]],
+    ]);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AttachTaskToEntitiesTool::class, [
+            'id' => $task->id,
+            'assignee_ids' => [$member->id],
+        ])
+        ->assertOk();
+
+    defer()->invoke();
+
+    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($member->email));
+});
+
 it('can filter tasks by company_id', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->team])->create();
     $linkedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Linked Task']);
@@ -156,8 +179,8 @@ it('can filter tasks by company_id', function (): void {
         ->assertDontSee('Unlinked Task');
 });
 
-describe('team scoping', function () {
-    beforeEach(function () {
+describe('team scoping', function (): void {
+    beforeEach(function (): void {
         Task::addGlobalScope(new TeamScope);
     });
 

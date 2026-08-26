@@ -27,6 +27,8 @@ final readonly class CustomFieldFilter implements Filter
         'lte' => '<=',
     ];
 
+    private const array OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte', 'contains', 'in', 'has_any'];
+
     public function __construct(
         private string $entityType,
     ) {}
@@ -43,17 +45,27 @@ final readonly class CustomFieldFilter implements Filter
 
         $fields = $this->resolveFields($fieldCodes);
 
+        $unknownFieldCodes = array_diff($fieldCodes, $fields->keys()->all());
+
+        abort_if(
+            $unknownFieldCodes !== [],
+            422,
+            'Unknown custom field filter codes: '.implode(', ', $unknownFieldCodes).'.',
+        );
+
         foreach ($value as $fieldCode => $operators) {
-            if (! is_array($operators)) {
-                continue;
-            }
-            if (! isset($fields[$fieldCode])) {
-                continue;
-            }
+            abort_unless(is_array($operators), 422, "Custom field filter [{$fieldCode}] must contain an operator object.");
+
             $field = $fields[$fieldCode];
             $valueColumn = CustomFieldValue::getValueColumn($field->type);
 
             foreach ($operators as $operator => $operand) {
+                abort_unless(
+                    in_array($operator, self::OPERATORS, true),
+                    422,
+                    "Unknown custom field filter operator [{$operator}] for [{$fieldCode}].",
+                );
+
                 $this->applyCondition($query, $field, $valueColumn, (string) $operator, $operand);
             }
         }
@@ -77,7 +89,7 @@ final readonly class CustomFieldFilter implements Filter
                 'contains' => $q->where($valueColumn, 'ILIKE', '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], (string) $operand).'%'),
                 'in' => $q->whereIn($valueColumn, (array) $operand),
                 'has_any' => $q->whereJsonContains($valueColumn, $operand),
-                default => null,
+                default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
             };
         });
     }

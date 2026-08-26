@@ -123,6 +123,7 @@ final readonly class CustomFieldFilterSchema
     public static function forget(int|string $tenantId, string $entityType): void
     {
         Cache::forget(self::cacheKey($tenantId, $entityType));
+        Cache::forget("custom_fields_schema_{$tenantId}_{$entityType}");
     }
 
     private static function cacheKey(int|string $tenantId, string $entityType): string

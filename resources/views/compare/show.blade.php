@@ -36,7 +36,7 @@
         ],
         'espocrm' => [
             'badge' => __('Comparison'),
-            'opening' => __('Relaticle and EspoCRM are both open-source, AGPL-3.0, self-hosted-first CRMs built to run on a single PHP server. Pick Relaticle if built-in AI — a chat assistant plus a 32-tool MCP server — matters to you, since EspoCRM ships neither today. Pick EspoCRM if you want a more established codebase and its paid extension ecosystem for specific integrations.'),
+            'opening' => __('Relaticle and EspoCRM are both open-source, AGPL-3.0, self-hosted-first CRMs built to run on a single PHP server. Pick Relaticle if built-in AI, including a chat assistant and 37-tool MCP server, matters to you. EspoCRM ships neither today. Pick EspoCRM if you want a more established codebase and its paid extension ecosystem for specific integrations.'),
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and EspoCRM pricing compare?'),

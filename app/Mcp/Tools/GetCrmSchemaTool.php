@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\Resources\CompanySchemaResource;
+use App\Mcp\Resources\NoteSchemaResource;
+use App\Mcp\Resources\OpportunitySchemaResource;
+use App\Mcp\Resources\PeopleSchemaResource;
+use App\Mcp\Resources\TaskSchemaResource;
+use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\Rule;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
+use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Resource;
+use Laravel\Mcp\Server\Tool;
+
+#[Description('Get the current workspace schema for one CRM entity, including active custom fields, choice options, filters, and relationships.')]
+final class GetCrmSchemaTool extends Tool
+{
+    use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
+
+    /** @var array<string, class-string<resource>> */
+    private const array RESOURCE_MAP = [
+        'company' => CompanySchemaResource::class,
+        'people' => PeopleSchemaResource::class,
+        'opportunity' => OpportunitySchemaResource::class,
+        'task' => TaskSchemaResource::class,
+        'note' => NoteSchemaResource::class,
+    ];
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'entity_type' => $schema->string()->description('One of: company, people, opportunity, task, note.')->required(),
+        ];
+    }
+
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'entity' => $schema->string()->required(),
+            'description' => $schema->string()->required(),
+            'fields' => $schema->object()->required(),
+            'custom_fields' => $schema->object()->required(),
+            'filterable_fields' => $schema->object()->required(),
+            'relationships' => $schema->array()->items($schema->string())->required(),
+            'aggregate_includes' => $schema->object(),
+            'usage' => $schema->string()->required(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
+    {
+        if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'entity_type' => ['required', 'string', Rule::in(array_keys(self::RESOURCE_MAP))],
+        ]);
+
+        $resource = resolve(self::RESOURCE_MAP[$validated['entity_type']]);
+        $payload = json_decode((string) $resource->handle($request)->content(), true, flags: JSON_THROW_ON_ERROR);
+
+        return Response::structured($payload);
+    }
+}

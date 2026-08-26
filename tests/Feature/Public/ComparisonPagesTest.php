@@ -90,5 +90,5 @@ it('does not lowercase the leading acronym of an extensibility fact in alternati
     $html = $this->get('/alternatives/attio')->assertOk()->getContent();
 
     expect($html)->not->toContain('rEST')
-        ->and($html)->toContain('Relaticle&#039;s extensibility: REST API plus a 32-tool MCP server');
+        ->and($html)->toContain('Relaticle&#039;s extensibility: REST API plus a 37-tool MCP server');
 });

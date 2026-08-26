@@ -28,7 +28,7 @@
                     Connect Any External Agent
                 </h3>
                 <p class="{{ $cardDesc }} max-w-md">
-                    Bring your own agent through the MCP server with 32 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                    Bring your own agent through the MCP server with 37 tools, or build custom integrations with the REST API. Full CRUD, custom fields, activity history, and pipeline analysis are built in.
                 </p>
 
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
