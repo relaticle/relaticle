@@ -9,9 +9,16 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
+         defaultTestSuite="Default"
          colors="true"
 >
     <testsuites>
+        <testsuite name="Default">
+            <directory>tests/Arch</directory>
+            <directory>tests/PHPStan</directory>
+            <directory>tests/Smoke</directory>
+            <directory>tests/Feature</directory>
+        </testsuite>
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
         </testsuite>
