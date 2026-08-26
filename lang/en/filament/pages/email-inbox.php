@@ -11,6 +11,7 @@ return [
     'tabs' => [
         'drafts' => 'Drafts',
         'outbox' => 'Outbox',
+        'failed' => 'Failed',
         'templates' => 'Templates',
     ],
     'drafts' => [
@@ -33,6 +34,12 @@ return [
         'notifications' => [
             'deleted' => 'Draft deleted',
             'bulk_deleted' => '{1}1 draft deleted|[2,*]:count drafts deleted',
+        ],
+    ],
+    'failed' => [
+        'empty' => [
+            'heading' => 'No failed emails',
+            'description' => 'Emails that could not be delivered will appear here.',
         ],
     ],
     'folders' => [

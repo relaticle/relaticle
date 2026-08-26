@@ -30,7 +30,7 @@ beforeEach(function (): void {
 
 function makeOutboxEmail(User $user, ConnectedAccount $account, EmailStatus $status, array $overrides = []): Email
 {
-    return Email::create(array_merge([
+    return Email::query()->create(array_merge([
         'team_id' => $user->currentTeam->id,
         'user_id' => $user->id,
         'connected_account_id' => $account->id,
@@ -74,12 +74,72 @@ it('failed tab filters to failed emails', function (): void {
         ->assertCanNotSeeTableRecords([$queued]);
 });
 
+it('locked failed mode lists every failed email owned by the user', function (): void {
+    $firstAccountFailure = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED, [
+        'last_error' => 'SMTP bounce',
+    ]);
+    $firstAccountFailure->forceFill(['created_at' => now()->subYears(3)])->saveQuietly();
+    $secondAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+    $secondAccountFailure = makeOutboxEmail($this->user, $secondAccount, EmailStatus::FAILED, [
+        'last_error' => 'Provider timeout',
+    ]);
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+    ]));
+    $teammateFailure = makeOutboxEmail($teammate, $teammateAccount, EmailStatus::FAILED);
+
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $otherUser->current_team_id,
+        'user_id' => $otherUser->id,
+    ]));
+    $otherTeamFailure = makeOutboxEmail($otherUser, $otherAccount, EmailStatus::FAILED);
+
+    $component = livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+        ->assertCanSeeTableRecords([$firstAccountFailure, $secondAccountFailure])
+        ->assertCanNotSeeTableRecords([$queued, $teammateFailure, $otherTeamFailure])
+        ->assertTableColumnVisible('last_error');
+
+    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
+});
+
+it('locked failed mode has a dedicated empty state', function (): void {
+    livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+        ->assertSee('No failed emails');
+});
+
+it('can exclude failed from the status filter without changing standalone outbox', function (): void {
+    $emailPageOptions = livewire(OutboxTable::class, ['includeFailedFilter' => false])
+        ->instance()
+        ->getTable()
+        ->getFilter('status_tab')
+        ?->getOptions();
+
+    $standaloneOptions = livewire(OutboxTable::class)
+        ->instance()
+        ->getTable()
+        ->getFilter('status_tab')
+        ?->getOptions();
+
+    expect($emailPageOptions)
+        ->not->toHaveKey('failed')
+        ->and($standaloneOptions)->toHaveKey('failed');
+});
+
 it('cancel row action moves a queued email to CANCELLED', function (): void {
     $email = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
     livewire(OutboxTable::class)
         ->callAction(TestAction::make('cancel')->table($email))
-        ->assertNotified();
+        ->assertNotified()
+        ->assertDispatched('outbox:changed');
 
     expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
 });
@@ -117,7 +177,8 @@ it('retry row action re-queues a failed email', function (): void {
         ->filterTable('status_tab', 'failed')
         ->assertCanSeeTableRecords([$email])
         ->callAction([['name' => 'retry', 'context' => ['table' => true, 'recordKey' => $email->getKey()]]])
-        ->assertNotified();
+        ->assertNotified()
+        ->assertDispatched('outbox:changed');
 
     expect($email->refresh())
         ->status->toBe(EmailStatus::QUEUED)
@@ -142,7 +203,8 @@ it('bulkCancel cancels selected queued rows', function (): void {
     livewire(OutboxTable::class)
         ->selectTableRecords([$queuedA, $queuedB])
         ->callAction([['name' => 'bulkCancel', 'context' => ['table' => true, 'bulk' => true]]])
-        ->assertNotified();
+        ->assertNotified()
+        ->assertDispatched('outbox:changed');
 
     expect($queuedA->refresh()->status)->toBe(EmailStatus::CANCELLED)
         ->and($queuedB->refresh()->status)->toBe(EmailStatus::CANCELLED);
@@ -159,7 +221,7 @@ it('bulkCancel skips a row that raced to SENDING and still cancels the rest', fu
     // Simulate the row transitioning QUEUED -> SENDING between render and the
     // bulk action firing. The action re-locks the row and throws RuntimeException;
     // the loop must catch it, skip that row, and still cancel the others.
-    Email::withoutEvents(fn () => Email::whereKey($racing->getKey())->update(['status' => EmailStatus::SENDING]));
+    Email::withoutEvents(fn () => Email::query()->whereKey($racing->getKey())->update(['status' => EmailStatus::SENDING]));
 
     $component
         ->callAction([['name' => 'bulkCancel', 'context' => ['table' => true, 'bulk' => true]]])

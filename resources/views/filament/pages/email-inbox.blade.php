@@ -7,9 +7,9 @@
             />
         </div>
     @else
-    {{-- ── Page tabs: the drafts, outbox and template lists, each a nested
+    {{-- ── Page tabs: the drafts, outbox, failed and template lists, each a nested
          Livewire component also hosted by a standalone page. ────────────── --}}
-    <div class="flex items-center gap-1 border-b border-gray-200 pb-2 dark:border-gray-700">
+    <div class="flex items-center gap-1 overflow-x-auto border-b border-gray-200 pb-2 dark:border-gray-700">
         @foreach (\Relaticle\EmailIntegration\Enums\EmailPageTab::cases() as $pageTab)
             <x-emails.page-tab
                 :tab="$pageTab"
@@ -20,7 +20,7 @@
     </div>
 
     {{-- No wrapper: the Filament table renders its own card. --}}
-    @livewire($tab->livewireComponent(), key($tab->value.'-table'))
+    @livewire($tab->livewireComponent(), $tab->livewireParameters(), key($tab->value.'-table'))
     @endif
 
     <x-filament-actions::modals />

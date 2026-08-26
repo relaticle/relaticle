@@ -154,6 +154,7 @@ final class EmailInboxPage extends Page
             // The composer saves/discards drafts and queues mail from outside this
             // component, so the tab badges have to be told when those counts move.
             'drafts:changed' => 'refreshTabCounts',
+            'outbox:changed' => 'refreshTabCounts',
         ];
     }
 
@@ -330,9 +331,9 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * Badge counts for the tab bar. Drafts are the user's own unsent messages and
-     * the outbox counts what is still waiting to go out; templates count what the
-     * user may actually apply (shared, or their own).
+     * Badge counts for the tab bar. Drafts are the user's own unsent messages,
+     * the outbox counts what is still waiting to go out, failed counts delivery
+     * failures, and templates count what the user may actually apply.
      *
      * @return array<string, int>
      */
@@ -351,7 +352,12 @@ final class EmailInboxPage extends Page
             EmailPageTab::OUTBOX->value => Email::query()
                 ->forTeam($teamId)
                 ->where('user_id', $user->getKey())
-                ->whereIn('status', [EmailStatus::QUEUED, EmailStatus::FAILED])
+                ->where('status', EmailStatus::QUEUED)
+                ->count(),
+            EmailPageTab::FAILED->value => Email::query()
+                ->forTeam($teamId)
+                ->where('user_id', $user->getKey())
+                ->where('status', EmailStatus::FAILED)
                 ->count(),
             EmailPageTab::TEMPLATES->value => EmailTemplate::query()
                 ->where('team_id', $teamId)

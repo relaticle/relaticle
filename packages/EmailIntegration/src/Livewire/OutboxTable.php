@@ -44,20 +44,22 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
     use InteractsWithSchemas;
     use InteractsWithTable;
 
+    public ?EmailStatus $lockedStatus = null;
+
+    public bool $includeFailedFilter = true;
+
     public function table(Table $table): Table
     {
         return $table
             ->query($this->buildQuery())
-            ->filters([
-                SelectFilter::make('status_tab')
-                    ->options(OutboxTab::class)
-                    ->default(OutboxTab::QUEUED->value)
-                    ->selectablePlaceholder(false)
-                    ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(
-                        $query,
-                        OutboxTab::tryFrom((string) ($data['value'] ?? '')) ?? OutboxTab::QUEUED,
-                    )),
-            ])
+            ->filters($this->lockedStatus instanceof EmailStatus ? [] : [$this->statusFilter()])
+            ->when(
+                $this->lockedStatus === EmailStatus::FAILED,
+                fn (Table $table): Table => $table
+                    ->emptyStateHeading(__('filament/pages/email-inbox.failed.empty.heading'))
+                    ->emptyStateDescription(__('filament/pages/email-inbox.failed.empty.description'))
+                    ->emptyStateIcon(Heroicon::ExclamationCircle),
+            )
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')
@@ -67,7 +69,9 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                 TextColumn::make('status')->badge(),
                 TextColumn::make('scheduled_for')->dateTime()->label(__('filament/pages/email-outbox.columns.scheduled_for')),
                 TextColumn::make('priority')->badge(),
-                TextColumn::make('last_error')->toggleable(isToggledHiddenByDefault: true)->wrap(),
+                TextColumn::make('last_error')
+                    ->toggleable(isToggledHiddenByDefault: $this->lockedStatus !== EmailStatus::FAILED)
+                    ->wrap(),
             ])
             ->recordActions([
                 Action::make('cancel')
@@ -77,6 +81,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
                     ->action(function (Email $record): void {
                         resolve(CancelQueuedEmailAction::class)->execute($record);
+                        $this->dispatch('outbox:changed');
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
                     }),
                 Action::make('reschedule')
@@ -100,6 +105,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
                     ->action(function (Email $record): void {
                         resolve(RetryFailedEmailAction::class)->execute($record);
+                        $this->dispatch('outbox:changed');
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
                     }),
             ])
@@ -134,6 +140,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                             ? __('filament/pages/email-outbox.notifications.bulk_cancelled_with_skipped', ['cancelled' => $cancelled, 'skipped' => $skipped])
                             : __('filament/pages/email-outbox.notifications.bulk_cancelled', ['count' => $cancelled]);
 
+                        $this->dispatch('outbox:changed');
                         Notification::make()->title($title)->success()->send();
                     }),
             ]);
@@ -153,7 +160,34 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->with(['participants'])
             ->where('team_id', filament()->getTenant()?->getKey())
             ->where('user_id', auth()->id())
-            ->where('direction', EmailDirection::OUTBOUND);
+            ->where('direction', EmailDirection::OUTBOUND)
+            ->when(
+                $this->lockedStatus instanceof EmailStatus,
+                fn (Builder $query): Builder => $query->where('status', $this->lockedStatus),
+            );
+    }
+
+    private function statusFilter(): SelectFilter
+    {
+        return SelectFilter::make('status_tab')
+            ->options($this->statusFilterOptions())
+            ->default(OutboxTab::QUEUED->value)
+            ->selectablePlaceholder(false)
+            ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(
+                $query,
+                OutboxTab::tryFrom((string) ($data['value'] ?? '')) ?? OutboxTab::QUEUED,
+            ));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function statusFilterOptions(): array
+    {
+        return collect(OutboxTab::cases())
+            ->reject(fn (OutboxTab $tab): bool => ! $this->includeFailedFilter && $tab === OutboxTab::FAILED)
+            ->mapWithKeys(fn (OutboxTab $tab): array => [$tab->value => $tab->getLabel()])
+            ->all();
     }
 
     /**
