@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 
 mutates(CreditService::class);
 
@@ -99,6 +100,29 @@ it('calculates credits with model multiplier', function (): void {
     );
 
     expect($credits)->toBe(3);
+});
+
+/**
+ * A turn enqueued before a model was retired settles after it. Reading the multiplier
+ * off the picker instead of the whole catalog re-priced that settlement at 1x, silently
+ * undercharging every Opus turn still in flight across the change.
+ */
+it('charges a retired model the multiplier it was retired on', function (): void {
+    config()->set('chat.models', [
+        catalogEntry(),
+        catalogEntry([
+            'key' => 'retired:claude-opus-4-7',
+            'model' => 'claude-opus-4-7',
+            'credit_multiplier' => 3.0,
+            'enabled' => false,
+        ]),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    expect(resolve(CreditService::class)->calculateCredits(
+        model: 'claude-opus-4-7',
+        toolCallsCount: 0,
+    ))->toBe(3);
 });
 
 it('adds tool call bonus to credit calculation', function (): void {

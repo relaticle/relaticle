@@ -15,10 +15,15 @@ final readonly class ModelRegistry
     /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> */
     private array $rates;
 
+    /** @var array<string, float> */
+    private array $multipliers;
+
     public function __construct()
     {
         /** @var list<array<string, mixed>> $entries */
         $entries = config('chat.models', []);
+
+        $custom = $this->customFromConfig();
 
         $enabled = array_values(array_filter(
             $entries,
@@ -27,27 +32,40 @@ final readonly class ModelRegistry
 
         $this->models = [
             ...array_map(ModelDescriptor::fromEntry(...), $enabled),
-            ...array_map(ModelDescriptor::fromConfig(...), $this->customFromConfig()),
+            ...array_map(ModelDescriptor::fromConfig(...), $custom),
         ];
 
-        // Every entry, disabled ones included: a retired model still has to be
-        // priced, because ai_credit_transactions rows keep naming it.
+        // Every entry, disabled ones included. A retired model still has to be priced
+        // for the spend widget AND charged at the multiplier it was retired on: a turn
+        // enqueued before the catalog changed settles after it, and reading this off
+        // the picker instead would silently re-price that turn at 1x.
         $rates = [];
+        $multipliers = [];
 
-        foreach ($entries as $entry) {
+        foreach ([...$entries, ...$custom] as $entry) {
             $model = $entry['model'] ?? null;
+
+            if (! is_string($model)) {
+                continue;
+            }
+
             $input = $entry['input_per_mtok'] ?? null;
             $output = $entry['output_per_mtok'] ?? null;
 
-            if (is_string($model) && is_numeric($input) && is_numeric($output)) {
+            if (is_numeric($input) && is_numeric($output)) {
                 $rates[$model] = [
                     'input_per_mtok' => (float) $input,
                     'output_per_mtok' => (float) $output,
                 ];
             }
+
+            if (is_numeric($entry['credit_multiplier'] ?? null)) {
+                $multipliers[$model] = (float) $entry['credit_multiplier'];
+            }
         }
 
         $this->rates = $rates;
+        $this->multipliers = $multipliers;
     }
 
     /** @return list<ModelDescriptor> */
@@ -165,15 +183,9 @@ final readonly class ModelRegistry
         return $this->rates[$model] ?? null;
     }
 
-    public function multiplierFor(string $modelId): float
+    public function multiplierFor(string $model): float
     {
-        foreach ($this->models as $model) {
-            if ($model->model === $modelId) {
-                return $model->creditMultiplier;
-            }
-        }
-
-        return 1.0;
+        return $this->multipliers[$model] ?? 1.0;
     }
 
     /**
