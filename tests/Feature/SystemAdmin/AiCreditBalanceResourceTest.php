@@ -88,3 +88,20 @@ it('rejects an edit that would drop credits_remaining below purchased_credits', 
 
     expect($balance->refresh()->credits_remaining)->toBe(500);
 });
+
+it('renders the period dates on the administrator calendar day, not the server one', function (): void {
+    $admin = SystemAdministrator::factory()->create(['timezone' => 'Asia/Yerevan']);
+    $this->actingAs($admin, 'sysadmin');
+
+    $team = Team::factory()->create();
+    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
+
+    // 01:00 on Jun 10 in Yerevan, still Jun 9 on the server.
+    $balance = AiCreditBalance::factory()->create([
+        'team_id' => $team->getKey(),
+        'period_starts_at' => '2026-06-09 21:00:00',
+    ]);
+
+    livewire(ListAiCreditBalances::class)
+        ->assertTableColumnFormattedStateSet('period_starts_at', 'Jun 10, 2026', $balance);
+});

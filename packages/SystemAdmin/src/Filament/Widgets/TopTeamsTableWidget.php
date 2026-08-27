@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 /**
  * Ranks teams by the distinct records they worked on in the selected period,
@@ -99,9 +100,15 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->since()
                     ->sortable(),
 
+                /**
+                 * A date-only column resolves its zone to config('app.timezone'),
+                 * not FilamentTimezone, so it has to name the viewer's zone to
+                 * agree with the relative column above it.
+                 */
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->date('M j, Y')
+                    ->timezone(fn (): string => ViewerTime::timezone())
                     ->sortable(),
             ])
             ->recordActions([

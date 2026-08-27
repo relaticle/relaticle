@@ -34,6 +34,7 @@ use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\EditA
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ViewAiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class AiCreditBalanceResource extends Resource
 {
@@ -144,11 +145,19 @@ final class AiCreditBalanceResource extends Resource
                     ->numeric()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                /**
+                 * A date-only column resolves its zone to config('app.timezone'),
+                 * not FilamentTimezone, so the period bounds have to name the
+                 * viewer's zone or the table shows a different day than the
+                 * infolist does for the same record.
+                 */
                 TextColumn::make('period_starts_at')
                     ->date()
+                    ->timezone(fn (): string => ViewerTime::timezone())
                     ->sortable(),
                 TextColumn::make('period_ends_at')
                     ->date()
+                    ->timezone(fn (): string => ViewerTime::timezone())
                     ->sortable()
                     ->badge()
                     ->color(fn (?Carbon $state): string => $state?->isPast() ? 'danger' : 'gray'),
