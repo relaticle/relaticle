@@ -6,6 +6,7 @@ namespace App\Enums;
 
 use App\Models\Team;
 use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasLabel;
 
 /**
@@ -20,7 +21,7 @@ use Filament\Support\Contracts\HasLabel;
  * about whether a workspace can currently reach the app — that is
  * `HostedWorkspaceAccess`, which layers the billing feature flag on top.
  */
-enum BillingStatus: string implements HasColor, HasLabel
+enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 {
     case PastDue = 'past_due';
 
@@ -82,6 +83,24 @@ enum BillingStatus: string implements HasColor, HasLabel
             self::Grandfathered => 'Free (legacy)',
             self::Granted => 'Granted',
             self::Free => 'Free',
+        };
+    }
+
+    /**
+     * The one-line reason behind the badge, for the tooltip the sysadmin
+     * tables hang off it. A label alone cannot separate a plan someone paid
+     * for from one an admin typed in.
+     */
+    public function getDescription(): string
+    {
+        return match ($this) {
+            self::PastDue => 'Paid subscription whose latest charge failed. Access stays open until Stripe cancels it.',
+            self::Subscribed => 'Paying for Pro through a live Stripe subscription.',
+            self::Enterprise => 'Put on the Enterprise plan by hand. No self-serve price exists for it.',
+            self::Trialing => 'Running an unexpired Pro trial. Nothing has been charged yet.',
+            self::Grandfathered => 'Existed before billing shipped, so hosted access stays free for good.',
+            self::Granted => 'Given a paid plan by hand, with no subscription or trial behind it.',
+            self::Free => 'No subscription, trial, or grandfathering. Hosted access is paused while billing is on.',
         };
     }
 

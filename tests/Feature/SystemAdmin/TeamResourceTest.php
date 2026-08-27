@@ -101,7 +101,8 @@ it('labels a workspace by why it has its plan, not by the plan alone', function 
 
     livewire(ListTeams::class)
         ->assertCanSeeTableRecords([$team])
-        ->assertSee($expected->getLabel());
+        ->assertSee($expected->getLabel())
+        ->assertSeeHtml($expected->getDescription());
 })->with([
     'a trial reads Trial, never Pro' => [
         fn (Team $team) => $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save(),
