@@ -80,7 +80,6 @@ use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
-use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
@@ -421,7 +420,7 @@ final class AppPanelProvider extends PanelProvider
                 Action::make('custom_fields')
                     ->label(__('filament/panel.tenant_menu.custom_fields'))
                     ->icon(Heroicon::OutlinedCube)
-                    ->url(fn (): string => CustomFieldsManagementPage::getUrl()),
+                    ->url(fn (): string => CustomFields::getUrl()),
                 Action::make('email_settings')
                     ->label(__('filament/panel.tenant_menu.email_settings'))
                     ->icon(Heroicon::OutlinedEnvelope)

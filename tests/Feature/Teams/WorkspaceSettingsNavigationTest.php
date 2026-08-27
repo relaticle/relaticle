@@ -8,12 +8,14 @@ use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\User;
+use App\Providers\Filament\AppPanelProvider;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(Members::class, CustomFields::class);
+mutates(AppPanelProvider::class, Members::class, CustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -53,6 +55,14 @@ test('the custom fields tab lives under the team url and the standalone route is
         ->and(Members::getSlug())->toBe('team/members')
         ->and(Route::has('filament.app.pages.custom-fields'))->toBeFalse()
         ->and(Route::has('filament.app.pages.team.custom-fields'))->toBeTrue();
+});
+
+test('the tenant menu links to the workspace custom fields tab', function (): void {
+    $customFieldsAction = collect(Filament::getPanel('app')->getTenantMenuItems())
+        ->first(fn (Action $action): bool => $action->getName() === 'custom_fields');
+
+    expect($customFieldsAction)->toBeInstanceOf(Action::class)
+        ->and($customFieldsAction->getUrl())->toBe(CustomFields::getUrl(tenant: $this->team));
 });
 
 test('billing keeps its own url so the paywall allowlist keeps matching', function (): void {
