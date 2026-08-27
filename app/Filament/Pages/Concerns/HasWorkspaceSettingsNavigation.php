@@ -15,6 +15,7 @@ use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 
 /**
  * The workspace settings tab strip. Every page it links to uses this concern, so
@@ -60,6 +61,13 @@ trait HasWorkspaceSettingsNavigation
                 ->url(fn (): string => CustomFields::getUrl())
                 ->isActiveWhen(fn (): bool => request()->routeIs(CustomFields::getRouteName()))
                 ->visible(fn (): bool => CustomFields::canAccess()),
+
+            NavigationItem::make()
+                ->label(__('teams.tabs.email'))
+                ->icon(Heroicon::OutlinedEnvelope)
+                ->url(fn (): string => EmailPrivacySettingsPage::getUrl())
+                ->isActiveWhen(fn (): bool => request()->routeIs(EmailPrivacySettingsPage::getRouteName()))
+                ->visible(fn (): bool => EmailPrivacySettingsPage::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.billing'))
