@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Str;
+use Pdo\Mysql;
 
 return [
 
@@ -60,7 +61,7 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
@@ -80,7 +81,7 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
@@ -97,6 +98,14 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+
+            /*
+             * Every datetime column is `timestamp without time zone` holding a UTC value, so
+             * the session timezone decides what `now()`, `CURRENT_TIMESTAMP` and any
+             * `timestamptz` cast mean. Left unset it inherits the server default, which
+             * differs per environment and silently writes local wall-clock into UTC columns.
+             */
+            'timezone' => 'UTC',
         ],
 
         'sqlsrv' => [

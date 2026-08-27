@@ -49,6 +49,24 @@ final readonly class ModelRegistry
         ));
     }
 
+    /**
+     * Voice input is servable on this install: the feature is switched on and
+     * the transcription provider is configured. Same availability shape the
+     * model picker uses for a cloud provider (ModelDescriptor::isAvailable()),
+     * read off `ai.default_for_transcription` so this gate and the provider
+     * PendingTranscriptionGeneration::generate() falls back to cannot disagree.
+     */
+    public function voiceInputAvailable(): bool
+    {
+        if (config('chat.voice_enabled') !== true) {
+            return false;
+        }
+
+        $provider = config('ai.default_for_transcription');
+
+        return is_string($provider) && filled(config("ai.providers.{$provider}.key"));
+    }
+
     /** @return list<array{value:string,label:string,provider:?string,min_plan:string}> */
     public function pickerOptions(): array
     {

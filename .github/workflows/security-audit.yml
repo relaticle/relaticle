@@ -17,14 +17,14 @@ jobs:
           path: |
             ~/.composer/cache
             vendor
-          key: ${{ runner.os }}-php-8.4-composer-${{ hashFiles('composer.lock') }}
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            ${{ runner.os }}-php-8.4-composer-
+            ${{ runner.os }}-php-8.5-composer-
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.4
+          php-version: 8.5
           extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
 

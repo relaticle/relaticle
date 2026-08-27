@@ -5,28 +5,105 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin;
 
 use Exception;
+use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
+use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Relaticle\Ink\InkPlugin;
+use Relaticle\Ink\Models\Category;
+use Relaticle\Ink\Models\Post;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
+use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Relaticle\SystemAdmin\Policies\CategoryPolicy;
+use Relaticle\SystemAdmin\Policies\PostPolicy;
 
 final class SystemAdminPanelProvider extends PanelProvider
 {
+    /**
+     * Single source of truth for which ink models the blog policies below cover
+     * — both Gate::policy() registration and the Gate::before() guard read from
+     * this array, so the two can never drift apart.
+     *
+     * @var array<class-string, class-string>
+     */
+    private const array BLOG_MODEL_POLICIES = [
+        Post::class => PostPolicy::class,
+        Category::class => CategoryPolicy::class,
+    ];
+
+    /**
+     * Datetime format for this panel. The zone is opt-in per administrator on the
+     * profile page and defaults to UTC, because this panel is used to correlate
+     * incidents against Horizon, Flare and server logs, which are all UTC.
+     *
+     * `T` prints the zone the value is actually rendered in, so a timestamp is never
+     * ambiguous: an administrator who has opted out of UTC can still see they did,
+     * and two administrators in different zones cannot read the same row as the same
+     * numbers. This is why the suffix must stay — dropping it, not the conversion
+     * itself, is what would break incident correlation.
+     */
+    private const string DATE_TIME_FORMAT = 'M j, Y H:i:s T';
+
+    public function boot(): void
+    {
+        // Blog MCP requests are not Filament panel requests, so the panel-scoped
+        // policy discovery in AppServiceProvider never sees them.
+        foreach (self::BLOG_MODEL_POLICIES as $model => $policy) {
+            Gate::policy($model, $policy);
+        }
+
+        // Table and Schema configuration is global, so both callbacks have to check
+        // which panel is actually serving the request before they touch the format.
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $table);
+
+        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
+            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $schema);
+
+        // PostPolicy/CategoryPolicy type-hint SystemAdministrator, and Gate never
+        // checks a policy method's parameter type before calling it — a caller of
+        // any other type (e.g. a customer's User model, or an MCP token minted for
+        // one) would hit an uncaught TypeError instead of a clean denial now that
+        // the policies above resolve globally. Intercept before Gate reaches them.
+        Gate::before(function (Authenticatable $user, string $ability, array $arguments = []): ?bool {
+            $target = $arguments[0] ?? null;
+            $modelClass = is_string($target) ? $target : ($target instanceof Model ? $target::class : null);
+
+            if ($modelClass !== null && array_key_exists($modelClass, self::BLOG_MODEL_POLICIES) && ! $user instanceof SystemAdministrator) {
+                return false;
+            }
+
+            return null;
+        });
+    }
+
+    private function isCurrentPanel(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'sysadmin';
+    }
+
     /**
      * @throws Exception
      */
@@ -43,6 +120,7 @@ final class SystemAdminPanelProvider extends PanelProvider
 
         return $panel
             ->login()
+            ->profile(EditProfile::class)
             ->emailVerification(isRequired: config('app.require_email_verification'))
             ->authGuard('sysadmin')
             ->authPasswordBroker('system_administrators')
@@ -103,6 +181,7 @@ final class SystemAdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                DenySearchIndexing::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

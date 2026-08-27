@@ -15,7 +15,7 @@
                 One CRM. Three ways to work: UI, chat, and agents.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                Manage records by hand, ask Relaticle in the app, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
+                Manage records by hand, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask Relaticle in the app</a>, or connect any external agent through MCP. Every path works from the same permissions, schema, and customer data.
             </p>
         </div>
 
@@ -28,7 +28,7 @@
                     Connect Any External Agent
                 </h3>
                 <p class="{{ $cardDesc }} max-w-md">
-                    Bring your own agent through the MCP server with 30 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                    Bring your own agent through the MCP server with 32 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
                 </p>
 
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
@@ -54,7 +54,7 @@
                         <div class="fn w-full bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
                             <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
                             <div class="flex gap-4 text-[11px]">
-                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">30</span> tools</span>
+                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">32</span> tools</span>
                                 <span class="text-gray-500 dark:text-gray-400">REST API <span class="font-mono font-medium text-gray-800 dark:text-gray-200">v1</span></span>
                                 <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-700 dark:text-emerald-400">auto</span></span>
                             </div>
@@ -98,7 +98,7 @@
                                 <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
                                     <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">Connected</div>
                                     <div class="space-y-1.5">
-                                        @foreach([['Tools', '30', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
+                                        @foreach([['Tools', '32', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
                                             <div class="flex items-center justify-between text-[11px]">
                                                 <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
                                                 <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>
@@ -161,6 +161,14 @@
                     </div>
                     <div class="ml-6 ai-line h-2 rounded-full bg-primary/[0.07] dark:bg-primary/[0.12] w-1/2 overflow-hidden"><div class="ai-fill h-full rounded-full bg-primary/15 dark:bg-primary/25 w-0"></div></div>
                 </div>
+
+                {{-- A text link, not a clickable card: no other card in this grid is an
+                     anchor, and making one of them one breaks the grid's contract. --}}
+                <a href="{{ route('ai') }}"
+                   class="group mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
+                    Meet {{ config('chat.assistant_name') }}
+                    <x-ri-arrow-right-line class="w-3 h-3"/>
+                </a>
             </div>
 
             {{-- Customizable Data Model --}}

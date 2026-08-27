@@ -47,11 +47,7 @@ trait HasProfilePhoto
 
     protected function defaultProfilePhotoUrl(): string
     {
-        $name = trim(
-            collect(explode(' ', $this->name))->map(fn ($segment): string => mb_substr($segment, 0, 1))->join(' ')
-        );
-
-        return 'https://ui-avatars.com/api/?name='.urlencode($name).'&color=7F9CF5&background=EBF4FF';
+        return resolve(AvatarService::class)->generateAuto($this->name);
     }
 
     protected function profilePhotoDisk(): string
@@ -68,7 +64,7 @@ trait HasProfilePhoto
     {
         return $this->profile_photo_path
             ? $this->resolveSameOriginUrl($this->profile_photo_path)
-            : resolve(AvatarService::class)->generate($this->name);
+            : $this->defaultProfilePhotoUrl();
     }
 
     private function resolveSameOriginUrl(string $path): string

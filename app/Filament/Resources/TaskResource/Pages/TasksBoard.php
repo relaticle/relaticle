@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -18,6 +19,7 @@ use Filament\Actions\CreateAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -144,6 +146,7 @@ final class TasksBoard extends BoardResourcePage
                         return $task;
                     }),
             ])
+            ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
                     ->label(__('filament/pages/boards.tasks.actions.edit'))
@@ -169,7 +172,9 @@ final class TasksBoard extends BoardResourcePage
             ->filters([
                 SelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
-                    ->relationship('assignees', 'name')
+                    ->relationship('assignees', 'name', TeamMemberSelect::currentUserFirst())
+                    ->searchable()
+                    ->preload()
                     ->multiple(),
             ])
             ->filtersFormWidth(Width::Medium)
@@ -241,6 +246,12 @@ final class TasksBoard extends BoardResourcePage
      *
      * Shows relative dates (Today/Tomorrow) for immediate items,
      * and full dates with year for all other cases.
+     *
+     * "Today" and "tomorrow" are questions about the viewer's calendar, so the stored
+     * UTC value is moved into their zone first: isToday()/isTomorrow() compare against
+     * now in the instance's own timezone, and left in UTC they bucket a late-evening
+     * due date a day early for anyone far enough east. isPast() compares instants and
+     * is unaffected either way.
      */
     private function formatDueDateBadge(?string $state): string
     {
@@ -248,7 +259,7 @@ final class TasksBoard extends BoardResourcePage
             return '';
         }
 
-        $date = Date::parse($state);
+        $date = Date::parse($state)->setTimezone(FilamentTimezone::get());
 
         return match (true) {
             $date->isPast() => $date->format('M j, Y').' (Overdue)',

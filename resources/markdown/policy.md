@@ -103,7 +103,7 @@ When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protoc
 
 **What the connector can write.** Create, update, delete, and link/unlink companies, people, opportunities, tasks, and notes — the same actions you can perform in the Relaticle UI. Writes are scoped to the team you authorize.
 
-**OAuth tokens.** When you connect via OAuth (Claude Connectors Directory, ChatGPT App Directory), Relaticle stores an access token and refresh token in the `oauth_access_tokens` and `oauth_refresh_tokens` tables. You can revoke any connector at any time from your account settings; revocation immediately invalidates the connector.
+**OAuth tokens.** When you connect via OAuth (Claude Connectors Directory, ChatGPT App Directory), Relaticle stores an access token and refresh token in the `oauth_access_tokens` and `oauth_refresh_tokens` tables. Access tokens expire after 30 days and refresh tokens after 90 days. You can revoke any connector at any time from **Settings → Access Tokens → AI Connectors**; revocation immediately invalidates both the access and refresh token.
 
 **Personal access tokens.** If you connect using a personal access token created from the Access Tokens page, you control its lifetime. Tokens are hashed at rest. You can revoke individual tokens at any time.
 

@@ -14,12 +14,15 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use Relaticle\SystemAdmin\Filament\Resources\ImportResource\Pages\ListImports;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\ListNotes;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\ListPeople;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\ListTasks;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -129,3 +132,35 @@ it('has trashed filter on soft-deletable resources', function (string $listPageC
     'notes' => ListNotes::class,
     'opportunities' => ListOpportunities::class,
 ]);
+
+it('can open the view page of a soft deleted company', function () {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()
+        ->for($this->team)
+        ->create(['creator_id' => $this->teamOwner->id]));
+
+    $company->delete();
+
+    livewire(ViewCompany::class, ['record' => $company->id])
+        ->assertOk();
+});
+
+it('links relation columns to the related record', function () {
+    Company::withoutEvents(fn (): Company => Company::factory()
+        ->for($this->team)
+        ->create(['creator_id' => $this->teamOwner->id]));
+
+    livewire(ListCompanies::class)
+        ->assertOk()
+        ->assertSee(TeamResource::getUrl('view', ['record' => $this->team->id]), escape: false)
+        ->assertSee(UserResource::getUrl('view', ['record' => $this->teamOwner->id]), escape: false);
+});
+
+it('does not link a relation column when the related record is missing', function () {
+    Company::withoutEvents(fn (): Company => Company::factory()
+        ->for($this->team)
+        ->create(['creator_id' => null]));
+
+    livewire(ListCompanies::class)
+        ->assertOk()
+        ->assertDontSee(UserResource::getUrl('view', ['record' => $this->teamOwner->id]), escape: false);
+});

@@ -40,6 +40,7 @@ final class ListOpportunitiesTool extends BaseListTool
         return [
             'company_id' => $schema->string()->description('Filter by company ID.'),
             'contact_id' => $schema->string()->description('Filter by contact (person) ID.'),
+            'stale_days' => $schema->integer()->description('Return only opportunities with no activity in the last N days. Use this to find deals that have gone quiet.'),
         ];
     }
 
@@ -48,6 +49,7 @@ final class ListOpportunitiesTool extends BaseListTool
         return [
             'company_id' => $request->get('company_id'),
             'contact_id' => $request->get('contact_id'),
+            'stale_days' => $request->get('stale_days') !== null ? (string) $request->get('stale_days') : null,
         ];
     }
 }

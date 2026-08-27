@@ -27,6 +27,7 @@ yarn-error.log
 !/.ai/guidelines/
 /.ai/guidelines/*
 !/.ai/guidelines/relaticle/
+!/.ai/rules/
 /.github/skills
 /.fleet
 /.idea
@@ -62,3 +63,6 @@ test-results.xml
 /.gemini
 /.amp
 /.agents
+
+# business-review regression ledger is machine-local (~/.claude/business-review/) — never commit it
+.claude/skills/business-review/regressions.json

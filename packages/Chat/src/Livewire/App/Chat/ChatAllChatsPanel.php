@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\App\Chat;
 
-use App\Filament\Pages\ChatConversation;
+use App\Filament\Pages\Dashboard;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -72,7 +72,7 @@ final class ChatAllChatsPanel extends BaseLivewireComponent
 
         return view('chat::livewire.app.chat.chat-all-chats-panel', [
             'conversations' => $conversations,
-            'newChatUrl' => ChatConversation::getUrl(),
+            'newChatUrl' => Dashboard::getUrl(),
             'isSearching' => $query !== '',
         ]);
     }

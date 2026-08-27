@@ -13,29 +13,84 @@ use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
+use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
+use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ProposalPayload;
+use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
+/**
+ * The docked proposal card: the one place a chat-proposed write is decided.
+ *
+ * It presents a PLAN, every proposal the assistant's turn produced, in order,
+ * even when that plan has a single step, which is the common case and behaves
+ * exactly as it always has. A multi-step plan adds the parts a chained request
+ * needs: each step's fields stay visible, a step whose dependency is still
+ * pending cannot be approved alone, and one Approve resolves them in order.
+ *
+ * $pendingActionId anchors the plan (the id the transcript docked), while
+ * $activeStepId is the step the per-record controls act on. For a one-step plan
+ * they are the same id.
+ */
 final class ProposalCard extends BaseLivewireComponent
 {
     public string $context = 'conversation';
 
     public ?string $pendingActionId = null;
 
+    public ?string $activeStepId = null;
+
+    /**
+     * The composer's current model pick, mirrored from the client so a turn
+     * resumed by an approval runs on the same model the user was talking to.
+     * Client-writable, and deliberately so: AiModelResolver re-checks the plan
+     * and availability, so the worst a forged value can do is fall back to auto.
+     */
+    public ?string $model = null;
+
     public int $cursor = 0;
 
+    /**
+     * Field codes the user unchecked on the active record: excluded from the
+     * write at approval time, never persisted into the frozen action_data.
+     * Client-writable by nature (checkbox state); the real guard lives in
+     * PendingActionService::sanitizedExclusions(), which drops payload markers
+     * and the entity's title key whatever the client sends. Reset on every
+     * navigation (setActive, focusItem, prev/next, each decided item) so one
+     * record's exclusions can never leak onto the next.
+     *
+     * @var list<string>
+     */
+    public array $excludedFields = [];
+
+    /**
+     * Which field is open for inline editing, and on which step. Both are set
+     * together by editField() and cleared together; neither is ever written from
+     * the client, so they are locked. Unlocked, a payload could name a field
+     * while nulling the step and open the same Filament schema on every step
+     * that owns that field code, giving one statePath several bound inputs.
+     */
+    #[Locked]
     public ?string $editingFieldCode = null;
+
+    #[Locked]
+    public ?string $editingStepId = null;
 
     /** @var array<string, mixed> */
     public array $data = [];
@@ -57,9 +112,9 @@ final class ProposalCard extends BaseLivewireComponent
             ->model($this->modelClass());
     }
 
-    public function editField(string $code): void
+    public function editField(string $code, ?string $stepId = null): void
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($stepId ?? $this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction || $pendingAction->operation !== PendingActionOperation::Create) {
             return;
@@ -67,20 +122,30 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
+        $this->editingStepId = (string) $pendingAction->getKey();
         $this->editingFieldCode = $code;
         $this->form->fill($this->formStateFor($pendingAction, $code));
     }
 
     public function saveField(): void
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($this->editingStepId ?? $this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction || $this->editingFieldCode === null) {
             return;
         }
 
         $input = $this->flattenFormState($this->form->getState());
-        $index = ($pendingAction->action_data['_batch'] ?? false) === true ? $this->cursor : null;
+        $index = ProposalPayload::from($pendingAction)->isBatch ? $this->cursorFor($pendingAction) : null;
+
+        // $cursor is a public property, so it is client-writable, and a partially
+        // resolved batch is still Pending: without this an edit could rewrite the
+        // action and display data of an item that was already created, leaving the
+        // transcript's audit card showing values the record never had. createCurrent()
+        // and discardCurrent() already snap away from a resolved index.
+        if ($index !== null && ! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
+            return;
+        }
 
         try {
             resolve(ProposalEditor::class)->applyEdit($pendingAction, $this->authUser(), $input, $index);
@@ -91,11 +156,13 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $this->editingFieldCode = null;
+        $this->editingStepId = null;
     }
 
     public function cancelField(): void
     {
         $this->editingFieldCode = null;
+        $this->editingStepId = null;
     }
 
     /**
@@ -130,7 +197,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function componentsForField(string $code): array
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($this->editingStepId ?? $this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction) {
             return [];
@@ -187,16 +254,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function currentRecord(PendingAction $pendingAction): array
     {
-        $data = $pendingAction->action_data;
-
-        if (($data['_batch'] ?? false) !== true) {
-            return $data;
-        }
-
-        $records = is_array($data['records'] ?? null) ? array_values($data['records']) : [];
-        $record = $records[$this->cursor] ?? [];
-
-        return is_array($record) ? $record : [];
+        return ProposalPayload::from($pendingAction)->recordAtOrEmpty($this->cursorFor($pendingAction));
     }
 
     /**
@@ -204,7 +262,7 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function modelClass(): string
     {
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($this->editingStepId ?? $this->activeStepId());
 
         $entityType = $pendingAction instanceof PendingAction ? $pendingAction->entity_type : '';
 
@@ -220,112 +278,102 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     #[On('proposal:set-active')]
-    public function setActive(?string $id = null, string $context = 'conversation'): void
+    public function setActive(?string $id = null, string $context = 'conversation', ?string $model = null): void
     {
         if ($context !== $this->context) {
             return;
         }
 
+        $this->model = $model;
+
         $this->editingFieldCode = null;
+        $this->editingStepId = null;
+        $this->excludedFields = [];
 
         if ($id === null) {
             $this->pendingActionId = null;
+            $this->activeStepId = null;
 
             return;
         }
 
-        $pendingAction = $this->loadPending($id);
+        $pendingAction = $this->loadStep($id);
 
         if (! $pendingAction instanceof PendingAction) {
             $this->pendingActionId = null;
+            $this->activeStepId = null;
 
             return;
         }
 
         $this->pendingActionId = $pendingAction->getKey();
-        $this->cursor = $this->firstUnresolvedIndex($pendingAction);
-    }
-
-    public function stepNext(): void
-    {
-        $this->stepWithin(1);
-    }
-
-    public function stepPrev(): void
-    {
-        $this->stepWithin(-1);
+        $this->focusFirstPendingStep($pendingAction);
     }
 
     /**
-     * Move the cursor to the adjacent UNRESOLVED record in the given direction.
-     * Decided items are dropped from the dock queue entirely (Attio behavior), so
-     * they can never be navigated back to and re-decided — their outcome lives in
-     * the transcript audit card above.
+     * Focus one record of a batch step: its row expands to show the editable
+     * fields. Decided items are dropped from the dock queue entirely (Attio
+     * behavior), so a click on a just-resolved row snaps to the first undecided
+     * record instead of re-opening an outcome that lives in the transcript.
      */
-    private function stepWithin(int $direction): void
+    public function focusItem(string $stepId, int $index): void
     {
         $this->editingFieldCode = null;
+        $this->editingStepId = null;
+        $this->excludedFields = [];
 
-        if ($this->pendingActionId === null) {
-            return;
-        }
-
-        $pendingAction = $this->loadPending($this->pendingActionId);
+        $pendingAction = $this->loadStep($stepId);
 
         if (! $pendingAction instanceof PendingAction) {
             return;
         }
 
-        $unresolved = $this->unresolvedIndices($pendingAction);
+        // Focusing a row of a step the dock was not anchored on focuses that
+        // step too, so the expanded fields always describe the clicked record.
+        $this->activeStepId = (string) $pendingAction->getKey();
 
-        if ($unresolved === []) {
-            return;
-        }
-
-        $position = array_search($this->cursor, $unresolved, true);
-
-        if ($position === false) {
-            $this->cursor = $unresolved[0];
-
-            return;
-        }
-
-        $target = $position + $direction;
-
-        if ($target < 0 || $target >= count($unresolved)) {
-            return;
-        }
-
-        $this->cursor = $unresolved[$target];
-    }
-
-    public function recordCount(?PendingAction $pendingAction = null): int
-    {
-        if ($this->pendingActionId === null) {
-            return 1;
-        }
-
-        $pendingAction ??= $this->loadPending($this->pendingActionId);
-
-        if (! $pendingAction instanceof PendingAction) {
-            return 1;
-        }
-
-        return $this->resolveRecordCount($pendingAction);
+        $this->cursor = in_array($index, $this->unresolvedIndices($pendingAction), true)
+            ? $index
+            : $this->firstUnresolvedIndex($pendingAction);
     }
 
     /**
-     * How many records still await a decision — the dock stepper's denominator.
-     * Resolved items have left the queue, so this shrinks as the user decides.
+     * The five *Of() helpers below take the step to read; their public callers take
+     * nothing and resolve it through loadStep().
+     *
+     * Livewire runs every client-invoked method through implicit route-model
+     * binding, so a public method typed `PendingAction` accepts a bare
+     * `where(id)->first()` on whatever id the browser sends, with no team, no
+     * user, no status and no expiry. PendingAction rows carry another tenant's
+     * proposed record fields and old→new diffs, so the parameter has to stay off
+     * the public surface: internal callers pass a step that loadStep() or
+     * planAllSteps() already scoped, and the client can reach only the active step.
      */
-    public function remainingCount(?PendingAction $pendingAction = null): int
+    public function recordCount(): int
     {
-        if ($this->pendingActionId === null) {
-            return 0;
+        return $this->recordCountOf($this->loadStep($this->activeStepId()));
+    }
+
+    private function recordCountOf(?PendingAction $pendingAction): int
+    {
+        if (! $pendingAction instanceof PendingAction) {
+            return 1;
         }
 
-        $pendingAction ??= $this->loadPending($this->pendingActionId);
+        return ProposalPayload::from($pendingAction)->count();
+    }
 
+    /**
+     * How many records still await a decision: the footer button's live count.
+     * Resolved items have left the queue, so this shrinks as the user decides.
+     */
+    public function remainingCount(): int
+    {
+        return $this->remainingCountOf($this->loadStep($this->activeStepId()));
+    }
+
+    private function remainingCountOf(?PendingAction $pendingAction): int
+    {
         if (! $pendingAction instanceof PendingAction) {
             return 0;
         }
@@ -334,34 +382,37 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * 1-based position of the current record within the unresolved queue.
+     * The cursor belongs to the active step. Any other step of the plan renders at
+     * its own first undecided record, so a card never expands a record the user
+     * cannot decide.
+     *
+     * Only a multi-record step has a cursor at all. A single-record proposal always
+     * renders its one record, whatever the client-writable $cursor holds: a plan
+     * whose earlier batch step left the cursor past zero must not blank the next
+     * step's fields.
      */
-    public function currentPosition(?PendingAction $pendingAction = null): int
+    private function cursorFor(PendingAction $pendingAction): int
     {
-        $pendingAction ??= ($this->pendingActionId !== null ? $this->loadPending($this->pendingActionId) : null);
-
-        if (! $pendingAction instanceof PendingAction) {
-            return 1;
+        if (! ProposalPayload::from($pendingAction)->isBatch) {
+            return 0;
         }
 
-        $position = array_search($this->cursor, $this->unresolvedIndices($pendingAction), true);
-
-        return $position === false ? 1 : $position + 1;
+        return (string) $pendingAction->getKey() === $this->activeStepId()
+            ? $this->cursor
+            : $this->firstUnresolvedIndex($pendingAction);
     }
 
-    private function resolveRecordCount(PendingAction $pendingAction): int
+    private function activeStepId(): ?string
     {
-        $data = $pendingAction->action_data;
+        return $this->activeStepId ?? $this->pendingActionId;
+    }
 
-        if (($data['_batch'] ?? false) !== true || ! is_array($data['records'] ?? null)) {
-            return 1;
+    private function loadStep(?string $id): ?PendingAction
+    {
+        if ($id === null || $id === '') {
+            return null;
         }
 
-        return max(1, count($data['records']));
-    }
-
-    private function loadPending(string $id): ?PendingAction
-    {
         $user = $this->authUser();
 
         return PendingAction::query()
@@ -374,50 +425,408 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * @return array<array-key, mixed>
+     * Per-request memo for the plan's steps. stepViews() walks every step and each
+     * walk re-read the whole plan (once for unmetDependencies, once more per
+     * dependency through stepPosition), so a three-step plan issued the plan query
+     * roughly a dozen times per dock render. Livewire builds a fresh component per
+     * request, so this never outlives one round trip, but it does have to be
+     * dropped after a resolve inside the same request: render() runs after
+     * approveAll()/discardAll() and would otherwise paint the pre-decision list.
+     *
+     * @var list<PendingAction>|null
      */
-    private function resolvedItems(PendingAction $pendingAction): array
-    {
-        $resultData = $pendingAction->result_data;
+    private ?array $planAllStepsCache = null;
 
-        return is_array($resultData) && is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+    /**
+     * Per-request memo for editableCodes(), keyed by entity type.
+     *
+     * @var array<string, list<string>>
+     */
+    private array $editableCodesCache = [];
+
+    /**
+     * Every step of the plan, decided or not, in order. Approved steps have to
+     * stay visible here: unmetDependencies() reads this list to tell an approved
+     * dependency from a missing one.
+     *
+     * @return list<PendingAction>
+     */
+    private function planAllSteps(): array
+    {
+        if ($this->planAllStepsCache !== null) {
+            return $this->planAllStepsCache;
+        }
+
+        $anchor = $this->loadStep($this->pendingActionId);
+
+        if (! $anchor instanceof PendingAction) {
+            return $this->planAllStepsCache = [];
+        }
+
+        return $this->planAllStepsCache = resolve(ProposalPlanService::class)->steps($anchor);
+    }
+
+    /**
+     * Drop the memo so a read after a resolve sees the decision rather than the
+     * list as it was on mount. render() is the only caller it needs: every read
+     * that happens after a mutation (focusFirstPendingStep, loadStep, refresh)
+     * goes to the database directly, so nothing else can observe a stale memo.
+     */
+    private function forgetPlanSteps(): void
+    {
+        $this->planAllStepsCache = null;
+    }
+
+    /**
+     * The plan's steps that still need a decision, in order. The dock only ever
+     * presents undecided work: a step resolved a moment ago lives in the
+     * transcript audit card above.
+     *
+     * @return list<PendingAction>
+     */
+    public function planSteps(): array
+    {
+        return resolve(ProposalPlanService::class)->pendingAmong($this->planAllSteps());
+    }
+
+    /**
+     * Everything the card needs to render one step, so the view stays a template
+     * rather than a second place where proposal semantics are decided.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function stepViews(): array
+    {
+        $plan = resolve(ProposalPlanService::class);
+        $activeStepId = $this->activeStepId();
+        $siblings = $this->planAllSteps();
+        $views = [];
+
+        foreach ($this->planSteps() as $position => $step) {
+            $blockedBy = $plan->unmetDependencies($step, $siblings);
+
+            $views[] = [
+                'id' => (string) $step->getKey(),
+                'position' => $position + 1,
+                'operation' => $step->operation->value,
+                'entity_type' => $step->entity_type,
+                'summary' => $this->stepSummary($step),
+                'title' => is_string($step->display_data['title'] ?? null) ? $step->display_data['title'] : '',
+                'recordLabel' => $this->stepRecordLabel($step),
+                'fields' => $this->recordFieldsOf($step),
+                'editableCodes' => $this->editableCodesOf($step),
+                'isActive' => (string) $step->getKey() === $activeStepId,
+                'isBatch' => ProposalPayload::from($step)->isBatch,
+                'recordCount' => $this->recordCountOf($step),
+                'remainingCount' => $this->remainingCountOf($step),
+                'items' => $this->batchItemViews($step),
+                'blockedBy' => $this->sortedPositions($blockedBy),
+                'activeItemLabel' => $this->activeItemLabelOf($step),
+                'activeItemPosition' => $this->activeItemPositionOf($step),
+                'excludableCodes' => $this->excludableCodesOf($step),
+            ];
+        }
+
+        return $views;
+    }
+
+    /**
+     * Step positions in plan order, so a hint reads "after steps 1, 2".
+     *
+     * @param  list<PendingAction>  $steps
+     * @return list<int>
+     */
+    private function sortedPositions(array $steps): array
+    {
+        $positions = array_map($this->stepPosition(...), $steps);
+
+        sort($positions);
+
+        return $positions;
+    }
+
+    /**
+     * 1-based position of a step within the plan's undecided steps.
+     */
+    private function stepPosition(PendingAction $step): int
+    {
+        foreach ($this->planSteps() as $index => $candidate) {
+            if ((string) $candidate->getKey() === (string) $step->getKey()) {
+                return $index + 1;
+            }
+        }
+
+        return 1;
+    }
+
+    private function stepSummary(PendingAction $step): string
+    {
+        // A batch step lists every record as its own row, so its header carries
+        // the batch-level summary ("Create 3 people"), not one record's.
+        $display = ProposalPayload::from($step)->isBatch
+            ? $step->display_data
+            : $this->currentRecordDisplay($step);
+
+        $summary = $display['summary']
+            ?? $step->display_data['summary']
+            ?? $step->display_data['title']
+            ?? '';
+
+        return is_string($summary) ? $summary : '';
+    }
+
+    /**
+     * The record identity shown in the same compact pill used by read results.
+     * Create payloads hold the exact title. Other operations keep the current
+     * title in their display summary, outside the fields that are changing.
+     */
+    private function stepRecordLabel(PendingAction $step): string
+    {
+        // A batch names every record on its own row below, so its header stays
+        // the batch summary ("Create 3 people"). A chip here would show only the
+        // first record and read as the whole card.
+        if (ProposalPayload::from($step)->isBatch) {
+            return '';
+        }
+
+        if ($step->operation === PendingActionOperation::Create) {
+            $record = $this->currentRecord($step);
+            $title = $record[ProposalCoreFields::titleKey($step->entity_type)] ?? null;
+
+            if (is_string($title) && $title !== '') {
+                return $title;
+            }
+        }
+
+        $summary = $this->stepSummary($step);
+
+        if (preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
+            return $matches[1];
+        }
+
+        return '';
+    }
+
+    /**
+     * One row per still-undecided record of a batch step. Every record is its
+     * own visible row with its own skip control, so nothing can be committed or
+     * skipped without having been on screen.
+     *
+     * @return list<array{index: int, summary: string, isActive: bool}>
+     */
+    private function batchItemViews(PendingAction $step): array
+    {
+        $payload = ProposalPayload::from($step);
+
+        if (! $payload->isBatch) {
+            return [];
+        }
+
+        $cursor = $this->cursorFor($step);
+
+        return array_map(function (int $index) use ($payload, $cursor): array {
+            $display = $payload->displayAt($index);
+            $summary = $display['summary'] ?? $display['title'] ?? __('Record :position', ['position' => $index + 1]);
+
+            return [
+                'index' => $index,
+                'summary' => is_string($summary) ? $summary : '',
+                'isActive' => $index === $cursor,
+            ];
+        }, $this->unresolvedIndices($step));
+    }
+
+    /**
+     * The record name the paginated batch card leads with: the active item's
+     * display title, or the quoted name from its summary. Kept separate from
+     * stepRecordLabel(): a PLAN's batch step header must keep the batch-level
+     * summary, not adopt whichever record the cursor is on.
+     */
+    private function activeItemLabelOf(PendingAction $step): string
+    {
+        $payload = ProposalPayload::from($step);
+
+        if (! $payload->isBatch) {
+            return '';
+        }
+
+        $display = $payload->displayAt($this->cursorFor($step));
+        $summary = $display['summary'] ?? null;
+
+        // The quoted record name from the summary ('Create person "Alice"')
+        // comes first: the real tools set each item's `title` to the generic
+        // entity title ("Create Person"), which is the eyebrow, not an identity.
+        if (is_string($summary) && preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
+            return $matches[1];
+        }
+
+        $title = $display['title'] ?? null;
+
+        if (is_string($title) && $title !== '') {
+            return $title;
+        }
+
+        return is_string($summary) ? $summary : '';
+    }
+
+    /**
+     * 1-based position of the active record among the still-undecided ones: the
+     * "1/3" the pagination footer shows.
+     */
+    private function activeItemPositionOf(PendingAction $step): int
+    {
+        if (! ProposalPayload::from($step)->isBatch) {
+            return 1;
+        }
+
+        $position = array_search($this->cursorFor($step), $this->unresolvedIndices($step), true);
+
+        return $position === false ? 1 : $position + 1;
     }
 
     private function firstUnresolvedIndex(PendingAction $pendingAction): int
     {
-        $count = $this->resolveRecordCount($pendingAction);
-
-        $items = $this->resolvedItems($pendingAction);
-
-        for ($index = 0; $index < $count; $index++) {
-            if (! isset($items[(string) $index])) {
-                return $index;
-            }
-        }
-
-        return $count - 1;
+        return ProposalProgress::for($pendingAction)->firstUnresolvedIndex();
     }
 
     /**
      * Record indices not yet resolved — the only items the dock presents. A decided
-     * item leaves this list, so the stepper can never land back on it.
+     * item leaves this list, so focus can never land back on it.
      *
      * @return list<int>
      */
     private function unresolvedIndices(PendingAction $pendingAction): array
     {
-        $count = $this->resolveRecordCount($pendingAction);
-        $items = $this->resolvedItems($pendingAction);
+        return ProposalProgress::for($pendingAction)->unresolvedIndices();
+    }
 
-        $indices = [];
+    /**
+     * Re-anchor the card on the plan's first step still awaiting a decision.
+     */
+    private function focusFirstPendingStep(PendingAction $anchor): void
+    {
+        $steps = resolve(ProposalPlanService::class)->pendingSteps($anchor);
+        $first = $steps[0] ?? $anchor;
 
-        for ($index = 0; $index < $count; $index++) {
-            if (! isset($items[(string) $index])) {
-                $indices[] = $index;
-            }
+        $this->activeStepId = (string) $first->getKey();
+        $this->cursor = $this->firstUnresolvedIndex($first);
+        $this->excludedFields = [];
+    }
+
+    /**
+     * Page to the next undecided record of the active batch (Attio-style
+     * pagination). The card renders only the active record, so these arrows are
+     * how every other record is reviewed before its own footer decision.
+     */
+    public function nextItem(): void
+    {
+        $this->moveCursor(1);
+    }
+
+    public function prevItem(): void
+    {
+        $this->moveCursor(-1);
+    }
+
+    private function moveCursor(int $direction): void
+    {
+        $step = $this->loadStep($this->activeStepId());
+
+        if (! $step instanceof PendingAction || ! ProposalPayload::from($step)->isBatch) {
+            return;
         }
 
-        return $indices;
+        $unresolved = $this->unresolvedIndices($step);
+
+        if ($unresolved === []) {
+            return;
+        }
+
+        $position = array_search($this->cursorFor($step), $unresolved, true);
+        $position = $position === false ? 0 : $position + $direction;
+        $position = max(0, min(count($unresolved) - 1, $position));
+
+        $this->editingFieldCode = null;
+        $this->editingStepId = null;
+        $this->excludedFields = [];
+        $this->activeStepId = (string) $step->getKey();
+        $this->cursor = $unresolved[$position];
+    }
+
+    /**
+     * Toggle one attribute checkbox of the active record. Unchecked codes are
+     * dropped from the write at approval; the service re-guards the list, so a
+     * forged code can at worst be ignored.
+     */
+    public function toggleField(string $code): void
+    {
+        $step = $this->loadStep($this->activeStepId());
+
+        if (! $step instanceof PendingAction) {
+            return;
+        }
+
+        if (! in_array($code, $this->excludableCodesOf($step), true)) {
+            return;
+        }
+
+        $this->excludedFields = in_array($code, $this->excludedFields, true)
+            ? array_values(array_diff($this->excludedFields, [$code]))
+            : [...$this->excludedFields, $code];
+    }
+
+    /**
+     * The header master checkbox: all attributes included → exclude all; any
+     * other state (partial or none) → include all.
+     */
+    public function toggleAllFields(): void
+    {
+        $step = $this->loadStep($this->activeStepId());
+
+        if (! $step instanceof PendingAction) {
+            return;
+        }
+
+        $this->excludedFields = $this->excludedFields === []
+            ? $this->excludableCodesOf($step)
+            : [];
+    }
+
+    /**
+     * Field codes the user may uncheck: coded rows minus the entity's title key
+     * (a create without it fails validation), and for an update only the rows
+     * that actually change something. A delete writes no fields at all.
+     *
+     * @return list<string>
+     */
+    private function excludableCodesOf(?PendingAction $pendingAction): array
+    {
+        if (! $pendingAction instanceof PendingAction) {
+            return [];
+        }
+
+        if ($pendingAction->operation === PendingActionOperation::Delete) {
+            return [];
+        }
+
+        $titleKey = ProposalCoreFields::titleKey($pendingAction->entity_type);
+        $codes = [];
+
+        foreach ($this->recordFieldsOf($pendingAction) as $row) {
+            $code = $row['code'] ?? null;
+
+            if (! is_string($code) || $code === '' || $code === $titleKey) {
+                continue;
+            }
+
+            if ($pendingAction->operation === PendingActionOperation::Update && ! array_key_exists('new', $row)) {
+                continue;
+            }
+
+            $codes[] = $code;
+        }
+
+        return array_values(array_unique($codes));
     }
 
     #[On('proposal:create-current')]
@@ -427,7 +836,192 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
+        if (count($this->stepViews()) > 1) {
+            $this->approveAll(resolve(ProposalPlanService::class));
+
+            return;
+        }
+
         $this->createCurrent(resolve(PendingActionService::class));
+    }
+
+    /**
+     * Approve every remaining step of the plan, in order.
+     *
+     * Steps commit one at a time and execution stops at the first failure, so the
+     * card reports what did happen rather than pretending the plan was atomic.
+     */
+    public function approveAll(ProposalPlanService $plan): void
+    {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
+        $anchor = $this->loadStep($this->pendingActionId);
+
+        if (! $anchor instanceof PendingAction) {
+            return;
+        }
+
+        $this->ensureTenantContext();
+
+        $steps = $this->planSteps();
+
+        try {
+            $result = $plan->approveAll($anchor, $this->authUser());
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($anchor, $exception);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            $this->reportDeliveryFailure($anchor, $exception);
+
+            return;
+        } catch (RuntimeException|ValidationException $exception) {
+            $this->reportResolveFailure($anchor, $exception->getMessage());
+
+            return;
+        }
+
+        foreach (array_slice($steps, 0, $result['approved']) as $step) {
+            $this->announceResolution($step, 'approved');
+        }
+
+        if ($result['failed'] !== null) {
+            $this->reportResolveFailure($anchor, __('Step :step could not be completed: :message', [
+                'step' => $result['failed']['step'],
+                'message' => $result['failed']['message'],
+            ]));
+
+            $remaining = $this->loadStep($this->pendingActionId);
+
+            if ($remaining instanceof PendingAction) {
+                $this->focusFirstPendingStep($remaining);
+            }
+
+            return;
+        }
+
+        $this->settleAfterResolution($anchor);
+    }
+
+    /**
+     * Approve one step of the plan, leaving the rest pending.
+     */
+    public function approveStep(string $stepId, ProposalPlanService $plan): void
+    {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
+        $step = $this->loadStep($stepId);
+
+        if (! $step instanceof PendingAction) {
+            return;
+        }
+
+        if ($plan->unmetDependencies($step, $plan->steps($step)) !== []) {
+            $this->reportResolveFailure($step, __('Approve the earlier step this one links to first.'));
+
+            return;
+        }
+
+        $this->ensureTenantContext();
+
+        try {
+            $plan->approveStep($step, $this->authUser());
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($step, $exception);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            $this->reportDeliveryFailure($step, $exception);
+
+            return;
+        } catch (RuntimeException|ValidationException $exception) {
+            $this->reportResolveFailure($step, $exception->getMessage());
+
+            return;
+        }
+
+        $this->announceResolution($step, 'approved');
+        $this->settleAfterResolution($step);
+    }
+
+    /**
+     * Reject one step and cancel whatever depended on it.
+     */
+    public function rejectStep(string $stepId, ProposalPlanService $plan): void
+    {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
+        $step = $this->loadStep($stepId);
+
+        if (! $step instanceof PendingAction) {
+            return;
+        }
+
+        try {
+            $cancelled = $plan->reject($step, $this->authUser());
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($step, $exception);
+
+            return;
+        } catch (RuntimeException $exception) {
+            $this->reportResolveFailure($step, $exception->getMessage());
+
+            return;
+        }
+
+        $this->announceResolution($step, 'rejected');
+
+        foreach ($cancelled as $cancelledStep) {
+            $this->announceResolution($cancelledStep, 'rejected');
+        }
+
+        $this->settleAfterResolution($step);
+    }
+
+    /**
+     * Discard the whole plan: every remaining step, none of them executed.
+     */
+    public function discardAll(ProposalPlanService $plan): void
+    {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
+        $steps = $this->planSteps();
+
+        if ($steps === []) {
+            return;
+        }
+
+        foreach ($steps as $step) {
+            $fresh = $this->loadStep((string) $step->getKey());
+
+            if (! $fresh instanceof PendingAction) {
+                continue;
+            }
+
+            try {
+                $plan->reject($fresh, $this->authUser());
+            } catch (QueryException $exception) {
+                $this->reportDatabaseFailure($fresh, $exception);
+
+                return;
+            } catch (RuntimeException $exception) {
+                $this->reportResolveFailure($fresh, $exception->getMessage());
+
+                return;
+            }
+
+            $this->announceResolution($fresh, 'rejected');
+        }
+
+        $this->settleAfterResolution($steps[0]);
     }
 
     public function createCurrent(PendingActionService $service): void
@@ -436,44 +1030,63 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction) {
             return;
         }
 
-        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
+        $this->ensureTenantContext();
 
-        // A decided item is no longer in the dock queue — snap to the next undecided
-        // one rather than re-running an already-resolved index.
-        if ($isBatch && ! in_array($this->cursor, $this->unresolvedIndices($pendingAction), true)) {
-            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
+        // A batch renders exactly one record at a time (Attio pagination), so the
+        // footer's Create decides exactly what is on screen: the active record,
+        // never a hidden remainder.
+        if (ProposalPayload::from($pendingAction)->isBatch) {
+            $this->approveActiveItem($pendingAction, $service);
 
             return;
         }
 
-        $this->ensureTenantContext();
+        // Every change unchecked on an update: approving would write nothing and
+        // still stamp the row Approved. The footer disables itself for this, but
+        // the ⌘⏎ shortcut lands here directly.
+        $excludable = $this->excludableCodesOf($pendingAction);
+
+        if ($pendingAction->operation === PendingActionOperation::Update
+            && $excludable !== []
+            && array_diff($excludable, $this->excludedFields) === []) {
+            return;
+        }
 
         try {
-            if ($isBatch) {
-                $result = $service->approveItem($pendingAction, $this->authUser(), $this->cursor);
-                $finalized = $result['finalized'];
-                // A deleted record has no page to link to, so only Create items carry a ref.
-                $record = ($pendingAction->operation === PendingActionOperation::Create && $result['record'] instanceof Model)
-                    ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
-                    : null;
-            } else {
-                $resolved = $service->approve($pendingAction, $this->authUser());
-                $finalized = true;
-                $record = $this->recordReferenceFor($resolved);
-            }
-        } catch (RuntimeException $exception) {
-            $this->dispatch(
-                'proposal:resolve-failed',
-                pendingActionId: $pendingAction->getKey(),
-                message: $exception->getMessage(),
-                context: $this->context,
-            );
+            $resolved = $service->approve($pendingAction, $this->authUser(), $this->excludedFields);
+            $record = $this->recordReferenceFor($resolved);
+        } catch (QueryException $exception) {
+            // Must precede the RuntimeException arm — QueryException extends
+            // PDOException extends RuntimeException, so it would otherwise be caught
+            // there and its getMessage() put the failing SQL, the row's values and
+            // the connection host straight onto the card and into the transcript.
+            $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            // Same reasoning as the QueryException arm: TransportException extends
+            // \RuntimeException, so an SMTP failure would otherwise render its own
+            // message, which names the mail host and port and, on an auth failure,
+            // the SMTP username. Inviting a teammate is the first proposal action
+            // that sends mail inside approve().
+            $this->reportDeliveryFailure($pendingAction, $exception);
+
+            return;
+        } catch (RuntimeException|ValidationException $exception) {
+            // ValidationException is thrown by the action's tenant guards when a
+            // referenced record or assignee stopped being reachable between the
+            // proposal and the approval. HttpException (from abort_*() inside an
+            // action, e.g. the owner-only guard) is a RuntimeException too, and its
+            // message is written for the user, so it renders as-is. Livewire would
+            // otherwise absorb these into an error bag nothing renders, leaving the
+            // button a permanent no-op.
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
             return;
         }
@@ -481,20 +1094,168 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch(
             'proposal:resolved',
             pendingActionId: $pendingAction->getKey(),
-            index: $isBatch ? $this->cursor : null,
+            index: null,
             decision: 'approved',
-            finalized: $finalized,
+            finalized: true,
             record: $record,
             context: $this->context,
         );
 
-        if ($finalized) {
-            $this->pendingActionId = null;
+        $this->settleAfterResolution($pendingAction);
+    }
+
+    /**
+     * Approve the batch record on screen: the active item, in its own
+     * transaction. The rest of the batch stays pending and the card advances to
+     * the next undecided record.
+     */
+    private function approveActiveItem(PendingAction $pendingAction, PendingActionService $service): void
+    {
+        $index = $this->cursorFor($pendingAction);
+
+        if (! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
 
             return;
         }
 
-        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+        try {
+            $result = $service->approveItem($pendingAction, $this->authUser(), $index, $this->excludedFields);
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($pendingAction, $exception);
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+            return;
+        } catch (TransportExceptionInterface $exception) {
+            // Must sit above the RuntimeException arm: TransportException extends
+            // \RuntimeException, so without this a failed invite mail would render
+            // the transport's own message (mail host, port, SMTP username) onto the
+            // card. Same masking the single-record path applies in createCurrent().
+            $this->reportDeliveryFailure($pendingAction, $exception, $index);
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+            return;
+        } catch (RuntimeException|ValidationException $exception) {
+            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $exception->getMessage()));
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+            return;
+        }
+
+        // A deleted record has no page to link to, so only Create items carry a ref.
+        $record = ($pendingAction->operation === PendingActionOperation::Create && $result['record'] instanceof Model)
+            ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
+            : null;
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $pendingAction->getKey(),
+            index: $index,
+            decision: 'approved',
+            finalized: $result['finalized'],
+            record: $record,
+            context: $this->context,
+        );
+
+        $this->afterItemDecision($pendingAction, $index, $result['finalized']);
+    }
+
+    /**
+     * Advance past a just-decided batch record: exclusions belong to the decided
+     * record only, and the cursor lands on the next undecided record after it
+     * (wrapping to the first) so review order stays forward.
+     */
+    private function afterItemDecision(PendingAction $pendingAction, int $decidedIndex, bool $finalized): void
+    {
+        $this->excludedFields = [];
+
+        if ($finalized) {
+            $this->settleAfterResolution($pendingAction);
+
+            return;
+        }
+
+        $fresh = $pendingAction->fresh() ?? $pendingAction;
+        $unresolved = $this->unresolvedIndices($fresh);
+        $after = array_values(array_filter($unresolved, fn (int $i): bool => $i > $decidedIndex));
+
+        $this->cursor = $after[0] ?? ($unresolved[0] ?? 0);
+    }
+
+    /**
+     * Prefix an item failure with the record it belongs to: after "Create all N"
+     * the card must say which record stopped the run.
+     */
+    private function itemFailureMessage(PendingAction $pendingAction, int $index, string $message): string
+    {
+        $display = ProposalPayload::from($pendingAction)->displayAt($index);
+        $summary = $display['summary'] ?? null;
+
+        if (! is_string($summary) || $summary === '') {
+            return $message;
+        }
+
+        return __(':record: :message', ['record' => $summary, 'message' => $message]);
+    }
+
+    /**
+     * Skip one record of a batch step from its row: used by a PLAN's batch step,
+     * whose rows stay listed under the numbered rail. A standalone batch is
+     * paginated instead and its footer Discard rejects the visible record.
+     */
+    public function skipItem(string $stepId, int $index, PendingActionService $service): void
+    {
+        if ($this->editingFieldCode !== null) {
+            return;
+        }
+
+        $pendingAction = $this->loadStep($stepId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        if (! ProposalPayload::from($pendingAction)->isBatch) {
+            return;
+        }
+
+        // An already-decided row cannot be re-decided; its outcome lives in the
+        // transcript audit card.
+        if (! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
+            return;
+        }
+
+        try {
+            $result = $service->rejectItem($pendingAction, $this->authUser(), $index);
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
+        } catch (RuntimeException $exception) {
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+
+            return;
+        }
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $pendingAction->getKey(),
+            index: $index,
+            decision: 'rejected',
+            finalized: $result['finalized'],
+            record: null,
+            context: $this->context,
+        );
+
+        if (! $result['finalized']) {
+            if ((string) $pendingAction->getKey() === $this->activeStepId()) {
+                $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+            }
+
+            return;
+        }
+
+        $this->settleAfterResolution($pendingAction);
     }
 
     public function discardCurrent(PendingActionService $service): void
@@ -503,37 +1264,29 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $pendingAction = $this->loadPending($this->pendingActionId ?? '');
+        $pendingAction = $this->loadStep($this->activeStepId());
 
         if (! $pendingAction instanceof PendingAction) {
             return;
         }
 
-        $isBatch = ($pendingAction->action_data['_batch'] ?? false) === true;
-
-        // A decided item is no longer in the dock queue — snap to the next undecided
-        // one rather than re-running an already-resolved index.
-        if ($isBatch && ! in_array($this->cursor, $this->unresolvedIndices($pendingAction), true)) {
-            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
+        // A batch renders exactly one record at a time (Attio pagination), so the
+        // footer's Discard rejects exactly what is on screen: the active record.
+        // The rest of the batch stays pending and the card advances.
+        if (ProposalPayload::from($pendingAction)->isBatch) {
+            $this->rejectActiveItem($pendingAction, $service);
 
             return;
         }
 
         try {
-            if ($isBatch) {
-                $result = $service->rejectItem($pendingAction, $this->cursor);
-                $finalized = $result['finalized'];
-            } else {
-                $service->reject($pendingAction);
-                $finalized = true;
-            }
+            resolve(ProposalPlanService::class)->reject($pendingAction, $this->authUser());
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($pendingAction, $exception);
+
+            return;
         } catch (RuntimeException $exception) {
-            $this->dispatch(
-                'proposal:resolve-failed',
-                pendingActionId: $pendingAction->getKey(),
-                message: $exception->getMessage(),
-                context: $this->context,
-            );
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
 
             return;
         }
@@ -541,20 +1294,265 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch(
             'proposal:resolved',
             pendingActionId: $pendingAction->getKey(),
-            index: $isBatch ? $this->cursor : null,
+            index: null,
             decision: 'rejected',
-            finalized: $finalized,
+            finalized: true,
             record: null,
             context: $this->context,
         );
 
-        if ($finalized) {
-            $this->pendingActionId = null;
+        // Rejecting a step cancels its dependents, so the transcript is told about
+        // each of them too, a card that silently vanished would read as a bug.
+        foreach ($this->cancelledDependentsOf($pendingAction) as $cancelled) {
+            $this->announceResolution($cancelled, 'rejected');
+        }
+
+        $this->settleAfterResolution($pendingAction);
+    }
+
+    /**
+     * Reject the batch record on screen: the active item alone. Mirrors
+     * approveActiveItem(): the rest of the batch stays pending and the card
+     * advances to the next undecided record.
+     */
+    private function rejectActiveItem(PendingAction $pendingAction, PendingActionService $service): void
+    {
+        $index = $this->cursorFor($pendingAction);
+
+        if (! in_array($index, $this->unresolvedIndices($pendingAction), true)) {
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction);
 
             return;
         }
 
-        $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+        try {
+            $result = $service->rejectItem($pendingAction, $this->authUser(), $index);
+        } catch (QueryException $exception) {
+            $this->reportDatabaseFailure($pendingAction, $exception);
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+            return;
+        } catch (RuntimeException $exception) {
+            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
+
+            return;
+        }
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $pendingAction->getKey(),
+            index: $index,
+            decision: 'rejected',
+            finalized: $result['finalized'],
+            record: null,
+            context: $this->context,
+        );
+
+        $this->afterItemDecision($pendingAction, $index, $result['finalized']);
+    }
+
+    /**
+     * Steps this rejection cancelled: pending a moment ago, rejected now, and
+     * marked with the step that caused it.
+     *
+     * @return list<PendingAction>
+     */
+    private function cancelledDependentsOf(PendingAction $step): array
+    {
+        $candidates = PendingAction::query()
+            ->where('team_id', $step->team_id)
+            ->where('conversation_id', $step->conversation_id)
+            ->where('turn_id', $step->turn_id)
+            ->whereKeyNot($step->getKey())
+            ->where('status', PendingActionStatus::Rejected)
+            ->get();
+
+        $cancelled = [];
+
+        foreach ($candidates as $candidate) {
+            if (($candidate->result_data['cancelled_by'] ?? null) === (string) $step->getKey()) {
+                $cancelled[] = $candidate;
+            }
+        }
+
+        return $cancelled;
+    }
+
+    private function announceResolution(PendingAction $step, string $decision): void
+    {
+        $record = null;
+
+        // Only an approval needs the reload: it is the executed write that stamps
+        // the created record onto result_data. A cancelled step arrives here
+        // already carrying its outcome, from cancelStep()'s saved model.
+        if ($decision === 'approved') {
+            $step = $step->refresh();
+            $record = $this->recordReferenceFor($step);
+        }
+
+        // A step cancelled because the step it depended on was rejected has to say
+        // so live, not only after a reload. ListConversationMessages sets this on
+        // the way back in; without it here the transcript shows a bare "Rejected"
+        // in the very session where the cascade happened, which is the outcome
+        // PendingActionService::cancelStep() records it to prevent.
+        $cancelledBy = $step->result_data['cancelled_by'] ?? null;
+
+        $this->dispatch(
+            'proposal:resolved',
+            pendingActionId: $step->getKey(),
+            index: null,
+            decision: $decision,
+            finalized: true,
+            record: $record,
+            cancelledBy: is_string($cancelledBy) ? $cancelledBy : null,
+            context: $this->context,
+        );
+    }
+
+    /**
+     * After a step resolves, the dock either moves to the plan's next undecided
+     * step or closes when there is none left, and when there is none left, the
+     * decision itself becomes the next turn.
+     */
+    private function settleAfterResolution(PendingAction $resolved): void
+    {
+        $anchor = $this->loadStep($this->pendingActionId);
+
+        if ($anchor instanceof PendingAction) {
+            $this->focusFirstPendingStep($anchor);
+
+            return;
+        }
+
+        $next = $this->nextPendingStepOfPlan();
+
+        if ($next instanceof PendingAction) {
+            $this->pendingActionId = (string) $next->getKey();
+            $this->focusFirstPendingStep($next);
+
+            return;
+        }
+
+        $this->pendingActionId = null;
+        $this->activeStepId = null;
+
+        $this->resumeAssistant($resolved);
+    }
+
+    /**
+     * Hand the decision back to the assistant so the user never has to type
+     * "next" to hear what happened or to get the rest of a chained request.
+     * The service owns every gate (nothing else pending, once per turn, one
+     * credit); this only supplies the turn that was decided.
+     */
+    private function resumeAssistant(PendingAction $resolved): void
+    {
+        $conversationId = $resolved->conversation_id;
+        $turnId = $resolved->turn_id;
+
+        if ($conversationId === null || $turnId === null) {
+            return;
+        }
+
+        $queued = resolve(TurnContinuationService::class)->resume(
+            $this->authUser(),
+            $conversationId,
+            $turnId,
+            $this->model,
+        );
+
+        if ($queued) {
+            $this->dispatch('chat:resuming', context: $this->context);
+        }
+    }
+
+    /**
+     * The anchor itself can be the step that just resolved, so the plan is
+     * re-entered through any sibling that is still pending.
+     */
+    private function nextPendingStepOfPlan(): ?PendingAction
+    {
+        $user = $this->authUser();
+
+        $resolved = PendingAction::query()
+            ->whereKey($this->pendingActionId ?? '')
+            ->where('team_id', $user->currentTeam->getKey())
+            ->first();
+
+        if (! $resolved instanceof PendingAction || $resolved->turn_id === null) {
+            return null;
+        }
+
+        return PendingAction::query()
+            ->where('team_id', $user->currentTeam->getKey())
+            ->where('user_id', $user->getKey())
+            ->where('conversation_id', $resolved->conversation_id)
+            ->where('turn_id', $resolved->turn_id)
+            ->where('status', PendingActionStatus::Pending)
+            ->where('expires_at', '>', now())
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Report a failed resolve on the card itself AND to the transcript. The
+     * dispatched event alone is not user-visible, so the message is also bound to
+     * the `resolve` error bag which the dock renders — a proposal that cannot be
+     * resolved must say so rather than leave the button dead.
+     */
+    /**
+     * A database error is never shown verbatim: the driver's message carries the
+     * statement, its bindings and the connection details. The operator still needs
+     * the real thing, so it goes to the log instead.
+     *
+     * A unique violation here means something got past the actions' re-validation —
+     * in practice a second approval landing in the same instant — so it is reported
+     * as a race the user can retry, not as a generic failure.
+     */
+    private function reportDatabaseFailure(PendingAction $pendingAction, QueryException $exception): void
+    {
+        report($exception);
+
+        $this->reportResolveFailure($pendingAction, $exception->getCode() === '23505'
+            ? __('Someone else just made a conflicting change. Reload the page and try again.')
+            : __('This change could not be saved. Please try again.'));
+    }
+
+    /**
+     * The approval transaction rolls back when the mail send throws, so nothing was
+     * written and retrying is safe: say exactly that, and keep the transport's own
+     * message (mail host, port, SMTP username) out of the card and the transcript.
+     *
+     * On a batch the failure belongs to one record, so name it: the items before it
+     * did commit, and a bare message would read as if the whole batch had failed.
+     */
+    private function reportDeliveryFailure(PendingAction $pendingAction, TransportExceptionInterface $exception, ?int $index = null): void
+    {
+        report($exception);
+
+        $message = __('The email could not be sent, so nothing was saved. Please try again in a moment.');
+
+        $this->reportResolveFailure($pendingAction, $index === null
+            ? $message
+            : $this->itemFailureMessage($pendingAction, $index, $message));
+    }
+
+    private function reportResolveFailure(PendingAction $pendingAction, string $message): void
+    {
+        $this->addError('resolve', $message);
+
+        // Persisted so the model can explain the failure later: without this
+        // the card is the only witness, and a proposal discarded after a failed
+        // approval reads to the assistant as a plain user rejection.
+        resolve(PendingActionService::class)->recordResolveFailure($pendingAction, $message);
+
+        $this->dispatch(
+            'proposal:resolve-failed',
+            pendingActionId: $pendingAction->getKey(),
+            message: $message,
+            context: $this->context,
+        );
     }
 
     private function ensureTenantContext(): void
@@ -592,21 +1590,15 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function currentRecordDisplay(PendingAction $pendingAction): array
     {
-        $display = $pendingAction->display_data;
+        return ProposalPayload::from($pendingAction)->displayAt($this->cursorFor($pendingAction));
+    }
 
-        if (($pendingAction->action_data['_batch'] ?? false) !== true) {
-            return $display;
-        }
-
-        $items = is_array($display['items'] ?? null) ? $display['items'] : [];
-
-        if ($items === []) {
-            return [];
-        }
-
-        $current = $items[$this->cursor] ?? reset($items);
-
-        return is_array($current) ? $current : [];
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function currentRecordFields(): array
+    {
+        return $this->recordFieldsOf($this->loadStep($this->activeStepId()));
     }
 
     /**
@@ -618,10 +1610,8 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<array<string, mixed>>
      */
-    public function currentRecordFields(?PendingAction $pendingAction = null): array
+    private function recordFieldsOf(?PendingAction $pendingAction): array
     {
-        $pendingAction ??= $this->loadPending($this->pendingActionId ?? '');
-
         if (! $pendingAction instanceof PendingAction) {
             return [];
         }
@@ -645,6 +1635,14 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
+     * @return list<string>
+     */
+    public function editableCodes(): array
+    {
+        return $this->editableCodesOf($this->loadStep($this->activeStepId()));
+    }
+
+    /**
      * The set of field codes the dock allows inline editing for the current
      * entity: core keys plus the active, non-deferred custom field codes. Derived
      * from ProposalFieldSchemaDescriber so the deferred-field exclusion (FILE_UPLOAD,
@@ -652,10 +1650,8 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * @return list<string>
      */
-    public function editableCodes(?PendingAction $pendingAction = null): array
+    private function editableCodesOf(?PendingAction $pendingAction): array
     {
-        $pendingAction ??= $this->loadPending($this->pendingActionId ?? '');
-
         if (! $pendingAction instanceof PendingAction) {
             return [];
         }
@@ -665,12 +1661,27 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
+        $entityType = $pendingAction->entity_type;
+
+        // Which codes are editable is a property of the entity, not of the record:
+        // the describer lists the entity's core keys plus its active, non-deferred
+        // custom fields, and defers by field type rather than by value. stepViews()
+        // asks once per step, so without this memo a plan whose steps share an
+        // entity type (the usual shape: one company, then its four contacts) re-ran
+        // the same CustomField query for every step on every dock round trip.
+        if (array_key_exists($entityType, $this->editableCodesCache)) {
+            return $this->editableCodesCache[$entityType];
+        }
+
         $this->ensureTenantContext();
 
         $schema = resolve(ProposalFieldSchemaDescriber::class)
-            ->describe($this->authUser(), $pendingAction->entity_type, $this->currentRecord($pendingAction));
+            ->describe($this->authUser(), $entityType, $this->currentRecord($pendingAction));
 
-        return array_map(static fn (array $field): string => (string) $field['code'], $schema);
+        return $this->editableCodesCache[$entityType] = array_map(
+            static fn (array $field): string => (string) $field['code'],
+            $schema,
+        );
     }
 
     /**
@@ -688,16 +1699,25 @@ final class ProposalCard extends BaseLivewireComponent
 
     public function render(): View
     {
-        $proposal = $this->pendingActionId !== null ? $this->loadPending($this->pendingActionId) : null;
+        // An action ran earlier in this same request may have resolved a step, so
+        // the memo is dropped here rather than trusted: stepViews() repopulates it
+        // once and the rest of the render reads that.
+        $this->forgetPlanSteps();
 
+        $proposal = $this->loadStep($this->activeStepId());
+        $steps = $this->stepViews();
+
+        // recordFields and editableCodes are dropped: no partial reads them, and each
+        // ran its own CustomField query (editableCodes two more for team members) on
+        // every dock round trip, only to be discarded. stepViews() already carries
+        // both per step. The counters below stay: they are cheap array reads and the
+        // batch footer's behaviour is asserted through them.
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
-            'record' => $proposal instanceof PendingAction ? $this->currentRecordDisplay($proposal) : [],
-            'recordFields' => $proposal instanceof PendingAction ? $this->currentRecordFields($proposal) : [],
-            'editableCodes' => $proposal instanceof PendingAction ? $this->editableCodes($proposal) : [],
-            'recordCount' => $proposal instanceof PendingAction ? $this->recordCount($proposal) : 0,
-            'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCount($proposal) : 0,
-            'position' => $proposal instanceof PendingAction ? $this->currentPosition($proposal) : 1,
+            'steps' => $steps,
+            'isPlan' => count($steps) > 1,
+            'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
+            'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
         ]);
     }
 }

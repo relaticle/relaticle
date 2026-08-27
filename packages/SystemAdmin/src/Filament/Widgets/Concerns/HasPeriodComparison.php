@@ -86,18 +86,35 @@ trait HasPeriodComparison
      */
     private function getActiveCreatorIds(CarbonImmutable $start, CarbonImmutable $end): Collection
     {
+        return $this->getDistinctActiveColumnValues('creator_id', $start, $end);
+    }
+
+    /**
+     * The shared "did something real" filter behind activation metrics: a
+     * non-null creator, a non-system creation source, within the period, on a
+     * non-deleted row — applied across every entity table and unioned.
+     *
+     * $column selects the grain (e.g. `creator_id` for active users,
+     * `team_id` for active teams); it is only ever a trusted internal literal,
+     * never user input, so it is safe to interpolate into the identifier
+     * position.
+     *
+     * @return Collection<int, int|string>
+     */
+    private function getDistinctActiveColumnValues(string $column, CarbonImmutable $start, CarbonImmutable $end): Collection
+    {
         $unionParts = [];
         $bindings = [];
 
         foreach (self::ENTITY_TABLES as $table) {
-            $unionParts[] = "SELECT DISTINCT \"creator_id\" FROM \"{$table}\" WHERE \"creator_id\" IS NOT NULL AND \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
+            $unionParts[] = "SELECT DISTINCT \"{$column}\" FROM \"{$table}\" WHERE \"creator_id\" IS NOT NULL AND \"creation_source\" != ? AND \"created_at\" BETWEEN ? AND ? AND \"deleted_at\" IS NULL";
             $bindings[] = CreationSource::SYSTEM->value;
             $bindings[] = $start->toDateTimeString();
             $bindings[] = $end->toDateTimeString();
         }
 
-        $sql = 'SELECT DISTINCT creator_id FROM ('.implode(' UNION ', $unionParts).') AS all_creators';
+        $sql = "SELECT DISTINCT {$column} FROM (".implode(' UNION ', $unionParts).') AS active_rows';
 
-        return collect(DB::select($sql, $bindings))->pluck('creator_id');
+        return collect(DB::select($sql, $bindings))->pluck($column);
     }
 }

@@ -9,6 +9,7 @@ use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
@@ -17,7 +18,6 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\RedirectResponse;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
@@ -26,6 +26,8 @@ use Throwable;
 
 final class Billing extends Page
 {
+    use HasWorkspaceSettingsNavigation;
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
     protected static ?string $slug = 'billing';
@@ -49,11 +51,6 @@ final class Billing extends Page
         return __('billing.title');
     }
 
-    public function getSubheading(): string
-    {
-        return __('billing.subtitle');
-    }
-
     public function mount(): void
     {
         abort_unless(Feature::active(BillingFeature::class), 403);
@@ -61,7 +58,7 @@ final class Billing extends Page
 
     public function startTrial(StartProTrial $startProTrial): void
     {
-        // The button is only rendered for a grandfathered workspace, but the
+        // The button is only rendered for an eligible workspace, but the
         // Livewire method is reachable regardless — enforce it server-side.
         if (! $this->trialAvailable()) {
             Notification::make()->title(__('billing.trial.not_available'))->danger()->send();
@@ -86,57 +83,51 @@ final class Billing extends Page
         Notification::make()->title(__('billing.trial.started'))->success()->send();
     }
 
-    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): ?RedirectResponse
+    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team) || $team->subscribed()) {
-            return null;
+            return;
         }
 
         try {
-            return redirect()->away($createCheckout->execute($team, $interval));
+            $this->redirect($createCheckout->execute($team, $interval));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 
-    public function managePortal(): ?RedirectResponse
+    public function managePortal(): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team)) {
-            return null;
+            return;
         }
 
         try {
-            return $team->redirectToBillingPortal(self::getUrl(panel: 'app', tenant: $team));
+            $this->redirect($team->billingPortalUrl(self::getUrl(panel: 'app', tenant: $team)));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 
-    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): ?RedirectResponse
+    public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): void
     {
         $team = $this->team();
 
         if (! $this->user()->ownsTeam($team) || ! resolve(HostedWorkspaceAccess::class)->allows($team)) {
-            return null;
+            return;
         }
 
         try {
-            return redirect()->away($createCheckout->execute($team, $pack));
+            $this->redirect($createCheckout->execute($team, $pack));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
-
-            return null;
         }
     }
 
@@ -173,16 +164,16 @@ final class Billing extends Page
     }
 
     /**
-     * A manual trial is offered only to a grandfathered workspace — a new
-     * hosted workspace receives its trial automatically at creation.
+     * A manual trial start is the escape hatch for a workspace that never
+     * received its automatic creation-time trial — grandfathered pre-billing
+     * workspaces and workspaces created while trials were per-user.
      */
     private function trialAvailable(): bool
     {
         $team = $this->team();
 
-        return $team->hosted_free_grandfathered_at !== null
-            && $team->plan === Plan::Free
-            && $this->user()->pro_trial_used_at === null
+        return $team->plan === Plan::Free
+            && $team->pro_trial_used_at === null
             && ! $team->subscriptions()->exists();
     }
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -65,11 +66,11 @@ function makeUpdateFieldTool(string $convId): UpdateCustomFieldTool
 it('proposes renaming a custom field and updates name on approval', function (): void {
     $tool = makeUpdateFieldTool($this->convId);
 
-    $result = $tool->handle(new Request([
+    $result = $tool->handle(new Request(['records' => [[
         'entity_type' => 'company',
         'code' => $this->field->code,
         'name' => 'Sector',
-    ]));
+    ]]]));
 
     $decoded = json_decode($result, true);
 
@@ -101,11 +102,11 @@ it('returns error and creates no proposal for non-owner', function (): void {
     $this->actingAs($nonOwner);
 
     $tool = makeUpdateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $result = $tool->handle(new Request(['records' => [[
         'entity_type' => 'company',
         'code' => $this->field->code,
         'name' => 'Sector',
-    ]));
+    ]]]));
 
     $decoded = json_decode($result, true);
 
@@ -124,11 +125,110 @@ it('returns error when trying to update a system_defined field', function (): vo
     ]);
 
     $tool = makeUpdateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $result = $tool->handle(new Request(['records' => [[
         'entity_type' => 'company',
         'code' => $systemField->code,
         'name' => 'Hacked',
-    ]));
+    ]]]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('System-defined')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses to propose reactivating a system-defined field', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    $priorityField = CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Priority',
+        'type' => 'select',
+        'system_defined' => true,
+        'active' => false,
+    ]);
+
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request(['records' => [[
+        'entity_type' => 'task',
+        'code' => $priorityField->code,
+        'active' => true,
+    ]]]));
+
+    expect($result)->toContain('System-defined')
+        ->and(PendingAction::query()->where('entity_type', 'custom_field')->count())->toBe(0);
+});
+
+it('rejects renaming to a name that already exists on the entity at proposal time', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Sector',
+        'code' => 'sector',
+        'type' => 'text',
+    ]);
+
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Sector',
+    ]]]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded)->toHaveKey('error')
+        ->and($decoded['error'])->toContain('already exists')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('allows renaming a field to its own current name', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Industry',
+    ]]]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded['type'])->toBe('pending_action');
+});
+
+it('rejects approval when the new name was taken after the proposal', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $tool->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => 'Sector',
+    ]]]));
+
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+    CustomField::factory()->create([
+        $tenantKey => $this->team->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Sector',
+        'code' => 'sector',
+        'type' => 'text',
+    ]);
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->owner))
+        ->toThrow(ValidationException::class, 'already exists');
+
+    expect($this->field->refresh()->name)->toBe('Industry');
+});
+
+it('rejects renaming to a name longer than 50 characters', function (): void {
+    $tool = makeUpdateFieldTool($this->convId);
+    $result = $tool->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'name' => str_repeat('a', 51),
+    ]]]));
 
     $decoded = json_decode($result, true);
 
@@ -139,11 +239,11 @@ it('returns error when trying to update a system_defined field', function (): vo
 it('proposes toggling active status and applies it on approval', function (): void {
     $tool = makeUpdateFieldTool($this->convId);
 
-    $result = $tool->handle(new Request([
+    $result = $tool->handle(new Request(['records' => [[
         'entity_type' => 'company',
         'code' => $this->field->code,
         'active' => false,
-    ]));
+    ]]]));
 
     $decoded = json_decode($result, true);
     expect($decoded['type'])->toBe('pending_action');
@@ -159,4 +259,31 @@ it('proposes toggling active status and applies it on approval', function (): vo
         ->find($this->field->getKey());
 
     expect($refreshed->active)->toBeFalse();
+});
+
+it('batches several field definitions into one per-item proposal', function (): void {
+    $second = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->team->getKey(), 'entity_type' => 'company', 'name' => 'Region', 'code' => 'region', 'type' => 'text', 'active' => true,
+    ]);
+
+    $tool = makeUpdateFieldTool($this->convId);
+
+    $result = json_decode($tool->handle(new Request(['records' => [
+        ['entity_type' => 'company', 'code' => $this->field->code, 'name' => 'Sector'],
+        ['entity_type' => 'company', 'code' => $second->code, 'active' => false],
+    ]])), true);
+
+    $pending = PendingAction::query()->latest()->firstOrFail();
+
+    expect($result['data']['_batch'])->toBeTrue()
+        ->and($pending->action_data['records'])->toHaveCount(2)
+        ->and($pending->action_data['records'][1]['_model_class'])->toBe(CustomField::class)
+        ->and($pending->display_data['summary'])->toBe('Update 2 custom fields');
+
+    $service = resolve(PendingActionService::class);
+    $service->approveItem($pending, $this->owner, 0);
+    $service->approveItem($pending->fresh(), $this->owner, 1);
+
+    expect($this->field->refresh()->name)->toBe('Sector')
+        ->and(CustomField::withoutGlobalScopes()->find($second->getKey())->active)->toBeFalse();
 });

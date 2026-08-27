@@ -212,6 +212,22 @@ describe('cross-tenant isolation', function (): void {
             ->assertUnprocessable()
             ->assertInvalid(['company_id']);
     });
+
+    it('lets an update resubmit the record\'s own unique email but not another record\'s', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $other = People::factory()->recycle([$this->user, $this->team])->create();
+
+        $this->putJson("/api/v1/people/{$person->id}", ['custom_fields' => ['emails' => ['unique@example.com']]])
+            ->assertOk();
+
+        $this->putJson("/api/v1/people/{$person->id}", ['custom_fields' => ['emails' => ['unique@example.com']]])
+            ->assertOk();
+
+        $this->putJson("/api/v1/people/{$other->id}", ['custom_fields' => ['emails' => ['unique@example.com']]])
+            ->assertUnprocessable();
+    });
 });
 
 describe('includes', function (): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Task;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use App\Rules\ValidCustomFields;
@@ -33,6 +34,6 @@ final class UpdateTaskRequest extends FormRequest
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
-        ], new ValidCustomFields($teamId, 'task', isUpdate: true)->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, 'task', isUpdate: true, ignoreEntityId: ($record = $this->route('task')) instanceof Task ? $record->getKey() : null)->toRules($this->input('custom_fields')));
     }
 }

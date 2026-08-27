@@ -16,6 +16,11 @@ final class SubscriptionPolicy
         return true;
     }
 
+    public function transfer(): bool
+    {
+        return true;
+    }
+
     public function create(): bool
     {
         return false;

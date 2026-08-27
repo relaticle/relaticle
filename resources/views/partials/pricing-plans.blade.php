@@ -45,8 +45,8 @@
                     @foreach([
                         'Unlimited users and records',
                         '2,000 AI credits / month',
-                        'All AI models, including premium',
-                        'REST API and 30-tool MCP server',
+                        'Premium AI models included',
+                        'REST API and 32-tool MCP server',
                         'Email support',
                     ] as $feature)
                         <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
@@ -118,6 +118,6 @@
         <a href="{{ route('contact') }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">Talk to us</a>.
     </p>
     <p class="text-xs text-gray-400 dark:text-gray-500">
-        1 credit ≈ one AI chat message or record summary. Allowances may evolve with notice.
+        Credit cost varies by model and tool calls — a simple reply is 1 credit, a premium one costs more. Allowances may evolve with notice.
     </p>
 </div>

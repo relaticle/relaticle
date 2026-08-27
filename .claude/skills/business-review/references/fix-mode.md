@@ -27,8 +27,9 @@ refusing to touch code.
    updated in place with a `## Fixes applied` section (finding → commit/diff → re-verify
    artifact → status).
 5. **Ledger update** (`regression-ledger.md`): every confirmed-then-fixed finding whose
-   class could recur becomes a `regressions.json` entry (id, class, trigger, check,
-   repro). This is mandatory — findings must compound.
+   class could recur becomes an entry in the machine-local ledger
+   (`~/.claude/business-review/relaticle/regressions.json` — never commit it to the
+   repo). This is mandatory — findings must compound.
 
 ## Hard rules
 

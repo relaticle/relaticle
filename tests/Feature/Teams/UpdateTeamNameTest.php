@@ -82,13 +82,14 @@ test('team can keep its own slug on update', function () {
         ->assertNotified();
 });
 
-test('slug change triggers redirect', function () {
+test('slug change triggers redirect and still notifies', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
     Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
         ->fillForm(['name' => 'New Name', 'slug' => 'completely-new-slug'])
         ->call('updateTeamName', $user->currentTeam)
         ->assertHasNoFormErrors()
+        ->assertNotified()
         ->assertRedirect();
 });
 

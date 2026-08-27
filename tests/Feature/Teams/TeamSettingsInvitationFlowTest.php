@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\Members;
 use App\Livewire\App\Teams\AddTeamMember;
 use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
@@ -24,19 +26,30 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
-test('team settings page does not render ManageInviteLink', function () {
+test('the general tab owns workspace name and deletion', function () {
     $page = app(EditTeam::class);
     $page->tenant = $this->team;
 
-    $schema = $page->form(Schema::make($page));
-
-    $components = collect($schema->getComponents())
-        ->filter(fn ($c) => $c instanceof LivewireComponent)
-        ->map(fn (LivewireComponent $c) => $c->getComponent())
+    $components = collect($page->form(Schema::make($page))->getComponents())
+        ->filter(fn ($c): bool => $c instanceof LivewireComponent)
+        ->map(fn (LivewireComponent $c): string => $c->getComponent())
         ->all();
 
     expect($components)->toContain(UpdateTeamName::class)
-        ->and($components)->toContain(AddTeamMember::class)
+        ->and($components)->not->toContain(AddTeamMember::class)
+        ->and($components)->not->toContain(PendingTeamInvitations::class)
+        ->and($components)->not->toContain(TeamMembers::class);
+});
+
+test('the members tab owns invitations and membership, and does not render ManageInviteLink', function () {
+    $page = app(Members::class);
+
+    $components = collect($page->form(Schema::make($page))->getComponents())
+        ->filter(fn ($c): bool => $c instanceof LivewireComponent)
+        ->map(fn (LivewireComponent $c): string => $c->getComponent())
+        ->all();
+
+    expect($components)->toContain(AddTeamMember::class)
         ->and($components)->toContain(PendingTeamInvitations::class)
         ->and($components)->toContain(TeamMembers::class)
         ->and($components)->not->toContain('App\\Livewire\\App\\Teams\\ManageInviteLink');
@@ -60,7 +73,28 @@ test('admin invites by email and the invitation appears in the pending list', fu
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->assertCanSeeTableRecords([$invitation]);
 
-    Mail::assertSent(TeamInvitationMail::class);
+    Mail::assertQueued(TeamInvitationMail::class);
+});
+
+test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
+    Mail::fake();
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'invitee@example.com',
+            'role' => 'editor',
+        ])
+        ->call('addTeamMember', $this->team)
+        ->assertNoRedirect()
+        ->assertDispatched('teamInvitationSent')
+        ->assertSchemaStateSet([
+            'email' => null,
+            'role' => null,
+        ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+        ->dispatch('teamInvitationSent')
+        ->assertCanSeeTableRecords($this->team->fresh()->teamInvitations);
 });
 
 test('admin can resend a pending invitation', function () {
@@ -75,7 +109,11 @@ test('admin can resend a pending invitation', function () {
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
-    Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
+    Mail::assertNotSent(TeamInvitationMail::class);
+    Mail::assertQueued(
+        TeamInvitationMail::class,
+        fn (TeamInvitationMail $mail): bool => $mail->hasTo('pending@example.com') && $mail->afterCommit === true,
+    );
 });
 
 test('admin can revoke a pending invitation', function () {
@@ -111,7 +149,7 @@ test('onboarding-generated invite link still works for an authenticated user', f
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
         ->and($joiner->fresh()->current_team_id)->toBe($team->id);

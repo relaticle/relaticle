@@ -1,4 +1,4 @@
-<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-20 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
+<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
 
     {{-- Background system — layered depth --}}
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
@@ -27,7 +27,7 @@
 
                 <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
                     Open-source, self-hosted, and human-first.<br class="hidden sm:block"/>
-                    Built-in AI chat plus 30 MCP tools for external agents.
+                    Built-in AI chat plus 32 MCP tools for external agents.
                 </p>
             </div>
 
@@ -78,7 +78,7 @@
                     <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[100vw] h-px pointer-events-none bg-[repeating-linear-gradient(to_right,theme(colors.gray.200)_0,theme(colors.gray.200)_10px,transparent_10px,transparent_18px)] dark:bg-[repeating-linear-gradient(to_right,rgba(255,255,255,0.08)_0,rgba(255,255,255,0.08)_10px,transparent_10px,transparent_18px)]" aria-hidden="true"></div>
                     <div x-ref="indicator" class="absolute bottom-0 h-px bg-primary/80 rounded-full pointer-events-none transition-[left,width] duration-200" aria-hidden="true"></div>
                     <button type="button" id="tab-ai-agent" role="tab" :aria-selected="(activeTab === 'ai-agent').toString()" :tabindex="activeTab === 'ai-agent' ? 0 : -1" aria-controls="panel-ai-agent" x-ref="tab-ai-agent" x-on:click="switchTab('ai-agent')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('ai-agent')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
-                        <span class="sm:hidden">Ask</span><span class="hidden sm:inline">Ask Relaticle</span>
+                        <span class="sm:hidden">{{ __('Ask') }}</span><span class="hidden sm:inline">{{ __('Ask :name', ['name' => (string) config('chat.assistant_name')]) }}</span>
                     </button>
                     <div class="w-px self-stretch my-0 bg-gray-200 dark:bg-white/[0.08]" aria-hidden="true"></div>
                     <button type="button" id="tab-pipeline" role="tab" :aria-selected="(activeTab === 'pipeline').toString()" :tabindex="activeTab === 'pipeline' ? 0 : -1" aria-controls="panel-pipeline" x-ref="tab-pipeline" x-on:click="switchTab('pipeline')" x-on:keydown="handleTabKeydown($event)" :class="tabClasses('pipeline')" class="relative flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-colors duration-200 cursor-pointer">
@@ -117,57 +117,72 @@
                         </div>
 
                         {{-- Tab panels — grid stacking for Safari-smooth crossfade.
-                             min-height matches the live chat panel so switching to a
-                             shorter (16:10) image tab can't collapse the mockup frame. --}}
+                             min-height matches the live chat panel so switching to an
+                             image tab can't collapse the mockup frame.
+
+                             The image tabs FILL that frame (object-cover) rather than
+                             sitting in it at their own aspect: the frame is a constant
+                             826x640 from `lg` up, so the screenshots are captured at
+                             that ratio and land pixel-exact there. Below `lg` the frame
+                             narrows and finally turns portrait, and cover crops the
+                             right edge instead of leaving the dead band under the
+                             image that a plain `h-auto` used to (measured: 124px at
+                             desktop, over half the frame on a phone). object-left-top
+                             keeps the crop predictable -- you always see the app from
+                             its top-left corner, which is what the alt text
+                             describes. --}}
                         <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
                             {{-- AI Agent tab (default — featured) --}}
-                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1">
+                            {{-- min-w-0: a grid item defaults to min-width:auto, so the
+                                 chat panel's own table would size the column to its
+                                 intrinsic width and push the transcript past the frame. --}}
+                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 min-w-0">
                                 @include('home.partials.hero-agent-preview')
                             </div>
 
                             {{-- Pipeline tab --}}
                             <div id="panel-pipeline" role="tabpanel" aria-labelledby="tab-pipeline" x-ref="panel-pipeline" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
                                             data-dark-srcset="{{ asset('images/app-pipeline-preview-dark-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-dark-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-dark-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview-dark.webp') }} 1440w"
                                             srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
-                                            sizes="(max-width: 640px) 380px, (max-width: 1024px) 640px, 832px"
+                                            sizes="(max-width: 640px) 750px, 842px"
                                             type="image/webp">
                                     <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-pipeline-preview-dark.png') }}"
                                          src="{{ asset('images/app-pipeline-preview.png') }}"
-                                         alt="Relaticle CRM — Pipeline"
-                                         class="hero-preview-image w-full h-auto"
+                                         alt="{{ __('Relaticle opportunities board with deals grouped into pipeline stages, showing deal value and close date') }}"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-companies" role="tabpanel" aria-labelledby="tab-companies" x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-companies-preview-dark.png') }}"
                                          src="{{ asset('images/app-companies-preview.png') }}"
-                                         alt="Relaticle CRM — Companies"
-                                         class="hero-preview-image w-full h-auto"
+                                         alt="{{ __('Relaticle companies list showing account owner, ICP status, and website domain for each company') }}"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-custom-fields" role="tabpanel" aria-labelledby="tab-custom-fields" x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-custom-fields-preview-dark.png') }}"
                                          src="{{ asset('images/app-custom-fields-preview.png') }}"
-                                         alt="Relaticle CRM — Custom Fields"
-                                         class="hero-preview-image w-full h-auto"
+                                         alt="{{ __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities') }}"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>

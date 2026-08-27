@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
@@ -118,4 +119,65 @@ test('callback from socialite provider handles missing code parameter', function
 
     $errors = session('errors')->getBag('default');
     expect($errors->first('login'))->toBe('Authorization was cancelled or failed. Please try again.');
+});
+
+test('callback from socialite provider rejects a disposable email address', function () {
+    Exceptions::fake();
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('987654321', 'Burner User', 'burner@mailinator.com'),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login' => __('validation.indisposable')]);
+
+    $this->assertDatabaseMissing('users', ['email' => 'burner@mailinator.com']);
+    $this->assertGuest();
+
+    Exceptions::assertNothingReported();
+});
+
+/**
+ * The signup event was flagged only by the registration form, so every OAuth
+ * sign-up reached the panel without one. That made the number wrong rather
+ * than merely incomplete, and it is the undercount that made the Fathom
+ * signup series disagree with the users table.
+ */
+test('callback flags the signup event when the OAuth user is new', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('987654321', 'Fresh User', 'fresh@example.com'),
+    );
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(session()->get('fathom.track_signup'))->toBeTrue();
+});
+
+test('callback does not flag the signup event when the OAuth user already exists', function () {
+    $user = User::factory()->withTeam()->create([
+        'email' => 'returning@example.com',
+        'name' => 'Returning User',
+    ]);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => '55555',
+    ]);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('55555', 'Returning User', 'returning@example.com'),
+    );
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(session()->has('fathom.track_signup'))->toBeFalse();
 });

@@ -1,6 +1,6 @@
 ---
 name: spatie-security
-description: Apply Spatie's security guidelines when configuring applications, databases, or servers, or when reviewing code for security concerns; use for SSL setup, CSRF protection, password hashing, database permissions, and server hardening.
+description: Apply Spatie's security guidelines when configuring applications, databases, servers, credentials, or signed Git commits, or when reviewing code for security concerns; use for SSL setup, CSRF protection, password hashing, database permissions, and server hardening.
 license: MIT
 metadata:
   author: Spatie
@@ -18,48 +18,28 @@ Apply Spatie's security best practices when building, configuring, or reviewing 
 - Activate this skill when setting up or reviewing database configurations.
 - Activate this skill when configuring servers or reviewing infrastructure.
 - Activate this skill when reviewing code for security vulnerabilities.
+- Activate this skill when configuring or creating signed Git commits.
 
 ## Scope
 
-- In scope: Application security, database security, server configuration, credential management.
+- In scope: Application security, database security, server configuration, credential management, signed Git commits.
 - Out of scope: Code style, business logic, UI/UX design.
 
-## Application Security
+## Workflow
 
-- Transmit all HTTP traffic over SSL.
-- Use CSRF tokens in all forms.
-- Use appropriate HTTP methods for significant actions: `DELETE`, `POST`, `PUT` — never `GET`.
-- Add automated authorization tests to verify only authorized users can access restricted functionality.
+1. Identify the application, database, server, credential, or Git security concern.
+2. Read `references/spatie-security-guidelines.md` and focus on the relevant sections.
+3. Apply the narrowest relevant security controls without weakening existing protections.
 
-## Database Security
+## Core Rules (Summary)
 
-- Hash all stored passwords.
-- Encrypt API keys stored in databases.
-- Use separate database users per database with appropriate read/write permissions.
-- Restrict database access to whitelisted hosts only (webserver and developer machines).
+- Store unique passwords in 1Password, enable two-factor authentication, and password-protect private keys.
+- Sign all Git commits.
+- Use SSL, CSRF protection, appropriate HTTP methods, and automated authorization tests.
+- Hash passwords, encrypt stored API keys, isolate database users, and restrict database hosts.
+- Keep servers current, disable SSH password authentication, enable unattended security updates, and restrict firewall traffic.
+- Protect devices, backups, sensitive data, and browser activity.
 
-## Server Security
+## References
 
-- Keep NGINX, PHP, Ubuntu, and similar software up to date.
-- Use SSH with private key authentication; disable password authentication.
-- Install and enable `unattended-upgrades` for automatic security updates.
-- Configure firewalls to permit only necessary traffic (typically ports 22 and 443).
-- Manage all servers through Ansible for rapid patching and access revocation.
-
-## Credential Management
-
-- Store all passwords in a password manager (e.g. 1Password).
-- Ensure each password is unique; no reuse.
-- Enable two-factor authentication when available.
-- Protect all private keys with passwords.
-
-## General
-
-- Use backups (e.g. BackBlaze) and test them periodically.
-- Enable FileVault (full-disk encryption) on all Macs.
-- Never use public services like Pastebin for sensitive code or data.
-- Install browser extensions only from official stores; minimize usage.
-
----
-
-Source: https://spatie.be/guidelines/security
+- `references/spatie-security-guidelines.md`

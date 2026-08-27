@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
+use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ValidateSignature;
@@ -77,6 +79,45 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->prepend(SubdomainRootResponse::class);
 
+        // Outermost (last prepend wins the front slot) so the noindex header
+        // also lands on responses SubdomainRootResponse short-circuits — the
+        // api/mcp root banners are exactly the crawlable secondary-host URLs.
+        $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
+
+        $middleware->web(append: RedirectToPrimaryHost::class);
+
+        // Only enforced on multi-host deployments (any *_DOMAIN configured);
+        // the framework already skips TrustHosts in local and test runs.
+        // Anchored patterns, because Symfony matches them as unanchored regex.
+        $middleware->trustHosts(at: function (): array {
+            $dedicatedDomains = array_filter(
+                [
+                    config('app.api_domain'),
+                    config('app.mcp_domain'),
+                    config('app.sysadmin_domain'),
+                    config('app.app_panel_domain'),
+                ],
+                fn (mixed $domain): bool => is_string($domain) && $domain !== '',
+            );
+
+            if ($dedicatedDomains === []) {
+                return [];
+            }
+
+            $primaryHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+            $hosts = array_filter([
+                $primaryHost,
+                is_string($primaryHost) ? "www.{$primaryHost}" : null,
+                ...array_values($dedicatedDomains),
+            ], is_string(...));
+
+            return array_map(
+                fn (string $host): string => '^'.preg_quote($host).'$',
+                array_values($hosts),
+            );
+        }, subdomains: false);
+
         $middleware->prependToPriorityList(
             before: SubstituteBindings::class,
             prepend: SetApiTeamContext::class,
@@ -103,6 +144,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 return Filament::getRegistrationUrl();
             }
 
+            // A shared join link carries no email, so we cannot tell whether the
+            // visitor has an account. Most people opening one do not, and the
+            // register page links back to sign-in for the rest.
+            if ($request->routeIs('teams.join')) {
+                return Filament::getRegistrationUrl();
+            }
+
             return route('login');
         });
     })
@@ -126,16 +174,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+        $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:sync-recency-tags')->dailyAt('02:00')
             ->withoutOverlapping()
             ->onOneServer();
         $schedule->command('app:purge-scheduled-deletions')->daily()->withoutOverlapping()->onOneServer();
-        $schedule->command('app:refresh-demo-account')
-            ->dailyAt('03:00')
-            ->onOneServer()
-            ->environments(['local', 'staging']);
-
         $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
+        $schedule->command('notifications:send-setup-nudge')->hourly()->withoutOverlapping()->onOneServer();
 
         // TODO::Separate it in different command class
         $schedule->call(function (): void {

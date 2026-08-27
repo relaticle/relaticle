@@ -152,6 +152,38 @@ it('honors an Ollama default-model preference when configured', function (): voi
     expect($resolved['model'])->toBe('llama3.1:70b');
 });
 
+it('labels explicit and auto resolutions', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet');
+    $auto = resolve(AiModelResolver::class)->resolve($user, null);
+
+    expect($explicit['source'])->toBe('explicit')
+        ->and($explicit['id'])->toBe('claude-sonnet')
+        ->and($auto['source'])->toBe('auto')
+        ->and($auto['id'])->toBe('claude-sonnet');
+});
+
+it('fails over to the next available chain entry', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
+
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet');
+
+    expect($next)->not->toBeNull()
+        ->and($next['id'])->toBe('gpt-5-5')
+        ->and($next['provider'])->toBe('openai')
+        ->and($next['source'])->toBe('auto');
+});
+
+it('returns null once the auto chain is exhausted', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'ollama');
+
+    expect($next)->toBeNull();
+});
+
 it('throws a clear error when no chat model is configured', function (): void {
     config([
         'chat.models' => [],

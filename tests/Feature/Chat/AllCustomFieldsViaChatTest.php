@@ -18,9 +18,12 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
+use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
@@ -134,10 +137,10 @@ it('returns a tool error for an unknown custom field code', function (): void {
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'custom_fields' => ['this_does_not_exist' => 'whatever'],
-    ]));
+    ]]]));
 
     expect($response)->toContain('this_does_not_exist');
 });
@@ -148,10 +151,10 @@ it('returns a tool error for an unknown option label on a choice field', functio
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $response = $tool->handle(new Request([
+    $response = $tool->handle(new Request(['records' => [[
         'id' => (string) $task->id,
         'custom_fields' => ['status' => 'Bananas'],
-    ]));
+    ]]]));
 
     expect($response)->toContain('Bananas');
 });
@@ -160,22 +163,52 @@ it('returns a tool error for an unknown option label on a choice field', functio
  * @param  class-string  $toolClass
  * @param  array<string, mixed>  $customFields
  */
-function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array $customFields): void
+function runUpdateToolForCustomFieldsTest(string $toolClass, Model $model, array $customFields): string
 {
     $tool = resolve($toolClass);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
 
-    $tool->handle(new Request([
+    return $tool->handle(new Request(['records' => [[
         'id' => (string) $model->getKey(),
         'custom_fields' => $customFields,
-    ]));
+    ]]]));
 }
 
 function latestPendingForCustomFieldsTest(): PendingAction
 {
+    // Ordered by key, not created_at: two writes inside the same second tie on
+    // the timestamp and `latest()` then returns an arbitrary one of them.
     /** @var PendingAction */
-    return PendingAction::query()->latest()->firstOrFail();
+    return PendingAction::query()->orderByDesc('id')->firstOrFail();
 }
+
+it('clears a single-choice custom field when chat passes null', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => 'High']);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'priority', 'string_value'))->not->toBeNull();
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => null]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'priority', 'string_value'))->toBeNull();
+});
+
+it('clears a text custom field when chat passes null', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => 'Long body text']);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'description', 'text_value'))->toContain('Long body text');
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => null]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'description', 'text_value'))->toBeNull();
+});
 
 function rawValueForCustomFieldsTest(Model $model, string $code, string $column): mixed
 {
@@ -250,3 +283,35 @@ function morphAliasForCustomFieldsTest(Model $model): string
         default => throw new RuntimeException('unsupported model'),
     };
 }
+
+it('accepts an option label in any casing when writing a choice field', function (string $label): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => $label]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(optionLabelForCustomFieldsTest($task, 'status'))->toBe('In progress');
+})->with(['In progress', 'in progress', 'IN PROGRESS', 'In Progress']);
+
+it('resolves an option label identically whether filtering or writing', function (string $label, bool $valid): void {
+    Task::factory()->for($this->team)->create(['title' => 'T']);
+
+    $readAccepted = true;
+    try {
+        resolve(CustomFieldsFilterTranslator::class)
+            ->translate($this->user, 'task', ['status' => ['eq' => $label]]);
+    } catch (ValidationException) {
+        $readAccepted = false;
+    }
+
+    $writeAccepted = resolve(CustomFieldsRequestValidator::class)
+        ->validate($this->user, 'task', ['status' => $label])->error === null;
+
+    expect($readAccepted)->toBe($valid)
+        ->and($writeAccepted)->toBe($valid);
+})->with([
+    'exact casing' => ['In progress', true],
+    'lowercased' => ['in progress', true],
+    'uppercased' => ['IN PROGRESS', true],
+    'not an option' => ['Bananas', false],
+]);

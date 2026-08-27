@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -74,14 +75,12 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $firstName = explode(' ', $user->name)[0];
 
-        /** @var string $timezone */
-        $timezone = $user->timezone ?? config('app.timezone');
-        $hour = Date::now($timezone)->hour;
+        $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {
-            $hour < 12 => "Good morning, {$firstName}.",
-            $hour < 18 => "Good afternoon, {$firstName}.",
-            default => "Good evening, {$firstName}.",
+            $hour < 12 => __('Good morning, :name.', ['name' => $firstName]),
+            $hour < 18 => __('Good afternoon, :name.', ['name' => $firstName]),
+            default => __('Good evening, :name.', ['name' => $firstName]),
         };
     }
 
@@ -100,6 +99,35 @@ final class Dashboard extends Page
             : new Collection;
     }
 
+    #[Computed]
+    public function canCompleteTasks(): bool
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+        $team = $user->currentTeam;
+
+        return $team !== null && resolve(MyTasksService::class)->hasDoneOption($team);
+    }
+
+    public function completeTask(string $taskId): void
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+
+        // Scoped to the current tenant: the status custom field resolves against
+        // it, so a task from another of the user's teams would get a foreign
+        // field id written onto it. A row that no longer resolves (completed in
+        // another tab, deleted meanwhile) is not an error: the desired end state
+        // is already true, so just refresh instead of throwing a 404 over Home.
+        $task = Task::query()->where('team_id', Filament::getTenant()?->getKey())->find($taskId);
+
+        if ($task instanceof Task) {
+            resolve(CompleteTask::class)->execute($user, $task);
+        }
+
+        unset($this->myTasks);
+    }
+
     public function getTasksIndexUrl(): string
     {
         return TaskResource::getUrl('index', [
@@ -110,6 +138,7 @@ final class Dashboard extends Page
     public function createTaskAction(): CreateAction
     {
         return $this->configureCreateTaskAction(CreateAction::make('createTask'))
+            ->color('gray')
             ->label(__('filament/pages/dashboard.tasks.create_action_label'));
     }
 

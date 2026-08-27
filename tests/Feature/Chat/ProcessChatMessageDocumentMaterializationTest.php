@@ -46,7 +46,7 @@ it('materializes the assistant message document at stream end', function (): voi
         team: $this->team,
         message: 'Show me my deals',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
         mentions: [],
     )->handle(resolve(CreditService::class));
 
@@ -68,6 +68,41 @@ it('materializes the assistant message document at stream end', function (): voi
             'content' => [['type' => 'text', 'text' => 'I found 2 deals.']],
         ]],
     ]);
+});
+
+it('records turn duration in assistant message meta', function (): void {
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'team_id' => $this->team->getKey(),
+        'title' => 'Test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    CrmAssistant::fake(['I found 2 deals.']);
+
+    new ProcessChatMessage(
+        user: $this->user,
+        team: $this->team,
+        message: 'Show me my deals',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        mentions: [],
+    )->handle(resolve(CreditService::class));
+
+    $meta = json_decode((string) DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->latest()
+        ->orderByDesc('id')
+        ->value('meta'), associative: true);
+
+    expect($meta['duration_ms'])->toBeInt()->toBeGreaterThan(0)
+        ->and($meta['model'])->toBe('claude-sonnet-4-6')
+        ->and($meta['provider'])->toBe('anthropic');
 });
 
 it('TipTapDocumentParser::buildFromText produces the expected stored shape', function (): void {

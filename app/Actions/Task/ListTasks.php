@@ -12,6 +12,7 @@ use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -46,9 +47,26 @@ final readonly class ListTasks
                         $query->whereHas('assignees', fn (Builder $q) => $q->where('users.id', $user->getKey()));
                     }
                 }),
+                // Mirrors the panel's multi-select assignee filter: match a task if ANY
+                // of the given members is on it. assigned_to_me stays as the shorthand
+                // for the caller themselves, which needs no id round-trip.
+                AllowedFilter::callback('assignee_ids', function (Builder $query, mixed $value): void {
+                    $ids = array_values(array_filter(array_map(
+                        static fn (mixed $id): string => is_scalar($id) ? trim((string) $id) : '',
+                        Arr::wrap($value),
+                    ), static fn (string $id): bool => $id !== ''));
+
+                    if ($ids === []) {
+                        return;
+                    }
+
+                    $query->whereHas('assignees', fn (Builder $q) => $q->whereIn('users.id', $ids));
+                }),
                 AllowedFilter::scope('company_id', 'forCompany'),
                 AllowedFilter::scope('people_id', 'forPerson'),
                 AllowedFilter::scope('opportunity_id', 'forOpportunity'),
+                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '>=', $value)),
+                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '<=', $value)),
                 AllowedFilter::custom('custom_fields', new CustomFieldFilter('task')),
             )
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')

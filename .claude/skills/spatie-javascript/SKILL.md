@@ -16,105 +16,29 @@ Apply Spatie's JavaScript coding standards to keep JS/TS code consistent and rea
 
 - Activate this skill for any JavaScript or TypeScript coding work.
 - Activate this skill when working on `.js`, `.ts`, `.jsx`, `.tsx`, or `.vue` files.
-- Activate this skill when configuring Prettier or ESLint for a project.
+- Activate this skill when configuring Prettier for a project.
 
 ## Scope
 
-- In scope: JavaScript, TypeScript, Vue single-file components, Prettier/ESLint configuration.
+- In scope: JavaScript, TypeScript, Vue single-file components, Prettier configuration.
 - Out of scope: PHP, Laravel, CSS-only files, server configuration.
 
-## Prettier Configuration
+## Workflow
 
-- Indentation: 4 spaces (via `.editorconfig`, not Prettier default of 2)
-- Print width: 120 characters (not Prettier default of 80)
-- Quote style: single quotes
+1. Identify the JavaScript, TypeScript, Vue, or Prettier artifact being changed.
+2. Read `references/spatie-javascript-guidelines.md` and focus on the relevant sections.
+3. Apply Prettier configuration first, then the language rules relevant to the change.
 
-## Variable Declarations
+## Core Rules (Summary)
 
-- Prefer `const` over `let`. Only use `let` when a variable will be reassigned.
-- Never use `var`.
-- Reassigning object properties is fine with `const` — the reference is not reassigned.
+- Use four-space indentation, a 120-character print width, and single quotes.
+- Prefer `const`, use `let` only for reassignment, and never use `var`.
+- Avoid abbreviated variable names except in clear single-line arrow functions.
+- Always use strict equality and cast values before comparing different types.
+- Use `function` for declarations and arrow functions for anonymous or terse functions when appropriate.
+- Keep functions pure, limit `this`, and use shorthand object methods.
+- Prefer object and array destructuring.
 
-## Variable Names
+## References
 
-- Don't abbreviate variable names in multi-line functions. Use full, descriptive names.
-- Exception: single-line arrow functions where context is obvious.
-
-```javascript
-// Good — full names in multi-line functions
-function saveUserSession(userSession) {
-    // ...
-}
-
-// Acceptable — short name in single-line arrow
-userSessions.forEach(s => saveUserSession(s));
-```
-
-## Comparisons
-
-- Always use `===` (strict equality). Never use `==`.
-- If unsure of the type, cast it first:
-
-```javascript
-const number = parseInt(input);
-
-if (number === 5) {
-    // ...
-}
-```
-
-## Functions
-
-### Function Declarations
-
-- Use the `function` keyword for named functions to clearly signal it's a function.
-
-### Arrow Functions
-
-- Use for terse, single-line operations.
-- Use for anonymous callbacks.
-- Use in higher-order functions when it improves readability.
-- Don't use arrow functions when you need `this` context (e.g., jQuery event handlers).
-
-### Object Methods
-
-- Use shorthand method syntax:
-
-```javascript
-// Good
-const obj = {
-    handleClick(event) {
-        // ...
-    },
-};
-
-// Avoid
-const obj = {
-    handleClick: function(event) {
-        // ...
-    },
-};
-```
-
-## Destructuring
-
-- Prefer destructuring over manual property/index access:
-
-```javascript
-// Good
-const [hours, minutes] = '12:00'.split(':');
-
-// Good — configuration objects with defaults
-function createUser({ name, email, role = 'member' }) {
-    // ...
-}
-
-// Avoid
-const parts = '12:00'.split(':');
-const hours = parts[0];
-const minutes = parts[1];
-```
-
----
-
-Source: https://spatie.be/guidelines/javascript
+- `references/spatie-javascript-guidelines.md`

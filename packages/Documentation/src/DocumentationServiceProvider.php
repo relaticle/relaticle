@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\Documentation;
 
 use App\Features\Documentation;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
-use Relaticle\Documentation\Services\DocumentationService;
+use Relaticle\Documentation\Support\DocsRepository;
 
 final class DocumentationServiceProvider extends ServiceProvider
 {
@@ -20,7 +19,7 @@ final class DocumentationServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/documentation.php', 'documentation');
 
-        $this->app->singleton(DocumentationService::class);
+        $this->app->singleton(DocsRepository::class);
     }
 
     /**
@@ -34,7 +33,6 @@ final class DocumentationServiceProvider extends ServiceProvider
 
         $this->registerRoutes();
         $this->registerViews();
-        $this->registerComponents();
         $this->registerPublishing();
     }
 
@@ -58,18 +56,6 @@ final class DocumentationServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register Blade components.
-     */
-    private function registerComponents(): void
-    {
-        // Register components with the 'documentation::' namespace
-        Blade::componentNamespace('Relaticle\\Documentation\\Components', 'documentation');
-
-        // Register anonymous components
-        $this->loadViewComponentsAs('documentation', []);
-    }
-
-    /**
      * Register publishable resources.
      */
     private function registerPublishing(): void
@@ -85,10 +71,10 @@ final class DocumentationServiceProvider extends ServiceProvider
                 __DIR__.'/../resources/views' => resource_path('views/vendor/documentation'),
             ], 'documentation-views');
 
-            // Markdown
+            // Content
             $this->publishes([
-                __DIR__.'/../resources/markdown' => resource_path('markdown/documentation'),
-            ], 'documentation-markdown');
+                __DIR__.'/../resources/content' => resource_path('content/documentation'),
+            ], 'documentation-content');
         }
     }
 }

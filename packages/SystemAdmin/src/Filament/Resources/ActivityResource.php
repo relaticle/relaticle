@@ -19,9 +19,12 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
+use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\SystemAdministratorResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class ActivityResource extends Resource
 {
@@ -62,12 +65,39 @@ final class ActivityResource extends Resource
         return false;
     }
 
+    /**
+     * @return array<string, class-string> Morph alias => Filament resource class
+     */
+    public static function causerResources(): array
+    {
+        return [
+            'user' => UserResource::class,
+            'system_administrator' => SystemAdministratorResource::class,
+        ];
+    }
+
+    /**
+     * @return array<string, class-string> Morph alias => Filament resource class
+     */
+    public static function subjectResources(): array
+    {
+        return [
+            'company' => CompanyResource::class,
+            'people' => PeopleResource::class,
+            'opportunity' => OpportunityResource::class,
+            'task' => TaskResource::class,
+            'note' => NoteResource::class,
+            'team' => TeamResource::class,
+            'user' => UserResource::class,
+        ];
+    }
+
     #[Override]
     public static function table(Table $table): Table
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer', 'subject']))
             ->columns([
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -75,15 +105,28 @@ final class ActivityResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->placeholder('—')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('causer.name')
                     ->label('User')
-                    ->placeholder('System'),
+                    ->placeholder('System')
+                    ->color('primary')
+                    ->url(RecordLink::toMorph(self::causerResources(), 'causer_type', 'causer_id')),
                 TextColumn::make('subject_type')
                     ->label('Subject')
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (?string $state): string => $state === null ? '—' : ucfirst($state)),
+                    ->formatStateUsing(function (?string $state, Activity $record): string {
+                        if ($state === null) {
+                            return '—';
+                        }
+
+                        $name = self::subjectName($record);
+
+                        return $name === null ? ucfirst($state) : ucfirst($state).': '.$name;
+                    })
+                    ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                 TextColumn::make('event')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
@@ -159,13 +202,31 @@ final class ActivityResource extends Resource
                             'deleted' => 'danger',
                             default => 'gray',
                         }),
-                    TextEntry::make('team.name')->label('Team')->placeholder('—'),
-                    TextEntry::make('causer.name')->label('User')->placeholder('System'),
+                    TextEntry::make('team.name')
+                        ->label('Team')
+                        ->placeholder('—')
+                        ->color('primary')
+                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                    TextEntry::make('causer.name')
+                        ->label('User')
+                        ->placeholder('System')
+                        ->color('primary')
+                        ->url(RecordLink::toMorph(self::causerResources(), 'causer_type', 'causer_id')),
                     TextEntry::make('subject_type')
                         ->label('Subject')
-                        ->formatStateUsing(fn (?string $state, Activity $record): string => $state === null
-                            ? '—'
-                            : ucfirst($state).' #'.$record->subject_id),
+                        ->formatStateUsing(function (?string $state, Activity $record): string {
+                            if ($state === null) {
+                                return '—';
+                            }
+
+                            $name = self::subjectName($record);
+
+                            return $name === null
+                                ? ucfirst($state).' #'.$record->subject_id
+                                : ucfirst($state).': '.$name;
+                        })
+                        ->color('primary')
+                        ->url(RecordLink::toMorph(self::subjectResources(), 'subject_type', 'subject_id')),
                     TextEntry::make('description')->columnSpanFull(),
                 ])->columns(2)->columnSpanFull(),
                 Section::make('Changes')
@@ -180,6 +241,25 @@ final class ActivityResource extends Resource
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * The subject's display name: CRM records and teams/users use `name`,
+     * tasks and notes use `title`. Soft-deleted subjects still resolve
+     * (the activity relation loads trashed models); null only when the
+     * subject was hard-deleted or has neither attribute.
+     */
+    public static function subjectName(Activity $record): ?string
+    {
+        $subject = $record->subject;
+
+        if ($subject === null) {
+            return null;
+        }
+
+        $name = $subject->getAttribute('name') ?? $subject->getAttribute('title');
+
+        return is_string($name) && $name !== '' ? Str::limit($name, 40) : null;
     }
 
     /**

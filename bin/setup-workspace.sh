@@ -35,11 +35,31 @@ composer install --no-interaction --prefer-dist
 echo "→ Refreshing JS dependencies"
 npm ci
 
+if [[ ! -f storage/oauth-private.key ]]; then
+    echo "→ Generating Passport keys"
+    php artisan passport:keys --no-interaction
+fi
+
 echo "→ Pointing .env at ${WORKSPACE_HOST}"
 sed -i '' "s|^APP_URL=.*|APP_URL=https://${WORKSPACE_HOST}|" .env
 sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${WORKSPACE_HOST}|" .env
 sed -i '' "s|^APP_PANEL_DOMAIN=.*|APP_PANEL_DOMAIN=|" .env
 sed -i '' "s|^SYSADMIN_DOMAIN=.*|SYSADMIN_DOMAIN=|" .env
+
+# All checkouts share one local Redis. Without per-workspace prefixes, every
+# checkout resolves the same default key prefix (APP_NAME-derived), so another
+# workspace's Horizon/queue worker consumes THIS workspace's jobs with foreign
+# code, and cache entries leak across branches. Explicit prefixes isolate
+# queues, cache, and Horizon per workspace without rationing Redis's 16
+# numeric databases.
+echo "→ Isolating Redis keys for ${WORKSPACE}"
+sed -i '' "/^REDIS_PREFIX=/d; /^CACHE_PREFIX=/d; /^HORIZON_PREFIX=/d" .env
+{
+    echo ""
+    echo "REDIS_PREFIX=${WORKSPACE}_database_"
+    echo "CACHE_PREFIX=${WORKSPACE}_cache_"
+    echo "HORIZON_PREFIX=${WORKSPACE}_horizon:"
+} >> .env
 
 php artisan config:clear --no-interaction
 php artisan route:clear --no-interaction

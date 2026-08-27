@@ -19,6 +19,10 @@
     --color-primary-950: oklch(0.283 0.135 291.089);
     --color-primary: oklch(0.541 0.247 293.009); /* DEFAULT: primary-600 */
 
+    /* Third-party brand marks: kept out of the primary scale since they
+       represent an external provider's identity, not our own UI color. */
+    --color-anthropic: #D4763C;
+
     /* Off-step typography for compact UI surfaces */
     --text-pico: 0.625rem;     /* 10px */
     --text-pico--line-height: 0.875rem;
@@ -40,6 +44,12 @@
 :root {
     --surface-card-bg: rgb(249 250 251 / 0.8);            /* gray-50/80 */
     --surface-card-border: rgb(229 231 235 / 0.8);        /* gray-200/80 */
+    --surface-canvas-bg: rgb(249 250 251 / 0.6);          /* chat canvas wash: lifts solid blocks off the page */
+    /* Solid data-block tier: proposal cards and rendered read-tool blocks. Kept
+       deliberately distinct from the translucent card/pill tier above, and named
+       so the six partials that use it can be retuned in one place. */
+    --surface-block-bg: rgb(255 255 255);                 /* white */
+    --surface-block-border: rgb(229 231 235);             /* gray-200 */
     --surface-shell-bg: rgb(249 250 251 / 0.6);           /* gray-50/60 */
     --surface-shell-divider: rgb(229 231 235 / 0.6);      /* gray-200/60 */
     --surface-input-bg: rgb(249 250 251 / 0.8);           /* gray-50/80 */
@@ -48,6 +58,9 @@
 
 .dark {
     --surface-card-bg: rgb(255 255 255 / 0.02);
+    --surface-canvas-bg: transparent;                      /* dark canvas: blocks lift on gray-900 already */
+    --surface-block-bg: rgb(17 24 39);                     /* gray-900 */
+    --surface-block-border: rgb(255 255 255 / 0.1);        /* white/10 */
     --surface-card-border: rgb(255 255 255 / 0.06);
     --surface-shell-bg: rgb(255 255 255 / 0.015);
     --surface-shell-divider: rgb(255 255 255 / 0.06);
@@ -56,6 +69,58 @@
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Chat record chips: a `[Label](/r/{type}/{id})` citation inside an assistant
+   reply. Both render pipelines emit the same markup (RecordChipRenderer on the
+   server, applyRecordChips in chat.js on the client), so this single rule
+   dresses the streamed reply and the reloaded one alike. Same surface tokens
+   as the follow-up chips in _transcript.blade.php, at the density of an
+   @mention chip: the transcript carries two chip families, not three. */
+.chat-chip {
+    @apply inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 no-underline transition;
+
+    /* Prose gives the surrounding text a 14px line box; middle keeps the
+       shorter pill optically centred on it (an inline-flex box takes its
+       baseline from its first item, which here is the icon, and would ride
+       high). */
+    vertical-align: middle;
+}
+
+.chat-chip:hover {
+    @apply border-primary-300 bg-primary-50 text-primary-700;
+}
+
+.chat-chip:focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary-500;
+}
+
+.dark .chat-chip {
+    @apply text-gray-200;
+}
+
+.dark .chat-chip:hover {
+    @apply border-primary-700 bg-primary-900/20 text-primary-300;
+}
+
+.chat-chip > svg {
+    @apply h-3 w-3 shrink-0 text-gray-400;
+}
+
+.dark .chat-chip > svg {
+    @apply text-gray-500;
+}
+
+.chat-chip-label {
+    @apply max-w-[24ch] truncate;
+}
+
+/* Title-position chips: in a proposal row or a block header the pill IS the
+   row's title, so the inline 24ch cap would truncate against empty space.
+   The row's own min-w-0 flex still ellipsizes a name that truly overflows. */
+[data-proposal-record-chip] .chat-chip-label,
+[data-record-title-chip] .chat-chip-label {
+    max-width: none;
+}
 
 /* Hero gradient text animation — slow, subtle shimmer */
 @keyframes gradient-shift {

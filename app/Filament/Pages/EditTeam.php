@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
-use App\Livewire\App\Teams\AddTeamMember;
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Livewire\App\Teams\DeleteTeam;
-use App\Livewire\App\Teams\PendingTeamInvitations;
-use App\Livewire\App\Teams\TeamMembers;
 use App\Livewire\App\Teams\UpdateTeamName;
 use App\Models\Team;
 use Filament\Pages\Tenancy\EditTenantProfile;
@@ -16,6 +14,8 @@ use Filament\Schemas\Schema;
 
 final class EditTeam extends EditTenantProfile
 {
+    use HasWorkspaceSettingsNavigation;
+
     protected string $view = 'filament.pages.edit-team';
 
     protected static ?string $slug = 'team';
@@ -29,12 +29,6 @@ final class EditTeam extends EditTenantProfile
 
         return $schema->components([
             Livewire::make(UpdateTeamName::class)
-                ->data(['team' => $tenant]),
-            Livewire::make(AddTeamMember::class)
-                ->data(['team' => $tenant]),
-            Livewire::make(PendingTeamInvitations::class)
-                ->data(['team' => $tenant]),
-            Livewire::make(TeamMembers::class)
                 ->data(['team' => $tenant]),
             Livewire::make(DeleteTeam::class)
                 ->visible(fn (): bool => $tenant->isPersonalTeam() === false)

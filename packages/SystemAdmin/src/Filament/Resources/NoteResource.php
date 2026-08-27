@@ -23,9 +23,13 @@ use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\CreateNote;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\EditNote;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\ListNotes;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\ViewNote;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ResolvesTrashedRecords;
 
 final class NoteResource extends Resource
 {
+    use ResolvesTrashedRecords;
+
     protected static ?string $model = Note::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
@@ -77,11 +81,15 @@ final class NoteResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source')

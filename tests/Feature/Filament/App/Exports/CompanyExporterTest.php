@@ -13,6 +13,7 @@ use App\Models\Export;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -116,4 +117,44 @@ test('export generates CSV with correct data', function () {
     expect($headers)->toContain('Company Name')
         ->and($headers)->toContain('ICP')
         ->and($data)->toContain('Acme Corp');
+});
+
+test('export headers name the timezone the values are written in', function () {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $labels = collect(CompanyExporter::getColumns())->map(fn ($column) => $column->getLabel())->all();
+
+    expect($labels)->toContain('Created At (Asia/Tokyo)')
+        ->and($labels)->toContain('Updated At (Asia/Tokyo)');
+});
+
+test('export headers fall back to the app timezone for a user without one', function () {
+    $this->user->forceFill(['timezone' => null])->save();
+
+    $labels = collect(CompanyExporter::getColumns())->map(fn ($column) => $column->getLabel())->all();
+
+    expect($labels)->toContain('Created At (UTC)');
+});
+
+test('export values are converted out of utc into the requesting user timezone', function () {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $company = Company::factory()->create([
+        'team_id' => $this->team->id,
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+    ]);
+
+    Livewire::test(ListCompanies::class)
+        ->callAction('export')
+        ->assertHasNoFormErrors();
+
+    $export = Export::latest()->first();
+
+    expect($export->user_id)->toBe($this->user->getKey());
+
+    $exporter = new CompanyExporter($export, ['created_at' => 'Created At'], []);
+    $row = $exporter($company->fresh());
+
+    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo — the date rolls over.
+    expect($row[0])->toBe('2026-08-19 08:30:00');
 });

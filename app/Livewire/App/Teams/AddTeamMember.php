@@ -9,7 +9,6 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -22,12 +21,14 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Attributes\Locked;
 
 final class AddTeamMember extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void
@@ -109,7 +110,9 @@ final class AddTeamMember extends BaseLivewireComponent
 
         $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
 
-        $this->redirect(Filament::getTenantProfileUrl());
+        $this->form->fill($this->team->only(['name']));
+
+        $this->dispatch('teamInvitationSent');
     }
 
     public function render(): View

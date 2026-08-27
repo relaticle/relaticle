@@ -2,6 +2,7 @@
     <div
         x-data="{
             open: @entangle('isOpen'),
+            viewportWidth: window.innerWidth,
             init() {
                 this.keydownHandler = (e) => {
                     if (e.key === 'Escape' && this.open) {
@@ -10,43 +11,61 @@
                     }
                 };
                 window.addEventListener('keydown', this.keydownHandler);
+
+                this.resizeHandler = () => { this.viewportWidth = window.innerWidth; };
+                window.addEventListener('resize', this.resizeHandler);
             },
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
-            }
+                window.removeEventListener('resize', this.resizeHandler);
+            },
+
+            {{-- Sit flush against the sidebar, whichever width it currently has.
+                 Below Filament's `lg` breakpoint the sidebar is an overlay, so
+                 the panel starts at the viewport edge instead. --}}
+            get sidebarOffset() {
+                if (this.viewportWidth < 1024) {
+                    return '0px';
+                }
+
+                return $store.sidebar.isOpen
+                    ? 'var(--sidebar-width)'
+                    : 'var(--collapsed-sidebar-width)';
+            },
         }"
+        :style="{ insetInlineStart: sidebarOffset }"
         x-effect="if (open) $nextTick(() => $el.querySelector('input[type=search]')?.focus())"
         x-show="open"
         x-cloak
         role="dialog"
         aria-modal="false"
-        aria-label="All chats"
+        aria-label="{{ __('All chats') }}"
         tabindex="-1"
-        class="fi-chat-all-chats-panel fixed inset-y-0 left-[var(--fi-sidebar-width,_280px)] z-40 flex w-[360px] max-w-full"
+        class="fi-chat-all-chats-panel fixed inset-y-0 z-40 flex w-[360px] max-w-full"
         data-chat-all-chats-panel
     >
         {{-- Panel body --}}
         <div
             @click.outside="if (open) $wire.close()"
-            x-transition:enter="transition ease-out duration-200"
-            x-transition:enter-start="-translate-x-full"
-            x-transition:enter-end="translate-x-0"
-            x-transition:leave="transition ease-in duration-150"
-            x-transition:leave-start="translate-x-0"
-            x-transition:leave-end="-translate-x-full"
+            x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200"
+            x-transition:enter-start="motion-safe:-translate-x-full"
+            x-transition:enter-end="motion-safe:translate-x-0"
+            x-transition:leave="motion-safe:transition motion-safe:ease-in motion-safe:duration-150"
+            x-transition:leave-start="motion-safe:translate-x-0"
+            x-transition:leave-end="motion-safe:-translate-x-full"
             class="relative flex flex-1 flex-col overflow-hidden border-r border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900"
         >
             {{-- Header --}}
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Chats</h3>
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Chats') }}</h3>
 
                 <div class="flex items-center gap-1">
                     <a
                         href="{{ $newChatUrl }}"
                         wire:navigate
                         @click="$wire.close()"
-                        aria-label="New chat"
-                        title="New chat"
+                        aria-label="{{ __('New chat') }}"
+                        title="{{ __('New chat') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
                         <x-heroicon-o-plus class="h-4 w-4" />
@@ -55,7 +74,7 @@
                     <button
                         type="button"
                         @click="$wire.close()"
-                        aria-label="Close all chats panel"
+                        aria-label="{{ __('Close all chats panel') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
                         <x-heroicon-o-x-mark class="h-4 w-4" />
@@ -64,13 +83,19 @@
             </div>
 
             {{-- Search --}}
-            <div class="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
+            <div class="relative border-b border-gray-200 px-3 py-2 dark:border-gray-700">
                 <input
                     type="search"
                     wire:model.live.debounce.250ms="search"
-                    placeholder="Search chats..."
-                    aria-label="Search chats"
-                    class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    placeholder="{{ __('Search chats...') }}"
+                    aria-label="{{ __('Search chats') }}"
+                    class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 pe-8 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                />
+                <x-heroicon-o-arrow-path
+                    wire:loading
+                    wire:target="search"
+                    class="absolute end-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 motion-safe:animate-spin"
+                    aria-hidden="true"
                 />
             </div>
 
@@ -79,9 +104,9 @@
                 @if($conversations->isEmpty())
                     <li class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400" role="status">
                         @if($isSearching)
-                            No matches.
+                            {{ __('No matches.') }}
                         @else
-                            No chats yet. Start one with the + button above.
+                            {{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}
                         @endif
                     </li>
                 @else
@@ -89,16 +114,27 @@
                         @php
                             $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
                             $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
-                            $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: 'Untitled chat', 40);
-                            $rawTitle = $conversation->title ?: 'Untitled chat';
+                            $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: __('Untitled chat'), 40);
+                            $rawTitle = $conversation->title ?: __('Untitled chat');
                         @endphp
                         <li
+                            {{-- Keyed: these rows carry live Alpine state (editing, renamed, saving)
+                                 and the list is repainted by refresh-sidebar after a rename or a
+                                 delete. Morphing positionally would hand one row's open rename
+                                 input to whichever conversation slid into its index. --}}
+                            wire:key="conversation-{{ $conversation->id }}"
                             x-data="{
                                 editing: false,
                                 renamed: '',
+                                saving: false,
+                                {{-- Blur commits, Escape cancels: mirrors the sidebar row,
+                                     including the post-save dispatches: without them a rename
+                                     here left the sidebar, page H1 and tab title stale. --}}
                                 async save() {
+                                    if (!this.editing || this.saving) return;
                                     const text = this.renamed.trim();
-                                    if (!text) { this.editing = false; return; }
+                                    if (!text || text === @js($rawTitle)) { this.editing = false; return; }
+                                    this.saving = true;
                                     try {
                                         const res = await fetch(@js($renameUrl), {
                                             method: 'POST',
@@ -113,8 +149,23 @@
                                             const body = await res.json();
                                             const titleEl = $el.querySelector('[data-title]');
                                             if (titleEl) titleEl.textContent = body.title;
+
+                                            window.dispatchEvent(new CustomEvent('chat:renamed', {
+                                                detail: {
+                                                    conversationId: body.conversation_id,
+                                                    title: body.title,
+                                                },
+                                            }));
+
+                                            if (window.Livewire?.dispatch) {
+                                                window.Livewire.dispatch('chat:conversation-renamed', {
+                                                    conversationId: body.conversation_id,
+                                                    title: body.title,
+                                                });
+                                            }
                                         }
                                     } catch (_) { /* network errors silently abort */ }
+                                    this.saving = false;
                                     this.editing = false;
                                 },
                                 startEdit() {
@@ -129,10 +180,10 @@
                                     href="{{ $chatUrl }}"
                                     wire:navigate
                                     @click="$wire.close()"
-                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                                 >
                                     <x-heroicon-o-chat-bubble-left class="h-4 w-4 text-gray-400" />
-                                    <span data-title class="truncate pe-16">{{ $displayTitle }}</span>
+                                    <span data-title title="{{ $rawTitle }}" class="truncate pe-16">{{ $displayTitle }}</span>
                                 </a>
                             </template>
 
@@ -146,11 +197,11 @@
                                         x-model="renamed"
                                         @keydown.escape.prevent="editing = false"
                                         @click.stop
-                                        @blur="editing = false"
+                                        @blur="save()"
                                         x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                         maxlength="255"
-                                        aria-label="Rename chat"
-                                        class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                        aria-label="{{ __('Rename chat') }}"
+                                        class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                     />
                                 </form>
                             </template>
@@ -159,8 +210,8 @@
                                 type="button"
                                 @click.stop.prevent="startEdit()"
                                 x-show="!editing"
-                                aria-label="Rename chat"
-                                title="Rename chat"
+                                aria-label="{{ __('Rename chat') }}"
+                                title="{{ __('Rename chat') }}"
                                 class="absolute inset-y-0 end-9 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
                             >
                                 <x-heroicon-o-pencil-square class="h-4 w-4" />
@@ -169,10 +220,10 @@
                             <button
                                 type="button"
                                 wire:click="deleteConversation(@js($conversation->id))"
-                                wire:confirm="Delete this chat? Messages and any pending actions will be removed."
+                                wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
                                 x-show="!editing"
-                                aria-label="Delete chat"
-                                title="Delete chat"
+                                aria-label="{{ __('Delete chat') }}"
+                                title="{{ __('Delete chat') }}"
                                 class="absolute inset-y-0 end-3 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4" />

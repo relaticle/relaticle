@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
+use App\Models\People;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
+use Relaticle\SystemAdmin\Filament\Resources\PeopleResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class PeopleRelationManager extends RelationManager
 {
@@ -31,14 +36,20 @@ final class PeopleRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(fn (People $record): string => PeopleResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('company.name')
                     ->label('Company')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(CompanyResource::class, 'company')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),

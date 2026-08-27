@@ -34,3 +34,23 @@ it('returns null for an unknown destination', function (): void {
     expect(app(DestinationResolver::class)->resolve('does_not_exist', $this->user->currentTeam))
         ->toBeNull();
 });
+
+it('resolves every export destination to its list page with the export action deep-linked', function (): void {
+    $resolver = app(DestinationResolver::class);
+
+    $paths = [
+        'export_companies' => 'companies',
+        'export_people' => 'people',
+        'export_opportunities' => 'opportunities',
+        'export_tasks' => 'tasks',
+        'export_notes' => 'notes',
+    ];
+
+    foreach ($paths as $destination => $path) {
+        $url = $resolver->resolve($destination, $this->user->currentTeam);
+
+        expect($url)->toBeString("destination [{$destination}] should resolve to a url")
+            ->and($url)->toContain("/{$path}?")
+            ->and($url)->toContain('action=export');
+    }
+});

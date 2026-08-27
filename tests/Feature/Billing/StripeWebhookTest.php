@@ -17,6 +17,8 @@ use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(SyncTeamPlanFromSubscription::class);
 mutates(SyncPlanOnStripeSubscriptionChange::class);
@@ -412,4 +414,45 @@ it('subscribes the Stripe endpoint to every checkout event the controller handle
 
     expect($handled)->toContain('checkout.session.completed', 'checkout.session.async_payment_succeeded')
         ->and(config('cashier.webhook.events'))->toContain(...$handled);
+});
+
+it('syncs later stripe events to the workspace that received a transferred subscription', function (): void {
+    $owner = User::factory()->create();
+
+    /** @var Team $source */
+    $source = Team::factory()->create([
+        'user_id' => $owner->getKey(),
+        'plan' => Plan::Pro,
+        'stripe_id' => 'cus_webhook_transfer',
+    ]);
+
+    /** @var Team $target */
+    $target = Team::factory()->create([
+        'user_id' => $owner->getKey(),
+        'plan' => Plan::Free,
+    ]);
+
+    $source->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_webhook_transfer',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $admin = SystemAdministrator::factory()->create();
+    app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $admin->getKey());
+
+    $payload = stripeSubscriptionEvent($target, 'updated', [
+        'price' => 'price_pro_yearly_test',
+    ]);
+    $payload['data']['object']['id'] = 'sub_webhook_transfer';
+    $payload['data']['object']['customer'] = 'cus_webhook_transfer';
+
+    sendStripeWebhook($payload)->assertOk();
+
+    expect(Subscription::query()->where('stripe_id', 'sub_webhook_transfer')->count())->toBe(1)
+        ->and(Subscription::query()->where('stripe_id', 'sub_webhook_transfer')->sole()->team_id)->toBe($target->getKey())
+        ->and($target->refresh()->plan)->toBe(Plan::Pro)
+        ->and($source->refresh()->plan)->toBe(Plan::Free);
 });

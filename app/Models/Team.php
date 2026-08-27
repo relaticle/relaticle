@@ -26,8 +26,12 @@ use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\ImportWizard\Models\Import;
+use Spatie\Onboard\Concerns\GetsOnboarded;
+use Spatie\Onboard\Concerns\Onboardable;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -46,6 +50,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $pm_type
  * @property ?string $pm_last_four
  * @property Carbon|null $trial_ends_at
+ * @property Carbon|null $pro_trial_used_at
  * @property Carbon|null $hosted_free_grandfathered_at
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way
@@ -62,9 +67,10 @@ use Spatie\Sluggable\SlugOptions;
 #[Hidden([
     'invite_link_token',
 ])]
-final class Team extends JetstreamTeam implements HasAvatar
+final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 {
     use Billable;
+    use GetsOnboarded;
 
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
@@ -100,12 +106,12 @@ final class Team extends JetstreamTeam implements HasAvatar
         // App routes
         'companies', 'people', 'tasks', 'opportunities', 'notes',
         'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
-        'opportunities-board', 'tasks-board', 'chat',
+        'opportunities-board', 'tasks-board', 'chat', 'r',
 
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
-        'discord',
+        'discord', 'llms.txt',
 
         // API & developer
         'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
@@ -113,6 +119,7 @@ final class Team extends JetstreamTeam implements HasAvatar
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
         'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
+        'press', 'compare', 'alternatives', 'ai', 'self-hosted',
 
         // Communication
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
@@ -165,9 +172,12 @@ final class Team extends JetstreamTeam implements HasAvatar
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
+            'activation_checklist_dismissed_at' => 'datetime',
+            'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'trial_ends_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
             'hosted_free_grandfathered_at' => 'datetime',
         ];
     }
@@ -303,5 +313,21 @@ final class Team extends JetstreamTeam implements HasAvatar
     public function aiCreditBalance(): HasOne
     {
         return $this->hasOne(AiCreditBalance::class);
+    }
+
+    /**
+     * @return HasMany<AgentConversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(AgentConversation::class);
+    }
+
+    /**
+     * @return HasMany<Import, $this>
+     */
+    public function imports(): HasMany
+    {
+        return $this->hasMany(Import::class);
     }
 }

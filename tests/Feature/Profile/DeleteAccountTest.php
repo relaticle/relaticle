@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
 use App\Notifications\UserDeletionScheduledNotification;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
@@ -67,5 +68,28 @@ test('delete account component renders correctly', function () {
 
     Livewire::test(DeleteAccount::class)
         ->assertSuccessful()
-        ->assertSee('Delete Account');
+        ->assertSee('Delete Account')
+        ->assertSee('Permanently delete your account after a 30-day grace period.')
+        ->assertSee('Records in shared workspaces will remain without your profile.')
+        ->assertDontSee('all your data');
+});
+
+test('password confirmation explains what deletion keeps and removes', function () {
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
+
+    Livewire::test(DeleteAccount::class)
+        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
+        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
+        ->assertMountedActionModalSee('Shared workspace records will remain.')
+        ->assertMountedActionModalSee('Enter your password to confirm.');
+});
+
+test('social account confirmation explains what deletion keeps and removes', function () {
+    $this->actingAs(User::factory()->withPersonalTeam()->socialOnly()->create());
+
+    Livewire::test(DeleteAccount::class)
+        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
+        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
+        ->assertMountedActionModalSee('Shared workspace records will remain.')
+        ->assertDontSee('Enter your password to confirm.');
 });

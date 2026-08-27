@@ -222,3 +222,26 @@ test('user registering without invitation does not trigger subscriber sync', fun
 
     Queue::assertNotPushed(SyncSubscriberJob::class);
 });
+
+test('register page prefills the invited email address', function (): void {
+    $team = Team::factory()->create(['name' => 'Acme Corp']);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'invited.person@example.com',
+    ]);
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->get($acceptUrl)->assertRedirect(Filament::getRegistrationUrl());
+
+    livewire(Register::class)
+        ->assertSuccessful()
+        ->assertFormSet(['email' => 'invited.person@example.com']);
+});
+
+test('register page without an invitation leaves the email blank', function (): void {
+    livewire(Register::class)
+        ->assertSuccessful()
+        ->assertFormSet(['email' => null]);
+});

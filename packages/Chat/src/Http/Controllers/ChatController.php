@@ -15,6 +15,8 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -26,19 +28,28 @@ use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\RenameConversation;
+use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\TranscriptScope;
 
 final readonly class ChatController
 {
+    /**
+     * Cap on in-conversation search hits. Deliberately small: the overlay is a
+     * jump-to affordance, not a results page.
+     */
+    private const int SEARCH_MATCH_LIMIT = 20;
+
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
@@ -178,6 +189,9 @@ final readonly class ChatController
         });
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
+        $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
+
+        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
 
         dispatch(new ProcessChatMessage(
             user: $user,
@@ -187,7 +201,7 @@ final readonly class ChatController
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
-            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
+            pageContext: $pageContext,
             turnId: $turnId,
         ));
 
@@ -195,6 +209,38 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    /**
+     * Title the conversation from the message that just arrived, racing the turn
+     * rather than waiting for it — a chat that streams for a minute should not sit
+     * in the sidebar under a truncated sentence for that whole minute.
+     *
+     * ConversationTitleGate decides whether there is anything to do: it returns
+     * the provisional title (the opening message, sanitized) only while the
+     * stored title still IS that, and only for the conversation's first few typed
+     * messages. That single condition carries two rules, a chat the user has
+     * named is never re-titled, and a chat whose opener carried no topic stays
+     * eligible, so the next few messages get a chance to name it instead of it
+     * being stuck on "hey" forever.
+     *
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
+     */
+    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext): void
+    {
+        $provisional = ConversationTitleGate::beforeTurn($conversationId, $message);
+
+        if ($provisional === null) {
+            return;
+        }
+
+        dispatch(new GenerateConversationTitle(
+            conversationId: $conversationId,
+            provisionalTitle: $provisional,
+            message: $message,
+            provider: $provider,
+            pageContext: $pageContext,
+        ));
     }
 
     /**
@@ -221,14 +267,10 @@ final readonly class ChatController
             return null;
         }
 
-        $modelClass = match ($type) {
-            'company' => Company::class,
-            'people' => People::class,
-            'opportunity' => Opportunity::class,
-            'task' => Task::class,
-            'note' => Note::class,
-            default => null,
-        };
+        /** @var class-string<Model>|null $modelClass */
+        $modelClass = in_array($type, RecordReferenceResolver::CHIP_TYPES, true)
+            ? Relation::getMorphedModel($type)
+            : null;
 
         if ($modelClass === null) {
             return null;
@@ -388,6 +430,76 @@ final readonly class ChatController
         return response()->json(['superseded' => $superseded]);
     }
 
+    /**
+     * Search within one conversation.
+     *
+     * Scoped through TranscriptScope, the same predicate set the pager applies,
+     * so every id returned here is one the transcript can actually reach. A hit
+     * the pager could never render would send the client's load-until-found
+     * loop all the way to the top of the history and then report nothing.
+     *
+     * `q` is a user-supplied pattern, so it goes through LikePattern::escape
+     * before the ILIKE: a literal `%` or `_` typed into the search box must
+     * match that character, not act as a wildcard.
+     */
+    public function searchMessages(Request $request, string $conversationId): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if(
+            $conversation === null
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
+                || ($conversation->team_id !== null && $conversation->team_id !== $user->current_team_id),
+            404,
+        );
+
+        $escaped = LikePattern::escape($validated['q']);
+
+        $matches = TranscriptScope::apply(
+            DB::table('agent_conversation_messages as m'),
+            $user,
+            $conversationId,
+        )
+            ->where('m.content', 'ilike', "%{$escaped}%")
+            ->orderByDesc('m.id')
+            ->limit(self::SEARCH_MATCH_LIMIT)
+            ->get(['m.id', 'm.content']);
+
+        return response()->json([
+            'matches' => $matches
+                ->map(fn (object $row): array => [
+                    'message_id' => (string) $row->id,
+                    'snippet' => $this->snippet((string) $row->content, $validated['q']),
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * A one-line excerpt centred on the match, for the result row in the search
+     * overlay. Markdown syntax is stripped and whitespace collapsed so a
+     * multi-paragraph assistant answer renders as one readable line instead of
+     * leaking **bold** markers and [label](/r/...) link syntax.
+     */
+    private function snippet(string $content, string $needle): string
+    {
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $content) ?? $content;
+        $text = preg_replace('/[*_`~#]+/', '', $text) ?? $text;
+        $text = Str::squish($text);
+
+        return Str::excerpt($text, Str::squish($needle), ['radius' => 60, 'omission' => '…'])
+            ?? Str::limit($text, 160, '…');
+    }
+
     public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse
     {
         $validated = $request->validate([
@@ -403,75 +515,27 @@ final readonly class ChatController
 
         $results = collect();
 
-        $results = $results->merge(
-            People::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (People $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people', 'url' => $resolver->urlFor('people', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Company::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (Company $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company', 'url' => $resolver->urlFor('company', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Opportunity::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (Opportunity $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity', 'url' => $resolver->urlFor('opportunity', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Task::query()
-                ->whereBelongsTo($team)
-                ->where('title', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN title ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(title) ASC')
-                ->orderBy('title')
-                ->limit($limit)
-                ->get(['id', 'title', 'team_id'])
-                ->filter(fn (Task $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task', 'url' => $resolver->urlFor('task', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Note::query()
-                ->whereBelongsTo($team)
-                ->where('title', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN title ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(title) ASC')
-                ->orderBy('title')
-                ->limit($limit)
-                ->get(['id', 'title', 'team_id'])
-                ->filter(fn (Note $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note', 'url' => $resolver->urlFor('note', (string) $r->id)])
-        );
+        foreach ([
+            [People::class, 'name', 'people'],
+            [Company::class, 'name', 'company'],
+            [Opportunity::class, 'name', 'opportunity'],
+            [Task::class, 'title', 'task'],
+            [Note::class, 'title', 'note'],
+        ] as [$modelClass, $column, $type]) {
+            $results = $results->merge(
+                $modelClass::query()
+                    ->whereBelongsTo($team)
+                    ->where($column, 'ilike', "%{$search}%")
+                    ->orderByRaw("CASE WHEN {$column} ilike ? THEN 0 ELSE 1 END", ["{$search}%"])
+                    ->orderByRaw("LENGTH({$column}) ASC")
+                    ->orderBy($column)
+                    ->limit($limit)
+                    ->get(['id', $column, 'team_id'])
+                    ->filter(fn (Model $r): bool => $user->can('view', $r))
+                    ->values()
+                    ->map(fn (Model $r): array => ['id' => $r->getKey(), 'name' => $r->getAttribute($column), 'type' => $type, 'url' => $resolver->urlFor($type, (string) $r->getKey())])
+            );
+        }
 
         return response()->json(['data' => $results->take(15)->values()]);
     }

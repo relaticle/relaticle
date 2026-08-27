@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Hash;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(UserResource::class);
@@ -156,4 +159,33 @@ it('leaves other users untouched when one user is muted', function (): void {
 
     expect($other->fresh()->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::InApp))->toBeTrue()
         ->and($other->fresh()->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email))->toBeTrue();
+});
+
+describe('team relation managers', function (): void {
+    it('links member-of teams to the team view page using the team key, not the pivot key', function (): void {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->ownedTeams()->first();
+
+        $member = User::factory()->withPersonalTeam()->create();
+        $team->users()->attach($member, ['role' => 'admin']);
+
+        livewire(TeamsRelationManager::class, [
+            'ownerRecord' => $member,
+            'pageClass' => ViewUser::class,
+        ])
+            ->assertSuccessful()
+            ->assertSeeHtml("teams/{$team->getKey()}");
+    });
+
+    it('links owned teams to the team view page', function (): void {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->ownedTeams()->first();
+
+        livewire(OwnedTeamsRelationManager::class, [
+            'ownerRecord' => $owner,
+            'pageClass' => ViewUser::class,
+        ])
+            ->assertSuccessful()
+            ->assertSeeHtml("teams/{$team->getKey()}");
+    });
 });

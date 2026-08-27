@@ -33,6 +33,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\EditAiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ViewAiCreditBalance;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class AiCreditBalanceResource extends Resource
 {
@@ -78,7 +79,10 @@ final class AiCreditBalanceResource extends Resource
         return $schema
             ->components([
                 Section::make([
-                    TextEntry::make('team.name')->label('Team'),
+                    TextEntry::make('team.name')
+                        ->label('Team')
+                        ->color('primary')
+                        ->url(RecordLink::to(TeamResource::class, 'team')),
                     TextEntry::make('credits_remaining')->numeric(),
                     TextEntry::make('credits_used')->numeric(),
                     TextEntry::make('purchased_credits')
@@ -101,7 +105,9 @@ final class AiCreditBalanceResource extends Resource
                 TextColumn::make('team.name')
                     ->label('Team')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('origin')
                     ->label('Origin')
                     ->state(function (AiCreditBalance $record): string {

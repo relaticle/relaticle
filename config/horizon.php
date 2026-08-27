@@ -89,7 +89,7 @@ return [
         'redis:default' => 60,
         'redis:imports' => 120,
         'redis:emails-sync' => 300,
-        'redis:chat' => 30,
+        'redis-chat:chat' => 30,
     ],
 
     /*
@@ -376,7 +376,7 @@ return [
                 'nice' => 5,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
@@ -407,7 +407,7 @@ return [
                 'maxProcesses' => 5,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',

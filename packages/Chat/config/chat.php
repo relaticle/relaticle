@@ -6,6 +6,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Assistant Name
+    |--------------------------------------------------------------------------
+    |
+    | The name the assistant introduces itself by, in the system prompt and
+    | across the chat UI. Override with CHAT_ASSISTANT_NAME in .env.
+    */
+
+    'assistant_name' => env('CHAT_ASSISTANT_NAME', 'Rela'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Batch Write Cap
     |--------------------------------------------------------------------------
     |
@@ -15,6 +26,18 @@ return [
     */
 
     'max_batch_size' => (int) env('CHAT_MAX_BATCH_SIZE', 25),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Max Plan Steps
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of write tool calls one turn may chain into a single plan
+    | proposal. Enforced server-side in the tool layer, and stated in the prompt
+    | so the assistant splits a longer request instead of being cut off.
+    */
+
+    'max_plan_steps' => (int) env('CHAT_MAX_PLAN_STEPS', 6),
 
     /*
     |--------------------------------------------------------------------------
@@ -30,7 +53,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'pending_action_expiry_minutes' => 15,
+    'pending_action_expiry_minutes' => 1440,
 
     /*
     |--------------------------------------------------------------------------
@@ -49,10 +72,13 @@ return [
     | Anthropic Prompt Caching
     |--------------------------------------------------------------------------
     |
-    | Marks the static system prompt with a cache_control breakpoint, which
-    | caches the whole request prefix (all tool schemas + instructions) on
-    | Anthropic's side. Cuts per-turn input tokens dramatically for multi-turn
-    | conversations. Disable if a model/provider combination misbehaves.
+    | Places two cache_control breakpoints on every Anthropic request. One marks
+    | the static system prompt, caching the whole prefix (tool schemas plus
+    | instructions) so a new conversation never rewrites it. The other is
+    | Anthropic's automatic caching, which follows the last block of the request,
+    | so each step of the agent loop reads the transcript the previous step
+    | wrote. Cuts per-turn input tokens dramatically. Disable if a
+    | model/provider combination misbehaves.
     */
 
     'anthropic_prompt_caching' => (bool) env('CHAT_ANTHROPIC_PROMPT_CACHING', true),
@@ -68,6 +94,57 @@ return [
     */
 
     'provider_starts_per_second' => (int) env('CHAT_PROVIDER_STARTS_PER_SECOND', 8),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Conversation Title Generation
+    |--------------------------------------------------------------------------
+    |
+    | A new conversation is stored under its opening message, truncated. Once
+    | the first turn is dispatched, a queued job replaces that with a short
+    | model-written title and broadcasts it to the open chat page. Switch this
+    | off to keep the truncated message as the permanent title.
+    |
+    | The title runs on the cheapest model of whichever provider served the
+    | turn — override that per provider with
+    | `ai.providers.<name>.models.text.cheapest`.
+    */
+
+    'title_generation' => [
+        'enabled' => (bool) env('CHAT_TITLE_GENERATION', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Next Steps
+    |--------------------------------------------------------------------------
+    |
+    | After a turn ends, a second cheap model reads what the user asked and what
+    | the assistant answered and drafts up to three things to do next. They sit
+    | at the tail of the transcript as one-click prompts. Switch this off to
+    | end the turn on the answer alone.
+    |
+    | Runs on the cheapest model of whichever provider served the turn, on the
+    | default queue, and is never charged against the workspace's AI credits.
+    */
+
+    'next_steps' => [
+        'enabled' => (bool) env('CHAT_NEXT_STEPS', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Voice Input
+    |--------------------------------------------------------------------------
+    |
+    | Push-to-talk dictation in the composer. A recording is transcribed by the
+    | provider named in `ai.default_for_transcription` and the text is inserted
+    | at the cursor for the user to review. It is never sent on their behalf.
+    | The mic button additionally requires that provider to have a key, so an
+    | install without one shows no button at all (ModelRegistry::voiceInputAvailable()).
+    */
+
+    'voice_enabled' => (bool) env('CHAT_VOICE_ENABLED', true),
 
     /*
     |--------------------------------------------------------------------------

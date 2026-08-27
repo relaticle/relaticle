@@ -14,6 +14,7 @@ beforeEach(function () {
 
     // Clear any cached values before each test
     Cache::forget('github_stars_Relaticle_relaticle');
+    Cache::forget('github_stars_Relaticle_relaticle_last_good');
 });
 
 it('gets stars count from GitHub API', function () {
@@ -123,4 +124,18 @@ it('returns int even when cache contains string value', function () {
     $result = $this->service->getStarsCount('Relaticle', 'relaticle');
 
     expect($result)->toBe(125)->toBeInt();
+});
+
+it('keeps the last good stars count when GitHub rate-limits the next fetch', function () {
+    Http::fake([
+        'api.github.com/repos/Relaticle/relaticle' => Http::sequence()
+            ->push(['stargazers_count' => 1522])
+            ->push(['message' => 'API rate limit exceeded'], 403),
+    ]);
+
+    expect($this->service->getStarsCount())->toBe(1522);
+
+    Cache::forget('github_stars_Relaticle_relaticle');
+
+    expect($this->service->getStarsCount())->toBe(1522);
 });

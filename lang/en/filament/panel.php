@@ -21,4 +21,8 @@ return [
         'email_settings' => 'Email Settings',
         'import_history' => 'Import History',
     ],
+
+    'selects' => [
+        'member_self' => ':name (You)',
+    ],
 ];

@@ -6,9 +6,10 @@
   "stack": { "language": "php", "framework": "laravel", "ui_layer": "filament+livewire" },
   "serve_url": "https://relaticle.test",
   "panel_urls": {
-    "app": "https://app.relaticle.test",
-    "sysadmin": "https://sysadmin.relaticle.test"
+    "app": "{app_url}/{app_panel_path}",
+    "sysadmin": "{app_url}/{sysadmin_path}"
   },
+  "panel_url_note": "Panels are path-routed under APP_URL unless APP_PANEL_DOMAIN/SYSADMIN_DOMAIN are set. Each Conductor workspace serves at its own https://<workspace>.test, so never assume relaticle.test — derive from config('app.url') per references/environment.md. Verified path-routed 2026-08-10 in workspace 'miami' (https://miami.test/app).",
   "commands": {
     "install": "composer install --no-interaction",
     "build": "npm run build",
@@ -26,6 +27,6 @@
   ],
   "doc_sources": ["CLAUDE.md", ".ai/guidelines/relaticle/core.md", "README.md"],
   "volatile_fields": ["serve_url", "panel_urls", "role_credentials", "commands"],
-  "cached_at": "2026-06-12",
+  "cached_at": "2026-08-10",
   "volatile_note": "Fields in volatile_fields are CACHED HINTS, not truth. Stage 0 (references/environment.md) MUST re-derive them from the running app (config(), route:list, seeders, herd) every run and overwrite this run's project-profile.json copy with the derived values. If a derived value contradicts this file, update THIS file too (self-heal) and bump cached_at."
 }

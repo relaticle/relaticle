@@ -114,12 +114,29 @@ final readonly class CustomFieldFilterSchema
     }
 
     /**
+     * Drop the memoised schema for one tenant + entity.
+     *
+     * Callers must not rebuild this key themselves — the TTL is long enough that a
+     * missed invalidation reads as "that field doesn't exist" right after the
+     * assistant created it.
+     */
+    public static function forget(int|string $tenantId, string $entityType): void
+    {
+        Cache::forget(self::cacheKey($tenantId, $entityType));
+    }
+
+    private static function cacheKey(int|string $tenantId, string $entityType): string
+    {
+        return "custom_fields_filter_schema_{$tenantId}_{$entityType}";
+    }
+
+    /**
      * @return Collection<int, CustomField>
      */
     private function resolveFilterableFields(User $user, string $entityType): Collection
     {
         $teamId = $user->currentTeam->getKey();
-        $cacheKey = "custom_fields_filter_schema_{$teamId}_{$entityType}";
+        $cacheKey = self::cacheKey($teamId, $entityType);
 
         /** @var Collection<int, CustomField> */
         return Cache::remember($cacheKey, 60, fn (): Collection => CustomField::query()

@@ -15,6 +15,28 @@ enum Plan: string
         return self::Free;
     }
 
+    /**
+     * Resolve the plan a Stripe price id belongs to, using the price map in
+     * `config('services.stripe.prices')` where each key is `<plan>_<interval>`.
+     */
+    public static function fromStripePrice(?string $priceId): ?self
+    {
+        if ($priceId === null) {
+            return null;
+        }
+
+        /** @var array<string, string|null> $prices */
+        $prices = config('services.stripe.prices', []);
+
+        foreach ($prices as $key => $mappedPriceId) {
+            if ($mappedPriceId !== null && $mappedPriceId === $priceId) {
+                return self::tryFrom(explode('_', $key)[0]);
+            }
+        }
+
+        return null;
+    }
+
     public function label(): string
     {
         return match ($this) {

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
 
 final class AiSpendStatsWidget extends StatsOverviewWidget
 {
+    use HasPeriodComparison;
+    use InteractsWithPageFilters;
+
     protected static ?int $sort = 30;
 
     protected int|string|array $columnSpan = 'full';
@@ -23,8 +27,8 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
      *
      * Refund/Adjustment rows are ledger artifacts (failed-job rollbacks,
      * sysadmin grants/clawbacks), not consumption — excluding them keeps the
-     * "credits this month" figure aligned with the team-level credits_used
-     * meter shown on the balances page.
+     * spend figures consumption-only, matching how the balances page's
+     * credits_used meter counts usage.
      */
     private const array SPENDABLE_TYPES = [
         AiCreditType::Chat,
@@ -34,32 +38,27 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $now = Date::now();
-        $monthStart = $now->copy()->startOfMonth();
-        $nextMonthStart = $monthStart->copy()->addMonth();
-        $lastMonthStart = $monthStart->copy()->subMonth();
+        [$currentStart, $currentEnd, $previousStart, $previousEnd] = $this->getPeriodDates();
+        $days = (int) ($this->pageFilters['period'] ?? 30);
 
-        $currentMonthCredits = (int) AiCreditTransaction::query()
+        $currentCredits = (int) AiCreditTransaction::query()
             ->whereIn('type', self::SPENDABLE_TYPES)
-            ->where('created_at', '>=', $monthStart)
-            ->where('created_at', '<', $nextMonthStart)
+            ->whereBetween('created_at', [$currentStart, $currentEnd])
             ->sum('credits_charged');
 
-        $previousMonthCredits = (int) AiCreditTransaction::query()
+        $previousCredits = (int) AiCreditTransaction::query()
             ->whereIn('type', self::SPENDABLE_TYPES)
-            ->where('created_at', '>=', $lastMonthStart)
-            ->where('created_at', '<', $monthStart)
+            ->whereBetween('created_at', [$previousStart, $previousEnd])
             ->sum('credits_charged');
 
-        $delta = $currentMonthCredits - $previousMonthCredits;
+        $delta = $currentCredits - $previousCredits;
 
-        // One grouped pass over the month serves both the top-model stat and the
+        // One grouped pass over the period serves both the top-model stat and the
         // dollar-cost stat; they share the same filter and differ only in aggregates.
         $tokenRows = AiCreditTransaction::query()
             ->selectRaw('model, SUM(credits_charged) AS total, SUM(input_tokens) AS input_sum, SUM(output_tokens) AS output_sum')
             ->whereIn('type', self::SPENDABLE_TYPES)
-            ->where('created_at', '>=', $monthStart)
-            ->where('created_at', '<', $nextMonthStart)
+            ->whereBetween('created_at', [$currentStart, $currentEnd])
             ->groupBy('model')
             ->get();
 
@@ -108,13 +107,13 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
         }
 
         return [
-            Stat::make('Credits this month', number_format($currentMonthCredits))
-                ->description($monthStart->format('M Y'))
+            Stat::make('Credits this period', number_format($currentCredits))
+                ->description("Last {$days} days")
                 ->descriptionIcon('heroicon-o-banknotes')
                 ->color('primary'),
 
-            Stat::make('Delta vs last month', ($delta >= 0 ? '+' : '').number_format($delta))
-                ->description('Previous month: '.number_format($previousMonthCredits))
+            Stat::make('Delta vs previous period', ($delta >= 0 ? '+' : '').number_format($delta))
+                ->description('Previous period: '.number_format($previousCredits))
                 ->descriptionIcon($delta >= 0 ? 'heroicon-o-arrow-trending-up' : 'heroicon-o-arrow-trending-down')
                 ->color($delta >= 0 ? 'success' : 'danger'),
 
@@ -123,7 +122,7 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-o-cpu-chip')
                 ->color('info'),
 
-            Stat::make('AI cost this month', '$'.number_format($totalCost, 2))
+            Stat::make('AI cost this period', '$'.number_format($totalCost, 2))
                 ->description($costDescription)
                 ->descriptionIcon('heroicon-o-currency-dollar')
                 ->color('warning'),

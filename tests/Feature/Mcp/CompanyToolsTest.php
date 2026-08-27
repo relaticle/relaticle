@@ -176,3 +176,31 @@ describe('validation', function () {
         expect($company->creation_source)->toBe(CreationSource::MCP);
     });
 });
+
+describe('date filtering', function () {
+    it('filters companies by created_after', function (): void {
+        $old = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Ancient Corp']);
+        $old->forceFill(['created_at' => now()->subMonth()])->saveQuietly();
+
+        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Recent Corp']);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, ['created_after' => now()->subWeek()->toDateString()])
+            ->assertOk()
+            ->assertSee('Recent Corp')
+            ->assertDontSee('Ancient Corp');
+    });
+
+    it('filters companies by created_before', function (): void {
+        $old = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Ancient Corp']);
+        $old->forceFill(['created_at' => now()->subMonth()])->saveQuietly();
+
+        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Recent Corp']);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, ['created_before' => now()->subWeek()->toDateString()])
+            ->assertOk()
+            ->assertSee('Ancient Corp')
+            ->assertDontSee('Recent Corp');
+    });
+});

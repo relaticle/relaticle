@@ -31,6 +31,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Workspaces
+    |--------------------------------------------------------------------------
+    |
+    | How many workspaces one user may own. Workspaces they were invited into
+    | belong to someone else and never count. A workspace scheduled for
+    | deletion still occupies a slot until the grace period above elapses.
+    |
+    */
+
+    'workspaces' => [
+        'max_owned_per_user' => (int) env('RELATICLE_MAX_OWNED_WORKSPACES', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Horizon Access
     |--------------------------------------------------------------------------
     |

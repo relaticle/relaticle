@@ -1,7 +1,3 @@
-@push('turnstile')
-    <x-turnstile.scripts />
-@endpush
-
 <x-guest-layout
     title="Contact Us - Relaticle"
     description="Get in touch with the Relaticle team. Questions about enterprise deployments, custom integrations, or partnerships."
@@ -24,9 +20,13 @@
 
                     <div class="mt-8 space-y-4">
                         @feature(App\Features\Documentation::class)
+                        <a href="{{ route('help.index') }}" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors">
+                            <x-ri-lifebuoy-line class="w-4 h-4"/>
+                            Help Centre
+                        </a>
                         <a href="{{ route('documentation.index') }}" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors">
                             <x-ri-book-open-line class="w-4 h-4"/>
-                            Documentation
+                            Developer Docs
                         </a>
                         @endfeature
                         <a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 transition-colors">
@@ -62,11 +62,6 @@
                             <x-marketing.input label="Company" type="text" name="company" id="company" :value="old('company')" placeholder="Your company"/>
 
                             <x-marketing.textarea label="How can we help?" :required="true" name="message" id="message" rows="5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message') }}</x-marketing.textarea>
-
-                            <x-turnstile data-action="contact" data-theme="auto" />
-                            @error('cf-turnstile-response')
-                                <p class="text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
-                            @enderror
 
                             <x-marketing.button type="submit">
                                 Send message

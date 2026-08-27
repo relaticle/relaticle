@@ -35,7 +35,7 @@ it('scopes notes to the record they are attached to', function (): void {
         'notable_id' => (string) $acme->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)
         ->toContain('Acme discovery call')
         ->not->toContain('Globex renewal');
@@ -55,7 +55,7 @@ it('scopes tasks to the company they are attached to', function (): void {
         'company_id' => (string) $acme->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)
         ->toContain('Send Acme proposal')
         ->not->toContain('Chase Globex invoice');
@@ -77,6 +77,6 @@ it('does not leak another team notes through the notable filter', function (): v
         'notable_id' => (string) $theirs->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)->not->toContain('Their secret note');
 });

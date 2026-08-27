@@ -7,7 +7,7 @@
                 Built in the Open
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-lg mx-auto leading-relaxed">
-                Relaticle is AGPL-3.0 open source. Star the repo, join Discord, and help shape the future of agent-native CRM.
+                Relaticle is AGPL-3.0 open source, so you can <a href="{{ route('selfHosted') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">run it on your own server</a>. Star the repo, join Discord, and help shape the future of agent-native CRM.
             </p>
         </div>
 
@@ -19,7 +19,7 @@
                 ];
 
                 if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
-                    $cards[] = ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Documentation', 'desc' => 'Learn how to use Relaticle. Comprehensive guides for users and developers alike.', 'cta' => 'Read the Docs', 'external' => false];
+                    $cards[] = ['url' => route('documentation.index'), 'icon' => 'ri-book-open-line', 'iconClass' => 'text-primary dark:text-primary-400', 'title' => 'Developer Docs', 'desc' => 'Self-host with Docker, build on the REST API, and connect AI agents over MCP.', 'cta' => 'Read the Docs', 'external' => false];
                 }
             @endphp
             @foreach($cards as $card)
@@ -43,7 +43,7 @@
         <div class="max-w-3xl mx-auto">
             <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.015] overflow-hidden">
                 <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-200/60 dark:divide-white/[0.04]">
-                    @foreach([['AGPL-3.0', 'Open Source'], ['2,000+', 'Automated Tests'], ['30', 'MCP Tools'], ['Free', 'Forever']] as $index => [$value, $label])
+                    @foreach([['AGPL-3.0', 'Open Source'], ['2,000+', 'Automated Tests'], ['32', 'MCP Tools'], ['Free', 'Forever']] as $index => [$value, $label])
                         <div class="px-6 py-5 text-center @if($index >= 2) border-t border-gray-200/60 dark:border-white/[0.04] md:border-t-0 @endif">
                             <div class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">{{ $value }}</div>
                             <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 uppercase tracking-wider font-medium">{{ $label }}</div>

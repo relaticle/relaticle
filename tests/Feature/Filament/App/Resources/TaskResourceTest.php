@@ -8,7 +8,10 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 
 mutates(TaskResource::class);
 
@@ -205,4 +208,88 @@ it('denies non-team-member from viewing another team task', function (): void {
     expect($this->user->can('view', $record))->toBeFalse()
         ->and($this->user->can('update', $record))->toBeFalse()
         ->and($this->user->can('delete', $record))->toBeFalse();
+});
+
+/**
+ * The picker resolves its timezone from the same TimezoneManager the table columns read,
+ * so display and entry cannot drift apart — this asserts the *input* direction, where a
+ * regression would silently shift every datetime a user types.
+ */
+it('stores a datetime typed in the user timezone as utc', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    // A real request has the panel bound by Filament's middleware; the harness does not,
+    // and the conversion is deliberately scoped to the app panel.
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $dueField = DB::table('custom_fields')
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'due_date')
+        ->value('id');
+
+    expect($dueField)->not->toBeNull();
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('create'), [
+            'title' => 'typed in Tokyo',
+            'custom_fields' => ['due_date' => '2026-08-19 08:30:00'],
+        ])
+        ->assertHasNoActionErrors();
+
+    $task = Task::query()->where('title', 'typed in Tokyo')->sole();
+
+    $stored = DB::table('custom_field_values')
+        ->where('entity_id', $task->getKey())
+        ->where('entity_type', 'task')
+        ->where('custom_field_id', $dueField)
+        ->value('datetime_value');
+
+    // 08:30 on the 19th in Tokyo is 23:30 the previous evening in UTC.
+    expect($stored)->toBe('2026-08-18 23:30:00');
+});
+
+/**
+ * The other half of the round trip: a due date typed in the user's zone has to come
+ * back out of the table reading the same wall clock it was entered with. The list is
+ * the primary view of a task, so a shift here is what a customer actually sees.
+ */
+it('renders a custom-field datetime in the user timezone in the table', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('create'), [
+            'title' => 'round trips through Tokyo',
+            'custom_fields' => ['due_date' => '2026-08-19 08:30:00'],
+        ])
+        ->assertHasNoActionErrors();
+
+    livewire(ManageTasks::class)
+        ->assertOk()
+        ->assertSee('Aug 19, 2026 08:30')
+        ->assertDontSee('Aug 18, 2026 23:30');
+});
+
+/**
+ * A custom-field datetime has to read like the `created_at` next to it, so the column
+ * takes the table's format rather than one of its own. The seconds are the tell: the
+ * table default carries them, and the literal this class used to hardcode did not.
+ */
+it('renders a custom-field datetime in the same format as the table default', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    livewire(ManageTasks::class)
+        ->callAction(TestAction::make('create'), [
+            'title' => 'formatted like its neighbours',
+            'custom_fields' => ['due_date' => '2026-08-19 08:30:00'],
+        ])
+        ->assertHasNoActionErrors();
+
+    $format = Table::make(new ManageTasks)->getDefaultDateTimeDisplayFormat();
+
+    livewire(ManageTasks::class)
+        ->assertOk()
+        ->assertSee(Date::parse('2026-08-19 08:30:00', 'Asia/Tokyo')->translatedFormat($format));
 });

@@ -38,7 +38,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('returns record_ids for a batch-approved action in resolvedSinceLastAssistantMessage', function (): void {
+it('returns record_ids for a batch-approved action in resolvedForConversation', function (): void {
     PendingAction::query()->create([
         'team_id' => $this->user->currentTeam->getKey(),
         'user_id' => $this->user->getKey(),
@@ -54,7 +54,7 @@ it('returns record_ids for a batch-approved action in resolvedSinceLastAssistant
         'result_data' => ['ids' => ['01aa0000000000000000000000', '01bb0000000000000000000000'], 'type' => 'task', 'count' => 2],
     ]);
 
-    $results = resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage($this->convId);
+    $results = resolve(PendingActionService::class)->resolvedForConversation($this->convId, null);
 
     expect($results)->toHaveCount(1)
         ->and($results[0]['record_ids'])->toContain('01aa0000000000000000000000')
@@ -78,7 +78,7 @@ it('includes both batch ids in the resolved block of agent instructions', functi
         'result_data' => ['ids' => ['01aa0000000000000000000000', '01bb0000000000000000000000'], 'type' => 'task', 'count' => 2],
     ]);
 
-    $resolved = resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage($this->convId);
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($this->convId, null);
 
     $agent = resolve(CrmAssistant::class)->withResolvedActions($resolved);
 
@@ -105,7 +105,7 @@ it('returns an empty record_ids list and still emits record_id for a flat approv
         'result_data' => ['id' => '01cc0000000000000000000000', 'type' => 'task'],
     ]);
 
-    $results = resolve(PendingActionService::class)->resolvedSinceLastAssistantMessage($this->convId);
+    $results = resolve(PendingActionService::class)->resolvedForConversation($this->convId, null);
 
     expect($results)->toHaveCount(1)
         ->and($results[0]['record_id'])->toBe('01cc0000000000000000000000')
@@ -114,4 +114,41 @@ it('returns an empty record_ids list and still emits record_id for a flat approv
     $agent = resolve(CrmAssistant::class)->withResolvedActions($results);
 
     expect($agent->instructions())->toContain('01cc0000000000000000000000');
+});
+
+it('names the skipped batch records in the resolved block so the model never reports them as created', function (): void {
+    PendingAction::query()->create([
+        'team_id' => $this->user->currentTeam->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'action_class' => 'App\\Actions\\People\\CreatePeople',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['_batch' => true, 'records' => [['name' => 'Ivan Zhao'], ['name' => 'Akshay Kothari'], ['name' => 'Simon Last']]],
+        'display_data' => ['title' => 'Create 3 people', 'summary' => 'Create 3 people', 'items' => []],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => [
+            'items' => [
+                '0' => ['status' => 'approved', 'id' => '01aa0000000000000000000000'],
+                '1' => ['status' => 'approved', 'id' => '01bb0000000000000000000000'],
+                '2' => ['status' => 'rejected'],
+            ],
+            'ids' => ['01aa0000000000000000000000', '01bb0000000000000000000000'],
+            'type' => 'people',
+            'count' => 2,
+        ],
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($this->convId, null);
+
+    expect($resolved[0]['skipped'])->toBe(['Simon Last']);
+
+    $instructions = resolve(CrmAssistant::class)->withResolvedActions($resolved)->instructions();
+
+    expect($instructions)
+        ->toContain('skipped by the user, NOT created: "Simon Last"')
+        ->toContain('"Ivan Zhao"')
+        ->toContain('"Akshay Kothari"');
 });

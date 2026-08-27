@@ -104,9 +104,30 @@ production: message ordering, approval races, duplicate proposals.
 - Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
   tenant data into the system prompt — add prompt-context injection only when a
   tool round-trip is demonstrably too costly.
-- New write tools must support batch input like the delete path (`ids[]` /
-  multi-record proposals → one `PendingAction`, all-or-nothing) — do not add new
-  scalar-only tools.
+- Every write tool takes batch input: `records[]` on create and update,
+  `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
+  a `_batch` the dock resolves per item. Do not add scalar-only tools.
+- A request needing several writes is ONE turn: the assistant chains the write
+  tools and links them with `$ref:<pending_action_id>` where a record it just
+  proposed would go. Proposals sharing a `turn_id` are one plan, presented as a
+  single card and approved once (`ProposalPlanService`). A new foreign key on a
+  write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
+  it will accept neither reference validation nor ownership checks.
+- Resolve a reference only at approval time (`PlanReferenceResolver`), never at
+  proposal time, and never let a `$ref` fall out of a card's display: a plan card
+  that hides the link being approved is the failure this design exists to
+  prevent (`RecordNameResolver` renders it as "Name (step N)").
+- Read tools take `lookup: true` to skip the `display_block`; the prompt tells
+  the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
+  result without that flag renders, so a new read tool must either emit a block
+  or be named in the prompt's no-block list.
+- A new list tool needs `availableIncludes()` (copy its sibling `Get*Tool`'s
+  allowlist) or the prompt's related-records rule has nothing to call for it.
+- Replayed proposal tool results are NEVER rewritten: mutating an earlier
+  message invalidates the Anthropic prompt-cache prefix from that turn on.
+  Decided status travels only in `<resolved_actions>`, auto-cancelled status in
+  `<superseded_proposals>`, both re-queried per turn. Never label a proposal by
+  its card heading.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation
   to document.
@@ -138,6 +159,12 @@ Treat every change like it's going through senior code review:
 
 - This project uses **PostgreSQL exclusively** — do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
 - Migrations must only have `up()` methods — do not write `down()` methods
+- Every datetime column is `timestamp without time zone` holding **UTC**. Never write one from
+  the database clock — no `DB::raw('now()')`, `CURRENT_TIMESTAMP`, or `->useCurrent()` /
+  `->useCurrentOnUpdate()` column defaults. Those resolve against the *session* timezone and
+  write local wall-clock into a UTC column. Pass a PHP-side `now()` instead:
+  `->update(['used_at' => now()])`. The pgsql connection pins `'timezone' => 'UTC'` so the two
+  agree today; do not rely on that — it is the safety net, not the contract.
 
 ## Pre-Commit Quality Checks
 
@@ -148,6 +175,11 @@ Before committing any changes, always run these checks in order:
 3. `vendor/bin/phpstan analyse` — ensure no new static analysis errors
 4. `composer test:type-coverage` — type coverage must stay at 100%
 5. `php artisan test --compact` — run relevant tests (use `--filter` for targeted runs)
+
+`--dirty` only covers files with uncommitted changes, so a file you committed
+earlier in the branch stops being checked and its style break surfaces only in
+CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
+--parallel`, whole repo).
 
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
 
@@ -327,32 +359,11 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 
 ## Foundational Context
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
-- php - 8.4
-- filament/filament (FILAMENT) - v5
-- laravel/ai (AI) - v0
-- laravel/fortify (FORTIFY) - v1
-- laravel/framework (LARAVEL) - v13
-- laravel/horizon (HORIZON) - v5
-- laravel/mcp (MCP) - v0
-- laravel/pennant (PENNANT) - v1
-- laravel/prompts (PROMPTS) - v0
-- laravel/reverb (REVERB) - v1
-- laravel/sanctum (SANCTUM) - v4
-- laravel/socialite (SOCIALITE) - v5
-- livewire/livewire (LIVEWIRE) - v4
-- larastan/larastan (LARASTAN) - v3
-- laravel/boost (BOOST) - v2
-- laravel/pail (PAIL) - v1
-- laravel/pint (PINT) - v1
-- laravel/sail (SAIL) - v1
-- pestphp/pest (PEST) - v5
-- phpunit/phpunit (PHPUNIT) - v13
-- rector/rector (RECTOR) - v2
-- alpinejs (ALPINEJS) - v3
-- laravel-echo (ECHO) - v2
-- tailwindcss (TAILWINDCSS) - v4
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
 
 ## Skills Activation
 
@@ -399,7 +410,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Searching Documentation (IMPORTANT)
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
 - Pass a `packages` array to scope results when you know which packages are relevant.
 - Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
 - Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
@@ -410,6 +421,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
 3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
 4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+- Record durable rules with `record-rule` so the next agent or teammate inherits them instead of working them out again. Pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Always use `record-rule`, never your native memory or notes tool — native memory is personal and session-scoped; only `.ai/rules` is shared with the team and persists in the repo.
 
 ## Artisan
 
@@ -462,35 +478,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-### Model Creation
-
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
-
-## APIs & Eloquent Resources
-
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
 ## URL Generation
 
 - When generating links to other pages, prefer named routes and the `route()` function.
 
-## Testing
-
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-
 ## Vite Error
 
 - If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
-
-=== livewire/core rules ===
-
-# Livewire
-
-- Livewire allow to build dynamic, reactive interfaces in PHP without writing JavaScript.
-- You can use Alpine.js for client-side interactions instead of JavaScript frameworks.
-- Keep state server-side so the UI reflects it. Validate and authorize in actions as you would in HTTP requests.
 
 === pint/core rules ===
 
@@ -499,16 +493,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
 - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
 
-=== pest/core rules ===
-
-## Pest
-
-- This project uses Pest for testing. Create tests: `php artisan make:test --pest {name}`.
-- The `{name}` argument should not include the test suite directory. Use `php artisan make:test --pest SomeFeatureTest` instead of `php artisan make:test --pest Feature/SomeFeatureTest`.
-- Run tests: `php artisan test --compact` or filter: `php artisan test --compact --filter=testName`.
-- Do NOT delete tests without approval.
-
-=== filament/filament rules ===
+=== filament/filament/core rules ===
 
 ## Filament
 
@@ -744,14 +729,14 @@ livewire(ListUsers::class)
   - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
   - `$view`: `protected string` (not `protected static string`) on `Page` and `Widget` classes
 
-=== spatie/laravel-medialibrary rules ===
+=== spatie/laravel-medialibrary/core rules ===
 
 ## Media Library
 
 - `spatie/laravel-medialibrary` associates files with Eloquent models, with support for collections, conversions, and responsive images.
 - Always activate the `medialibrary-development` skill when working with media uploads, conversions, collections, responsive images, or any code that uses the `HasMedia` interface or `InteractsWithMedia` trait.
 
-=== spatie/guidelines-skills rules ===
+=== spatie/guidelines-skills/core rules ===
 
 # Project Coding Guidelines
 
@@ -759,6 +744,6 @@ livewire(ListUsers::class)
 - Always activate the `spatie-laravel-php` skill when writing, editing, reviewing, or formatting Laravel or PHP code.
 - Always activate the `spatie-javascript` skill when writing, editing, reviewing, or formatting JavaScript or TypeScript code.
 - Always activate the `spatie-version-control` skill when creating commits, branches, or managing Git operations.
-- Always activate the `spatie-security` skill when configuring security, reviewing authentication, or setting up servers and databases.
+- Always activate the `spatie-security` skill when configuring security, signing commits, reviewing authentication, or setting up servers and databases.
 
 </laravel-boost-guidelines>

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Broadcast;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
+use Relaticle\Chat\Models\PendingAction;
 
 final readonly class StreamEventBroadcaster
 {
@@ -85,6 +87,16 @@ final readonly class StreamEventBroadcaster
 
         unset($decoded['data']);
 
+        // Added to the BROADCAST only, never to the tool result the message
+        // stores: `tool_results` is replayed verbatim to the model on every later
+        // turn, and a rewrite there invalidates the prompt-cache prefix. The
+        // client needs the instant so a lapsed proposal stops hiding the composer.
+        $expiresAt = self::expiryFor($decoded['pending_action_id'] ?? null);
+
+        if ($expiresAt !== null) {
+            $decoded['expires_at'] = $expiresAt;
+        }
+
         return [
             'as' => 'tool_result',
             'with' => [
@@ -99,6 +111,17 @@ final readonly class StreamEventBroadcaster
                 'timestamp' => $event->timestamp,
             ],
         ];
+    }
+
+    private static function expiryFor(mixed $pendingActionId): ?string
+    {
+        if (! is_string($pendingActionId) || $pendingActionId === '') {
+            return null;
+        }
+
+        $expiresAt = PendingAction::query()->whereKey($pendingActionId)->value('expires_at');
+
+        return $expiresAt instanceof CarbonInterface ? $expiresAt->toIso8601String() : null;
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Services\ValidationService;
 
 trait ResolvesEntitySchema
 {
@@ -54,8 +55,12 @@ trait ResolvesEntitySchema
         $result = [];
 
         foreach ($fields as $field) {
-            $required = ($field->validation_rules ?? collect())
-                ->contains('name', 'required');
+            // The package owns this predicate. Three hand-rolled copies of it
+            // existed and only some were right: validation_rules casts to a
+            // key-value collection (['required' => true]), so the older
+            // ['name' => 'required'] scan matched nothing and told every agent
+            // no custom field was ever required.
+            $required = resolve(ValidationService::class)->isRequired($field);
 
             $entry = [
                 'name' => $field->name,

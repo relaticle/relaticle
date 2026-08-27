@@ -15,6 +15,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 mutates(UpdateUserProfileInformation::class, UpdateProfileInformationComponent::class);
@@ -361,7 +362,7 @@ describe('photo url generation', function () {
 
         Route::get('/_test/avatar-url', function () {
             return auth()->user()->getFilamentAvatarUrl();
-        })->middleware('web');
+        })->middleware(['web', 'auth']);
     });
 
     test('avatar url uses current request host instead of APP_URL', function () {
@@ -398,9 +399,10 @@ describe('photo url generation', function () {
         config(['app.url' => 'https://relaticle.test']);
 
         Route::get('/_test/rewrite-url', fn () => SameOriginUrl::rewrite('https://relaticle.test/storage/profile-photos/x.png'))
-            ->middleware('web');
+            ->middleware(['web', 'auth']);
 
-        $response = $this->get('https://app.relaticle.test/_test/rewrite-url');
+        $response = $this->actingAs(User::factory()->create())
+            ->get('https://app.relaticle.test/_test/rewrite-url');
 
         $response->assertOk();
         expect($response->getContent())->toBe('https://app.relaticle.test/storage/profile-photos/x.png');
@@ -410,9 +412,10 @@ describe('photo url generation', function () {
         config(['app.url' => 'https://relaticle.test']);
 
         Route::get('/_test/external-url', fn () => SameOriginUrl::rewrite('https://my-bucket.s3.amazonaws.com/profile-photos/x.png?X-Amz-Signature=abc'))
-            ->middleware('web');
+            ->middleware(['web', 'auth']);
 
-        $response = $this->get('https://app.relaticle.test/_test/external-url');
+        $response = $this->actingAs(User::factory()->create())
+            ->get('https://app.relaticle.test/_test/external-url');
 
         $response->assertOk();
         expect($response->getContent())->toBe('https://my-bucket.s3.amazonaws.com/profile-photos/x.png?X-Amz-Signature=abc');
@@ -435,7 +438,7 @@ describe('photo url generation', function () {
             Storage::shouldReceive('disk')->andReturn($disk);
 
             return auth()->user()->getFilamentAvatarUrl();
-        })->middleware('web');
+        })->middleware(['web', 'auth']);
 
         $response = $this->actingAs($user)
             ->get('https://app.relaticle.test/_test/avatar-url-query');
@@ -443,5 +446,102 @@ describe('photo url generation', function () {
         $response->assertOk();
         expect($response->getContent())
             ->toBe('https://app.relaticle.test/storage/profile-photos/test.png?signature=abc123');
+    });
+});
+
+describe('timezone', function () {
+    test('form is prefilled with the stored timezone', function () {
+        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['timezone' => 'Asia/Tokyo']);
+    });
+
+    test('can set a timezone through the component', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'tz@example.com',
+            'timezone' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'tz@example.com',
+                'timezone' => 'America/New_York',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->timezone)->toBe('America/New_York');
+    });
+
+    test('clearing the select writes null so the app default applies again', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'tz-clear@example.com',
+            'timezone' => 'Asia/Tokyo',
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'tz-clear@example.com',
+                'timezone' => null,
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->timezone)->toBeNull();
+    });
+
+    test('timezone survives a deferred email change', function () {
+        Notification::fake();
+
+        $user = User::factory()->withTeam()->create([
+            'email' => 'tz-email@example.com',
+            'email_verified_at' => now(),
+            'timezone' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'tz-changed@example.com',
+                'timezone' => 'Europe/Lisbon',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh())
+            ->timezone->toBe('Europe/Lisbon')
+            ->email->toBe('tz-email@example.com');
+    });
+
+    test('rejects an identifier that is not a real timezone', function () {
+        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+
+        expect(fn () => $this->action->update($user, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'timezone' => 'Mars/Olympus_Mons',
+        ]))->toThrow(ValidationException::class);
+
+        expect($user->fresh()->timezone)->toBe('Asia/Tokyo');
+    });
+
+    test('action leaves the timezone untouched when the key is absent from input', function () {
+        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+
+        $this->action->update($user, [
+            'name' => 'Renamed Without Timezone Key',
+            'email' => $user->email,
+        ]);
+
+        expect($user->fresh())
+            ->name->toBe('Renamed Without Timezone Key')
+            ->timezone->toBe('Asia/Tokyo');
     });
 });

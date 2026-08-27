@@ -12,6 +12,7 @@ use Laravel\Ai\Responses\Data\Meta;
 use Laravel\Ai\Responses\Data\Usage;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
+use Relaticle\Chat\Support\AssistantText;
 
 mutates(SupersededAwareConversationStore::class);
 
@@ -67,4 +68,11 @@ it('persists non-repeated assistant text unchanged', function (): void {
         ->value('content');
 
     expect($content)->toBe('Created Alpha and Beta.');
+});
+
+it('keeps only the text written after the last tool call, and everything when no text followed it', function (): void {
+    expect(AssistantText::finalReply("Let me look that up.\n\nHere is the note.", "\n\nHere is the note.", true))->toBe('Here is the note.')
+        ->and(AssistantText::finalReply('Review the proposal below.', '', true))->toBe('Review the proposal below.')
+        ->and(AssistantText::finalReply('Plain answer.', 'Plain answer.', false))->toBe('Plain answer.')
+        ->and(AssistantText::finalReply('Done.Done.', 'Done.Done.', true))->toBe('Done.');
 });

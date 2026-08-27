@@ -45,6 +45,23 @@ return [
             'provider' => 'users',
         ],
 
+        // Sanctum's own service provider registers this guard itself with
+        // `provider: null` (accepts any HasApiTokens tokenable) unless we define it
+        // here first. Scoping it to 'users' means a bearer token minted for a
+        // different tokenable (e.g. SystemAdministrator) fails authentication on
+        // every route guarded by `auth:sanctum` -- app API and MCP routes never see
+        // an unexpected caller type. The blog MCP endpoint authenticates system
+        // administrators through the separate 'sanctum-sysadmin' guard instead.
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
+
+        'sanctum-sysadmin' => [
+            'driver' => 'sanctum',
+            'provider' => 'system_administrators',
+        ],
+
         'api' => [
             'driver' => 'passport',
             'provider' => 'users',

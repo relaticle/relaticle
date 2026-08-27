@@ -25,6 +25,7 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
  * @property string $id
  * @property string $name
  * @property string $email
+ * @property string|null $timezone
  * @property string $password
  * @property SystemAdministratorRole $role
  * @property Carbon|null $email_verified_at
@@ -35,6 +36,7 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 #[Fillable([
     'name',
     'email',
+    'timezone',
     'password',
     'role',
 ])]

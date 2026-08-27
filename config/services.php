@@ -57,11 +57,6 @@ return [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
 
-    'turnstile' => [
-        'key' => env('TURNSTILE_SITE_KEY'),
-        'secret' => env('TURNSTILE_SECRET_KEY'),
-    ],
-
     'email_summary' => [
         'provider' => env('EMAIL_SUMMARY_PROVIDER', 'openai'),
         'model' => env('EMAIL_SUMMARY_MODEL', 'gpt-4o-mini'),
@@ -85,9 +80,8 @@ return [
         'client_secret' => env('AZURE_CLIENT_SECRET'),
         'redirect' => env('AZURE_REDIRECT_URI'),
         'tenant' => env('AZURE_TENANT_ID'),
-        'proxy' => env('PROXY'),  // optionally
+        'proxy' => env('PROXY'),
     ],
-
     'stripe' => [
         'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
         'prices' => [
@@ -98,5 +92,9 @@ return [
             'small' => ['price' => env('STRIPE_PRICE_CREDITS_1K'), 'credits' => 1_000],
             'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
         ],
+    ],
+
+    'demo_account' => [
+        'password' => env('DEMO_ACCOUNT_PASSWORD'),
     ],
 ];

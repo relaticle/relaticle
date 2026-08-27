@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use App\Support\DetectsPublicMarkdownRequest;
+use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
 use Spatie\MarkdownResponse\Actions\GeneratesCacheKey;
 use Spatie\MarkdownResponse\Postprocessors\CollapseBlankLinesPostprocessor;
 use Spatie\MarkdownResponse\Postprocessors\RemoveHtmlTagsPostprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveFooterPreprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveHeaderPreprocessor;
+use Spatie\MarkdownResponse\Preprocessors\RemoveNavigationPreprocessor;
 use Spatie\MarkdownResponse\Preprocessors\RemoveScriptsAndStylesPreprocessor;
 
 return [
@@ -66,6 +70,9 @@ return [
      */
     'preprocessors' => [
         RemoveScriptsAndStylesPreprocessor::class,
+        RemoveNavigationPreprocessor::class,
+        RemoveHeaderPreprocessor::class,
+        RemoveFooterPreprocessor::class,
     ],
 
     /*
@@ -74,6 +81,7 @@ return [
      */
     'postprocessors' => [
         RemoveHtmlTagsPostprocessor::class,
+        DecodeHtmlEntitiesPostprocessor::class,
         CollapseBlankLinesPostprocessor::class,
     ],
 

@@ -3,12 +3,23 @@
         label: 'Chats',
         onKeydown(e) {
             const tag = e.target?.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+            {{-- Bare keys must never fire while a dialog, dropdown, or the chat
+                 side panel owns the interaction. Quoteless attribute selectors
+                 are load-bearing: this sits inside a double-quoted x-data
+                 attribute. getComputedStyle (not offsetParent, which is always
+                 null for position:fixed) detects the panel's display:none. --}}
+            if (e.target?.closest?.('[role=dialog], [role=menu], [role=listbox], .fi-modal')) return;
+            const sidePanel = document.querySelector('[data-chat-side-panel]');
+            if (sidePanel && getComputedStyle(sidePanel).display !== 'none') return;
+            if (document.querySelector('.fi-modal-open')) return;
 
             if (e.key === 'n') {
                 e.preventDefault();
-                window.location = @js(\App\Filament\Pages\ChatConversation::getUrl());
+                window.Livewire?.navigate
+                    ? window.Livewire.navigate(@js(\App\Filament\Pages\Dashboard::getUrl()))
+                    : (window.location = @js(\App\Filament\Pages\Dashboard::getUrl()));
                 return;
             }
 
@@ -27,7 +38,7 @@
         }
     }"
     @keydown.window="onKeydown($event)"
-    data-group-label="Chats"
+    data-group-label="{{ __('Chats') }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{-- -ml-2 matches Filament's .fi-sidebar-nav-groups list which has margin-left: -8px;
          this hook renders as a sibling of that list inside .fi-sidebar-nav, so without
@@ -43,12 +54,12 @@
         x-transition:enter-end="fi-transition-enter-end"
         class="fi-sidebar-group-btn"
     >
-        <span class="fi-sidebar-group-label">Chats</span>
+        <span class="fi-sidebar-group-label">{{ __('Chats') }}</span>
 
         <x-filament::icon-button
             color="gray"
             :icon="\Filament\Support\Icons\Heroicon::ChevronUp"
-            label="Chats"
+            label="{{ __('Chats') }}"
             x-bind:aria-expanded="! $store.sidebar.groupIsCollapsed(label)"
             x-on:click.stop="$store.sidebar.toggleCollapsedGroup(label)"
             class="fi-sidebar-group-collapse-btn"
@@ -70,7 +81,7 @@
                 class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"
                 role="status"
             >
-                No chats yet. Start one from the dashboard.
+                {{ __("No chats yet. Ask about a deal, a contact, or what's overdue.") }}
             </li>
         @else
             @foreach($conversations as $conversation)
@@ -78,16 +89,27 @@
                     $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
                     $isActive = request()->url() === $chatUrl;
                     $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
-                    $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: 'Untitled chat', 30);
-                    $rawTitle = $conversation->title ?: 'Untitled chat';
+                    $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: __('Untitled chat'), 30);
+                    $rawTitle = $conversation->title ?: __('Untitled chat');
                 @endphp
                 <li
+                    {{-- Keyed: these rows carry live Alpine state (editing, renamed, saving)
+                         and the list is repainted by refresh-sidebar after a rename or a
+                         delete. Morphing positionally would hand one row's open rename
+                         input to whichever conversation slid into its index. --}}
+                    wire:key="conversation-{{ $conversation->id }}"
                     x-data="{
                         editing: false,
                         renamed: '',
+                        saving: false,
+                        {{-- Blur commits (Notion/Linear convention): Escape is the
+                             only cancel. The guards make the Enter-then-unmount blur
+                             and the Escape-then-blur sequences single-shot no-ops. --}}
                         async save() {
+                            if (!this.editing || this.saving) return;
                             const text = this.renamed.trim();
-                            if (!text) { this.editing = false; return; }
+                            if (!text || text === @js($rawTitle)) { this.editing = false; return; }
+                            this.saving = true;
                             try {
                                 const res = await fetch(@js($renameUrl), {
                                     method: 'POST',
@@ -100,8 +122,6 @@
                                 });
                                 if (res.ok) {
                                     const body = await res.json();
-                                    const titleEl = $el.querySelector('[data-title]');
-                                    if (titleEl) titleEl.textContent = body.title;
 
                                     // Notify the conversation page H1 (Alpine listener).
                                     window.dispatchEvent(new CustomEvent('chat:renamed', {
@@ -111,15 +131,29 @@
                                         },
                                     }));
 
-                                    // Notify the Livewire parent so its $refresh sees fresh state on the next render.
                                     if (window.Livewire?.dispatch) {
+                                        {{-- This row cannot be rewritten by hand: it lives
+                                             in an `x-if` template that Alpine tears down
+                                             while editing, so a write lands on a detached
+                                             node and the old title comes back with the
+                                             template. And this list cannot repaint itself
+                                             either (see ChatSidebarNav) -- only Filament's
+                                             sidebar can, via refresh-sidebar.
+
+                                             The two events go in separate ticks on purpose:
+                                             Livewire batches same-tick dispatches into one
+                                             request, and in that batch the all-chats panel's
+                                             own (never painted) re-render takes the sidebar's
+                                             paint down with it. --}}
                                         window.Livewire.dispatch('chat:conversation-renamed', {
                                             conversationId: body.conversation_id,
                                             title: body.title,
                                         });
+                                        setTimeout(() => window.Livewire.dispatch('refresh-sidebar'), 0);
                                     }
                                 }
                             } catch (_) { /* network errors silently abort */ }
+                            this.saving = false;
                             this.editing = false;
                         },
                         startEdit() {
@@ -146,6 +180,7 @@
                                 x-transition:enter="fi-transition-enter"
                                 x-transition:enter-start="fi-transition-enter-start"
                                 x-transition:enter-end="fi-transition-enter-end"
+                                title="{{ $rawTitle }}"
                                 class="fi-sidebar-item-label truncate"
                             >
                                 {{ $displayTitle }}
@@ -163,11 +198,11 @@
                                 x-model="renamed"
                                 @keydown.escape.prevent="editing = false"
                                 @click.stop
-                                @blur="editing = false"
+                                @blur="save()"
                                 x-init="$nextTick(() => { $el.focus(); $el.select(); })"
                                 maxlength="255"
-                                aria-label="Rename chat"
-                                class="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                aria-label="{{ __('Rename chat') }}"
+                                class="w-full rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             />
                         </form>
                     </template>
@@ -176,8 +211,8 @@
                         type="button"
                         @click.stop.prevent="startEdit()"
                         x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="Rename chat"
-                        title="Rename chat"
+                        aria-label="{{ __('Rename chat') }}"
+                        title="{{ __('Rename chat') }}"
                         class="absolute inset-y-0 end-7 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
                         <x-heroicon-o-pencil-square class="h-4 w-4" />
@@ -186,10 +221,10 @@
                     <button
                         type="button"
                         wire:click="deleteConversation(@js($conversation->id))"
-                        wire:confirm="Delete this chat? Messages and any pending actions will be removed."
+                        wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
                         x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="Delete chat"
-                        title="Delete chat"
+                        aria-label="{{ __('Delete chat') }}"
+                        title="{{ __('Delete chat') }}"
                         class="absolute inset-y-0 end-1 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
                     >
                         <x-heroicon-o-trash class="h-4 w-4" />
@@ -206,7 +241,7 @@
                         type="button"
                         @click="window.dispatchEvent(new CustomEvent('chat:open-all-chats'))"
                         class="fi-sidebar-item-btn w-full text-start opacity-60 transition hover:opacity-100"
-                        aria-label="Open all chats"
+                        aria-label="{{ __('Open all chats') }}"
                     >
                         <x-heroicon-o-ellipsis-horizontal class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                         <span
@@ -216,7 +251,7 @@
                             x-transition:enter-end="fi-transition-enter-end"
                             class="fi-sidebar-item-label"
                         >
-                            All chats
+                            {{ __('All chats') }}
                         </span>
                     </button>
                 </li>

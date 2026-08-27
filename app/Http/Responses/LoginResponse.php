@@ -45,6 +45,10 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
 
     private function intendedIsAccessible(string $intended, User $user): bool
     {
+        if (! $this->isSameSite($intended)) {
+            return false;
+        }
+
         $path = parse_url($intended, PHP_URL_PATH);
 
         if (! is_string($path)) {
@@ -53,9 +57,11 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
 
         $segments = array_values(array_filter(explode('/', $path), fn (string $s): bool => $s !== ''));
 
+        $isPanelUrl = ($segments[0] ?? null) === config('app.app_panel_path', 'app');
+
         // Drop the panel path prefix for path-based panels (/app/{slug}/...).
         // Domain-based panels ({domain}/{slug}/...) have no such prefix.
-        if (($segments[0] ?? null) === config('app.app_panel_path', 'app')) {
+        if ($isPanelUrl) {
             array_shift($segments);
         }
 
@@ -67,6 +73,32 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
 
         $team = Team::query()->where('slug', $slug)->first();
 
-        return $team !== null && $user->belongsToTeam($team);
+        // Non-tenant destinations on our own host — the OAuth consent screen at
+        // /oauth/authorize being the one that matters — carry no workspace to check,
+        // so the tenant guard below cannot speak to them. Dropping them silently
+        // stranded every first-run MCP connector: the user signed in and landed on the
+        // dashboard while the authorization request was discarded.
+        if (! $team instanceof Team) {
+            return ! $isPanelUrl;
+        }
+
+        return $user->belongsToTeam($team);
+    }
+
+    private function isSameSite(string $intended): bool
+    {
+        $host = parse_url($intended, PHP_URL_HOST);
+
+        if ($host === null || $host === false) {
+            return str_starts_with($intended, '/') && ! str_starts_with($intended, '//');
+        }
+
+        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+        if (! is_string($appHost) || $appHost === '') {
+            return false;
+        }
+
+        return $host === $appHost || str_ends_with($host, '.'.$appHost);
     }
 }

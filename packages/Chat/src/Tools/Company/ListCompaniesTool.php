@@ -6,8 +6,11 @@ namespace Relaticle\Chat\Tools\Company;
 
 use App\Actions\Company\ListCompanies;
 use App\Http\Resources\V1\CompanyResource;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Ai\Tools\Request;
+use App\Http\Resources\V1\NoteResource;
+use App\Http\Resources\V1\OpportunityResource;
+use App\Http\Resources\V1\PeopleResource;
+use App\Http\Resources\V1\TaskResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Relaticle\Chat\Tools\BaseReadListTool;
 
 final class ListCompaniesTool extends BaseReadListTool
@@ -32,26 +35,19 @@ final class ListCompaniesTool extends BaseReadListTool
         return 'name';
     }
 
-    /** @return array<string, mixed> */
-    protected function additionalSchema(JsonSchema $schema): array
-    {
-        return [
-            'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
-            'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    protected function additionalFilters(Request $request): array
-    {
-        return array_filter([
-            'created_after' => $request['created_after'] ?? null,
-            'created_before' => $request['created_before'] ?? null,
-        ]);
-    }
-
     protected function citationType(): string
     {
         return 'company';
+    }
+
+    /** @return array<string, class-string<JsonResource>> */
+    protected function availableIncludes(): array
+    {
+        return [
+            'people' => PeopleResource::class,
+            'opportunities' => OpportunityResource::class,
+            'notes' => NoteResource::class,
+            'tasks' => TaskResource::class,
+        ];
     }
 }

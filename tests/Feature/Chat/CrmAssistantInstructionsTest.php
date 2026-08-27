@@ -1,0 +1,331 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\CreationSource;
+use App\Models\People;
+use App\Models\User;
+use App\Services\WorkspaceActivationFacts;
+use Relaticle\Chat\Agents\CrmAssistant;
+
+mutates(CrmAssistant::class);
+
+/**
+ * The system prompt is a shipped artifact: read results now render as a
+ * display block under the reply, so any surviving instruction to hand-write a
+ * table of the same rows puts a duplicate table back on screen. Both the Rules
+ * entry and the Formatting bullet are pinned, because either one alone is
+ * enough to bring it back.
+ */
+it('no longer instructs the model to hand-write a table of read results', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->not->toContain('present results in a compact table format')
+        ->not->toContain('Use tables ONLY for read/search results');
+});
+
+/**
+ * Without a Capabilities line naming it, the change-history tool is a schema
+ * the model never reaches for: it answers "what changed last week" out of the
+ * list tools, which carry no history at all.
+ */
+it('tells the model it can read a record\'s change history', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('ListActivityTool');
+});
+
+/**
+ * Only the list tools, the show tools and ListActivityTool emit a display_block.
+ * SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool return plain JSON,
+ * so an unscoped "your read results are rendered as a block" plus Rule 3's ban on
+ * tables, bullet lists and per-record prose leaves the model no way to show a
+ * search hit at all: the user gets "I found 3 matches" over an empty screen.
+ */
+/*
+ * An observed "show me all my records" request used GetCrmSummaryTool.
+ * The summary tool must remain limited to counts and overviews.
+ */
+it('steers show-me-records requests to the list tools over the summary', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('call the list tools. List tools render real record tables')
+        ->toContain('Never use it instead of showing records.');
+});
+
+it('scopes the block claim to the read tools that emit one', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('rendered as a table or card block')
+        ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
+        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool')
+        ->toContain('A list with zero results renders no block either')
+        ->toContain('ONE short lead-in sentence');
+});
+
+/**
+ * Blocks are appended after the whole reply, so with two read tools in one turn
+ * a model-written "**Companies**" header can never sit next to its table: both
+ * headers strand at the bottom of the bubble and both tables land under them.
+ * The only header that can be adjacent is the block's own title, so the prompt
+ * has to forbid the model's.
+ */
+it('forbids per-result headings that would strand above the blocks', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('never write a heading or bold label naming a result set')
+        ->toContain('Never write a heading or bold label naming a set of results');
+});
+
+/**
+ * DestinationResolver gained an export_* destination per entity, but the model
+ * only reaches for a destination the prompt routes to. Without both of these,
+ * "how do I export my companies?" falls through to the product-question rule
+ * and answers with documentation steps and no link into the workspace, which
+ * the prompt itself calls a downgrade.
+ */
+it('routes export requests to the export destinations', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
+        ->toContain('(custom field definitions, bulk imports, exports, team members)');
+});
+
+it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner'])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('## Current user')
+        ->toContain('Manuk bMinasyan/b (user id: 01USER, team owner)')
+        ->toContain('"me", "my", "mine" and "I" refer to this user');
+});
+
+it('marks the context blocks as internal so the model never names them to the user', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('internal')
+        ->toContain('never mention these blocks, their names, or "resolved actions" to the user');
+});
+
+it('tells the model how to look a record up without rendering it', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('pass `lookup: true` to the list or get tool')
+        ->toContain('N counts tool calls in this turn, including calls that render nothing');
+});
+
+it('routes bulk updates through one records[] call instead of one approval per record', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('`records: [{..}, {..}]` on create and update tools')
+        ->toContain('pass null to clear it');
+});
+
+it('carries the grounding, join, and formatting rules', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('Never state a count, a total, or an absence')
+        ->toContain('lookup: true` on every read call that feeds it')
+        ->toContain('No emoji of any kind')
+        ->toContain('say so in your first sentence');
+});
+
+it('tells the model to name only the records its answer turns on', function (): void {
+    expect(app(CrmAssistant::class)->staticInstructions())
+        ->toContain('Name only the records the answer turns on')
+        ->toContain('Walking every row to show your work is re-listing');
+});
+
+it('tells the model to reach for include when asked for related records', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('pass `include` to the list tool')
+        ->toContain('no single block and no `include` can show');
+});
+
+/**
+ * Since the display block now renders every row the model received (no more
+ * BLOCK_ROW_LIMIT slicing), the old warning that `showing` "can exceed the
+ * rows the table under your reply prints" is false: the table always shows
+ * exactly what the model saw. Leaving the stale clause in would tell the
+ * model to distrust a table that is now trustworthy.
+ */
+it('no longer warns that showing can exceed what the table prints', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->not->toContain('can exceed the rows the table under your reply prints')
+        ->toContain('has_more');
+});
+
+/**
+ * The client collapses a long page to ten painted rows, and that budget lives
+ * only in transcript.js: the model never sees it. So a page size it states is
+ * a number it cannot verify, and a live turn proved it states one anyway once
+ * the user says it first ("show me 25 companies" produced "here are the first
+ * 25 of your 56" over a table reading "Showing 10 of 56"). The general ban on
+ * row counts was already there; only the named-page-size case leaks through,
+ * so that case is spelled out with the sentence to write instead.
+ */
+it('forbids repeating a page size the user named', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('even when the user named a page size')
+        ->toContain('never by repeating it in your reply')
+        ->toContain('never "the first 25 of your 56"');
+});
+
+/**
+ * `next_page` is the only instruction that tells the model how to reach page
+ * 2 of a list result. If a future prompt trim drops this line, the model has
+ * no way to fetch more rows and will either fabricate a "view more" answer or
+ * silently truncate the user's request to the first page.
+ */
+it('tells the model how to fetch the next page of a list result', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('page` set to the result\'s `next_page`');
+});
+
+it('tells the model to end every answer with exactly one offered next action', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('exactly one concrete offered next action or question')
+        ->toContain('the next action is mandatory and must offer to create or import the missing data');
+});
+
+it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('<workspace_state>')
+        ->toContain('must say plainly that these are seeded sample data');
+});
+
+it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->count(2)->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->toContain('only sample records');
+});
+
+it('stops claiming only sample records once the user has a record of their own', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::SYSTEM,
+    ]);
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($team);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->not->toContain('only sample records')
+        ->toContain("alongside the user's own records");
+});
+
+it('renders no workspace_state block for a workspace with no seeded sample data at all', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->currentTeam;
+
+    People::factory()->create([
+        'team_id' => $team->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withTeam($team);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
+});
+
+it('renders no workspace_state block when no team is bound', function (): void {
+    $agent = resolve(CrmAssistant::class);
+
+    expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
+});
+
+/**
+ * A resumed turn is the one the user's approval started, so the proposals it
+ * carries are the outcome of that click. The block used to open with "already
+ * decided by the user earlier in this conversation", and the model repeated
+ * that back verbatim: a freshly approved invitation was reported as "already
+ * sent earlier in our conversation, no new action was needed", which tells the
+ * user their own click did nothing. Reproduced live on three separate turns.
+ *
+ * Wording alone did not fix it, the marker is what carries the distinction, so
+ * this pins the marker rather than the prose.
+ */
+it('marks the proposals the resumed turn just decided', function (): void {
+    $agent = resolve(CrmAssistant::class);
+    $agent->resolvedActions = [
+        [
+            'operation' => 'create', 'entity_type' => 'team_invitations', 'status' => 'approved',
+            'label' => 'fresh@example.com', 'record_id' => '01JUSTNOW', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => true,
+        ],
+        [
+            'operation' => 'create', 'entity_type' => 'companies', 'status' => 'approved',
+            'label' => 'Older Co', 'record_id' => '01EARLIER', 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => false,
+        ],
+    ];
+
+    $block = $agent->instructions();
+
+    expect($block)
+        ->toContain('JUST DECIDED, approved: create team_invitations')
+        ->not->toContain('JUST DECIDED, approved: create companies')
+        ->not->toContain('already decided by the user earlier in this conversation')
+        ->toContain('Never call it already done, already sent, already invited');
+});
+
+/**
+ * The Writes rule used to say "already approved", which the model rendered back
+ * to the user as "already ... earlier in our conversation".
+ */
+it('does not tell the model the request is already approved without qualifying when', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->not->toContain('When everything requested is already approved')
+        ->toContain('If those approvals arrived on THIS turn');
+});
+
+/**
+ * House style bans the em dash everywhere, and the sanitiser that used to
+ * strip it from assistant prose left with the welcome conversation. Live
+ * replies were shipping "..., no further action is needed" with one.
+ */
+it('bans the em dash in assistant prose', function (): void {
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)->toContain('Never use an em dash');
+});
