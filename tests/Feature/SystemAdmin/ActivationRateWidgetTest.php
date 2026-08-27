@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Relaticle\SystemAdmin\Filament\Widgets\ActivationRateWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -67,4 +68,31 @@ it('excludes system-created records from activation count', function () {
     livewire(ActivationRateWidget::class)
         ->assertSee('Activated Users')
         ->assertSee('0');
+});
+
+function actAsActivationAdminInZone(string $timezone): void
+{
+    test()->actingAs(SystemAdministrator::factory()->create(['timezone' => $timezone]), 'sysadmin');
+    Filament::setCurrentPanel('sysadmin');
+}
+
+it('opens the window at midnight on the administrator calendar, not a rolling server window', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsActivationAdminInZone('Asia/Yerevan');
+
+    // beforeEach seeds a team owner at the frozen instant, which would otherwise
+    // land inside the window under test.
+    User::query()->update(['created_at' => Date::parse('2026-01-01 00:00:00', 'UTC')]);
+
+    /**
+     * The 30 day window opens at midnight on Jul 29 in Yerevan, which is
+     * 2026-07-28 20:00 UTC. A rolling now() minus 30 days window would have
+     * opened at 10:31 UTC that day and counted both of these.
+     */
+    User::factory()->create(['created_at' => Date::parse('2026-07-28 15:00:00', 'UTC')]);
+    User::factory()->create(['created_at' => Date::parse('2026-07-28 20:30:00', 'UTC')]);
+
+    $stats = invade(livewire(ActivationRateWidget::class)->assertOk()->instance())->getStats();
+
+    expect($stats[0]->getValue())->toBe('1');
 });

@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 /**
  * Shared logic for dashboard widgets that compare metrics across time periods.
@@ -20,15 +21,18 @@ trait HasPeriodComparison
     private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
     /**
+     * The current window is the viewer's last $days calendar days, ending with
+     * today so far; the comparison window is that same window shifted back
+     * $days days, so both cover the same elapsed time.
+     *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: CarbonImmutable, 3: CarbonImmutable}
      */
     private function getPeriodDates(): array
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $currentEnd = CarbonImmutable::now();
-        $currentStart = $currentEnd->subDays($days);
-        $previousEnd = $currentStart->subSecond();
-        $previousStart = $currentStart->subDays($days);
+
+        [$currentStart, $currentEnd] = ViewerTime::periodUtc($days);
+        [$previousStart, $previousEnd] = ViewerTime::periodUtc($days, $days);
 
         return [$currentStart, $currentEnd, $previousStart, $previousEnd];
     }
