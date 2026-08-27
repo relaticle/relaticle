@@ -6,10 +6,12 @@ namespace Relaticle\ImportWizard\Models;
 
 use App\Models\Team;
 use App\Models\User;
+use Database\Factories\ImportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -54,9 +56,17 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
 ])]
 final class Import extends Model
 {
+    /** @use HasFactory<ImportFactory> */
+    use HasFactory;
+
     use HasUlids;
 
     private ?BaseImporter $importerCache = null;
+
+    protected static function newFactory(): ImportFactory
+    {
+        return ImportFactory::new();
+    }
 
     protected function casts(): array
     {

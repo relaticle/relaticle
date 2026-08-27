@@ -45,7 +45,7 @@ function createStoreForMatchResolution(
     array $rows,
     array $mappings,
 ): array {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => ImportEntityType::People,
@@ -109,12 +109,11 @@ it('resolves Update when email matches existing record', function (): void {
         ->first();
 
     if ($emailField) {
-        CustomFieldValue::create([
+        CustomFieldValue::factory()->withJsonValue(['existing@test.com'])->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
             'tenant_id' => $this->team->id,
-            'json_value' => ['existing@test.com'],
         ]);
     }
 
@@ -228,12 +227,11 @@ it('resolves Update when CSV email column contains comma-separated values matchi
         $this->markTestSkipped('No email custom field seeded for team');
     }
 
-    CustomFieldValue::create([
+    CustomFieldValue::factory()->withJsonValue(['existing@test.com', 'other@test.com'])->create([
         'custom_field_id' => $emailField->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
         'tenant_id' => $this->team->id,
-        'json_value' => ['existing@test.com', 'other@test.com'],
     ]);
 
     createStoreForMatchResolution($this, ['Name', 'Email'], [

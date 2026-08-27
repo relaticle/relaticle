@@ -81,7 +81,7 @@ it('marks external header links with rel noopener', function (): void {
 
     preg_match('/<a[^>]*href="'.preg_quote(route('discord'), '/').'"[^>]*>/s', $header, $discordAnchor);
 
-    expect($header)->not->toBe('')
+    expect($header)->not->toBeEmpty()
         ->and($discordAnchor[0] ?? '')->toContain('rel="noopener noreferrer"');
 });
 
@@ -89,7 +89,7 @@ it('marks the current page in the navigation', function (): void {
     $html = $this->get('/pricing')->assertOk()->getContent();
     $header = extractNavRegion($html, __('Main'));
 
-    expect($header)->not->toBe('')
+    expect($header)->not->toBeEmpty()
         ->and($header)->toContain('aria-current="page"');
 });
 
@@ -166,7 +166,7 @@ it('renders the works-with strip on the homepage with a link to the developer do
     preg_match('/<section[^>]*aria-label="Works with"[^>]*>.*?<\/section>/s', $html, $matches);
     $strip = $matches[0] ?? '';
 
-    expect($strip)->not->toBe('')
+    expect($strip)->not->toBeEmpty()
         ->and($strip)->toContain('Claude', 'ChatGPT', 'Cursor', 'Gemini', '+ any MCP client')
         ->and($strip)->toContain('href="'.route('documentation.index').'"')
         ->and($strip)->toContain('21,000+');

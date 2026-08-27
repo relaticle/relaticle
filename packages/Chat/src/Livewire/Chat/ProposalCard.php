@@ -1606,7 +1606,7 @@ final class ProposalCard extends BaseLivewireComponent
      * from the record's clean action_data so each owned/editable row carries a
      * `code`. Carried-forward relationship rows stay code-less (read-only). The
      * rebuild is byte-for-byte the stored display because applyEdit re-renders
-     * with the same builder — see ProposalCardComponentTest's no-divergence test.
+     * with the same builder. See ProposalCardEditingTest's no-divergence test.
      *
      * @return list<array<string, mixed>>
      */

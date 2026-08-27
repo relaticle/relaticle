@@ -81,7 +81,7 @@ test('job rejects favicon url that resolves to private address', function (): vo
 
     (new FetchFaviconForCompany($company->fresh()))->handle();
 
-    expect($company->fresh()->getMedia('logo'))->toHaveCount(0);
+    expect($company->fresh()->getMedia('logo'))->toBeEmpty();
 });
 
 test('downloads the favicon through the guarded client and stores it', function (): void {

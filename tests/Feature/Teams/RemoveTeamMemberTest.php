@@ -21,7 +21,7 @@ test('team members can be removed from teams', function () {
         ->set('teamMemberIdBeingRemoved', $otherUser->id)
         ->call('removeTeamMember');
 
-    expect($user->currentTeam->fresh()->users)->toHaveCount(0);
+    expect($user->currentTeam->fresh()->users)->toBeEmpty();
 });
 
 test('removed team member receives notification', function () {

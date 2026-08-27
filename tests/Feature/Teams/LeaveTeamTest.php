@@ -21,7 +21,7 @@ test('users can leave teams', function () {
     Livewire::test(TeamMemberManager::class, ['team' => $user->currentTeam])
         ->call('leaveTeam');
 
-    expect($user->currentTeam->fresh()->users)->toHaveCount(0);
+    expect($user->currentTeam->fresh()->users)->toBeEmpty();
 });
 
 test('team owners cant leave their own team', function () {
@@ -50,5 +50,5 @@ test('a stranger cannot leave a team they were never on, so no removal notice na
 
     Notification::assertNothingSent();
 
-    expect($team->fresh()->users)->toHaveCount(0);
+    expect($team->fresh()->users)->toBeEmpty();
 });

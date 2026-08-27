@@ -229,10 +229,7 @@ it('marks an optimistic bubble failed on rate limit, and a real click resend doe
     $resolveInterface = ChatBrowser::resolveInterface();
 
     $afterFailure = chatTriggerRateLimitedFailure($page, $resolveInterface);
-
-    expect($afterFailure['userCount'])->toBe(1);
-    expect($afterFailure['domUserBubbles'])->toBe(1);
-    expect($afterFailure['domFailedBubbles'])->toBe(1);
+    expect($afterFailure)->toMatchArray(['userCount' => 1, 'domUserBubbles' => 1, 'domFailedBubbles' => 1]);
     expect($afterFailure['clientKey'])->not->toBeNull();
 
     // The failed bubble above lives in the dashboard's side-panel chatInterface

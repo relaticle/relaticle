@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,6 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
-
-uses(LazilyRefreshDatabase::class);
 
 function seedResolvedConv(string $id, User $user): void
 {
