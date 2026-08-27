@@ -125,6 +125,26 @@ it('can create a task', function (): void {
     ]);
 });
 
+// The create action reads assignee ids straight off submitted form state, and form
+// state is client-controlled: nothing stops a hand-crafted Livewire payload naming a
+// user from another workspace. The option query is what rejects it, because Filament
+// builds the field's `in` rule from that same query.
+it('rejects a create payload naming an assignee outside the workspace', function (): void {
+    $this->withoutDefer();
+
+    $outsider = User::factory()->withTeam()->create();
+
+    livewire(ManageTasks::class)
+        ->callAction('create', data: [
+            'title' => 'Outsider Task',
+            'assignees' => [$outsider->id],
+        ])
+        ->assertHasActionErrors(['assignees.0']);
+
+    expect(Task::query()->where('title', 'Outsider Task')->exists())->toBeFalse()
+        ->and($outsider->notifications()->count())->toBe(0);
+});
+
 it('notifies a newly assigned member with a deep-link that opens the task edit modal', function (): void {
     $this->withoutDefer();
 
