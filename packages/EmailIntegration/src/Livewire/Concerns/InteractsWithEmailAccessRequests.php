@@ -125,7 +125,7 @@ trait InteractsWithEmailAccessRequests
             ->modalIcon('heroicon-o-check-circle')
             ->modalIconColor('success')
             ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
-            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.approve.modal_description', ['name' => $request->requester?->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
+            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.approve.modal_description', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.approve.modal_submit_label'))
             ->action(function (EmailAccessRequest $request): void {
                 $accessRequest = EmailAccessRequest::query()->with(['email', 'owner', 'requester'])->whereKey($request->getKey())->where('owner_id', $this->authUser()->getKey())->first();
@@ -155,7 +155,7 @@ trait InteractsWithEmailAccessRequests
             ->visible(fn (EmailAccessRequest $request): bool => $this->tab === 'incoming' && $request->status === EmailAccessRequestStatus::PENDING)
             ->requiresConfirmation()
             ->modalHeading(__('filament/pages/email-access-requests.actions.deny.modal_heading'))
-            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.deny.modal_description', ['name' => $request->requester?->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
+            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.deny.modal_description', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.deny.modal_submit_label'))
             ->action(function (EmailAccessRequest $request): void {
                 $accessRequest = EmailAccessRequest::query()->with(['requester'])->whereKey($request->getKey())->where('owner_id', $this->authUser()->getKey())->first();
@@ -185,7 +185,7 @@ trait InteractsWithEmailAccessRequests
             ->visible(fn (EmailAccessRequest $request): bool => $this->tab === 'outgoing' && $request->status === EmailAccessRequestStatus::PENDING)
             ->requiresConfirmation()
             ->modalHeading(__('filament/pages/email-access-requests.actions.cancel.modal_heading'))
-            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.cancel.modal_description', ['name' => $request->owner?->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
+            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.cancel.modal_description', ['name' => $request->owner->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.cancel.modal_submit_label'))
             ->action(function (EmailAccessRequest $request): void {
                 $accessRequest = EmailAccessRequest::query()->whereKey($request->getKey())->where('requester_id', $this->authUser()->getKey())->first();
