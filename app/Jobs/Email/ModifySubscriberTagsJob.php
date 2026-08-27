@@ -5,52 +5,73 @@ declare(strict_types=1);
 namespace App\Jobs\Email;
 
 use App\Enums\TagAction;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\ThrottlesExceptionsWithRedis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
 
-#[Tries(5)]
+#[Tries(6)]
 final class ModifySubscriberTagsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * Doubles as the retry schedule and as the delay used while waiting for
+     * SyncSubscriberJob to store the subscriber uuid, so a slow or failing
+     * subscriber sync cannot drop a tag. Six tries means six waits, the last
+     * two both clamped to the final delay, so the total window (~171 minutes)
+     * deliberately outlasts SyncSubscriberJob's own budget (~81 minutes).
+     *
+     * @var list<int>
+     */
+    private const array RETRY_DELAYS = [60, 300, 900, 1800, 3600];
+
+    /**
      * @param  list<string>  $tags
      */
     public function __construct(
-        private readonly string $subscriberUuid,
+        private readonly string $userId,
         private readonly array $tags,
         private readonly TagAction $action = TagAction::Add,
     ) {}
 
     public function handle(): void
     {
+        $subscriberUuid = User::query()
+            ->whereKey($this->userId)
+            ->value('mailcoach_subscriber_uuid');
+
+        if (! $subscriberUuid) {
+            $this->release($this->nextDelay());
+
+            return;
+        }
+
         match ($this->action) {
-            TagAction::Add => Mailcoach::post("subscribers/{$this->subscriberUuid}/tags", ['tags' => $this->tags]),
-            TagAction::Remove => Mailcoach::delete("subscribers/{$this->subscriberUuid}/tags", ['tags' => $this->tags]),
+            TagAction::Add => Mailcoach::post("subscribers/{$subscriberUuid}/tags", ['tags' => $this->tags]),
+            TagAction::Remove => Mailcoach::delete("subscribers/{$subscriberUuid}/tags", ['tags' => $this->tags]),
         };
     }
 
-    /** @return array<ThrottlesExceptionsWithRedis> */
-    public function middleware(): array
+    /** @return list<int> */
+    public function backoff(): array
     {
-        return [new ThrottlesExceptionsWithRedis(1, 1)->backoff(1)->report()];
+        return self::RETRY_DELAYS;
     }
 
-    public function retryUntil(): \DateTime
+    private function nextDelay(): int
     {
-        return now()->addHour();
+        return self::RETRY_DELAYS[min($this->attempts(), count(self::RETRY_DELAYS)) - 1];
     }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error("Failed to {$this->action->value} tags for subscriber {$this->subscriberUuid}", [
+        Log::error("Failed to {$this->action->value} tags for user {$this->userId}", [
             'tags' => $this->tags,
             'error' => $exception->getMessage(),
         ]);
