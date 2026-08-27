@@ -9,7 +9,6 @@ use App\Enums\OnboardingUseCase;
 use App\Models\Team;
 use App\Rules\ValidTeamSlug;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -25,6 +24,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Laravel\Jetstream\Contracts\DeletesTeams;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
@@ -40,6 +40,7 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\Peopl
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\TasksRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
 final class TeamResource extends Resource
 {
@@ -179,7 +180,9 @@ final class TeamResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    SafeDelete::bulkAction(function (Team $record): void {
+                        resolve(DeletesTeams::class)->delete($record);
+                    }),
                 ]),
             ]);
     }

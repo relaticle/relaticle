@@ -26,6 +26,7 @@ final readonly class DeleteUser implements DeletesUsers
         DB::transaction(function () use ($user): void {
             $this->deleteTeams($user);
             $user->deleteProfilePhoto();
+            $user->loadMissing('tokens');
             $user->tokens->each->delete();
             $user->delete();
         });
@@ -37,6 +38,7 @@ final readonly class DeleteUser implements DeletesUsers
     private function deleteTeams(User $user): void
     {
         $user->teams()->detach();
+        $user->loadMissing('ownedTeams');
 
         $user->ownedTeams->each(function (Model $team): void {
             /** @var Team $team */

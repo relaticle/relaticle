@@ -88,8 +88,11 @@ final class PurgeScheduledDeletionsCommand extends Command
             ->with('owner')
             ->chunkById(100, function (Collection $teams): void {
                 $teams->each(function (Team $team): void {
-                    /** @var User $owner */
                     $owner = $team->owner;
+
+                    if (! $owner instanceof User) {
+                        return;
+                    }
 
                     $owner->notify(new TeamDeletionReminderNotification($team));
                 });
