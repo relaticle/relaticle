@@ -55,3 +55,18 @@ it('states the actual MCP rate limits in the rendered guide as :format', functio
     'HTML' => [[], 'text/html'],
     'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
 ]);
+
+it('explains OAuth setup for ChatGPT and Claude in the rendered guide as :format', function (array $headers, string $contentType): void {
+    $response = $this->get('/developers/mcp', $headers)->assertOk();
+
+    expect($response->headers->get('Content-Type'))->toStartWith($contentType);
+
+    $response
+        ->assertSee('Clients with OAuth support need only the MCP endpoint.')
+        ->assertSee('ChatGPT')
+        ->assertSee('Claude')
+        ->assertDontSee('Before connecting an AI assistant, you need an access token:');
+})->with([
+    'HTML' => [[], 'text/html'],
+    'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+]);
