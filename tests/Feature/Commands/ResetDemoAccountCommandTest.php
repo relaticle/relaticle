@@ -8,6 +8,7 @@ use App\Actions\CustomFields\UpdateCustomField;
 use App\Actions\Opportunity\AggregateOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\Task\UpdateTask;
+use App\Console\Commands\ResetDemoAccountCommand;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
 use App\Mcp\Tools\FetchTool;
@@ -25,19 +26,23 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
-use Database\Seeders\DemoAccountSeeder;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(
     AggregateOpportunities::class,
     AggregateOpportunitiesTool::class,
     CreateCustomField::class,
-    DemoAccountSeeder::class,
+    ResetDemoAccountCommand::class,
     FetchTool::class,
     GetCrmSchemaTool::class,
     GetCrmSummary::class,
@@ -53,28 +58,139 @@ mutates(
     WhoAmiTool::class,
 );
 
-it('refuses to seed a reviewer account without an environment password', function (): void {
-    config()->set('services.demo_account.password');
+it('refuses to create a reviewer account without a password', function (): void {
+    $this->artisan('demo:reset')->assertFailed();
 
-    expect(fn (): mixed => resolve(DemoAccountSeeder::class)->run())
-        ->toThrow(RuntimeException::class, 'DEMO_ACCOUNT_PASSWORD is not set');
-
-    expect(User::query()->where('email', DemoAccountSeeder::EMAIL)->exists())->toBeFalse();
+    expect(User::query()->where('email', ResetDemoAccountCommand::EMAIL)->exists())->toBeFalse();
 });
 
-it('seeds a deterministic reviewer workspace and safely refreshes it', function (): void {
+it('clears reviewer leftovers and restores credits without touching another workspace', function (): void {
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-four'])->assertSuccessful();
+
+    $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
+    $team = $reviewer->personalTeam();
+    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherTeam = $otherUser->personalTeam();
+
+    $leaveLeftovers = function (Team $team, User $user): string {
+        $conversationId = (string) Str::ulid();
+
+        DB::table('agent_conversations')->insert([
+            'id' => $conversationId,
+            'team_id' => $team->getKey(),
+            'participant_id' => $user->getKey(),
+            'participant_type' => $user->getMorphClass(),
+            'title' => 'Reviewer conversation',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('agent_conversation_messages')->insert([
+            'id' => (string) Str::ulid(),
+            'conversation_id' => $conversationId,
+            'participant_id' => $user->getKey(),
+            'participant_type' => $user->getMorphClass(),
+            'agent' => 'crm',
+            'role' => 'user',
+            'content' => 'Delete everything please',
+            'attachments' => json_encode([]),
+            'tool_calls' => json_encode([]),
+            'tool_results' => json_encode([]),
+            'usage' => json_encode([]),
+            'meta' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('pending_actions')->insert([
+            'id' => (string) Str::ulid(),
+            'team_id' => $team->getKey(),
+            'user_id' => $user->getKey(),
+            'conversation_id' => $conversationId,
+            'action_class' => 'CreateCompany',
+            'operation' => 'create',
+            'entity_type' => 'company',
+            'action_data' => json_encode([]),
+            'display_data' => json_encode([]),
+            'expires_at' => now()->addDay(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('exports')->insert([
+            'id' => (string) Str::ulid(),
+            'team_id' => $team->getKey(),
+            'user_id' => $user->getKey(),
+            'file_disk' => 'local',
+            'exporter' => 'CompanyExporter',
+            'total_rows' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Import::factory()->create(['team_id' => $team->getKey(), 'user_id' => $user->getKey()]);
+        TeamInvitation::factory()->create(['team_id' => $team->getKey()]);
+
+        return $conversationId;
+    };
+
+    $reviewerConversationId = $leaveLeftovers($team, $reviewer);
+    $otherConversationId = $leaveLeftovers($otherTeam, $otherUser);
+
+    AiCreditBalance::query()
+        ->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 0, 'credits_used' => 500]);
+
+    $this->artisan('demo:reset')->assertSuccessful();
+
+    $leftoverTables = ['agent_conversations', 'pending_actions', 'exports', 'imports', 'team_invitations'];
+
+    foreach ($leftoverTables as $table) {
+        expect(DB::table($table)->where('team_id', $team->getKey())->count())->toBe(0, $table)
+            ->and(DB::table($table)->where('team_id', $otherTeam->getKey())->count())->toBe(1, $table);
+    }
+
+    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->firstOrFail();
+    $rebuiltOpportunity = Opportunity::query()
+        ->where('team_id', $team->getKey())
+        ->where('name', 'Stripe Billing Rollout')
+        ->firstOrFail();
+    $rebuiltContact = People::query()->whereKey($rebuiltOpportunity->contact_id)->firstOrFail();
+
+    expect($rebuiltContact->name)->toBe('Marcus Webb')
+        ->and(DB::table('agent_conversation_messages')->where('conversation_id', $reviewerConversationId)->count())->toBe(0)
+        ->and(DB::table('agent_conversation_messages')->where('conversation_id', $otherConversationId)->count())->toBe(1)
+        ->and($balance->credits_remaining)->toBeGreaterThan(0)
+        ->and($balance->credits_used)->toBe(0);
+});
+
+it('resets the workspace without a password once the account exists', function (): void {
+    $this->artisan('demo:reset', ['--password' => 'established-secret'])->assertSuccessful();
+
+    $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
+    $team = $reviewer->personalTeam();
+    $reviewerCompany = Company::query()->where('team_id', $team->getKey())->firstOrFail();
+    $reviewerCompany->update(['name' => 'Renamed By A Reviewer']);
+
+    $this->artisan('demo:reset')->assertSuccessful();
+
+    expect(Hash::check('established-secret', (string) $reviewer->refresh()->password))->toBeTrue()
+        ->and(Company::query()->where('team_id', $team->getKey())->where('name', 'Renamed By A Reviewer')->exists())->toBeFalse()
+        ->and(Company::query()->where('team_id', $team->getKey())->where('name', 'Notion')->exists())->toBeTrue();
+});
+
+it('creates a deterministic reviewer workspace and safely refreshes it', function (): void {
     $this->travelTo(Date::parse('2026-08-26 12:00:00 UTC'));
     $password = 'runtime-secret-one';
-    config()->set('services.demo_account.password', $password);
 
     $otherUser = User::factory()->withPersonalTeam()->create();
     $otherCompany = Company::factory()
         ->recycle([$otherUser, $otherUser->currentTeam])
         ->create(['name' => 'Untouched Workspace Company']);
 
-    resolve(DemoAccountSeeder::class)->run();
+    $this->artisan('demo:reset', ['--password' => $password])->assertSuccessful();
 
-    $reviewer = User::query()->where('email', DemoAccountSeeder::EMAIL)->firstOrFail();
+    $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
     $team = $reviewer->currentTeam;
 
     expect($reviewer->email_verified_at)->not->toBeNull()
@@ -83,8 +199,8 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
         ->and($reviewer->getAttribute('two_factor_confirmed_at'))->toBeNull()
         ->and(Hash::check($password, (string) $reviewer->password))->toBeTrue()
         ->and($team)->not->toBeNull()
-        ->and($team->name)->toBe(DemoAccountSeeder::TEAM_NAME)
-        ->and($team->slug)->toBe(DemoAccountSeeder::TEAM_SLUG)
+        ->and($team->name)->toBe(ResetDemoAccountCommand::TEAM_NAME)
+        ->and($team->slug)->toBe(ResetDemoAccountCommand::TEAM_SLUG)
         ->and($team->hosted_free_grandfathered_at)->not->toBeNull()
         ->and(resolve(HostedWorkspaceAccess::class)->allows($team))->toBeTrue();
 
@@ -121,7 +237,7 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
         ->and($unassignedTask->assignees()->exists())->toBeFalse()
         ->and(CustomField::query()->withoutGlobalScopes()
             ->where('tenant_id', $team->getKey())
-            ->where('code', DemoAccountSeeder::INACTIVE_FIELD_CODE)
+            ->where('code', ResetDemoAccountCommand::INACTIVE_FIELD_CODE)
             ->where('active', false)
             ->exists())->toBeTrue()
         ->and(Activity::query()->withoutGlobalScopes()->where('team_id', $team->getKey())->count())->toBeGreaterThanOrEqual(5);
@@ -132,7 +248,7 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
     RelaticleServer::actingAs($reviewer)
         ->tool(WhoAmiTool::class)
         ->assertOk()
-        ->assertSee(DemoAccountSeeder::TEAM_NAME)
+        ->assertSee(ResetDemoAccountCommand::TEAM_NAME)
         ->assertDontSee($password);
 
     RelaticleServer::actingAs($reviewer)
@@ -157,8 +273,8 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
         ->tool(GetCrmSummaryTool::class)
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('opportunities.by_stage.Closed Won.count', 1)
-            ->where('tasks.overdue', 1)
+            ->where('opportunities.by_stage.Closed Won.count', 2)
+            ->where('tasks.overdue', 4)
             ->etc())
         ->assertDontSee($password);
 
@@ -177,7 +293,7 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
     RelaticleServer::actingAs($reviewer)
         ->tool(ListCustomFieldsTool::class, ['active' => false])
         ->assertOk()
-        ->assertSee(DemoAccountSeeder::INACTIVE_FIELD_NAME)
+        ->assertSee(ResetDemoAccountCommand::INACTIVE_FIELD_NAME)
         ->assertDontSee($password);
 
     $entityCounts = [
@@ -188,9 +304,10 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
         Note::query()->where('team_id', $team->getKey())->count(),
     ];
 
+    expect($entityCounts)->toBe([20, 30, 18, 20, 12]);
+
     $replacementPassword = 'runtime-secret-two';
-    config()->set('services.demo_account.password', $replacementPassword);
-    resolve(DemoAccountSeeder::class)->run();
+    $this->artisan('demo:reset', ['--password' => $replacementPassword])->assertSuccessful();
 
     $reviewer->refresh();
 
@@ -206,17 +323,15 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
 });
 
 it('keeps the existing workspace slug when another team already holds the reviewer slug', function (): void {
-    config()->set('services.demo_account.password', 'runtime-secret-three');
+    $incumbent = Team::factory()->create(['slug' => ResetDemoAccountCommand::TEAM_SLUG]);
 
-    $incumbent = Team::factory()->create(['slug' => DemoAccountSeeder::TEAM_SLUG]);
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-three'])->assertSuccessful();
 
-    resolve(DemoAccountSeeder::class)->run();
-
-    $team = User::query()->where('email', DemoAccountSeeder::EMAIL)->firstOrFail()->personalTeam();
+    $team = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalTeam();
 
     expect($team)->not->toBeNull()
-        ->and($team->name)->toBe(DemoAccountSeeder::TEAM_NAME)
-        ->and($team->slug)->not->toBe(DemoAccountSeeder::TEAM_SLUG)
+        ->and($team->name)->toBe(ResetDemoAccountCommand::TEAM_NAME)
+        ->and($team->slug)->not->toBe(ResetDemoAccountCommand::TEAM_SLUG)
         ->and($team->slug)->not->toBeEmpty()
-        ->and($incumbent->refresh()->slug)->toBe(DemoAccountSeeder::TEAM_SLUG);
+        ->and($incumbent->refresh()->slug)->toBe(ResetDemoAccountCommand::TEAM_SLUG);
 });
