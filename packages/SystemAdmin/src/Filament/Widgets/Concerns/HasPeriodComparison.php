@@ -23,7 +23,9 @@ trait HasPeriodComparison
     /**
      * The current window is the viewer's last $days calendar days, ending with
      * today so far; the comparison window is that same window shifted back
-     * $days days, so both cover the same elapsed time.
+     * $days days, so both end at the same wall clock. Across a DST transition
+     * the two spans differ by the hour the clocks moved, which is the price of
+     * comparing like time of day rather than like duration.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: CarbonImmutable, 3: CarbonImmutable}
      */
@@ -55,6 +57,31 @@ trait HasPeriodComparison
         $sign = $change > 0 ? '+' : '';
 
         return " ({$sign}{$change}%)";
+    }
+
+    /**
+     * Point count and segment length for a sparkline over $start to $end.
+     *
+     * The viewer-calendar window runs from local midnight to now, so it is a
+     * whole number of days plus part of today. Deriving the segment from
+     * truncated whole days would leave that tail outside the buckets, and
+     * fillBuckets() folds anything past the last bucket into it, which silently
+     * doubles the final point. Measuring the window itself keeps every bucket
+     * the same width and the last one honest.
+     *
+     * @return array{0: int, 1: float} the point count and the segment in seconds
+     */
+    private function getSparklineSegments(CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        $seconds = (float) ($end->getTimestamp() - $start->getTimestamp());
+
+        if ($seconds <= 0.0) {
+            return [0, 0.0];
+        }
+
+        $points = min((int) ceil($seconds / 86400), 7);
+
+        return [$points, $seconds / $points];
     }
 
     /**

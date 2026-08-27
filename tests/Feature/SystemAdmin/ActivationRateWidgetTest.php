@@ -96,3 +96,25 @@ it('opens the window at midnight on the administrator calendar, not a rolling se
 
     expect($stats[0]->getValue())->toBe('1');
 });
+
+it('spreads the sparkline across the whole window without doubling the last point', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsActivationAdminInZone('Asia/Yerevan');
+
+    User::query()->update(['created_at' => Date::parse('2026-01-01 00:00:00', 'UTC')]);
+
+    /**
+     * One signup on each of the seven viewer calendar days in the window, all at
+     * midday Yerevan so none sits near a bucket edge. The window runs from local
+     * midnight to now, so it is six whole days plus a part of today: deriving the
+     * segment from truncated whole days leaves today outside the buckets, and
+     * fillBuckets() folds anything past the end into the final one.
+     */
+    foreach (range(21, 27) as $day) {
+        User::factory()->create(['created_at' => Date::parse("2026-08-{$day} 08:00:00", 'UTC')]);
+    }
+
+    $stats = invade(livewire(ActivationRateWidget::class, ['pageFilters' => ['period' => '7']])->assertOk()->instance())->getStats();
+
+    expect($stats[0]->getChart())->toBe([1, 1, 1, 1, 1, 1, 1]);
+});
