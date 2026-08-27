@@ -382,14 +382,11 @@ test('a shared filtered url renders already filtered', function (): void {
 test('a custom field edit reads as an update, not its raw event name', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Field Edited Co']);
 
-    activity()
-        ->performedOn($company)
-        ->causedBy($this->owner)
-        ->event('custom_field_changes')
-        ->log('custom field changed');
+    $row = seedCustomFieldRow($this, $company, (string) Str::uuid(), 'ICP', 'No', 'Yes');
 
     livewire(ActivityLog::class)
         ->assertOk()
+        ->assertCanSeeTableRecords([$row])
         ->assertSee(__('teams.activity.events.updated'))
         ->assertDontSee('custom_field_changes');
 });
@@ -405,11 +402,7 @@ test('filtering on updated covers custom field edits too', function (): void {
     // which is what the page is supposed to do to a create that carried fields.
     app()->forgetScopedInstances();
 
-    activity()
-        ->performedOn($company)
-        ->causedBy($this->owner)
-        ->event('custom_field_changes')
-        ->log('custom field changed');
+    seedCustomFieldRow($this, $company, (string) Str::uuid(), 'ICP', 'No', 'Yes');
 
     livewire(ActivityLog::class)
         ->filterTable('event', 'updated')
