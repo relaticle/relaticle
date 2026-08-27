@@ -134,6 +134,26 @@ it('emails the owner when the trial ends in three days', function (): void {
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
 });
 
+it('skips ownerless workspaces without aborting trial reminders', function (): void {
+    $this->travelTo(now()->startOfDay()->addHours(12));
+    Mail::fake();
+
+    [$deletedOwner, $ownerlessTeam] = trialOwnerAndTeam();
+    $ownerlessTeam->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+    $deletedOwner->delete();
+
+    [, $ownedTeam] = trialOwnerAndTeam();
+    $ownedTeam->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(
+        ProTrialEndingSoonMail::class,
+        fn (ProTrialEndingSoonMail $mail): bool => $mail->team->is($ownedTeam),
+    );
+    Mail::assertQueuedCount(1);
+});
+
 it('does not email when the trial is outside the three-day window', function (): void {
     Mail::fake();
 

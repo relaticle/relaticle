@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Models\Team;
 use App\Rules\ValidTeamSlug;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -25,6 +25,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Laravel\Jetstream\Contracts\DeletesTeams;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
@@ -40,6 +42,7 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\Peopl
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\TasksRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
 final class TeamResource extends Resource
 {
@@ -56,6 +59,16 @@ final class TeamResource extends Resource
     protected static ?string $pluralModelLabel = 'Teams';
 
     protected static ?string $slug = 'teams';
+
+    /**
+     * @return Builder<Team>
+     */
+    #[Override]
+    public static function getEloquentQuery(): Builder
+    {
+        // billingStatus() reads the subscriptions relation per row.
+        return parent::getEloquentQuery()->with('subscriptions');
+    }
 
     public static function getNavigationBadge(): ?string
     {
@@ -102,6 +115,17 @@ final class TeamResource extends Resource
                     IconEntry::make('personal_team')
                         ->label('Personal')
                         ->boolean(),
+                    TextEntry::make('billing_status')
+                        ->label('Billing')
+                        ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                        ->badge(),
+                    TextEntry::make('plan')
+                        ->label('Plan')
+                        ->badge(),
+                    TextEntry::make('trial_ends_at')
+                        ->label('Trial Ends')
+                        ->dateTime()
+                        ->placeholder('—'),
                     TextEntry::make('onboarding_use_case')
                         ->label('Use Case')
                         ->badge()
@@ -144,6 +168,16 @@ final class TeamResource extends Resource
                 IconColumn::make('personal_team')
                     ->label('Personal')
                     ->boolean(),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->tooltip('Why this workspace has the plan it has')
+                    ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                    ->badge(),
+                TextColumn::make('plan')
+                    ->label('Plan')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('onboarding_use_case')
                     ->label('Use Case')
                     ->badge()
@@ -179,7 +213,9 @@ final class TeamResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    SafeDelete::bulkAction(function (Team $record): void {
+                        resolve(DeletesTeams::class)->delete($record);
+                    }),
                 ]),
             ]);
     }

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-enum Plan: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum Plan: string implements HasColor, HasLabel
 {
     case Free = 'free';
     case Pro = 'pro';
@@ -37,12 +40,21 @@ enum Plan: string
         return null;
     }
 
-    public function label(): string
+    public function getLabel(): string
     {
         return match ($this) {
             self::Free => 'Free',
             self::Pro => 'Pro',
             self::Enterprise => 'Enterprise',
+        };
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::Free => 'gray',
+            self::Pro => 'success',
+            self::Enterprise => 'primary',
         };
     }
 

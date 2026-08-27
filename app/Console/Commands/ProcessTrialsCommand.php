@@ -43,8 +43,11 @@ final class ProcessTrialsCommand extends Command
             ->with('owner')
             ->chunkById(100, function (Collection $teams) use (&$count): void {
                 $teams->each(function (Team $team) use (&$count): void {
-                    /** @var User $owner */
                     $owner = $team->owner;
+
+                    if (! $owner instanceof User) {
+                        return;
+                    }
 
                     Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($team));
                     $count++;

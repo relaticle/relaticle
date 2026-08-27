@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Enums\Plan;
+use App\Enums\BillingStatus;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -54,16 +54,11 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->color('primary')
                     ->url(fn (Team $record): ?string => $record->owner ? UserResource::getUrl('view', ['record' => $record->owner]) : null),
 
-                TextColumn::make('plan')
-                    ->label('Plan')
-                    ->badge()
-                    ->formatStateUsing(fn (Plan $state): string => $state->label())
-                    ->color(fn (Plan $state): string => match ($state) {
-                        Plan::Free => 'gray',
-                        Plan::Pro => 'success',
-                        Plan::Enterprise => 'primary',
-                    })
-                    ->sortable(),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->tooltip('Why this workspace has the plan it has')
+                    ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                    ->badge(),
 
                 TextColumn::make('members_count')
                     ->label('Members')
@@ -147,6 +142,8 @@ final class TopTeamsTableWidget extends BaseWidget
             ->groupBy('team_id');
 
         return Team::query()
+            // billingStatus() reads the subscriptions relation per row.
+            ->with('subscriptions')
             ->select([
                 'teams.*',
                 'activity.records_touched',
