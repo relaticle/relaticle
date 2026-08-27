@@ -17,7 +17,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Validation\ValidationException;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 mutates(
@@ -66,7 +65,7 @@ it('filters by custom field equality', function (): void {
 
     $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 
@@ -100,7 +99,7 @@ it('filters by currency field with gte operator', function (): void {
 
     $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 
@@ -119,7 +118,7 @@ it('rejects unknown field codes', function (): void {
 
     QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 })->throws(ValidationException::class, 'Unknown custom field filter codes: nonexistent_field.');
@@ -142,7 +141,7 @@ it('rejects unknown operators', function (): void {
 
     QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 })->throws(ValidationException::class, 'Custom field [amount] does not support operator [approximately].');
@@ -160,7 +159,7 @@ it('rejects more than 10 filter conditions', function (): void {
 
     QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 })->throws(ValidationException::class);
@@ -179,10 +178,44 @@ it('returns an actionable MCP error for an invalid operand shape', function (): 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'stage' => ['in' => 'Qualification'],
+                'stage' => ['in' => ['nested' => 'Qualification']],
             ],
         ])
         ->assertHasErrors(['must be an array']);
+});
+
+it('returns an actionable MCP error for an operand that is not the declared type', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => [
+                'amount' => ['gt' => 'lots'],
+            ],
+        ])
+        ->assertHasErrors(['must be a number']);
+});
+
+it('accepts a single value for an array operand', function (): void {
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Qualified Deal']);
+    Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Proposed Deal']);
+
+    $stageField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'stage')
+        ->firstOrFail();
+
+    $opportunity->saveCustomFieldValue($stageField, 'Qualification');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => [
+                'stage' => ['in' => 'Qualification'],
+            ],
+        ])
+        ->assertOk()
+        ->assertSee('Qualified Deal')
+        ->assertDontSee('Proposed Deal');
 });
 
 it('publishes only array-compatible operators for email, phone, and link fields', function (): void {
@@ -237,7 +270,7 @@ it('handles empty filter object as no-op', function (): void {
 
     $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+            CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
 

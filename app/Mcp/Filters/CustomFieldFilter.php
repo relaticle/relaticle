@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -19,6 +20,9 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class CustomFieldFilter implements Filter
 {
+    /** Separator for list operands sent as a single query-string value. */
+    private const string LIST_DELIMITER = ',';
+
     private const int MAX_CONDITIONS = 10;
 
     private const array OPERATOR_MAP = [
@@ -32,6 +36,16 @@ final readonly class CustomFieldFilter implements Filter
     public function __construct(
         private string $entityType,
     ) {}
+
+    /**
+     * Spatie splits comma-separated filter values into arrays before the filter runs,
+     * which would turn a `contains` term containing a comma into an array. Splitting is
+     * disabled here because this filter splits list operands itself, per operator type.
+     */
+    public static function allowedFilter(string $entityType): AllowedFilter
+    {
+        return AllowedFilter::custom('custom_fields', new self($entityType))->delimiter('');
+    }
 
     public function __invoke(Builder $query, mixed $value, string $property): void
     {
@@ -76,35 +90,101 @@ final readonly class CustomFieldFilter implements Filter
                     $this->invalid("Custom field [{$fieldCode}] does not support operator [{$operator}]. Allowed operators: {$allowed}.");
                 }
 
-                $this->validateOperand((string) $fieldCode, $operator, $operand, $supportedOperators[$operator]);
+                $operand = $this->normalizeOperand((string) $fieldCode, $operator, $operand, $supportedOperators[$operator]);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
             }
         }
     }
 
-    /** @param array<string, mixed> $operatorSchema */
-    private function validateOperand(string $fieldCode, string $operator, mixed $operand, array $operatorSchema): void
+    /**
+     * Coerce an operand to the type its schema declares. MCP and chat clients send
+     * typed JSON, but the REST API receives the same filters as query strings where
+     * every operand arrives as a string, so a strict type check alone would reject
+     * every REST request.
+     *
+     * @param  array<string, mixed>  $operatorSchema
+     */
+    private function normalizeOperand(string $fieldCode, string $operator, mixed $operand, array $operatorSchema): mixed
     {
         $type = $operatorSchema['type'] ?? null;
-        $valid = match ($type) {
-            'array' => is_array($operand)
-                && $operand !== []
-                && array_is_list($operand)
-                && array_all($operand, static fn (mixed $item): bool => is_string($item)),
-            'boolean' => is_bool($operand),
-            'integer' => is_int($operand),
-            'number' => is_int($operand) || is_float($operand),
-            'string' => is_string($operand),
-            default => false,
+
+        $normalized = match ($type) {
+            'array' => $this->toStringList($operand),
+            'boolean' => $this->toBoolean($operand),
+            'integer' => $this->toInteger($operand),
+            'number' => $this->toNumber($operand),
+            'string' => is_string($operand) ? $operand : null,
+            default => null,
         };
 
-        if ($valid) {
-            return;
+        if ($normalized !== null) {
+            return $normalized;
         }
 
         $expected = $type === 'array' ? 'an array of strings' : "a {$type}";
         $this->invalid("Custom field filter [{$fieldCode}.{$operator}] must be {$expected}.");
+    }
+
+    /** @return list<string>|null */
+    private function toStringList(mixed $operand): ?array
+    {
+        if (is_string($operand)) {
+            $operand = explode(self::LIST_DELIMITER, $operand);
+        }
+
+        if (! is_array($operand) || $operand === [] || ! array_is_list($operand)) {
+            return null;
+        }
+
+        if (! array_all($operand, static fn (mixed $item): bool => is_string($item))) {
+            return null;
+        }
+
+        return $operand;
+    }
+
+    private function toBoolean(mixed $operand): ?bool
+    {
+        if (is_bool($operand)) {
+            return $operand;
+        }
+
+        if (! is_string($operand) && ! is_int($operand)) {
+            return null;
+        }
+
+        return filter_var($operand, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    }
+
+    private function toInteger(mixed $operand): ?int
+    {
+        if (is_int($operand)) {
+            return $operand;
+        }
+
+        if (! is_string($operand)) {
+            return null;
+        }
+
+        $integer = filter_var($operand, FILTER_VALIDATE_INT);
+
+        return $integer === false ? null : $integer;
+    }
+
+    private function toNumber(mixed $operand): int|float|null
+    {
+        if (is_int($operand) || is_float($operand)) {
+            return $operand;
+        }
+
+        if (! is_string($operand)) {
+            return null;
+        }
+
+        $number = filter_var($operand, FILTER_VALIDATE_FLOAT);
+
+        return $number === false ? null : $number;
     }
 
     private function invalid(string $message): never
@@ -128,7 +208,7 @@ final readonly class CustomFieldFilter implements Filter
             match ($operator) {
                 'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
                 'contains' => $q->where($valueColumn, 'ILIKE', '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], (string) $operand).'%'),
-                'in' => $q->whereIn($valueColumn, (array) $operand),
+                'in' => $q->whereIn($valueColumn, $operand),
                 'has_any' => $q->whereJsonContains($valueColumn, $operand),
                 default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
             };
