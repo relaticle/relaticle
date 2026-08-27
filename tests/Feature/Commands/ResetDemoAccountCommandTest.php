@@ -9,6 +9,7 @@ use App\Actions\Opportunity\AggregateOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\Task\UpdateTask;
 use App\Console\Commands\ResetDemoAccountCommand;
+use App\Jobs\FetchFaviconForCompany;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
 use App\Mcp\Tools\FetchTool;
@@ -29,9 +30,11 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -320,6 +323,33 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
     ])->toBe($entityCounts)
         ->and(Hash::check($replacementPassword, (string) $reviewer->password))->toBeTrue()
         ->and(Company::query()->withoutGlobalScopes()->whereKey($otherCompany->getKey())->exists())->toBeTrue();
+});
+
+it('queues exactly one logo fetch per company, including the fixtures seeded without model events', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-five'])->assertSuccessful();
+
+    Bus::assertDispatched(FetchFaviconForCompany::class, fn (FetchFaviconForCompany $job): bool => $job->company->name === 'Notion');
+    Bus::assertDispatchedTimes(FetchFaviconForCompany::class, 20);
+});
+
+it('removes stored logos before rebuilding the workspace', function (): void {
+    Storage::fake('public');
+
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-six'])->assertSuccessful();
+
+    $team = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalTeam();
+    $company = Company::query()->where('team_id', $team->getKey())->where('name', 'Notion')->firstOrFail();
+    $company->addMediaFromString('logo-bytes')
+        ->usingFileName('logo.png')
+        ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    expect(DB::table('media')->where('model_id', $company->getKey())->count())->toBe(1);
+
+    $this->artisan('demo:reset')->assertSuccessful();
+
+    expect(DB::table('media')->where('model_id', $company->getKey())->count())->toBe(0);
 });
 
 it('keeps the existing workspace slug when another team already holds the reviewer slug', function (): void {

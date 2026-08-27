@@ -15,6 +15,7 @@ use App\Actions\People\CreatePeople;
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
+use App\Jobs\FetchFaviconForCompany;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -28,6 +29,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Carbon;
@@ -111,8 +113,10 @@ final class ResetDemoAccountCommand extends Command
         // team_id and creator_id from the authenticated user.
         Auth::setUser($user);
 
+        $seededCompanies = new EloquentCollection;
+
         try {
-            DB::transaction(function () use ($user, $team): void {
+            DB::transaction(function () use ($user, $team, &$seededCompanies): void {
                 $this->resetReviewerWorkspace($team);
 
                 throw_unless(
@@ -121,6 +125,8 @@ final class ResetDemoAccountCommand extends Command
                     'Reviewer workspace fixtures could not be generated.',
                 );
 
+                $seededCompanies = Company::query()->where('team_id', $team->getKey())->get();
+
                 $this->resetAiCredits($team);
                 $this->shapeOpportunities($user, $team);
                 $this->shapeTasks($user, $team);
@@ -128,6 +134,7 @@ final class ResetDemoAccountCommand extends Command
                 $this->ensureInactiveField($user, $team);
                 $this->recordCreationActivity($user, $team);
             });
+            $this->fetchCompanyLogos($seededCompanies);
         } finally {
             Auth::forgetUser();
             TenantContextService::setTenantId($previousTenantId);
@@ -137,6 +144,17 @@ final class ResetDemoAccountCommand extends Command
         $this->components->twoColumnDetail('Password', $password === null ? 'unchanged' : 'updated');
 
         return self::SUCCESS;
+    }
+
+    // OnboardSeed writes its fixtures with model events disabled, so the observer that
+    // normally queues a logo fetch never fires for them. Everything created afterwards
+    // goes through the actions, and the observer covers those.
+    /** @param  EloquentCollection<int, Company>  $companies */
+    private function fetchCompanyLogos(EloquentCollection $companies): void
+    {
+        $companies->each(function (Company $company): void {
+            dispatch(new FetchFaviconForCompany($company));
+        });
     }
 
     private function password(): ?string
@@ -216,6 +234,12 @@ final class ResetDemoAccountCommand extends Command
         DB::table('exports')->where('team_id', $teamId)->delete();
         DB::table('team_invitations')->where('team_id', $teamId)->delete();
         Activity::query()->withoutGlobalScopes()->where('team_id', $teamId)->delete();
+
+        Company::query()
+            ->where('team_id', $teamId)
+            ->each(function (Company $company): void {
+                $company->clearMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+            });
 
         Model::withoutEvents(function () use ($teamId): void {
             Note::query()->withTrashed()->where('team_id', $teamId)->forceDelete();
@@ -510,7 +534,7 @@ final class ResetDemoAccountCommand extends Command
             'Webflow' => ['domain' => 'webflow.com', 'handle' => 'webflow-inc-', 'icp' => true],
             'Zapier' => ['domain' => 'zapier.com', 'handle' => 'zapier', 'icp' => true],
             'Intercom' => ['domain' => 'intercom.com', 'handle' => 'intercom', 'icp' => true],
-            'Segment' => ['domain' => 'segment.com', 'handle' => 'segmentio', 'icp' => false],
+            'Airtable' => ['domain' => 'airtable.com', 'handle' => 'airtable', 'icp' => true],
             'Amplitude' => ['domain' => 'amplitude.com', 'handle' => 'amplitude-analytics', 'icp' => true],
         ];
     }
@@ -544,7 +568,7 @@ final class ResetDemoAccountCommand extends Command
             'Peter Nowak' => ['company' => 'Zapier', 'title' => 'Head of Integrations', 'phone' => '+14155550130'],
             'Sana Iqbal' => ['company' => 'Intercom', 'title' => 'Director of Support Operations', 'phone' => '+14155550131'],
             'Niall Sweeney' => ['company' => 'Intercom', 'title' => 'Revenue Operations Analyst', 'phone' => '+14155550132'],
-            'Gabriel Ruiz' => ['company' => 'Segment', 'title' => 'Data Platform Manager', 'phone' => '+14155550133'],
+            'Gabriel Ruiz' => ['company' => 'Airtable', 'title' => 'Data Platform Manager', 'phone' => '+14155550133'],
             'Helena Roth' => ['company' => 'Amplitude', 'title' => 'VP Product Analytics', 'phone' => '+14155550134'],
             'Tomas Bergstrom' => ['company' => 'Amplitude', 'title' => 'Enterprise Account Executive', 'phone' => '+14155550135'],
         ];
@@ -593,7 +617,7 @@ final class ResetDemoAccountCommand extends Command
             'Send Amplitude case study' => ['company' => 'Amplitude', 'contact' => 'Helena Roth', 'opportunity' => 'Amplitude Product Insights', 'status' => 'To do', 'priority' => 'Low', 'due_in_days' => 12, 'assigned' => false, 'description' => 'Share the product analytics case study she asked for on the intro call.'],
             'Confirm Retool sandbox access' => ['company' => 'Retool', 'contact' => 'Hugo Marchand', 'opportunity' => 'Retool Internal Tools', 'status' => 'In progress', 'priority' => 'Medium', 'due_in_days' => 4, 'assigned' => true, 'description' => 'Their architect needs sandbox credentials before the technical review.'],
             'Follow up with Loom on renewal' => ['company' => 'Loom', 'contact' => 'Mei Tanaka', 'opportunity' => '', 'status' => 'To do', 'priority' => 'Medium', 'due_in_days' => 9, 'assigned' => true, 'description' => 'Renewal conversation opens next month; confirm the seat count first.'],
-            'Introduce Segment to data team' => ['company' => 'Segment', 'contact' => 'Gabriel Ruiz', 'opportunity' => '', 'status' => 'To do', 'priority' => 'Low', 'due_in_days' => 15, 'assigned' => false, 'description' => 'Warm introduction between their data platform manager and our engineers.'],
+            'Introduce Airtable to the data team' => ['company' => 'Airtable', 'contact' => 'Gabriel Ruiz', 'opportunity' => '', 'status' => 'To do', 'priority' => 'Low', 'due_in_days' => 15, 'assigned' => false, 'description' => 'Warm introduction between their data platform manager and our engineers.'],
             'Recap Webflow platform review' => ['company' => 'Webflow', 'contact' => 'Isaac Mbeki', 'opportunity' => '', 'status' => 'Done', 'priority' => 'Low', 'due_in_days' => -8, 'assigned' => true, 'description' => 'Platform review went well; they will revisit budget next quarter.'],
         ];
     }

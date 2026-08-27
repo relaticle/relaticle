@@ -38,6 +38,10 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 ->where('code', CompanyField::DOMAINS->value)
                 ->first();
 
+            // Reading a value walks every custom field value on the company, and a company
+            // with more than one of them trips strict lazy loading outside production.
+            $this->company->load('customFieldValues.customField.options');
+
             $domains = $this->company->getCustomFieldValue($customFieldDomain);
             $domainName = is_array($domains) ? ($domains[0] ?? null) : $domains;
 
