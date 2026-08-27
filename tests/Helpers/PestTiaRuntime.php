@@ -58,9 +58,7 @@ final class PestTiaRuntime
             $usesSharedState = $inheritedShared === '1';
         } else {
             $usesSharedState = self::usesSharedState($arguments);
-            $storageDirectory = $usesSharedState
-                ? self::gitCommonDirectory($projectRoot).'/relaticle/pest-tia'
-                : $projectRoot.'/storage/framework/testing/pest-tia';
+            $storageDirectory = self::storageDirectory($projectRoot, $usesSharedState);
 
             self::export(self::STORAGE_ENVIRONMENT_KEY, $storageDirectory);
             self::export(self::SHARED_ENVIRONMENT_KEY, $usesSharedState ? '1' : '0');
@@ -77,6 +75,17 @@ final class PestTiaRuntime
         }
 
         pest()->tia()->directory($storageDirectory)->locally();
+    }
+
+    public static function storageDirectory(string $projectRoot, bool $usesSharedState): string
+    {
+        $projectRoot = self::realDirectory($projectRoot, 'project root');
+
+        if (! $usesSharedState) {
+            return $projectRoot.'/storage/framework/testing/pest-tia';
+        }
+
+        return self::gitCommonDirectory($projectRoot).'/relaticle/pest-tia';
     }
 
     /**

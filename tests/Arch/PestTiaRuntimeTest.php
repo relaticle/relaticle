@@ -219,27 +219,10 @@ it('uses repository-local shared storage for a normal Git checkout', function ()
     $temporaryDirectory = sys_get_temp_dir().'/relaticle-tia-repository-'.bin2hex(random_bytes(8));
     $projectRoot = $temporaryDirectory.'/project';
     mkdir($projectRoot.'/.git', 0777, true);
-    $autoloadPath = dirname(__DIR__, 2).'/vendor/autoload.php';
-    $script = <<<'PHP'
-require $argv[1];
-Tests\Helpers\PestTiaRuntime::configure($argv[2], []);
-fwrite(STDOUT, Pest\Plugins\Tia\Storage::tempDir($argv[2]));
-PHP;
-    $process = new Process(
-        [PHP_BINARY, '-r', $script, $autoloadPath, $projectRoot],
-        env: [
-            'RELATICLE_PEST_TIA_STORAGE' => false,
-            'RELATICLE_PEST_TIA_SHARED' => false,
-            'RELATICLE_PEST_TIA_LOCK_TOKEN' => false,
-            'PARATEST' => false,
-        ],
-    );
 
     try {
-        $process->run();
-
-        expect($process->isSuccessful())->toBeTrue()
-            ->and($process->getOutput())->toBe((string) realpath($projectRoot).'/.git/relaticle/pest-tia');
+        expect(PestTiaRuntime::storageDirectory($projectRoot, true))
+            ->toBe((string) realpath($projectRoot).'/.git/relaticle/pest-tia');
     } finally {
         (new Filesystem)->deleteDirectory($temporaryDirectory);
     }
@@ -253,27 +236,10 @@ it('resolves shared storage through linked-worktree metadata', function (): void
     mkdir($worktreeGitDirectory, 0777, true);
     file_put_contents($projectRoot.'/.git', "gitdir: ../common/worktrees/example\n");
     file_put_contents($worktreeGitDirectory.'/commondir', "../..\n");
-    $autoloadPath = dirname(__DIR__, 2).'/vendor/autoload.php';
-    $script = <<<'PHP'
-require $argv[1];
-Tests\Helpers\PestTiaRuntime::configure($argv[2], []);
-fwrite(STDOUT, Pest\Plugins\Tia\Storage::tempDir($argv[2]));
-PHP;
-    $process = new Process(
-        [PHP_BINARY, '-r', $script, $autoloadPath, $projectRoot],
-        env: [
-            'RELATICLE_PEST_TIA_STORAGE' => false,
-            'RELATICLE_PEST_TIA_SHARED' => false,
-            'RELATICLE_PEST_TIA_LOCK_TOKEN' => false,
-            'PARATEST' => false,
-        ],
-    );
 
     try {
-        $process->run();
-
-        expect($process->isSuccessful())->toBeTrue()
-            ->and($process->getOutput())->toBe((string) realpath($temporaryDirectory.'/common').'/relaticle/pest-tia');
+        expect(PestTiaRuntime::storageDirectory($projectRoot, true))
+            ->toBe((string) realpath($temporaryDirectory.'/common').'/relaticle/pest-tia');
     } finally {
         (new Filesystem)->deleteDirectory($temporaryDirectory);
     }
