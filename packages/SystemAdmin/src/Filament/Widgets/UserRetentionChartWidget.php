@@ -19,7 +19,7 @@ final class UserRetentionChartWidget extends ChartWidget
 
     protected static ?int $sort = 6;
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     protected ?string $maxHeight = '300px';
 
@@ -32,7 +32,7 @@ final class UserRetentionChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'New active vs returning users per week, in '.ViewerTime::timezone().'.';
+        return 'New active vs returning users per week, in '.ViewerTime::timezone().'. '.ViewerTime::freshnessCaption();
     }
 
     protected function getType(): string

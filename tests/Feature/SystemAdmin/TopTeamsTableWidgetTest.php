@@ -9,6 +9,7 @@ use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Relaticle\SystemAdmin\Filament\Widgets\TopTeamsTableWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -109,4 +110,53 @@ it('excludes a team whose activity all predates the period', function (): void {
     livewire(TopTeamsTableWidget::class)
         ->assertOk()
         ->assertCanNotSeeTableRecords([$team]);
+});
+
+function actAsTopTeamsAdminInZone(string $timezone): void
+{
+    test()->actingAs(SystemAdministrator::factory()->create(['timezone' => $timezone]), 'sysadmin');
+    Filament::setCurrentPanel('sysadmin');
+}
+
+it('counts active days on the administrator calendar, not the server one', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsTopTeamsAdminInZone('Asia/Yerevan');
+
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    // 01:00 and 09:00 on Aug 27 in Yerevan: one active day there, two on the server.
+    seedTeamActivity($team, $owner, 'subject-1', Date::parse('2026-08-26 21:00:00', 'UTC'));
+    seedTeamActivity($team, $owner, 'subject-2', Date::parse('2026-08-27 05:00:00', 'UTC'));
+
+    $records = livewire(TopTeamsTableWidget::class)->assertOk()->instance()->getTableRecords();
+
+    expect((int) $records->first()->active_days)->toBe(1);
+});
+
+it('opens its window at midnight on the administrator calendar', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsTopTeamsAdminInZone('Asia/Yerevan');
+
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+
+    /**
+     * 19:00 on Jul 28 in Yerevan is the day before the 30 day window opens, but
+     * it is after the 10:31 UTC mark a rolling window would have used.
+     */
+    seedTeamActivity($team, $owner, 'stale-subject', Date::parse('2026-07-28 15:00:00', 'UTC'));
+
+    livewire(TopTeamsTableWidget::class)
+        ->assertOk()
+        ->assertCanNotSeeTableRecords([$team]);
+});
+
+it('stamps the table with the read time in the administrator zone', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsTopTeamsAdminInZone('Asia/Yerevan');
+
+    livewire(TopTeamsTableWidget::class)
+        ->assertOk()
+        ->assertSee('Updated 14:31 +04');
 });

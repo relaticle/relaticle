@@ -55,4 +55,37 @@ final readonly class ViewerTime
     {
         return CarbonImmutable::parse($date, self::timezone())->endOfDay()->setTimezone('UTC');
     }
+
+    /**
+     * The window covering $days of the viewer's calendar days, the last of them
+     * being today so far, optionally shifted $shiftDays calendar days back.
+     *
+     * Shifting by whole calendar days rather than subtracting a measured
+     * interval keeps a comparison window ending at the same wall clock across a
+     * DST change, so a partial today never reads as a drop against a full
+     * previous day. The two windows do not touch: the tail of the shifted
+     * window's last day falls in neither, which is the price of comparing equal
+     * elapsed time.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function periodUtc(int $days, int $shiftDays = 0): array
+    {
+        $start = self::today()->subDays($days - 1 + $shiftDays);
+        $end = self::now()->subDays($shiftDays);
+
+        return [$start->setTimezone('UTC'), $end->setTimezone('UTC')];
+    }
+
+    /**
+     * Wall-clock stamp for when the numbers on screen were read.
+     *
+     * Dashboard widgets poll rather than reload, so without this a tab left open
+     * overnight looks exactly like one opened a second ago. That is the reading
+     * error this caption exists to prevent.
+     */
+    public static function freshnessCaption(): string
+    {
+        return 'Updated '.self::now()->format('H:i T').'.';
+    }
 }

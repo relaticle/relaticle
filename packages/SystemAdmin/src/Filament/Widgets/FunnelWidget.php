@@ -33,7 +33,7 @@ final class FunnelWidget extends StatsOverviewWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     protected function getStats(): array
     {
