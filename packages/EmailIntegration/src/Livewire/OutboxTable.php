@@ -29,14 +29,11 @@ use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
-use Relaticle\EmailIntegration\Filament\Pages\EmailOutboxPage;
 use Relaticle\EmailIntegration\Models\Email;
 use RuntimeException;
 
 /**
- * The outbox table, hosted by both the standalone {@see EmailOutboxPage}
- * and the Outbox tab of the email page — the table lives here so the two surfaces
- * can never drift apart.
+ * The Outbox tab of the email page.
  */
 final class OutboxTable extends Component implements HasActions, HasSchemas, HasTable
 {
