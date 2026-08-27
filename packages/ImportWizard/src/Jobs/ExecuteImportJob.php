@@ -20,10 +20,12 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
@@ -97,6 +99,12 @@ final class ExecuteImportJob implements ShouldQueue
         $this->onQueue('imports');
     }
 
+    /** @return list<FailOnException> */
+    public function middleware(): array
+    {
+        return [new FailOnException([LogicException::class])];
+    }
+
     public function handle(): void
     {
         $import = Import::query()->findOrFail($this->importId);
@@ -112,6 +120,8 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $store->ensureProcessedColumn();
+
+        throw_if($store->query()->where('processed', false)->whereNull('match_action')->exists(), LogicException::class, 'Import match resolution is incomplete.');
 
         $this->importerTimezone = $import->user?->effectiveTimezone() ?? (string) config('app.timezone');
 
