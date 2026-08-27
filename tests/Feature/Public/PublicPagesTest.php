@@ -72,14 +72,21 @@ describe('Home page', function () {
 });
 
 describe('Legal pages', function () {
-    it('displays the terms of service page with product-specific content', function () {
+    it('displays the terms of service page with current pricing terms', function () {
         $response = $this->get('/terms-of-service');
 
         $response->assertStatus(200);
         $response->assertSee('Terms of Service');
         $response->assertSee('Relaticle');
+        $response->assertSee('August 26, 2026');
+        $response->assertSee('Self-hosted software has no license fee under AGPL-3.0.');
+        $response->assertSee('The hosted Cloud service may offer trial, free, and paid plans.');
+        $response->assertSee('Current pricing and included features appear on the pricing page or during checkout.');
+        $response->assertSee('Charges apply only after you accept the displayed paid terms.');
+        $response->assertSee('Price changes apply prospectively after notice.');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
+        $response->assertDontSee('Both the Cloud and Self-Hosted options are available at no cost.');
     });
 
     it('displays the privacy policy page with product-specific content', function () {
