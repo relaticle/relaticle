@@ -54,8 +54,8 @@ it('keeps a retired model as a disabled entry so historical spend stays priced',
 it('never creates the two folded settings keys', function (): void {
     $repository = resolve(SettingsRepository::class);
 
-    expect(property_exists(resolve(ChatSettings::class), 'auto_chain'))->toBeFalse()
-        ->and(property_exists(resolve(ChatSettings::class), 'model_costs'))->toBeFalse()
+    expect(resolve(ChatSettings::class))->not->toHaveProperty('auto_chain')
+        ->and(resolve(ChatSettings::class))->not->toHaveProperty('model_costs')
         ->and($repository->checkIfPropertyExists('chat', 'auto_chain'))->toBeFalse()
         ->and($repository->checkIfPropertyExists('chat', 'model_costs'))->toBeFalse();
 });

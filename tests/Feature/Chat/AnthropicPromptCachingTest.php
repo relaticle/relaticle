@@ -127,7 +127,7 @@ it('forbids the probe from calling a tool while still sending every tool schema'
 
     expect($options->toolChoice?->mode)->toBe(ToolChoice::none)
         ->and($probe->providerOptions(Lab::Anthropic))->not->toHaveKey('tool_choice')
-        ->and($probe->tools())->toHaveCount(count((new CrmAssistant)->tools()));
+        ->and($probe->tools())->toHaveSameSize((new CrmAssistant)->tools());
 });
 
 it('falls back to a plain string system prompt when caching is disabled', function (): void {
