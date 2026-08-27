@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
@@ -24,21 +25,12 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsIdempotent]
 abstract class BaseShowTool extends Tool
 {
+    use BoundsToManyIncludes;
     use ChecksTokenAbility;
     use HasReadOnlyToolAnnotations;
     use SerializesRelatedModels;
 
     private const int RELATED_RECORD_LIMIT = 25;
-
-    /** @var list<string> */
-    private const array TO_MANY_INCLUDES = [
-        'assignees',
-        'companies',
-        'notes',
-        'opportunities',
-        'people',
-        'tasks',
-    ];
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -113,7 +105,7 @@ abstract class BaseShowTool extends Tool
             }
         }
 
-        $boundedIncludes = array_values(array_intersect($relationIncludes, self::TO_MANY_INCLUDES));
+        $boundedIncludes = $this->toManyIncludes($relationIncludes);
         $regularIncludes = array_values(array_diff($relationIncludes, $boundedIncludes));
 
         if ($regularIncludes !== []) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\CustomField;
@@ -27,8 +28,6 @@ final class ListCustomFieldsTool extends Tool
 {
     use ChecksTokenAbility;
     use HasReadOnlyToolAnnotations;
-
-    private const array ENTITY_TYPES = ['company', 'people', 'opportunity', 'task', 'note'];
 
     private const int MAX_PER_PAGE = 25;
 
@@ -67,7 +66,7 @@ final class ListCustomFieldsTool extends Tool
         }
 
         $validated = $request->validate([
-            'entity_type' => ['sometimes', 'string', Rule::in(self::ENTITY_TYPES)],
+            'entity_type' => ['sometimes', 'string', Rule::in(CrmEntity::morphAliases())],
             'active' => ['sometimes', 'boolean'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
             'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],

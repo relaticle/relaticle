@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
@@ -23,6 +24,7 @@ use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseListTool extends Tool
 {
+    use BoundsToManyIncludes;
     use ChecksTokenAbility;
     use HasReadOnlyToolAnnotations;
     use SerializesRelatedModels;
@@ -30,16 +32,6 @@ abstract class BaseListTool extends Tool
     private const int MAX_PER_PAGE = 25;
 
     private const int MAX_PAGE = 1_000_000;
-
-    /** @var list<string> */
-    private const array TO_MANY_INCLUDES = [
-        'assignees',
-        'companies',
-        'notes',
-        'opportunities',
-        'people',
-        'tasks',
-    ];
 
     /** @return class-string */
     abstract protected function actionClass(): string;
@@ -128,7 +120,7 @@ abstract class BaseListTool extends Tool
 
         $requestedIncludes = $request->get('include');
         $toManyIncludes = is_array($requestedIncludes)
-            ? array_values(array_intersect($requestedIncludes, self::TO_MANY_INCLUDES))
+            ? $this->toManyIncludes($requestedIncludes)
             : [];
 
         if ($toManyIncludes !== []) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Http\Resources\V1\NoteResource;
 use App\Http\Resources\V1\OpportunityResource;
@@ -11,11 +12,6 @@ use App\Http\Resources\V1\PeopleResource;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
-use App\Models\Task;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -42,15 +38,6 @@ final class FetchTool extends Tool
 {
     use ChecksTokenAbility;
     use HasReadOnlyToolAnnotations;
-
-    /** @var array<string, array{0: class-string<Model>, 1: class-string<JsonResource>}> */
-    private const array TYPE_MAP = [
-        'company' => [Company::class, CompanyResource::class],
-        'person' => [People::class, PeopleResource::class],
-        'opportunity' => [Opportunity::class, OpportunityResource::class],
-        'task' => [Task::class, TaskResource::class],
-        'note' => [Note::class, NoteResource::class],
-    ];
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}
 
@@ -85,15 +72,22 @@ final class FetchTool extends Tool
 
         $parsed = $this->urls->parse((string) $validated['url']);
 
-        if ($parsed === null || ! isset(self::TYPE_MAP[$parsed['type']])) {
+        if ($parsed === null) {
             return Response::error("URL [{$validated['url']}] is not a recognized record URL.");
         }
 
-        $type = $parsed['type'];
+        $entity = $parsed['entity'];
         $id = $parsed['id'];
-        [$modelClass, $resourceClass] = self::TYPE_MAP[$type];
 
-        /** @var class-string<Model> $modelClass */
+        $resourceClass = match ($entity) {
+            CrmEntity::Company => CompanyResource::class,
+            CrmEntity::People => PeopleResource::class,
+            CrmEntity::Opportunity => OpportunityResource::class,
+            CrmEntity::Task => TaskResource::class,
+            CrmEntity::Note => NoteResource::class,
+        };
+
+        $modelClass = $entity->model();
         $model = $modelClass::query()->find($id);
 
         if (! $model instanceof Model) {
@@ -115,7 +109,7 @@ final class FetchTool extends Tool
         $data = $envelope['data'] ?? (object) $envelope;
 
         return Response::structured([
-            'type' => $type,
+            'type' => $entity->urlType(),
             'url' => $validated['url'],
             'data' => $data,
         ]);

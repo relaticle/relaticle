@@ -4,19 +4,14 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
-use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -49,15 +44,6 @@ final class SearchTool extends Tool
         'tags-input',
         'rich-editor',
         'markdown-editor',
-    ];
-
-    /** @var array<string, array{0: class-string<Model>, 1: string, 2: string, 3: string}> */
-    private const array ENTITY_MAP = [
-        'company' => [Company::class, 'name', 'companies', 'company'],
-        'person' => [People::class, 'name', 'people', 'people'],
-        'opportunity' => [Opportunity::class, 'name', 'opportunities', 'opportunity'],
-        'task' => [Task::class, 'title', 'tasks', 'task'],
-        'note' => [Note::class, 'title', 'notes', 'note'],
     ];
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}
@@ -107,7 +93,13 @@ final class SearchTool extends Tool
         /** @var array<string, bool> $truncated */
         $truncated = [];
 
-        foreach (self::ENTITY_MAP as $type => [$modelClass, $field, $table, $entityType]) {
+        foreach (CrmEntity::cases() as $entity) {
+            $modelClass = $entity->model();
+            $field = $entity->titleColumn();
+            $table = $entity->table();
+            $entityType = $entity->value;
+            $type = $entity->urlType();
+
             $hits = $modelClass::query()
                 ->where('team_id', $team->getKey())
                 ->where(function (Builder $builder) use ($field, $query, $team, $entityType, $table): void {
@@ -143,7 +135,7 @@ final class SearchTool extends Tool
                     continue;
                 }
 
-                $url = $this->urls->build($type, (string) $hit->getKey(), $team);
+                $url = $this->urls->build($entity, (string) $hit->getKey(), $team);
 
                 if ($url === null) {
                     continue;

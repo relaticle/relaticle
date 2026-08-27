@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
-use App\Models\Task;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -47,15 +43,6 @@ final class ListActivityTool extends Tool
 
     private const string SAVE_KEY_SQL = "coalesce(batch_uuid::text, 'row:' || id::text)";
 
-    /** @var array<string, class-string<Model>> */
-    private const array RECORD_MODELS = [
-        'company' => Company::class,
-        'people' => People::class,
-        'opportunity' => Opportunity::class,
-        'task' => Task::class,
-        'note' => Note::class,
-    ];
-
     public function __construct(
         private readonly CanonicalRecordUrl $urls,
     ) {}
@@ -89,7 +76,7 @@ final class ListActivityTool extends Tool
         }
 
         $validated = $request->validate([
-            'record_type' => ['string', 'required_with:record_id', Rule::in(array_keys(self::RECORD_MODELS))],
+            'record_type' => ['string', 'required_with:record_id', Rule::in(CrmEntity::morphAliases())],
             'record_id' => ['sometimes', 'string'],
             'days' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_DAYS],
             'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
@@ -97,23 +84,21 @@ final class ListActivityTool extends Tool
 
         /** @var User $user */
         $user = $request->user();
-        $recordType = isset($validated['record_type']) ? (string) $validated['record_type'] : null;
+        $recordType = isset($validated['record_type']) ? CrmEntity::from((string) $validated['record_type']) : null;
         $recordId = isset($validated['record_id']) ? (string) $validated['record_id'] : null;
         $days = (int) ($validated['days'] ?? 7);
         $page = (int) ($validated['page'] ?? 1);
 
-        $recordModels = $recordType !== null
-            ? [self::RECORD_MODELS[$recordType]]
-            : array_values(self::RECORD_MODELS);
+        $entities = $recordType instanceof CrmEntity ? [$recordType] : CrmEntity::cases();
 
-        foreach ($recordModels as $recordModel) {
-            if ($user->cannot('viewAny', $recordModel)) {
+        foreach ($entities as $entity) {
+            if ($user->cannot('viewAny', $entity->model())) {
                 return Response::error('You do not have permission to view CRM activity.');
             }
         }
 
-        if ($recordId !== null) {
-            $record = $this->visibleRecord($user, (string) $recordType, $recordId);
+        if ($recordId !== null && $recordType instanceof CrmEntity) {
+            $record = $this->visibleRecord($user, $recordType, $recordId);
 
             if (! $record instanceof Model) {
                 return Response::error("Record [{$recordId}] was not found or is not visible.");
@@ -146,7 +131,7 @@ final class ListActivityTool extends Tool
     }
 
     /** @return Builder<Activity> */
-    private function scopedQuery(string $teamId, int $days, ?string $recordType, ?string $recordId): Builder
+    private function scopedQuery(string $teamId, int $days, ?CrmEntity $recordType, ?string $recordId): Builder
     {
         $query = Activity::query()
             ->withoutGlobalScope(TeamScope::class)
@@ -154,7 +139,7 @@ final class ListActivityTool extends Tool
             ->where('created_at', '>=', now()->subDays($days))
             ->whereHasMorph(
                 'subject',
-                $recordType !== null ? [$recordType] : array_keys(self::RECORD_MODELS),
+                $recordType instanceof CrmEntity ? [$recordType->value] : CrmEntity::morphAliases(),
                 static fn (Builder $subject): Builder => $subject->withoutGlobalScope(SoftDeletingScope::class),
             );
 
@@ -259,7 +244,7 @@ final class ListActivityTool extends Tool
 
         $subjectType = (string) $base->subject_type;
         $subjectId = (string) $base->subject_id;
-        $urlType = $subjectType === 'people' ? 'person' : $subjectType;
+        $entity = CrmEntity::tryFrom($subjectType);
 
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
@@ -269,7 +254,9 @@ final class ListActivityTool extends Tool
                 'type' => $subjectType,
                 'id' => $subjectId,
                 'name' => $this->recordName($subject),
-                'url' => $this->urls->build($urlType, $subjectId, $user->currentTeam),
+                'url' => $entity instanceof CrmEntity
+                    ? $this->urls->build($entity, $subjectId, $user->currentTeam)
+                    : null,
             ],
             'changes' => $this->changes($this->mergedProperties($group)),
         ];
@@ -401,15 +388,9 @@ final class ListActivityTool extends Tool
         return '';
     }
 
-    private function visibleRecord(User $user, string $recordType, string $recordId): ?Model
+    private function visibleRecord(User $user, CrmEntity $recordType, string $recordId): ?Model
     {
-        /** @var class-string<Model>|null $modelClass */
-        $modelClass = Relation::getMorphedModel($recordType);
-
-        if ($modelClass === null) {
-            return null;
-        }
-
+        $modelClass = $recordType->model();
         $model = $modelClass::query()->find($recordId);
 
         return $model instanceof Model && $user->can('view', $model) ? $model : null;
