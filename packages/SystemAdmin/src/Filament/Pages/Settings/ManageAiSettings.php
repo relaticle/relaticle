@@ -1,0 +1,549 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\SystemAdmin\Filament\Pages\Settings;
+
+use App\Enums\Plan;
+use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Repeater\TableColumn;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
+use Illuminate\Support\Facades\Artisan;
+use Relaticle\Chat\Services\ModelProbe;
+use Relaticle\Chat\Services\ProviderModelCatalog;
+use Relaticle\Chat\Settings\ChatSettings;
+use UnitEnum;
+
+/**
+ * The model catalog, editable without a deploy.
+ *
+ * A vendor retiring a model or shipping a new one is not a code change, but it
+ * used to need one. The safety this buys back is ModelProbe: nothing can be saved
+ * until the provider has accepted a real request built the way a real turn builds
+ * it. That gate is the whole point of the page — see RELATICLE-CRM-6D, where a
+ * request the app happily built was rejected by the provider on every single turn.
+ *
+ * @property-read Schema $form
+ */
+final class ManageAiSettings extends Page
+{
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cpu-chip';
+
+    protected static string|UnitEnum|null $navigationGroup = 'AI';
+
+    protected static ?string $navigationLabel = 'Model Catalog';
+
+    protected static ?string $title = 'AI Model Catalog';
+
+    protected static ?int $navigationSort = 10;
+
+    protected static ?string $slug = 'ai-models';
+
+    protected string $view = 'system-admin::filament.pages.manage-ai-settings';
+
+    /** @var array<string, mixed>|null */
+    public ?array $data = [];
+
+    public function mount(): void
+    {
+        $settings = resolve(ChatSettings::class);
+
+        $this->form->fill([
+            'models' => $settings->models,
+            'anthropic_effort' => $settings->anthropic_effort,
+        ]);
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Form::make([
+                    Section::make('Models')
+                        ->description('What the model picker offers. Drag to set the Auto order. Capabilities are measured by a real request to the provider, never typed.')
+                        ->schema([
+                            Repeater::make('models')
+                                ->hiddenLabel()
+                                ->reorderableWithDragAndDrop()
+                                // A table, not stacked cards: the catalog is read as a
+                                // comparison (which provider serves it, which one Auto
+                                // reaches first, which ones are on) and rows make that
+                                // legible in a way one card per model does not.
+                                ->table([
+                                    TableColumn::make('Key')->markAsRequired(),
+                                    TableColumn::make('Provider')->markAsRequired(),
+                                    TableColumn::make('Model')->markAsRequired(),
+                                    TableColumn::make('Auto'),
+                                    TableColumn::make('On'),
+                                    TableColumn::make('Verified'),
+                                ])
+                                ->schema([
+                                    TextInput::make('key')
+                                        ->required()
+                                        ->distinct(),
+                                    Select::make('provider')
+                                        ->options(fn (Get $get): array => $this->providerOptions($get('provider')))
+                                        ->required()
+                                        ->live(),
+                                    // Suggests from the provider's live list, but keeps whatever is
+                                    // already stored: a Select that dropped the current value would
+                                    // invalidate every entry the moment a provider is unreachable
+                                    // or its key is absent on this install.
+                                    Select::make('model')
+                                        ->options(fn (Get $get): array => $this->modelOptions($get('provider'), $get('model')))
+                                        ->searchable()
+                                        ->required()
+                                        // Required fields have nothing to clear, and the clear
+                                        // button overflows the column into Auto.
+                                        ->selectablePlaceholder(false)
+                                        ->live()
+                                        ->afterStateUpdated(function (Set $set, Get $get, mixed $state): void {
+                                            if (is_string($state) && $state !== '' && blank($get('label'))) {
+                                                $set('label', $state);
+                                            }
+                                        })
+                                        ->helperText(fn (Get $get): ?string => $this->unlistedNote($get('provider'), $get('model')))
+                                        // An inline style, not a Tailwind class: this file is
+                                        // outside the sysadmin theme's JIT scan paths, so a
+                                        // utility class here compiles to nothing. Without a floor
+                                        // the table wraps model ids onto three lines.
+                                        ->extraAttributes(['style' => 'min-width: 11rem']),
+                                    // Hidden, not absent: a table repeater renders Hidden
+                                    // components without giving them a column, and a field
+                                    // missing from the schema is dropped from getState() —
+                                    // so leaving these out would silently discard every
+                                    // label, plan and price on the next save.
+                                    Hidden::make('label'),
+                                    // A row whose modal was never opened must not hand an
+                                    // expensive model to every free workspace.
+                                    Hidden::make('min_plan')->default(Plan::Pro->value),
+                                    // Without a default a row saved before its modal was
+                                    // opened charges nothing: `(float) null` is 0.0.
+                                    Hidden::make('credit_multiplier')->default(1.0),
+                                    Hidden::make('input_per_mtok'),
+                                    Hidden::make('output_per_mtok'),
+                                    Toggle::make('auto')->inline(false),
+                                    Toggle::make('enabled')->inline(false),
+                                    Placeholder::make('measured')
+                                        ->hiddenLabel()
+                                        ->content(fn (Get $get): string => $this->capabilitySummary($get('capabilities'))),
+                                ])
+                                // How a model is presented and priced is set once and then
+                                // rarely touched, while the rest of the row is what an
+                                // operator scans. It lives behind a gear so the table stays
+                                // readable.
+                                ->extraItemActions([
+                                    Action::make('configure')
+                                        ->icon('heroicon-o-cog-6-tooth')
+                                        ->color('gray')
+                                        ->modalHeading('Model configuration')
+                                        ->modalDescription('How this model is named in the picker, who may reach it, and what a turn on it costs.')
+                                        ->modalWidth(Width::Medium)
+                                        ->schema([
+                                            TextInput::make('label')
+                                                ->label('Label')
+                                                ->required()
+                                                ->helperText('The name users see in the model picker.'),
+                                            Select::make('min_plan')
+                                                ->label('Minimum plan')
+                                                ->options(Plan::class)
+                                                ->required()
+                                                ->selectablePlaceholder(false),
+                                            TextInput::make('credit_multiplier')
+                                                ->label('Credit multiplier')
+                                                ->numeric()
+                                                ->required()
+                                                ->minValue(0)
+                                                ->helperText('Charged to the workspace per turn, before tool-call bonuses.'),
+                                            TextInput::make('input_per_mtok')
+                                                ->label('Input $ / Mtok')
+                                                ->numeric()
+                                                ->minValue(0)
+                                                ->helperText('Vendor list price. Feeds the sysadmin spend widget only.'),
+                                            TextInput::make('output_per_mtok')
+                                                ->label('Output $ / Mtok')
+                                                ->numeric()
+                                                ->minValue(0),
+                                        ])
+                                        ->fillForm(fn (array $arguments, Repeater $component): array => collect($component->getItemState($arguments['item']))
+                                            ->only(['label', 'min_plan', 'credit_multiplier', 'input_per_mtok', 'output_per_mtok'])
+                                            ->all())
+                                        ->action(function (array $arguments, array $data, Repeater $component): void {
+                                            $state = $component->getState();
+                                            $state[$arguments['item']] = [...$state[$arguments['item']], ...$data];
+
+                                            $component->state($state);
+                                        }),
+                                ])
+                                ->addActionLabel('Add a model'),
+                        ]),
+                    Section::make('Tuning')
+                        ->description('Anthropic removed temperature and top_p on Opus 4.7 and every model since, so effort is the only quality-versus-cost dial those models expose.')
+                        ->schema([
+                            Select::make('anthropic_effort')
+                                ->label('Anthropic reasoning effort')
+                                ->options([
+                                    'low' => 'Low',
+                                    'medium' => 'Medium',
+                                    'high' => 'High (provider default)',
+                                    'xhigh' => 'Extra high',
+                                    'max' => 'Max',
+                                ])
+                                ->required(),
+                        ]),
+                ])
+                    ->livewireSubmitHandler('save')
+                    ->footer([
+                        Actions::make([
+                            Action::make('save')->label('Verify and save')->submit('save')->keyBindings(['mod+s']),
+                        ]),
+                    ]),
+            ])
+            ->statePath('data');
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('refreshModelLists')
+                ->label('Refresh model lists')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->action(function (): void {
+                    $catalog = resolve(ProviderModelCatalog::class);
+
+                    foreach (array_keys($this->providerOptions()) as $provider) {
+                        $catalog->forget($provider);
+                    }
+
+                    Notification::make()->title('Model lists refreshed')->success()->send();
+                }),
+        ];
+    }
+
+    /**
+     * Every cloud model in the submitted catalog has to be accepted by its own
+     * provider before any of it is written. A pass is cached by ModelProbe, so an
+     * unchanged row costs nothing and only a genuinely new pairing spends a call.
+     */
+    public function save(): void
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->form->getState();
+
+        /** @var list<array<string, mixed>> $submitted */
+        $submitted = $data['models'] ?? [];
+
+        [$models, $failure] = $this->verified($this->normalizeModels($submitted));
+
+        if ($failure !== null) {
+            Notification::make()
+                ->title('The provider rejected this model')
+                ->body($failure)
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
+        $settings = resolve(ChatSettings::class);
+        $before = $settings->toConfig();
+        $settings->models = $models;
+        $settings->anthropic_effort = (string) ($data['anthropic_effort'] ?? 'high');
+        $settings->save();
+
+        config($settings->toConfig());
+
+        $this->recordActivity($before, $settings);
+
+        // Chat runs entirely in queued jobs, and a worker holds the config it
+        // booted with. Without this the save looks applied in the panel and
+        // changes nothing about what users actually get until the next deploy.
+        Artisan::call('queue:restart');
+
+        Notification::make()
+            ->title('Saved')
+            ->body('Workers are restarting; the next chat turn uses the new catalog.')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Who changed which model dial, and to what.
+     *
+     * This is the one control in the panel that changes what every workspace's
+     * assistant does, and it takes effect on the next turn rather than at the next
+     * deploy, so git history will not answer "what changed at 09:00 on Tuesday".
+     * Only the keys that actually moved are recorded; a save that touched nothing
+     * writes nothing.
+     *
+     * @param  array<string, mixed>  $before
+     */
+    private function recordActivity(array $before, ChatSettings $settings): void
+    {
+        $after = $settings->toConfig();
+
+        // Numbers are compared as floats because a whole float survives the settings
+        // row's JSON round trip as an int: `1.0` going out and `1` coming back describe
+        // the same catalog. Without this every no-op save logs a change, and the audit
+        // trail is noise exactly when someone needs to read it.
+        $changed = collect($after)
+            ->reject(fn (mixed $value, string $key): bool => self::comparable($value) === self::comparable($before[$key] ?? null))
+            ->keys()
+            ->all();
+
+        if ($changed === []) {
+            return;
+        }
+
+        activity((string) config('activitylog.default_log_name'))
+            ->causedBy(auth('sysadmin')->user())
+            ->withProperties([
+                'changed' => $changed,
+                'old' => collect($before)->only($changed)->all(),
+                'attributes' => collect($after)->only($changed)->all(),
+            ])
+            ->event('chat_settings_updated')
+            ->log('chat_settings_updated');
+    }
+
+    private static function comparable(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map(self::comparable(...), $value);
+        }
+
+        return is_int($value) || is_float($value) ? (float) $value : $value;
+    }
+
+    /**
+     * Probes every newly introduced (provider, model) pairing and writes back what
+     * the provider reported.
+     *
+     * Capabilities are never taken from the form. A model the provider will not
+     * serve must not be storable as enabled and tool-capable, which is exactly how
+     * Opus 4.7 went down in production (Sentry RELATICLE-CRM-6D).
+     *
+     * Only NEW pairings are probed. Verifying the whole catalog on every save would
+     * mean one provider with a stale key blocks edits to unrelated entries,
+     * including the effort dial. What is already stored is the status quo whether
+     * or not it still works; this gate stops a bad pairing being introduced, it is
+     * not a continuous audit.
+     *
+     * @param  list<array<string, mixed>>  $models
+     * @return array{0: list<array<string, mixed>>, 1: string|null}
+     */
+    private function verified(array $models): array
+    {
+        $probe = resolve(ModelProbe::class);
+        $known = $this->pairings(resolve(ChatSettings::class)->models);
+        $verified = [];
+
+        foreach ($models as $entry) {
+            $provider = $entry['provider'] ?? null;
+            $name = $entry['model'] ?? null;
+
+            // A disabled entry is not served to anyone, so it does not earn an API
+            // call. Retired models kept only for pricing history land here.
+            if (($entry['enabled'] ?? true) !== true) {
+                $verified[] = $entry;
+
+                continue;
+            }
+
+            if (! is_string($provider) || ! is_string($name) || $name === '') {
+                $verified[] = $entry;
+
+                continue;
+            }
+
+            if (in_array("{$provider}|{$name}", $known, true)) {
+                $verified[] = $entry;
+
+                continue;
+            }
+
+            if (blank(config("ai.providers.{$provider}.key"))) {
+                return [[], "{$name}: no API key is configured for {$provider}."];
+            }
+
+            $report = $probe($provider, $name);
+
+            if ($report['ok'] === false) {
+                return [[], "{$name}: ".($report['error'] ?? 'unknown error')];
+            }
+
+            $entry['capabilities'] = [
+                'supports_tools' => $report['supports_tools'],
+                'write_guard' => $report['write_guard'],
+            ];
+            $entry['verified_at'] = now()->toIso8601String();
+
+            $verified[] = $entry;
+        }
+
+        return [$verified, null];
+    }
+
+    /**
+     * Form state is not config-shaped. A Select bound to an enum hands back a Plan
+     * instance, a numeric TextInput hands back a string, and a toggle can hand back
+     * "1" — all of which get JSON-encoded into the settings row as-is and then blow
+     * up in ModelDescriptor::fromEntry(), which type-hints the primitives a PHP
+     * config file used to supply. Coerce here, at the one boundary where the panel
+     * writes the catalog.
+     *
+     * @param  list<array<string, mixed>>  $models
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeModels(array $models): array
+    {
+        return collect($models)
+            ->map(fn (array $model): array => [
+                ...$model,
+                'min_plan' => $this->plan($model['min_plan'] ?? null)->value,
+                'credit_multiplier' => is_numeric($model['credit_multiplier'] ?? null) ? (float) $model['credit_multiplier'] : 1.0,
+                'input_per_mtok' => is_numeric($model['input_per_mtok'] ?? null) ? (float) $model['input_per_mtok'] : null,
+                'output_per_mtok' => is_numeric($model['output_per_mtok'] ?? null) ? (float) $model['output_per_mtok'] : null,
+                // Cast rather than compare: a Filament toggle can hand back "1", and
+                // pint's strict_comparison fixer rewrites any `==` put here.
+                'auto' => (bool) ($model['auto'] ?? false),
+                'enabled' => (bool) ($model['enabled'] ?? true),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fails closed: an entry with no readable plan is stored as the most
+     * restrictive one rather than becoming free for every workspace.
+     */
+    private function plan(mixed $plan): Plan
+    {
+        if ($plan instanceof Plan) {
+            return $plan;
+        }
+
+        return Plan::tryFrom(is_string($plan) ? $plan : '') ?? Plan::Pro;
+    }
+
+    private function capabilitySummary(mixed $capabilities): string
+    {
+        if (! is_array($capabilities) || $capabilities === []) {
+            return 'on save';
+        }
+
+        $tools = ($capabilities['supports_tools'] ?? false) === true ? 'tools' : 'no tools';
+
+        return $tools.' · '.($capabilities['write_guard'] ?? 'prompt');
+    }
+
+    /**
+     * Flags a stored model the provider is not currently listing, which is normal
+     * for an install without that provider's key and suspicious otherwise.
+     */
+    private function unlistedNote(mixed $provider, mixed $model): ?string
+    {
+        if (! is_string($provider) || ! is_string($model) || $model === '') {
+            return null;
+        }
+
+        $catalog = resolve(ProviderModelCatalog::class)($provider);
+
+        // Say nothing when the provider gave us no list at all: that means this
+        // install has no key for it, not that the model is wrong.
+        if ($catalog === [] || array_key_exists($model, $catalog)) {
+            return null;
+        }
+
+        return 'not listed by the provider';
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $models
+     * @return list<string>
+     */
+    private function pairings(array $models): array
+    {
+        return collect($models)
+            ->filter(fn (mixed $model): bool => is_array($model) && is_string($model['provider'] ?? null) && is_string($model['model'] ?? null))
+            ->map(fn (array $model): string => "{$model['provider']}|{$model['model']}")
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The providers this install can actually reach, plus whatever a stored row
+     * already names.
+     *
+     * A provider with no API key can serve nothing — save() rejects every model
+     * under one — so offering it is offering a dead end. The merge of the current
+     * value is load-bearing for the same reason as in modelOptions(): a Select
+     * silently drops a value missing from its options, so a row naming a provider
+     * that is keyed in production but not here would blank itself on render.
+     *
+     * @return array<string, string>
+     */
+    private function providerOptions(mixed $current = null): array
+    {
+        /** @var array<string, array<string, mixed>> $providers */
+        $providers = config('ai.providers', []);
+
+        $options = collect($providers)
+            ->filter(fn (array $connection): bool => filled($connection['key'] ?? null))
+            ->keys()
+            ->mapWithKeys(fn (string $provider): array => [$provider => str($provider)->headline()->toString()])
+            ->all();
+
+        if (is_string($current) && $current !== '' && ! array_key_exists($current, $options)) {
+            $options[$current] = str($current)->headline()->toString().' (no API key)';
+        }
+
+        return $options;
+    }
+
+    /**
+     * The provider's live list, with whatever is already stored merged in.
+     *
+     * The merge is load-bearing: a Select silently drops a value that is not among
+     * its options, so without it every entry goes invalid the moment a provider is
+     * unreachable or its key is absent on this install.
+     *
+     * @return array<string, string>
+     */
+    private function modelOptions(mixed $provider, mixed $current = null): array
+    {
+        $options = [];
+
+        if (is_string($provider) && $provider !== '') {
+            foreach (array_keys(resolve(ProviderModelCatalog::class)($provider)) as $id) {
+                $options[$id] = $id;
+            }
+        }
+
+        if (is_string($current) && $current !== '' && ! array_key_exists($current, $options)) {
+            $options[$current] = $current;
+        }
+
+        return $options;
+    }
+}

@@ -41,14 +41,19 @@
                 // max(1, ceil(multiplier + toolCalls * toolBonus)).
                 $opusReplies = intdiv((int) \App\Enums\Plan::Pro->credits(), 3);
 
-                // Filtered from config rather than hardcoded so this list can never name a model
-                // the app won't actually serve. Gemini 3 Flash and Gemini 3.1 Pro carry
-                // 'supports_tools' => false in chat.php, which makes ModelDescriptor::isAvailable()
-                // (packages/Chat/src/Support/ModelDescriptor.php:49) return false unconditionally —
-                // AiModelResolver::pick() can never select them, so they must not appear here even
-                // though they're in the catalog with real min_plan/credit_multiplier values.
-                $toolCapableCloudModels = collect(config('chat.models', []))
-                    ->filter(fn (array $model): bool => ($model['supports_tools'] ?? false) === true && ($model['self_hosted'] ?? false) === false);
+                // Read through the registry rather than the raw catalog so this list can never
+                // name a model the app won't actually serve: ModelRegistry::available() drops
+                // the entries whose measured capabilities say they cannot call tools (both
+                // Gemini models today) and the ones whose provider has no key on this install.
+                // AiModelResolver::pick() can never select those, so the page must not claim a
+                // plan "unlocks" them even though they sit in the catalog with a real price.
+                $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->available())
+                    ->reject(fn (\Relaticle\Chat\Support\ModelDescriptor $model): bool => $model->selfHosted)
+                    ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
+                        'label' => $model->displayLabel(),
+                        'min_plan' => $model->minPlan->value,
+                        'credit_multiplier' => $model->creditMultiplier,
+                    ]);
                 $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
                 $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
                 $multiplierOneModels = $toolCapableCloudModels->where('credit_multiplier', 1.0)->pluck('label')->join(', ', ' and ');
@@ -56,7 +61,7 @@
                 $multiplierThreeModels = $toolCapableCloudModels->where('credit_multiplier', 3.0)->pluck('label')->join(', ', ' and ');
 
                 $creditFaqAnswer = __(
-                    'Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (1x for :oneX and self-hosted models; 1.5x for :oneFiveX; 3x for :threeX), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple Sonnet 4.6 reply with no tool calls costs 1 credit; an Opus 4.7 reply that touches two records costs 4. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
+                    'Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (1x for :oneX and self-hosted models; 1.5x for :oneFiveX; 3x for :threeX), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple Sonnet 5 reply with no tool calls costs 1 credit; an Opus 5 reply that touches two records costs 4. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
                     ['oneX' => $multiplierOneModels, 'oneFiveX' => $multiplierOneHalfModels, 'threeX' => $multiplierThreeModels]
                 );
 
@@ -88,7 +93,7 @@
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle — no self-hosted maintenance required');
                     $hostedPlanAnswer = __(
-                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 4.6 up to Opus 4.7, the REST API, the 37-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple Sonnet 4.6 replies, or around :opusReplies Opus 4.7 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
+                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 5 up to Opus 5, the REST API, the 37-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple Sonnet 5 replies, or around :opusReplies Opus 5 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
                             'price' => '$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)',
                             'credits' => $proCredits,

@@ -155,11 +155,17 @@ final class ChatProviderCheck extends Check
             return false;
         }
 
-        if (($entry['self_hosted'] ?? false) === true) {
+        if (($entry['enabled'] ?? true) !== true) {
             return false;
         }
 
-        if (($entry['supports_tools'] ?? false) !== true) {
+        // Capabilities are measured by ModelProbe and stored on the entry; a model
+        // nobody has probed carries none and is not worth a minute-by-minute call.
+        // Self-hosted models are never in this catalog (ModelRegistry merges them
+        // from env), so there is nothing to exclude for them here.
+        $capabilities = is_array($entry['capabilities'] ?? null) ? $entry['capabilities'] : [];
+
+        if (($capabilities['supports_tools'] ?? false) !== true) {
             return false;
         }
 

@@ -94,7 +94,7 @@ it('deducts credits and logs a transaction', function (): void {
 
 it('calculates credits with model multiplier', function (): void {
     $credits = $this->service->calculateCredits(
-        model: 'claude-opus-4-7',
+        model: 'claude-opus-5',
         toolCallsCount: 0,
     );
 

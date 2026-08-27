@@ -190,7 +190,7 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
 
 it('allows a Free user to pick Ollama when it is configured', function (): void {
     Queue::fake();
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();

@@ -12,15 +12,42 @@ final readonly class ModelRegistry
     /** @var list<ModelDescriptor> */
     private array $models;
 
+    /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> */
+    private array $rates;
+
     public function __construct()
     {
-        /** @var list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}> $curated */
-        $curated = config('chat.models', []);
+        /** @var list<array<string, mixed>> $entries */
+        $entries = config('chat.models', []);
 
-        $this->models = array_map(
-            ModelDescriptor::fromConfig(...),
-            [...$curated, ...$this->customFromConfig()],
-        );
+        $enabled = array_values(array_filter(
+            $entries,
+            static fn (array $entry): bool => ($entry['enabled'] ?? true) === true,
+        ));
+
+        $this->models = [
+            ...array_map(ModelDescriptor::fromEntry(...), $enabled),
+            ...array_map(ModelDescriptor::fromConfig(...), $this->customFromConfig()),
+        ];
+
+        // Every entry, disabled ones included: a retired model still has to be
+        // priced, because ai_credit_transactions rows keep naming it.
+        $rates = [];
+
+        foreach ($entries as $entry) {
+            $model = $entry['model'] ?? null;
+            $input = $entry['input_per_mtok'] ?? null;
+            $output = $entry['output_per_mtok'] ?? null;
+
+            if (is_string($model) && is_numeric($input) && is_numeric($output)) {
+                $rates[$model] = [
+                    'input_per_mtok' => (float) $input,
+                    'output_per_mtok' => (float) $output,
+                ];
+            }
+        }
+
+        $this->rates = $rates;
     }
 
     /** @return list<ModelDescriptor> */
@@ -103,16 +130,39 @@ final readonly class ModelRegistry
         return $ids;
     }
 
-    /** @return list<ModelDescriptor> */
+    /**
+     * Auto's failover order: the entries flagged `auto`, in list order, then every
+     * env-derived self-hosted model.
+     *
+     * Self-hosted models are appended rather than stored because they used to sit
+     * at the tail of `chat.auto_chain`, and that tail is what makes Auto usable on
+     * an install with no cloud keys at all.
+     *
+     * @return list<ModelDescriptor>
+     */
     public function autoChain(): array
     {
-        /** @var list<string> $ids */
-        $ids = config('chat.auto_chain', []);
+        /** @var list<array<string, mixed>> $entries */
+        $entries = config('chat.models', []);
 
-        return array_values(array_filter(array_map(
-            $this->find(...),
-            $ids,
-        )));
+        $chosen = array_filter(
+            $entries,
+            static fn (array $entry): bool => ($entry['auto'] ?? false) === true
+                && ($entry['enabled'] ?? true) === true,
+        );
+
+        return [
+            ...array_map(ModelDescriptor::fromEntry(...), array_values($chosen)),
+            ...array_map(ModelDescriptor::fromConfig(...), $this->customFromConfig()),
+        ];
+    }
+
+    /**
+     * @return array{input_per_mtok: float, output_per_mtok: float}|null
+     */
+    public function ratesFor(string $model): ?array
+    {
+        return $this->rates[$model] ?? null;
     }
 
     public function multiplierFor(string $modelId): float
@@ -126,8 +176,49 @@ final readonly class ModelRegistry
         return 1.0;
     }
 
-    /** @return list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}> */
+    /**
+     * Self-hosted models, built from env on every read.
+     *
+     * They are deliberately not stored: `.env` stays their single source of truth,
+     * so OLLAMA_MODEL and SELF_HOSTED_AI_MODELS keep taking effect without a deploy
+     * and without anyone editing the panel. Ollama keeps the bare `ollama` id it has
+     * always had, because that id is what a user's saved preference stores.
+     *
+     * @return list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}>
+     */
     private function customFromConfig(): array
+    {
+        return [...$this->ollamaFromEnv(), ...$this->customEndpointFromEnv()];
+    }
+
+    /**
+     * @return list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}>
+     */
+    private function ollamaFromEnv(): array
+    {
+        $model = config('chat.ollama.model');
+
+        if (! is_string($model) || $model === '') {
+            return [];
+        }
+
+        return [[
+            'id' => 'ollama',
+            'label' => 'Ollama',
+            'provider' => 'ollama',
+            'model' => $model,
+            'min_plan' => Plan::Free->value,
+            'credit_multiplier' => 1.0,
+            'supports_tools' => true,
+            'write_guard' => 'prompt',
+            'self_hosted' => true,
+        ]];
+    }
+
+    /**
+     * @return list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}>
+     */
+    private function customEndpointFromEnv(): array
     {
         $url = config('chat.self_hosted.url');
         $models = config('chat.self_hosted.models');

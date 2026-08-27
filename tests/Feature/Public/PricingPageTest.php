@@ -133,7 +133,7 @@ it('discloses the real per-model credit multiplier instead of a flat allowance c
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('What counts as an AI credit?'))
-        ->assertSee('3x for Opus 4.7', false)
+        ->assertSee('3x for Opus 5', false)
         ->assertSee('0.5 credits for every tool call')
         ->assertDontSee('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary.');
 });
@@ -182,8 +182,8 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertOk()
         ->assertDontSee('Gemini')
         ->assertSee(__('Which AI models does my plan unlock?'))
-        ->assertSee('Sonnet 4.6 and self-hosted models')
-        ->assertSee('Opus 4.7, GPT 5.5 and GPT 5.4');
+        ->assertSee('Sonnet 5 and self-hosted models')
+        ->assertSee('GPT 5.5, Opus 5 and GPT 5.4');
 });
 
 it('pins the exact membership of every model list derived from the chat catalog', function (): void {
@@ -198,11 +198,11 @@ it('pins the exact membership of every model list derived from the chat catalog'
     $this->get('/pricing')
         ->assertOk()
         // $freeCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Every plan can use Sonnet 4.6 and any self-hosted model you connect yourself.')
+        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
         // $paidCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Cloud Pro additionally unlocks Opus 4.7, GPT 5.5 and GPT 5.4 — the models with a higher credit multiplier.')
+        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4 — the models with a higher credit multiplier.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
-        ->assertSee('1x for Sonnet 4.6 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 4.7)', false);
+        ->assertSee('1x for Sonnet 5 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is on', function (): void {

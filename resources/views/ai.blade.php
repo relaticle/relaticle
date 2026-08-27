@@ -1,8 +1,15 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
 
-    $toolCapableCloudModels = collect(config('chat.models', []))
-        ->filter(fn (array $model): bool => ($model['supports_tools'] ?? false) === true && ($model['self_hosted'] ?? false) === false);
+    // Through the registry, not the raw catalog: it drops models this install cannot
+    // serve (no provider key) and ones a probe measured as unable to call tools, so the
+    // page never names a model the assistant could not actually run.
+    $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->available())
+        ->reject(fn (\Relaticle\Chat\Support\ModelDescriptor $model): bool => $model->selfHosted)
+        ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
+            'label' => $model->displayLabel(),
+            'min_plan' => $model->minPlan->value,
+        ]);
     $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
     $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
 

@@ -40,6 +40,35 @@ final readonly class ModelDescriptor
     }
 
     /**
+     * A descriptor for a stored catalog entry.
+     *
+     * `selfHosted` is false by construction: self-hosted models are never stored,
+     * they are merged from env by ModelRegistry.
+     *
+     * A missing capability record means nobody has probed this entry yet, so it
+     * gets the weaker guard. Claiming `api` without proof would tell the write path
+     * the provider refuses parallel tool calls when it may not.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    public static function fromEntry(array $entry): self
+    {
+        $capabilities = is_array($entry['capabilities'] ?? null) ? $entry['capabilities'] : [];
+
+        return new self(
+            id: (string) $entry['key'],
+            label: (string) $entry['label'],
+            provider: isset($entry['provider']) ? (string) $entry['provider'] : null,
+            model: isset($entry['model']) ? (string) $entry['model'] : null,
+            minPlan: Plan::from((string) $entry['min_plan']),
+            creditMultiplier: (float) $entry['credit_multiplier'],
+            supportsTools: ($capabilities['supports_tools'] ?? false) === true,
+            writeGuard: WriteGuard::from((string) ($capabilities['write_guard'] ?? WriteGuard::Prompt->value)),
+            selfHosted: false,
+        );
+    }
+
+    /**
      * Servable on this install: tool-capable, has a model tag, and its provider
      * connection is configured. Cloud providers need a key; self-hosted providers
      * need a base URL.
