@@ -47,7 +47,7 @@ final class TeamMemberSelect extends Select
     }
 
     /**
-     * Both member relationships — Task::assignees() and the account-owner belongsTo —
+     * Both member relationships (Task::assignees() and the account-owner belongsTo)
      * resolve to an unconstrained User query, so without this every registered user on
      * the installation is a valid option. That is two defects, not one: the preloaded
      * picker lists every user's name, and Filament builds its `in` validation rule from
@@ -67,7 +67,7 @@ final class TeamMemberSelect extends Select
             return self::orderByCurrentUserFirst($query->whereIn('users.id', []));
         }
 
-        // The owner is not a `team_user` row, so membership is the pivot plus the owner —
+        // The owner is not a `team_user` row, so membership is the pivot plus the owner,
         // the same two sources App\Support\TenantFkValidator checks on the API side.
         $query->where(function (Builder $members) use ($team): void {
             $members->whereKey($team->user_id)

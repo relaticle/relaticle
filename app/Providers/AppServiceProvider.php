@@ -500,7 +500,7 @@ final class AppServiceProvider extends ServiceProvider
         CustomField::deleted($invalidate);
 
         // An option carries its own tenant_id, so clearing that tenant's five entity
-        // schemas beats one SELECT per option row — team creation seeds sixteen of
+        // schemas beats one SELECT per option row: team creation seeds sixteen of
         // them inside the registration transaction.
         $invalidateOption = static function (CustomFieldOption $option): void {
             $tenantId = $option->getAttribute('tenant_id');

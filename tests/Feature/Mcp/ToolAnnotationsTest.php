@@ -135,7 +135,7 @@ mutates(...array_merge(
 
 // Enumerating the server's own registration, rather than a hand-listed subset, is
 // what stops a new tool opting out of the submission policy by simply not being
-// added to a dataset — which is how WhoAmiTool once shipped without openWorldHint.
+// added to a dataset, which is how WhoAmiTool once shipped without openWorldHint.
 it('publishes the exact explicit title and stable technical name for every registered tool', function () use ($toolContracts): void {
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];

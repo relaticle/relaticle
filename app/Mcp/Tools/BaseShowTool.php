@@ -110,7 +110,7 @@ abstract class BaseShowTool extends Tool
 
         // One loadCount() for every relation that needs a total: it resolves them as
         // subqueries in a single statement, where a call per relation is a round trip
-        // per relation. The counts also make the bounded loads exact — the total says
+        // per relation. The counts also make the bounded loads exact: the total says
         // whether a relation was truncated, so there is no need to over-fetch a row.
         $countTargets = [...$boundedIncludes, ...$countIncludes];
 

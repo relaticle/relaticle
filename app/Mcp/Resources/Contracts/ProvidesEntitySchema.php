@@ -12,7 +12,7 @@ use App\Models\User;
  * The resource JSON-encodes it for MCP resource reads and GetCrmSchemaTool returns
  * it structured. Going through the encoded string in both directions used to flatten
  * an empty `custom_fields` map from `{}` to `[]`, which the tool then patched back
- * per known key — a repair that silently missed any new key that can be empty.
+ * per known key, a repair that silently missed any new key that can be empty.
  */
 interface ProvidesEntitySchema
 {

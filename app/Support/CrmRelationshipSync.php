@@ -29,7 +29,7 @@ final readonly class CrmRelationshipSync
     ];
 
     /**
-     * Payload key to relation name. `assignee_ids` only ever reaches a Task —
+     * Payload key to relation name. `assignee_ids` only ever reaches a Task:
      * the note tools neither declare nor validate it.
      *
      * @var array<string, string>

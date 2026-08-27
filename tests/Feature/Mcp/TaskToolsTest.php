@@ -291,6 +291,32 @@ it('only notifies assignees added by its own update', function (): void {
     Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
 });
 
+it('does not re-notify an assignee the update kept in place', function (): void {
+    Mail::fake();
+
+    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $existingAssignee = User::factory()->create([
+        'notification_preferences' => ['task_assigned' => ['email' => true]],
+    ]);
+    $newAssignee = User::factory()->create([
+        'notification_preferences' => ['task_assigned' => ['email' => true]],
+    ]);
+    $this->team->users()->attach([$existingAssignee->id, $newAssignee->id], ['role' => 'editor']);
+    $task->assignees()->attach($existingAssignee);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, [
+            'id' => $task->id,
+            'assignee_ids' => [$existingAssignee->id, $newAssignee->id],
+        ])
+        ->assertOk();
+
+    defer()->invoke();
+
+    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($newAssignee->email));
+    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($existingAssignee->email));
+});
+
 it('only notifies assignees added by its own create', function (): void {
     Mail::fake();
 
