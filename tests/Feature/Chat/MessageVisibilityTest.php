@@ -52,7 +52,5 @@ it('hides synthetic [approval] user messages from the visible message list', fun
     expect(implode("\n", $contents))->toContain('I have proposed creating a person.');
     expect(implode("\n", $contents))->toContain('Now proposing the linked task.');
 
-    foreach ($contents as $content) {
-        expect($content)->not->toStartWith('[approval]');
-    }
+    expect($contents)->each->not->toStartWith('[approval]');
 });

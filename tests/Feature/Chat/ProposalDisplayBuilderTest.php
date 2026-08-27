@@ -86,7 +86,7 @@ it('does not duplicate custom rows when existingFields already has a type-bearin
 
     $linkedinRows = collect($display['fields'])->filter(fn (array $r): bool => ($r['label'] ?? '') === 'LinkedIn')->values()->all();
 
-    expect($linkedinRows)->toHaveCount(0);
+    expect($linkedinRows)->toBeEmpty();
 });
 
 it('does not duplicate a custom row when the stored display row carries no type key', function (): void {

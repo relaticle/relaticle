@@ -11,7 +11,7 @@ use PHPStan\Testing\RuleTestCase;
 /**
  * @extends RuleTestCase<HardcodedStaticPropertyRule>
  */
-final class HardcodedStaticPropertyRuleTest extends RuleTestCase
+abstract class HardcodedStaticPropertyRuleTest extends RuleTestCase
 {
     protected function getRule(): Rule
     {
@@ -19,16 +19,16 @@ final class HardcodedStaticPropertyRuleTest extends RuleTestCase
             guardedProperties: ['navigationLabel', 'navigationGroup', 'modelLabel', 'pluralModelLabel', 'breadcrumb'],
         );
     }
-
-    public function test_flags_hardcoded_static_property(): void
-    {
-        $this->analyse([__DIR__.'/data/hardcoded-static-nav.php'], [
-            ['Hardcoded user-facing string in $navigationGroup — set property to null and override getNavigationGroup() with __().', 9],
-        ]);
-    }
-
-    public function test_allows_null_static_property(): void
-    {
-        $this->analyse([__DIR__.'/data/null-static-nav.php'], []);
-    }
 }
+
+pest()->extend(HardcodedStaticPropertyRuleTest::class);
+
+it('flags a hardcoded static property', function (): void {
+    $this->analyse([__DIR__.'/data/hardcoded-static-nav.php'], [
+        ['Hardcoded user-facing string in $navigationGroup: set property to null and override getNavigationGroup() with __().', 9],
+    ]);
+});
+
+it('allows a null static property', function (): void {
+    $this->analyse([__DIR__.'/data/null-static-nav.php'], []);
+});

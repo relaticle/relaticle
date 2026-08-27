@@ -199,8 +199,8 @@ it('truncates a label or prompt the model wrote too long for the strip', functio
 
     $steps = persistedNextSteps($messageId);
 
-    expect(mb_strlen($steps[0]['label']))->toBe(48)
-        ->and(mb_strlen($steps[0]['prompt']))->toBe(160);
+    expect($steps[0]['label'])->toHaveLength(48)
+        ->and($steps[0]['prompt'])->toHaveLength(160);
 });
 
 it('writes nothing when the model offers no steps', function (): void {

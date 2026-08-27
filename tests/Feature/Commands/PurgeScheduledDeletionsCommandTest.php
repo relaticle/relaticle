@@ -117,3 +117,20 @@ test('day 25 reminder is sent to team owner only', function () {
     Notification::assertSentTo($owner, TeamDeletionReminderNotification::class);
     Notification::assertNotSentTo($member, TeamDeletionReminderNotification::class);
 });
+
+test('ownerless workspaces are skipped without aborting the deletion reminders', function () {
+    Notification::fake();
+
+    $ownerlessTeam = User::factory()->withTeam()->create()->currentTeam;
+    $ownerlessTeam->update(['scheduled_deletion_at' => now()->addDays(5)]);
+    User::query()->whereKey($ownerlessTeam->user_id)->delete();
+
+    $owner = User::factory()->withTeam()->create();
+    $owner->currentTeam->update(['scheduled_deletion_at' => now()->addDays(5)]);
+
+    $this->artisan('app:purge-scheduled-deletions')
+        ->assertExitCode(0);
+
+    Notification::assertSentTo($owner, TeamDeletionReminderNotification::class);
+    Notification::assertSentTimes(TeamDeletionReminderNotification::class, 1);
+});

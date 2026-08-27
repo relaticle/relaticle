@@ -153,7 +153,7 @@ final readonly class EloquentWriteOutsideActionRule implements Rule
     private function error(string $method): IdentifierRuleError
     {
         return RuleErrorBuilder::message(
-            "Eloquent write ->{$method}() in a UI/transport surface — route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md)."
+            "Eloquent write ->{$method}() in a UI/transport surface: route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md)."
         )
             ->identifier('app.architecture.eloquentWriteOutsideAction')
             ->build();

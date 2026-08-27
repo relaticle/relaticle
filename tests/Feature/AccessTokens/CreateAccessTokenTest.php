@@ -64,7 +64,7 @@ test('cannot create token for a team user does not belong to', function () {
         ])
         ->call('createToken');
 
-    expect($user->fresh()->tokens)->toHaveCount(0);
+    expect($user->fresh()->tokens)->toBeEmpty();
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('token name is required', function () {

@@ -34,7 +34,7 @@ beforeEach(function (): void {
 
     Filament::setTenant($this->team);
 
-    $this->import = Import::create([
+    $this->import = Import::factory()->create([
         'team_id' => (string) $this->team->id,
         'user_id' => (string) $this->user->id,
         'entity_type' => ImportEntityType::People,

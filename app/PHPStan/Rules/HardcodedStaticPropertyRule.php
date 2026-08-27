@@ -56,7 +56,7 @@ final readonly class HardcodedStaticPropertyRule implements Rule
             $methodName = 'get'.ucfirst($name);
 
             $errors[] = RuleErrorBuilder::message(sprintf(
-                'Hardcoded user-facing string in $%s — set property to null and override %s() with __().',
+                'Hardcoded user-facing string in $%s: set property to null and override %s() with __().',
                 $name,
                 $methodName,
             ))

@@ -52,7 +52,7 @@ test('two factor authentication can be disabled', function () {
     $component = Livewire::test(TwoFactorAuthenticationForm::class)
         ->call('enableTwoFactorAuthentication');
 
-    $this->assertNotNull($user->fresh()->two_factor_secret);
+    expect($user->fresh()->two_factor_secret)->not->toBeNull();
 
     $component->call('disableTwoFactorAuthentication');
 

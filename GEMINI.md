@@ -275,15 +275,14 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 ## Running the suite
 
-- `composer test:pest` — the normal local run (parallel, excludes Browser).
-- `composer test:pest:tia` — Pest's **experimental** test-impact-analysis mode.
-  Records a coverage-backed dependency graph once (~3x a normal run), then
-  replays unaffected tests instead of executing them, so a no-op run drops from
-  ~3 minutes to a few seconds. **Local accelerator only — never a merge gate.**
-  It replays a cached *pass* whenever a test's edges are unchanged, so it cannot
-  see time-dependent failures (`travelTo`, expiring tokens), `.env` edits, or
-  dynamic dispatch it did not trace while recording. Always confirm with
-  `composer test:pest` before pushing.
+- `composer test:pest` is the normal local run (parallel, TIA enabled, excludes
+  Browser). Pest records a coverage-backed dependency graph once, then replays
+  unaffected tests instead of executing them.
+- `composer test:pest:full` is the complete non-TIA merge gate.
+- TIA is a local accelerator only. It replays a cached pass whenever a test's
+  edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
+  expiring tokens), `.env` edits, or dynamic dispatch it did not trace while
+  recording. Always confirm with `composer test:pest:full` before pushing.
 - After changing test timings materially, refresh the CI shard balance with
   `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
   file silently drops new test classes out of time-balancing.
@@ -467,8 +466,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Test every code change by adding or updating a test.
+- Run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 

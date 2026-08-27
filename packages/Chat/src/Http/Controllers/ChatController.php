@@ -129,7 +129,7 @@ final readonly class ChatController
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->label()]),
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->getLabel()]),
                     'plan' => $team->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
@@ -150,7 +150,7 @@ final readonly class ChatController
 
             return response()->json([
                 'error' => 'credits_exhausted',
-                'message' => "You have used all {$team->plan->credits()} credits for this {$team->plan->label()} plan period.",
+                'message' => "You have used all {$team->plan->credits()} credits for this {$team->plan->getLabel()} plan period.",
                 'plan' => $team->plan->value,
                 'allowance' => $team->plan->credits(),
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),

@@ -29,18 +29,14 @@ it('extracts plain text from a paragraph-only document', function (): void {
     ];
 
     $result = $parser->parse($document, $this->team);
-
-    expect($result['text'])->toBe('Hello world');
-    expect($result['mentions'])->toBe([]);
+    expect($result)->toMatchArray(['text' => 'Hello world', 'mentions' => []]);
 });
 
 it('returns empty text for an empty document', function (): void {
     $parser = app(TipTapDocumentParser::class);
 
     $result = $parser->parse(['type' => 'doc', 'content' => []], $this->team);
-
-    expect($result['text'])->toBe('');
-    expect($result['mentions'])->toBe([]);
+    expect($result)->toMatchArray(['text' => '', 'mentions' => []]);
 });
 
 it('extracts mention nodes alongside text', function (): void {

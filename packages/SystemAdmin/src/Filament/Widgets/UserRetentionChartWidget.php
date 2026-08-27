@@ -9,6 +9,7 @@ use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
 
 final class UserRetentionChartWidget extends ChartWidget
@@ -31,7 +32,7 @@ final class UserRetentionChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'New active vs returning users per week.';
+        return 'New active vs returning users per week, in '.ViewerTime::timezone().'.';
     }
 
     protected function getType(): string
@@ -42,10 +43,8 @@ final class UserRetentionChartWidget extends ChartWidget
     protected function getData(): array
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
 
-        $intervals = $this->buildWeeklyIntervals($start, $end);
+        $intervals = $this->buildWeeklyIntervals($days);
 
         $newActive = [];
         $returning = [];
@@ -108,19 +107,25 @@ final class UserRetentionChartWidget extends ChartWidget
     }
 
     /**
+     * Weeks are the viewer's weeks: built in their zone for the label, handed
+     * back as UTC instants because query bindings are formatted in whatever
+     * zone the instance carries.
+     *
      * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable}>
      */
-    private function buildWeeklyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
+    private function buildWeeklyIntervals(int $days): Collection
     {
-        $intervals = collect();
-        $current = $start->startOfWeek();
+        $now = ViewerTime::now();
+        $current = $now->startOfDay()->subDays($days - 1)->startOfWeek();
 
-        while ($current->lt($end)) {
-            $weekEnd = $current->endOfWeek()->min($end);
+        $intervals = collect();
+
+        while ($current->lte($now)) {
+            $weekEnd = $current->endOfWeek()->min($now);
             $intervals->push([
                 'label' => $current->format('M j'),
-                'start' => $current,
-                'end' => $weekEnd,
+                'start' => $current->setTimezone('UTC'),
+                'end' => $weekEnd->setTimezone('UTC'),
             ]);
             $current = $current->addWeek();
         }

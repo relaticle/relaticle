@@ -47,7 +47,7 @@ function createValidationStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): array {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,

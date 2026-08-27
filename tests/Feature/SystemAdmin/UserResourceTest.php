@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
@@ -188,4 +190,30 @@ describe('team relation managers', function (): void {
             ->assertSuccessful()
             ->assertSeeHtml("teams/{$team->getKey()}");
     });
+});
+
+it('deletes a user through the Jetstream deleter so their workspaces are not orphaned', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->ownedTeams()->firstOrFail();
+
+    livewire(EditUser::class, ['record' => $user->getKey()])
+        ->callAction('delete')
+        ->assertHasNoActionErrors();
+
+    expect(User::query()->find($user->getKey()))->toBeNull()
+        ->and(Team::query()->find($team->getKey()))->toBeNull();
+});
+
+it('deletes users in bulk through the Jetstream deleter so their workspaces are not orphaned', function (): void {
+    $first = User::factory()->withPersonalTeam()->create();
+    $second = User::factory()->withPersonalTeam()->create();
+    $teamIds = [$first->ownedTeams()->firstOrFail()->getKey(), $second->ownedTeams()->firstOrFail()->getKey()];
+
+    livewire(ListUsers::class)
+        ->selectTableRecords([$first->getKey(), $second->getKey()])
+        ->callAction([['name' => 'delete', 'context' => ['table' => true, 'bulk' => true]]])
+        ->assertHasNoActionErrors();
+
+    expect(User::query()->whereKey([$first->getKey(), $second->getKey()])->count())->toBe(0)
+        ->and(Team::query()->whereKey($teamIds)->count())->toBe(0);
 });

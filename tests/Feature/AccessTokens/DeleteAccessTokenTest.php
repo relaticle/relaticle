@@ -21,7 +21,7 @@ test('api tokens can be deleted', function () {
     livewire(ManageAccessTokens::class)
         ->callTableAction('delete', $token);
 
-    expect($user->fresh()->tokens)->toHaveCount(0);
+    expect($user->fresh()->tokens)->toBeEmpty();
 })->skip(function () {
     return ! Features::hasApiFeatures();
 }, 'API support is not enabled.');

@@ -556,7 +556,7 @@ describe('input validation', function (): void {
     it('accepts null to clear a date custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $section = CustomFieldSection::create([
+        $section = CustomFieldSection::factory()->create([
             'tenant_id' => $this->team->id,
             'entity_type' => 'opportunity',
             'name' => 'Date Fields',
@@ -566,7 +566,7 @@ describe('input validation', function (): void {
             'active' => true,
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'opportunity',
@@ -591,7 +591,7 @@ describe('input validation', function (): void {
     it('accepts null to clear a datetime custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $section = CustomFieldSection::create([
+        $section = CustomFieldSection::factory()->create([
             'tenant_id' => $this->team->id,
             'entity_type' => 'opportunity',
             'name' => 'Timestamps',
@@ -601,7 +601,7 @@ describe('input validation', function (): void {
             'active' => true,
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'opportunity',

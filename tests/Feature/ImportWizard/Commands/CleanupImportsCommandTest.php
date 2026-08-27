@@ -31,7 +31,7 @@ afterEach(function (): void {
 
 function createTestImport(object $context, ImportStatus $status, string $updatedAt): Import
 {
-    $import = Import::create([
+    $import = Import::factory()->create([
         'team_id' => (string) $context->team->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => ImportEntityType::People,

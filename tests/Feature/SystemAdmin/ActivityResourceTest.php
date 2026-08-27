@@ -93,6 +93,21 @@ it('filters activity by date range', function (): void {
         ->assertCanNotSeeTableRecords([$outOfRange]);
 });
 
+it('filters activity by the date range on the administrator calendar, not the server one', function (): void {
+    $this->admin->forceFill(['timezone' => 'Asia/Yerevan'])->save();
+    $this->actingAs($this->admin->refresh(), 'sysadmin');
+
+    // 01:30 on Jun 10 in Yerevan, still Jun 9 on the server.
+    $justInside = $this->travelTo('2026-06-09 21:30:00', fn (): Activity => seedActivity($this->teamA, $this->ownerA, ['description' => 'just inside']));
+    // 01:30 on Jun 21 in Yerevan, still Jun 20 on the server.
+    $justOutside = $this->travelTo('2026-06-20 21:30:00', fn (): Activity => seedActivity($this->teamA, $this->ownerA, ['description' => 'just outside']));
+
+    livewire(ListActivities::class)
+        ->filterTable('created_at', ['from' => '2026-06-10', 'until' => '2026-06-20'])
+        ->assertCanSeeTableRecords([$justInside])
+        ->assertCanNotSeeTableRecords([$justOutside]);
+});
+
 it('renders the view page with a standard attribute diff', function (): void {
     $activity = seedActivity($this->teamA, $this->ownerA, [
         'event' => 'updated',
