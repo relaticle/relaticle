@@ -11,6 +11,7 @@ use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class SignupTrendChartWidget extends ChartWidget
 {
@@ -40,7 +41,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'New users and teams over time.';
+        return 'New users and teams over time, by '.ViewerTime::timezone().' calendar days. The last point is today so far.';
     }
 
     protected function getType(): string
@@ -51,20 +52,29 @@ final class SignupTrendChartWidget extends ChartWidget
     protected function getData(): array
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
 
-        $intervals = $this->buildIntervals($start, $end, $days);
-        $labels = $intervals->pluck('label')->toArray();
-
+        $timezone = ViewerTime::timezone();
         $groupFormat = $this->getGroupFormat($days);
 
-        $userCountsByBucket = $this->getCountsByBucket(User::query(), $start, $end, $groupFormat);
+        /**
+         * Intervals run whole buckets in the viewer's calendar, the last one
+         * being the bucket today falls in — so the window is derived from them
+         * rather than from a bare `now() - N days`, which would start mid-bucket
+         * and end a bucket short.
+         */
+        $intervals = $this->buildIntervals($days);
+        $labels = $intervals->pluck('label')->all();
+
+        $start = $intervals->first()['start'];
+        $end = ViewerTime::now()->setTimezone('UTC');
+
+        $userCountsByBucket = $this->getCountsByBucket(User::query(), $start, $end, $groupFormat, $timezone);
         $teamCountsByBucket = $this->getCountsByBucket(
             Team::query()->where('personal_team', false),
             $start,
             $end,
             $groupFormat,
+            $timezone,
         );
 
         $userCounts = $intervals->map(
@@ -103,6 +113,10 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
+     * `created_at` is a UTC-bearing `timestamp without time zone`, so it is
+     * relabelled as UTC before being shifted into the viewer's zone — otherwise
+     * a signup just after local midnight buckets into the previous day.
+     *
      * @return Collection<string, int>
      */
     private function getCountsByBucket(
@@ -110,13 +124,17 @@ final class SignupTrendChartWidget extends ChartWidget
         CarbonImmutable $start,
         CarbonImmutable $end,
         string $groupFormat,
+        string $timezone,
     ): Collection {
-        $bucketExpression = "to_char(created_at, '{$groupFormat}')";
-
         return $query
-            ->selectRaw("{$bucketExpression} as bucket, COUNT(*) as cnt")
+            ->selectRaw(
+                "to_char(created_at AT TIME ZONE 'UTC' AT TIME ZONE ?, ?) as bucket, COUNT(*) as cnt",
+                [$timezone, $groupFormat],
+            )
             ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
-            ->groupByRaw($bucketExpression)
+            // Grouped by output position: repeating the expression would repeat its
+            // placeholders, and Postgres will not match two distinct parameters.
+            ->groupByRaw('1')
             ->pluck('cnt', 'bucket')
             ->map(fn (mixed $value): int => (int) $value);
     }
@@ -135,52 +153,53 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, bucket: string}>
      */
-    private function buildIntervals(CarbonImmutable $start, CarbonImmutable $end, int $days): Collection
+    private function buildIntervals(int $days): Collection
     {
         if ($days <= 30) {
-            return $this->buildDailyIntervals($start, $days);
+            return $this->buildDailyIntervals($days);
         }
 
         if ($days <= 90) {
-            return $this->buildWeeklyIntervals($start, $end);
+            return $this->buildWeeklyIntervals($days);
         }
 
-        return $this->buildMonthlyIntervals($start, $end);
+        return $this->buildMonthlyIntervals($days);
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, bucket: string}>
      */
-    private function buildDailyIntervals(CarbonImmutable $start, int $days): Collection
+    private function buildDailyIntervals(int $days): Collection
     {
-        return collect(range(0, $days - 1))->map(function (int $i) use ($start): array {
-            $day = $start->addDays($i);
+        $first = ViewerTime::today()->subDays($days - 1);
+
+        return collect(range(0, $days - 1))->map(function (int $offset) use ($first): array {
+            $day = $first->addDays($offset);
 
             return [
                 'label' => $day->format('M j'),
-                'start' => $day->startOfDay(),
-                'end' => $day->endOfDay(),
+                'start' => $day->setTimezone('UTC'),
                 'bucket' => $day->format('Y-m-d'),
             ];
         });
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, bucket: string}>
      */
-    private function buildWeeklyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
+    private function buildWeeklyIntervals(int $days): Collection
     {
-        $intervals = collect();
-        $current = $start->startOfWeek();
+        $today = ViewerTime::today();
+        $current = $today->subDays($days - 1)->startOfWeek();
 
-        while ($current->lt($end)) {
-            $weekEnd = $current->endOfWeek()->min($end);
+        $intervals = collect();
+
+        while ($current->lte($today)) {
             $intervals->push([
                 'label' => $current->format('M j'),
-                'start' => $current,
-                'end' => $weekEnd,
+                'start' => $current->setTimezone('UTC'),
                 'bucket' => $current->format('o-W'),
             ]);
             $current = $current->addWeek();
@@ -190,19 +209,19 @@ final class SignupTrendChartWidget extends ChartWidget
     }
 
     /**
-     * @return Collection<int, array{label: string, start: CarbonImmutable, end: CarbonImmutable, bucket: string}>
+     * @return Collection<int, array{label: string, start: CarbonImmutable, bucket: string}>
      */
-    private function buildMonthlyIntervals(CarbonImmutable $start, CarbonImmutable $end): Collection
+    private function buildMonthlyIntervals(int $days): Collection
     {
-        $intervals = collect();
-        $current = $start->startOfMonth();
+        $today = ViewerTime::today();
+        $current = $today->subDays($days - 1)->startOfMonth();
 
-        while ($current->lt($end)) {
-            $monthEnd = $current->endOfMonth()->min($end);
+        $intervals = collect();
+
+        while ($current->lte($today)) {
             $intervals->push([
                 'label' => $current->format('M Y'),
-                'start' => $current,
-                'end' => $monthEnd,
+                'start' => $current->setTimezone('UTC'),
                 'bucket' => $current->format('Y-m'),
             ]);
             $current = $current->addMonth();
