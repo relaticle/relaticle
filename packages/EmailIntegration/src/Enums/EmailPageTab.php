@@ -18,6 +18,7 @@ enum EmailPageTab: string implements HasIcon, HasLabel
     case OUTBOX = 'outbox';
     case FAILED = 'failed';
     case TEMPLATES = 'templates';
+    case REQUESTS = 'requests';
 
     public function getLabel(): string
     {
@@ -26,6 +27,7 @@ enum EmailPageTab: string implements HasIcon, HasLabel
             self::OUTBOX => __('filament/pages/email-inbox.tabs.outbox'),
             self::FAILED => __('filament/pages/email-inbox.tabs.failed'),
             self::TEMPLATES => __('filament/pages/email-inbox.tabs.templates'),
+            self::REQUESTS => __('filament/pages/email-inbox.tabs.requests'),
         };
     }
 
@@ -36,6 +38,7 @@ enum EmailPageTab: string implements HasIcon, HasLabel
             self::OUTBOX => Heroicon::OutlinedClock,
             self::FAILED => Heroicon::OutlinedExclamationCircle,
             self::TEMPLATES => Heroicon::OutlinedDocumentDuplicate,
+            self::REQUESTS => Heroicon::OutlinedKey,
         };
     }
 
@@ -48,6 +51,7 @@ enum EmailPageTab: string implements HasIcon, HasLabel
             self::DRAFTS => 'email-integration.drafts-table',
             self::OUTBOX, self::FAILED => 'email-integration.outbox-table',
             self::TEMPLATES => 'email-integration.templates-table',
+            self::REQUESTS => 'email-integration.access-requests-table',
         };
     }
 

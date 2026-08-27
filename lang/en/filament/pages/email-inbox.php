@@ -13,6 +13,7 @@ return [
         'outbox' => 'Outbox',
         'failed' => 'Failed',
         'templates' => 'Templates',
+        'requests' => 'Requests',
     ],
     'drafts' => [
         'columns' => [
