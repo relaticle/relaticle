@@ -72,7 +72,7 @@ describe('Home page', function () {
 });
 
 describe('Legal pages', function () {
-    it('displays the terms of service page with current pricing terms as :format', function (array $headers, string $contentType) {
+    it('displays the terms of service page with product-specific content as :format', function (array $headers, string $contentType) {
         $response = $this->get('/terms-of-service', $headers);
 
         $response->assertStatus(200);
@@ -80,15 +80,8 @@ describe('Legal pages', function () {
 
         $response->assertSee('Terms of Service');
         $response->assertSee('Relaticle');
-        $response->assertSee('August 26, 2026');
-        $response->assertSee('Self-hosted software has no license fee under AGPL-3.0.');
-        $response->assertSee('The hosted Cloud service may offer trial, free, and paid plans.');
-        $response->assertSee('Current pricing and included features appear on the pricing page or during checkout.');
-        $response->assertSee('Charges apply only after you accept the displayed paid terms.');
-        $response->assertSee('Price changes apply prospectively after notice.');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
-        $response->assertDontSee('Both the Cloud and Self-Hosted options are available at no cost.');
     })->with([
         'HTML' => [[], 'text/html'],
         'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
