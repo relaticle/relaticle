@@ -80,11 +80,6 @@ final readonly class ModelProbe
         return $result;
     }
 
-    public function passedAt(string $provider, string $model): ?string
-    {
-        return is_array(Cache::get($this->cacheKey($provider, $model))) ? 'verified' : null;
-    }
-
     /**
      * `api` means the provider itself refuses parallel tool calls, which is what
      * makes the sequential approval flow unbypassable. Only providers whose options
