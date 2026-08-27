@@ -261,3 +261,28 @@ it('falls back to the most restrictive plan and a full-price multiplier when a r
     expect($descriptor?->minPlan)->toBe(Plan::Pro)
         ->and($descriptor?->creditMultiplier)->toEqual(1.0);
 });
+
+it('keeps probed capabilities when a save touches only the effort dial', function (): void {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response(['data' => []]),
+        'api.anthropic.com/v1/messages*' => Http::response([], 500),
+    ]);
+
+    $settings = resolve(ChatSettings::class);
+    $settings->models = [catalogEntry(['verified_at' => '2026-08-27T09:00:00+00:00'])];
+    $settings->save();
+
+    livewire(ManageAiSettings::class)
+        ->set('data.anthropic_effort', 'max')
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet');
+
+    expect($entry['capabilities'])->toBe(['supports_tools' => true, 'write_guard' => 'api'])
+        ->and($entry['verified_at'])->toBe('2026-08-27T09:00:00+00:00');
+
+    app()->forgetInstance(ModelRegistry::class);
+
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet')?->supportsTools)->toBeTrue();
+});
