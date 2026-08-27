@@ -6,11 +6,12 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
+use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
-mutates(EmailAccessRequestsPage::class);
+mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -31,6 +32,22 @@ beforeEach(function (): void {
 });
 
 describe('Tab switching', function (): void {
+    it('shows incoming requests in a table with the available review actions', function (): void {
+        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->assertCanSeeTableRecords([$request])
+            ->assertTableActionVisible('approveAccessRequest', $request)
+            ->assertTableActionVisible('denyAccessRequest', $request)
+            ->assertTableActionHidden('cancelAccessRequest', $request);
+    });
+
     it('defaults to incoming tab and shows requests where user is owner', function (): void {
         $requester = User::factory()->create(['current_team_id' => $this->team->id]);
 
@@ -57,14 +74,9 @@ describe('Tab switching', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        $ids = livewire(EmailAccessRequestsPage::class)
-            ->get('requests')
-            ->pluck('id')
-            ->all();
-
-        expect($ids)
-            ->toContain($incomingRequest->id)
-            ->not->toContain($outgoingRequest->id);
+        livewire(AccessRequestsTable::class)
+            ->assertCanSeeTableRecords([$incomingRequest])
+            ->assertCanNotSeeTableRecords([$outgoingRequest]);
     });
 
     it('shows outgoing requests after switching to outgoing tab', function (): void {
@@ -93,52 +105,16 @@ describe('Tab switching', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        $ids = livewire(EmailAccessRequestsPage::class)
+        livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
-            ->get('requests')
-            ->pluck('id')
-            ->all();
-
-        expect($ids)
-            ->toContain($outgoingRequest->id)
-            ->not->toContain($incomingRequest->id);
+            ->assertCanSeeTableRecords([$outgoingRequest])
+            ->assertCanNotSeeTableRecords([$incomingRequest]);
     });
 
-    it('clears selectedRequestId when switching tabs', function (): void {
-        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
-
-        $request = EmailAccessRequest::factory()->pending()->create([
-            'owner_id' => $this->user->id,
-            'requester_id' => $requester->id,
-            'email_id' => $this->email->getKey(),
-        ]);
-
-        livewire(EmailAccessRequestsPage::class)
-            ->call('selectRequest', (string) $request->id)
-            ->assertSet('selectedRequestId', (string) $request->id)
-            ->call('setTab', 'outgoing')
-            ->assertSet('selectedRequestId', null);
-    });
-});
-
-describe('selectRequest', function (): void {
-    it('sets selectedRequestId to the given request id', function (): void {
-        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
-
-        $request = EmailAccessRequest::factory()->pending()->create([
-            'owner_id' => $this->user->id,
-            'requester_id' => $requester->id,
-            'email_id' => $this->email->getKey(),
-        ]);
-
-        livewire(EmailAccessRequestsPage::class)
-            ->call('selectRequest', (string) $request->id)
-            ->assertSet('selectedRequestId', (string) $request->id);
-    });
 });
 
 describe('approveAccessRequest action', function (): void {
-    it('approves a pending request, sends notification, and clears selectedRequestId', function (): void {
+    it('approves a pending request and sends a notification', function (): void {
         $requester = User::factory()->create(['current_team_id' => $this->team->id]);
 
         $request = EmailAccessRequest::factory()->pending()->create([
@@ -147,11 +123,9 @@ describe('approveAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        livewire(EmailAccessRequestsPage::class)
-            ->call('selectRequest', (string) $request->id)
-            ->callAction('approveAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotified('Access request approved.')
-            ->assertSet('selectedRequestId', null);
+        livewire(AccessRequestsTable::class)
+            ->callTableAction('approveAccessRequest', $request)
+            ->assertNotified('Access request approved.');
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -170,17 +144,15 @@ describe('approveAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        // Current user ($this->user) is not the owner — action should be a no-op
-        livewire(EmailAccessRequestsPage::class)
-            ->callAction('approveAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotNotified();
+        livewire(AccessRequestsTable::class)
+            ->assertCanNotSeeTableRecords([$request]);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
     });
 });
 
 describe('denyAccessRequest action', function (): void {
-    it('denies a pending request, sends notification, and clears selectedRequestId', function (): void {
+    it('denies a pending request and sends a notification', function (): void {
         $requester = User::factory()->create(['current_team_id' => $this->team->id]);
 
         $request = EmailAccessRequest::factory()->pending()->create([
@@ -189,11 +161,9 @@ describe('denyAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
-        livewire(EmailAccessRequestsPage::class)
-            ->call('selectRequest', (string) $request->id)
-            ->callAction('denyAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotified('Access request denied.')
-            ->assertSet('selectedRequestId', null);
+        livewire(AccessRequestsTable::class)
+            ->callTableAction('denyAccessRequest', $request)
+            ->assertNotified('Access request denied.');
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -212,17 +182,15 @@ describe('denyAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        // Current user ($this->user) is not the owner — action should be a no-op
-        livewire(EmailAccessRequestsPage::class)
-            ->callAction('denyAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotNotified();
+        livewire(AccessRequestsTable::class)
+            ->assertCanNotSeeTableRecords([$request]);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
     });
 });
 
 describe('cancelAccessRequest action', function (): void {
-    it('deletes a pending outgoing request and clears selectedRequestId', function (): void {
+    it('deletes a pending outgoing request', function (): void {
         $owner = User::factory()->create(['current_team_id' => $this->team->id]);
 
         $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -242,12 +210,10 @@ describe('cancelAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        livewire(EmailAccessRequestsPage::class)
+        livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
-            ->call('selectRequest', (string) $request->id)
-            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotified('Access request cancelled.')
-            ->assertSet('selectedRequestId', null);
+            ->callTableAction('cancelAccessRequest', $request)
+            ->assertNotified('Access request cancelled.');
 
         expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeFalse();
     });
@@ -273,10 +239,8 @@ describe('cancelAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        // Current user ($this->user) is neither owner nor requester — action should be a no-op
-        livewire(EmailAccessRequestsPage::class)
-            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id])
-            ->assertNotNotified();
+        livewire(AccessRequestsTable::class)
+            ->assertCanNotSeeTableRecords([$request]);
 
         expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeTrue();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
@@ -302,9 +266,9 @@ describe('cancelAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
-        livewire(EmailAccessRequestsPage::class)
+        livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
-            ->callAction('cancelAccessRequest', arguments: ['requestId' => $request->id]);
+            ->assertTableActionHidden('cancelAccessRequest', $request);
 
         expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeTrue();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);

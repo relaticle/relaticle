@@ -10,10 +10,18 @@ return [
         'outgoing' => 'Sent',
     ],
     'filters' => [
+        'label' => 'Status',
         'all' => 'All',
         'pending' => 'Pending',
         'approved' => 'Approved',
         'denied' => 'Denied',
+    ],
+    'columns' => [
+        'requested_by' => 'Requested by',
+        'sent_to' => 'Sent to',
+        'email' => 'Email',
+        'access' => 'Access',
+        'requested' => 'Requested',
     ],
     'search' => [
         'placeholder' => 'Search by name or subject…',
