@@ -14,6 +14,18 @@ beforeEach(function () {
     config(['mailcoach-sdk.api_token' => 'fake-token', 'mailcoach-sdk.endpoint' => 'https://fake.mailcoach.test']);
 });
 
+function waitingTagJob(User $user, int $attempt, int $expectedDelay): ModifySubscriberTagsJob
+{
+    $queueJob = Mockery::mock(QueueJob::class);
+    $queueJob->shouldReceive('attempts')->andReturn($attempt);
+    $queueJob->shouldReceive('release')->once()->with($expectedDelay);
+
+    $job = new ModifySubscriberTagsJob((string) $user->id, ['use-case:sales'], TagAction::Add);
+    $job->setJob($queueJob);
+
+    return $job;
+}
+
 test('it calls the Mailcoach add tags endpoint', function () {
     $user = User::factory()->create(['mailcoach_subscriber_uuid' => 'test-uuid-123']);
 
@@ -47,31 +59,13 @@ test('it calls the Mailcoach delete tags endpoint for remove action', function (
     (new ModifySubscriberTagsJob((string) $user->id, ['dormant'], TagAction::Remove))->handle();
 });
 
-test('it waits instead of tagging when the subscriber uuid has not landed yet', function () {
+test('it waits instead of tagging, backing off further on each attempt, while the uuid has not landed', function (int $attempt, int $expectedDelay) {
     $user = User::factory()->create(['mailcoach_subscriber_uuid' => null]);
 
     Mailcoach::shouldReceive('post')->never();
     Mailcoach::shouldReceive('delete')->never();
 
-    $queueJob = Mockery::mock(QueueJob::class);
-    $queueJob->shouldReceive('attempts')->andReturn(1);
-    $queueJob->shouldReceive('release')->once()->with(60);
-
-    $job = new ModifySubscriberTagsJob((string) $user->id, ['use-case:sales'], TagAction::Add);
-    $job->setJob($queueJob);
-    $job->handle();
-});
-
-test('it backs off further on each attempt while waiting for the uuid', function (int $attempt, int $expectedDelay) {
-    $user = User::factory()->create(['mailcoach_subscriber_uuid' => null]);
-
-    $queueJob = Mockery::mock(QueueJob::class);
-    $queueJob->shouldReceive('attempts')->andReturn($attempt);
-    $queueJob->shouldReceive('release')->once()->with($expectedDelay);
-
-    $job = new ModifySubscriberTagsJob((string) $user->id, ['use-case:sales'], TagAction::Add);
-    $job->setJob($queueJob);
-    $job->handle();
+    waitingTagJob($user, $attempt, $expectedDelay)->handle();
 })->with([
     [1, 60],
     [2, 300],
@@ -84,12 +78,7 @@ test('it backs off further on each attempt while waiting for the uuid', function
 test('it tags a user whose uuid arrived while the job was waiting', function () {
     $user = User::factory()->create(['mailcoach_subscriber_uuid' => null]);
 
-    $queueJob = Mockery::mock(QueueJob::class);
-    $queueJob->shouldReceive('attempts')->andReturn(1);
-    $queueJob->shouldReceive('release')->once()->with(60);
-
-    $job = new ModifySubscriberTagsJob((string) $user->id, ['use-case:sales'], TagAction::Add);
-    $job->setJob($queueJob);
+    $job = waitingTagJob($user, 1, 60);
     $job->handle();
 
     $user->forceFill(['mailcoach_subscriber_uuid' => 'mc-uuid-late'])->save();

@@ -23,8 +23,9 @@ final class ModifySubscriberTagsJob implements ShouldQueue
     /**
      * Doubles as the retry schedule and as the delay used while waiting for
      * SyncSubscriberJob to store the subscriber uuid, so a slow or failing
-     * subscriber sync cannot drop a tag. The total window (~111 minutes)
-     * deliberately outlasts SyncSubscriberJob's own retry budget.
+     * subscriber sync cannot drop a tag. Six tries means five waits, so the
+     * total window (~111 minutes) deliberately outlasts SyncSubscriberJob's
+     * own retry budget.
      *
      * @var list<int>
      */

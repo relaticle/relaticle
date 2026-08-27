@@ -25,12 +25,20 @@ mutates(SyncSubscriberJob::class, SyncRecencyBucketJob::class, ModifySubscriberT
  *
  * These assert the exact payload values the queue Worker reads.
  */
-test('mailcoach jobs are bounded by attempts, never by a retry deadline', function (object $job, int $tries, string $backoff): void {
+test('mailcoach jobs retry on attempts alone, with nothing able to swallow the exception', function (object $job, int $tries, string $backoff): void {
     $queue = Queue::connection('sync');
+
+    // array_merge() mirrors CallQueuedHandler::dispatchThroughMiddleware() exactly:
+    // anything in that pipeline can catch and release instead of rethrowing.
+    $middleware = array_merge(
+        method_exists($job, 'middleware') ? $job->middleware() : [],
+        $job->middleware ?? [],
+    );
 
     expect($queue->getJobExpiration($job))->toBeNull()
         ->and($queue->getJobTries($job))->toBe($tries)
-        ->and($queue->getJobBackoff($job))->toBe($backoff);
+        ->and($queue->getJobBackoff($job))->toBe($backoff)
+        ->and($middleware)->toBe([]);
 })->with([
     'sync subscriber' => [
         fn (): SyncSubscriberJob => new SyncSubscriberJob(SubscriberData::from(['email' => 'a@b.test'])),
@@ -47,20 +55,4 @@ test('mailcoach jobs are bounded by attempts, never by a retry deadline', functi
         6,
         '60,300,900,1800,3600',
     ],
-]);
-
-test('mailcoach jobs register no middleware that could swallow the exception', function (object $job): void {
-    // The exact list CallQueuedHandler::dispatchThroughMiddleware() pipes the job through.
-    // Anything in it can catch and release, which is what made #[Backoff] and
-    // #[MaxExceptions] unreachable and reported one Sentry event per retry.
-    $pipeline = array_merge(
-        method_exists($job, 'middleware') ? $job->middleware() : [],
-        $job->middleware ?? [],
-    );
-
-    expect($pipeline)->toBe([]);
-})->with([
-    'sync subscriber' => fn (): SyncSubscriberJob => new SyncSubscriberJob(SubscriberData::from(['email' => 'a@b.test'])),
-    'sync recency bucket' => fn (): SyncRecencyBucketJob => new SyncRecencyBucketJob('user-1', 'sub-1', null, 'active-7d'),
-    'modify subscriber tags' => fn (): ModifySubscriberTagsJob => new ModifySubscriberTagsJob('user-1', ['use-case:sales'], TagAction::Add),
 ]);

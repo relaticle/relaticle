@@ -28,7 +28,7 @@ final class NewSubscriberListener
         $tags = [
             SubscriberTagEnum::Verified->value,
             $signupSourceTag,
-            ...$user->currentTeam?->onboardingSubscriberTags() ?? [],
+            ...($user->currentTeam?->onboardingSubscriberTags() ?? []),
         ];
 
         [$firstName, $lastName] = $this->splitName($user->name);
