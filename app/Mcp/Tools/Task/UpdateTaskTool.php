@@ -15,11 +15,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 
 #[Title('Update Task')]
 #[Description('Update an existing task in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsIdempotent]
 final class UpdateTaskTool extends BaseUpdateTool
 {
     protected function openWorldHint(): bool

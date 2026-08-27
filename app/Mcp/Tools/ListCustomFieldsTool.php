@@ -88,7 +88,12 @@ final class ListCustomFieldsTool extends Tool
                 array_key_exists('active', $validated),
                 fn (Builder $query): Builder => $query->where('active', $validated['active']),
             )
-            ->with(['options' => fn (Relation $query): Relation => $query->withoutGlobalScopes()->orderBy('sort_order')])
+            // The package's options() relation eager-loads customField; without this
+            // the parent rows we already hold are re-queried and re-hydrated per option.
+            ->with(['options' => fn (Relation $query): Relation => $query
+                ->without('customField')
+                ->withoutGlobalScopes()
+                ->orderBy('sort_order')])
             ->orderBy('entity_type')
             ->orderBy('sort_order')
             ->orderBy('id')

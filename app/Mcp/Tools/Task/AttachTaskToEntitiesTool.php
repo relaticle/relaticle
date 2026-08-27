@@ -15,11 +15,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 
 #[Title('Attach Task Relationships')]
 #[Description('Attach a task to companies, people, opportunities, or assign to users. Adds links without removing existing ones.')]
-#[IsIdempotent]
 final class AttachTaskToEntitiesTool extends BaseAttachTool
 {
     protected function openWorldHint(): bool

@@ -145,7 +145,7 @@ it('rejects unknown operators', function (): void {
             AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
         )
         ->get();
-})->throws(ValidationException::class, 'Unknown custom field filter operator [approximately] for [amount].');
+})->throws(ValidationException::class, 'Custom field [amount] does not support operator [approximately].');
 
 it('rejects more than 10 filter conditions', function (): void {
     $filters = [];

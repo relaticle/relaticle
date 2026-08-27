@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Task;
 
-use App\Models\Company;
-use App\Models\Opportunity;
-use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CrmRelationshipSync;
 use App\Support\TenantFkValidator;
 use Illuminate\Support\Facades\DB;
 
@@ -26,11 +24,7 @@ final readonly class AttachTaskRelationships
         abort_unless($user->can('update', $task), 403);
         abort_unless($task->team_id === $user->current_team_id, 403);
 
-        TenantFkValidator::assertOwnedMany($user, $data, [
-            'company_ids' => Company::class,
-            'people_ids' => People::class,
-            'opportunity_ids' => Opportunity::class,
-        ]);
+        TenantFkValidator::assertOwnedMany($user, $data, CrmRelationshipSync::OWNED_MODELS);
         TenantFkValidator::assertUsersInWorkspace($user, $data, ['assignee_ids']);
 
         /** @var array<int, string> $newAssigneeIds */
@@ -42,19 +36,8 @@ final readonly class AttachTaskRelationships
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (array_key_exists('company_ids', $data)) {
-                $lockedTask->companies()->syncWithoutDetaching($data['company_ids']);
-            }
-            if (array_key_exists('people_ids', $data)) {
-                $lockedTask->people()->syncWithoutDetaching($data['people_ids']);
-            }
-            if (array_key_exists('opportunity_ids', $data)) {
-                $lockedTask->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
-            }
-            if (array_key_exists('assignee_ids', $data)) {
-                $changes = $lockedTask->assignees()->syncWithoutDetaching($data['assignee_ids']);
-                $newAssigneeIds = $changes['attached'];
-            }
+            $attached = CrmRelationshipSync::attach($lockedTask, $data);
+            $newAssigneeIds = $attached['assignee_ids'] ?? [];
         });
 
         $task->refresh();

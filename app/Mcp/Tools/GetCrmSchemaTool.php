@@ -12,6 +12,7 @@ use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
+use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
@@ -68,10 +69,10 @@ final class GetCrmSchemaTool extends Tool
             CrmEntity::Task => resolve(TaskSchemaResource::class),
             CrmEntity::Note => resolve(NoteSchemaResource::class),
         };
-        $payload = json_decode((string) $resource->handle($request)->content(), true, flags: JSON_THROW_ON_ERROR);
-        $payload['custom_fields'] = (object) ($payload['custom_fields'] ?? []);
-        $payload['filterable_fields'] = (object) ($payload['filterable_fields'] ?? []);
 
-        return Response::structured($payload);
+        /** @var User $user */
+        $user = $request->user();
+
+        return Response::structured($resource->toSchema($user));
     }
 }

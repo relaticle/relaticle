@@ -45,15 +45,6 @@ final readonly class CreateCustomField
         'toggle-buttons',
     ];
 
-    /** @var list<string> */
-    public const array VALID_ENTITY_TYPES = [
-        'company',
-        'people',
-        'opportunity',
-        'task',
-        'note',
-    ];
-
     /**
      * @param  array<string, mixed>  $data
      */

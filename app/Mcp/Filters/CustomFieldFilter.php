@@ -71,10 +71,6 @@ final readonly class CustomFieldFilter implements Filter
             $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
 
             foreach ($operators as $operator => $operand) {
-                if (! in_array($operator, CustomFieldFilterSchema::operatorNames(), true)) {
-                    $this->invalid("Unknown custom field filter operator [{$operator}] for [{$fieldCode}].");
-                }
-
                 if (! isset($supportedOperators[$operator])) {
                     $allowed = implode(', ', array_keys($supportedOperators));
                     $this->invalid("Custom field [{$fieldCode}] does not support operator [{$operator}]. Allowed operators: {$allowed}.");

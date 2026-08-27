@@ -253,7 +253,7 @@ final class ListActivityTool extends Tool
             'record' => [
                 'type' => $subjectType,
                 'id' => $subjectId,
-                'name' => $this->recordName($subject),
+                'name' => $this->recordName($subject, $entity),
                 'url' => $entity instanceof CrmEntity
                     ? $this->urls->build($entity, $subjectId, $user->currentTeam)
                     : null,
@@ -375,17 +375,15 @@ final class ListActivityTool extends Tool
         return is_string($name) && $name !== '' ? $name : 'System';
     }
 
-    private function recordName(Model $subject): string
+    private function recordName(Model $subject, ?CrmEntity $entity): string
     {
-        foreach (['name', 'title'] as $attribute) {
-            $value = $subject->getAttribute($attribute);
-
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
+        if (! $entity instanceof CrmEntity) {
+            return '';
         }
 
-        return '';
+        $value = $subject->getAttribute($entity->titleColumn());
+
+        return is_string($value) && $value !== '' ? $value : '';
     }
 
     private function visibleRecord(User $user, CrmEntity $recordType, string $recordId): ?Model

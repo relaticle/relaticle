@@ -66,17 +66,6 @@ enum CrmEntity: string
         };
     }
 
-    public static function fromUrlType(string $urlType): ?self
-    {
-        foreach (self::cases() as $case) {
-            if ($case->urlType() === $urlType) {
-                return $case;
-            }
-        }
-
-        return null;
-    }
-
     /** @return array<string, class-string<Model>> */
     public static function morphMap(): array
     {

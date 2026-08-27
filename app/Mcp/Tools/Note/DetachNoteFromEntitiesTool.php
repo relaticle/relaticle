@@ -13,13 +13,9 @@ use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
-use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Title('Detach Note Relationships')]
 #[Description('Detach a note from companies, people, or opportunities. Removes specified links.')]
-#[IsDestructive]
-#[IsOpenWorld(false)]
 final class DetachNoteFromEntitiesTool extends BaseDetachTool
 {
     protected function modelClass(): string

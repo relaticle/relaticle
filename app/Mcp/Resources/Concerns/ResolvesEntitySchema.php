@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Resources\Concerns;
 
 use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\User;
@@ -17,9 +18,9 @@ trait ResolvesEntitySchema
     protected function resolveCustomFields(User $user, string $entityType): object
     {
         $teamId = $user->currentTeam->getKey();
-        $cacheKey = "custom_fields_schema_{$teamId}_{$entityType}";
+        $cacheKey = McpSchemaCache::entitySchemaKey($teamId, $entityType);
 
-        return (object) Cache::remember($cacheKey, 60, function () use ($teamId, $entityType): array {
+        return (object) Cache::remember($cacheKey, McpSchemaCache::TTL, function () use ($teamId, $entityType): array {
             $fields = CustomField::query()
                 ->withoutGlobalScopes()
                 ->where('tenant_id', $teamId)

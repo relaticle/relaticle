@@ -99,18 +99,6 @@ final readonly class CustomFieldFilterSchema
         };
     }
 
-    /** @return list<string> */
-    public static function operatorNames(): array
-    {
-        $operators = [];
-
-        foreach (CustomFieldType::cases() as $fieldType) {
-            $operators = [...$operators, ...array_keys(self::operatorsForType($fieldType->value))];
-        }
-
-        return array_values(array_unique($operators));
-    }
-
     /**
      * @param  array<int, string>  $operators
      * @return array<string, array<string, string>>
@@ -127,33 +115,15 @@ final readonly class CustomFieldFilterSchema
     }
 
     /**
-     * Drop the memoised schema for one tenant + entity.
-     *
-     * Callers must not rebuild this key themselves — the TTL is long enough that a
-     * missed invalidation reads as "that field doesn't exist" right after the
-     * assistant created it.
-     */
-    public static function forget(int|string $tenantId, string $entityType): void
-    {
-        Cache::forget(self::cacheKey($tenantId, $entityType));
-        Cache::forget("custom_fields_schema_{$tenantId}_{$entityType}");
-    }
-
-    private static function cacheKey(int|string $tenantId, string $entityType): string
-    {
-        return "custom_fields_filter_schema_{$tenantId}_{$entityType}";
-    }
-
-    /**
      * @return Collection<int, CustomField>
      */
     private function resolveFilterableFields(User $user, string $entityType): Collection
     {
         $teamId = $user->currentTeam->getKey();
-        $cacheKey = self::cacheKey($teamId, $entityType);
+        $cacheKey = McpSchemaCache::filterSchemaKey($teamId, $entityType);
 
         /** @var Collection<int, CustomField> */
-        return Cache::remember($cacheKey, 60, fn (): Collection => CustomField::query()
+        return Cache::remember($cacheKey, McpSchemaCache::TTL, fn (): Collection => CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $teamId)
             ->where('entity_type', $entityType)

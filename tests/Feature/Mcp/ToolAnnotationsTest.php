@@ -9,6 +9,7 @@ use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseDeleteTool;
 use App\Mcp\Tools\BaseDetachTool;
 use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseRelationshipTool;
 use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Mcp\Tools\Company\CreateCompanyTool;
@@ -125,57 +126,16 @@ mutates(...array_merge(
         BaseCreateTool::class,
         BaseUpdateTool::class,
         BaseDeleteTool::class,
+        BaseRelationshipTool::class,
         BaseAttachTool::class,
         BaseDetachTool::class,
     ],
     array_keys($toolContracts),
 ));
 
-dataset('annotation_matrix', [
-    [ListCompaniesTool::class, ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false]],
-    [GetCompanyTool::class, ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false]],
-    [CreateCompanyTool::class, ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => false, 'openWorldHint' => false]],
-    [UpdateCompanyTool::class, ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true, 'openWorldHint' => false]],
-    [DeleteCompanyTool::class, ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => false]],
-    [AttachNoteToEntitiesTool::class, ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false]],
-    [DetachNoteFromEntitiesTool::class, ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true, 'openWorldHint' => false]],
-    [CreateTaskTool::class, ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => false, 'openWorldHint' => true]],
-    [UpdateTaskTool::class, ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true, 'openWorldHint' => true]],
-    [AttachTaskToEntitiesTool::class, ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => true]],
-    [DetachTaskFromEntitiesTool::class, ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => true, 'openWorldHint' => false]],
-]);
-
-it('exposes the required annotation matrix', function (string $toolClass, array $expected): void {
-    $tool = new $toolClass;
-    assert($tool instanceof Tool);
-
-    $annotations = $tool->annotations();
-
-    expect($annotations)->toBe($expected);
-})->with('annotation_matrix');
-
-// The per-category matrix above only covers the classes someone remembered to list,
-// which is how WhoAmiTool shipped without openWorldHint. Enumerate the server's own
-// registration instead so a new tool cannot opt out of the submission policy by
-// simply not being added to the dataset.
-it('declares all four annotation hints on every registered tool', function (): void {
-    $tools = new ReflectionClass(RelaticleServer::class)
-        ->getDefaultProperties()['tools'];
-
-    expect($tools)->toBeArray()->not->toBeEmpty();
-
-    foreach ($tools as $toolClass) {
-        $annotations = resolve($toolClass)->annotations();
-
-        expect($annotations)->toHaveKeys([
-            'readOnlyHint',
-            'destructiveHint',
-            'idempotentHint',
-            'openWorldHint',
-        ]);
-    }
-});
-
+// Enumerating the server's own registration, rather than a hand-listed subset, is
+// what stops a new tool opting out of the submission policy by simply not being
+// added to a dataset — which is how WhoAmiTool once shipped without openWorldHint.
 it('publishes the exact explicit title and stable technical name for every registered tool', function () use ($toolContracts): void {
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];

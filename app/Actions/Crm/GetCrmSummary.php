@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\Crm;
 
 use App\Actions\Opportunity\AggregateOpportunities;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\Note;
-use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
@@ -28,11 +28,9 @@ final readonly class GetCrmSummary
     /** @return array<string, mixed> */
     public function execute(User $user): array
     {
-        abort_unless($user->can('viewAny', Company::class), 403);
-        abort_unless($user->can('viewAny', People::class), 403);
-        abort_unless($user->can('viewAny', Opportunity::class), 403);
-        abort_unless($user->can('viewAny', Task::class), 403);
-        abort_unless($user->can('viewAny', Note::class), 403);
+        foreach (CrmEntity::cases() as $entity) {
+            abort_unless($user->can('viewAny', $entity->model()), 403);
+        }
 
         $teamId = (string) $user->currentTeam->getKey();
         $timezone = $user->effectiveTimezone();
@@ -131,10 +129,10 @@ final readonly class GetCrmSummary
             ->where('field.active', true)
             ->whereIn('field.code', [TaskField::DUE_DATE->value, TaskField::STATUS->value])
             ->selectRaw(implode(', ', [
-                "MAX(CASE WHEN field.code = 'due_date' THEN field.id END) AS due_field_id",
-                "MAX(CASE WHEN field.code = 'status' THEN field.id END) AS status_field_id",
-                "MAX(CASE WHEN field.code = 'status' THEN option.id END) AS done_option_id",
-            ]))
+                'MAX(CASE WHEN field.code = ? THEN field.id END) AS due_field_id',
+                'MAX(CASE WHEN field.code = ? THEN field.id END) AS status_field_id',
+                'MAX(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
+            ]), [TaskField::DUE_DATE->value, TaskField::STATUS->value, TaskField::STATUS->value])
             ->first();
 
         return [

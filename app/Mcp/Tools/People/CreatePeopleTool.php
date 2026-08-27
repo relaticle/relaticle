@@ -12,11 +12,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
 
 #[Title('Create Person')]
 #[Description('Create a new person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsOpenWorld(false)]
 final class CreatePeopleTool extends BaseCreateTool
 {
     protected function actionClass(): string

@@ -12,6 +12,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use Filament\Actions\EditAction;
+use Filament\Resources\Resource as FilamentResource;
 use Throwable;
 
 /**
@@ -33,16 +34,13 @@ final readonly class CanonicalRecordUrl
         // The match sits outside the try on purpose: catching Throwable there would
         // swallow the UnhandledMatchError a newly added entity raises, turning a
         // missing case into a silently null URL. Only the route lookup is guarded.
-        $route = match ($entity) {
-            CrmEntity::Company => static fn (): string => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-            CrmEntity::People => static fn (): string => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-            CrmEntity::Opportunity => static fn (): string => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-            CrmEntity::Task => fn (): string => TaskResource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team),
-            CrmEntity::Note => fn (): string => NoteResource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team),
-        };
+        $resource = $this->resource($entity);
+        $modalManaged = $this->isModalManaged($entity);
 
         try {
-            return $route();
+            return $modalManaged
+                ? $resource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team)
+                : $resource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team);
         } catch (Throwable) {
             return null;
         }
@@ -97,15 +95,25 @@ final readonly class CanonicalRecordUrl
         return null;
     }
 
-    private function segment(CrmEntity $entity): string
+    /** @return class-string<FilamentResource> */
+    private function resource(CrmEntity $entity): string
     {
         return match ($entity) {
-            CrmEntity::Company => 'companies',
-            CrmEntity::People => 'people',
-            CrmEntity::Opportunity => 'opportunities',
-            CrmEntity::Task => 'tasks',
-            CrmEntity::Note => 'notes',
+            CrmEntity::Company => CompanyResource::class,
+            CrmEntity::People => PeopleResource::class,
+            CrmEntity::Opportunity => OpportunityResource::class,
+            CrmEntity::Task => TaskResource::class,
+            CrmEntity::Note => NoteResource::class,
         };
+    }
+
+    /**
+     * Read from the resource rather than restated here, so a resource that sets its
+     * own $slug stays parseable by the same class that emitted the URL.
+     */
+    private function segment(CrmEntity $entity): string
+    {
+        return $this->resource($entity)::getSlug();
     }
 
     private function isModalManaged(CrmEntity $entity): bool

@@ -97,10 +97,8 @@ final readonly class ValidateMcpOrigin
 
     private function canonicalOrigin(string $origin): ?string
     {
-        if ($origin === '' || trim($origin) !== $origin || str_contains($origin, ',')) {
-            return null;
-        }
-
+        // The pattern is anchored and its host class admits no whitespace or comma,
+        // so empty, padded and comma-joined origins fall out here.
         if (preg_match('/\A(?<scheme>https?):\/\/(?<host>\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::(?<port>[0-9]{1,5}))?\z/iD', $origin, $matches) !== 1) {
             return null;
         }

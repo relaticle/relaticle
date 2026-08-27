@@ -18,11 +18,7 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[IsReadOnly]
-#[IsIdempotent]
 abstract class BaseShowTool extends Tool
 {
     use BoundsToManyIncludes;
@@ -112,6 +108,16 @@ abstract class BaseShowTool extends Tool
             $model->loadMissing($regularIncludes);
         }
 
+        // One loadCount() for every relation that needs a total: it resolves them as
+        // subqueries in a single statement, where a call per relation is a round trip
+        // per relation. The counts also make the bounded loads exact — the total says
+        // whether a relation was truncated, so there is no need to over-fetch a row.
+        $countTargets = [...$boundedIncludes, ...$countIncludes];
+
+        if ($countTargets !== []) {
+            $model->loadCount($countTargets);
+        }
+
         $relationshipMeta = [];
 
         foreach ($boundedIncludes as $relation) {
@@ -122,10 +128,9 @@ abstract class BaseShowTool extends Tool
                     $query
                         ->orderByDesc($related->qualifyColumn('created_at'))
                         ->orderByDesc($related->qualifyColumn('id'))
-                        ->limit(self::RELATED_RECORD_LIMIT + 1);
+                        ->limit(self::RELATED_RECORD_LIMIT);
                 },
             ]);
-            $model->loadCount($relation);
 
             $related = $model->getRelation($relation);
 
@@ -133,26 +138,20 @@ abstract class BaseShowTool extends Tool
                 continue;
             }
 
-            $totalKey = "{$relation}_count";
-            $total = (int) $model->getAttribute($totalKey);
-            $model->setRelation($relation, $related->take(self::RELATED_RECORD_LIMIT));
+            $total = (int) $model->getAttribute("{$relation}_count");
 
             $relationshipMeta[$relation] = [
-                'returned' => min($related->count(), self::RELATED_RECORD_LIMIT),
+                'returned' => $related->count(),
                 'total' => $total,
                 'truncated' => $total > self::RELATED_RECORD_LIMIT,
             ];
-        }
-
-        if ($countIncludes !== []) {
-            $model->loadCount($countIncludes);
         }
 
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
         $resource = new $resourceClass($model);
-        $json = $resource->toJson(JSON_PRETTY_PRINT);
+        $json = $resource->toJson();
 
         if ($relationIncludes === []) {
             /** @var array<string, mixed> $payload */
