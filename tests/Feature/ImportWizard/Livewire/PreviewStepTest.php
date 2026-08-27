@@ -373,6 +373,28 @@ it('startImport dispatches ExecuteImportJob and sets status to Importing', funct
     expect($freshImport->status)->toBe(ImportStatus::Importing);
 });
 
+it('does not start while match resolution is incomplete', function (): void {
+    Bus::fake();
+
+    createPreviewReadyStore($this, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->store->query()->update(['match_action' => null]);
+
+    $component = mountPreviewStep($this);
+    $component
+        ->assertActionDisabled('startImport')
+        ->assertActionHasLabel('startImport', 'Match resolution failed')
+        ->call('startImport');
+
+    Bus::assertNothingBatched();
+
+    expect($this->import->fresh()->status)->toBe(ImportStatus::Reviewing);
+});
+
 it('startImport proceeds even when rows have validation errors', function (): void {
     Bus::fake();
 

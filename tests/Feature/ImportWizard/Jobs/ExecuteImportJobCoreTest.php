@@ -12,6 +12,7 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -304,7 +305,7 @@ it('sets store status to Completed on success', function (): void {
     expect($import->status)->toBe(ImportStatus::Completed);
 });
 
-it('skips rows with null match_action without crashing', function (): void {
+it('fails before writing records when match resolution is incomplete', function (): void {
     ImportExecutionFixture::readyStore($this, ['Name'], [
         ImportExecutionFixture::row(2, ['Name' => 'Good Person'], ['match_action' => RowMatchAction::Create->value]),
         ImportExecutionFixture::row(3, ['Name' => 'Null Action'], ['match_action' => null]),
@@ -312,14 +313,47 @@ it('skips rows with null match_action without crashing', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    ImportExecutionFixture::run($this);
+    $job = new ExecuteImportJob(
+        importId: $this->import->id,
+        teamId: (string) $this->team->id,
+    );
+
+    expect(fn () => $job->handle())
+        ->toThrow(LogicException::class, 'Import match resolution is incomplete.');
+
+    $job->failed(new LogicException('Import match resolution is incomplete.'));
 
     $import = $this->import->fresh();
-    expect($import->status)->toBe(ImportStatus::Completed);
-
-    expect($import->created_rows)->toBe(1)
-        ->and($import->skipped_rows)->toBe(1)
+    expect($import->status)->toBe(ImportStatus::Failed)
+        ->and($import->created_rows)->toBe(0)
+        ->and($import->skipped_rows)->toBe(0)
         ->and($import->failed_rows)->toBe(0);
+
+    expect(People::query()
+        ->where('team_id', $this->team->id)
+        ->where('name', 'Good Person')
+        ->exists())->toBeFalse();
+});
+
+it('fails incomplete match resolution without retrying', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Null Action'], ['match_action' => null]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $job = (new ExecuteImportJob(
+        importId: $this->import->id,
+        teamId: (string) $this->team->id,
+    ))->withFakeQueueInteractions();
+
+    $middleware = $job->middleware()[0];
+
+    expect($middleware)->toBeInstanceOf(FailOnException::class)
+        ->and(fn () => $middleware->handle($job, fn (): mixed => $job->handle()))
+        ->toThrow(LogicException::class, 'Import match resolution is incomplete.');
+
+    $job->assertFailedWith(LogicException::class);
 });
 
 it('stores results with counts in meta', function (): void {
