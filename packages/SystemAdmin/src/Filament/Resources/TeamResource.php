@@ -170,8 +170,8 @@ final class TeamResource extends Resource
                     ->boolean(),
                 TextColumn::make('billing_status')
                     ->label('Billing')
-                    ->tooltip('Why this workspace has the plan it has')
                     ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
                     ->badge(),
                 TextColumn::make('plan')
                     ->label('Plan')

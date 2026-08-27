@@ -53,6 +53,7 @@ it('lists an active team with its billing badge and active member count', functi
         ->assertCanSeeTableRecords([$team])
         // Pro with nothing bought and no trial running is a hand-assigned plan.
         ->assertSee(BillingStatus::Granted->getLabel())
+        ->assertSeeHtml(BillingStatus::Granted->getDescription())
         ->assertSee('1 / 1');
 });
 
