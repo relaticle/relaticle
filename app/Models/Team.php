@@ -203,6 +203,26 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         return $this->invite_link_token_expires_at->isPast();
     }
 
+    /**
+     * The Mailcoach subscriber tags derived from this team's onboarding answers.
+     *
+     * @return list<string>
+     */
+    public function onboardingSubscriberTags(): array
+    {
+        $tags = [];
+
+        if ($this->onboarding_use_case) {
+            $tags[] = $this->onboarding_use_case->toSubscriberTag();
+        }
+
+        if ($this->onboarding_referral_source) {
+            $tags[] = $this->onboarding_referral_source->toSubscriberTag();
+        }
+
+        return $tags;
+    }
+
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()

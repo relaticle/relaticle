@@ -29,15 +29,7 @@ final class TeamCreatedTagListener implements ShouldQueue
         /** @var Team $team */
         $team = $event->team;
 
-        $tags = [];
-
-        if ($team->onboarding_use_case) {
-            $tags[] = $team->onboarding_use_case->toSubscriberTag();
-        }
-
-        if ($team->onboarding_referral_source) {
-            $tags[] = $team->onboarding_referral_source->toSubscriberTag();
-        }
+        $tags = $team->onboardingSubscriberTags();
 
         if ($tags === []) {
             return;
@@ -46,14 +38,8 @@ final class TeamCreatedTagListener implements ShouldQueue
         /** @var User $owner */
         $owner = $team->owner()->first();
 
-        if (! $owner->mailcoach_subscriber_uuid) {
-            $this->release(15);
-
-            return;
-        }
-
         dispatch(new ModifySubscriberTagsJob(
-            $owner->mailcoach_subscriber_uuid,
+            (string) $owner->id,
             $tags,
             TagAction::Add,
         ))->afterCommit();
