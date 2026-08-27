@@ -9,12 +9,11 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Filament\Pages\EmailOutboxPage;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
-mutates(EmailOutboxPage::class, OutboxTable::class);
+mutates(OutboxTable::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -42,8 +41,9 @@ function makeOutboxEmail(User $user, ConnectedAccount $account, EmailStatus $sta
     ], $overrides));
 }
 
-it('renders the page for an authenticated user', function (): void {
-    livewire(EmailOutboxPage::class)->assertSuccessful();
+it('does not expose Outbox in workspace settings', function (): void {
+    $this->get("/app/{$this->team->slug}/email-settings/outbox")
+        ->assertNotFound();
 });
 
 it('queued tab shows only this user\'s queued OUTBOUND emails', function (): void {
