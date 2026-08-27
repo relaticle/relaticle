@@ -10,9 +10,9 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class RecordDistributionChartWidget extends ChartWidget
 {
@@ -53,8 +53,7 @@ final class RecordDistributionChartWidget extends ChartWidget
     protected function getData(): array
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
+        [$start, $end] = ViewerTime::periodUtc($days);
 
         $entities = [
             'Companies' => Company::class,
