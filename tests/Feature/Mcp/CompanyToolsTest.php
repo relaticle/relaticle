@@ -314,6 +314,16 @@ describe('validation', function (): void {
             ->assertHasErrors(['name']);
     });
 
+    it('reports a non-scalar update id as a validation error', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdateCompanyTool::class, [
+                'id' => ['not-an-id'],
+                'name' => 'Renamed Corp',
+            ])
+            ->assertHasErrors(['id'])
+            ->assertDontSee('internal server error');
+    });
+
     it('sets creation source to MCP', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(CreateCompanyTool::class, [

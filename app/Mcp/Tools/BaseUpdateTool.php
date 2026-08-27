@@ -76,6 +76,10 @@ abstract class BaseUpdateTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
+        // Read before validation runs, so anything but a scalar id is dropped here and
+        // reported by the `id` rule below rather than blowing up on the typed parameter.
+        $entityId = $request->get('id');
+
         $rules = array_merge(
             ['id' => ['required', 'string']],
             $this->entityRules($user),
@@ -83,7 +87,7 @@ abstract class BaseUpdateTool extends Tool
                 $user->currentTeam->getKey(),
                 $this->entityType(),
                 isUpdate: true,
-                ignoreEntityId: $request->get('id'),
+                ignoreEntityId: is_string($entityId) || is_int($entityId) ? $entityId : null,
             )->toRules($request->get('custom_fields')),
         );
 
