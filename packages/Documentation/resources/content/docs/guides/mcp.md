@@ -2,7 +2,7 @@
 title: MCP Server
 description: Connect AI assistants like Claude to your CRM.
 order: 2
-updated: "2026-08-12"
+updated: "2026-08-26"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update contacts, and more -- all from a natural conversation.
@@ -138,7 +138,7 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 32 tools: one account tool, two cross-entity discovery tools (search/fetch), full CRUD across five CRM entities, and link management for tasks and notes.
+The server provides 37 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, and relationship management.
 
 ### Cross-entity discovery
 
@@ -152,6 +152,16 @@ The server provides 32 tools: one account tool, two cross-entity discovery tools
 | Tool | Description |
 |------|-------------|
 | `who-ami-tool` | Get the authenticated user, current team, team members, and token abilities |
+
+### Workspace intelligence
+
+| Tool | Description |
+|------|-------------|
+| `get-crm-schema-tool` | Get the active schema, custom fields, filters, and relationships for one entity type |
+| `get-crm-summary-tool` | Get record counts, pipeline totals by stage, and task due status in your timezone |
+| `aggregate-opportunities-tool` | Group opportunity counts and amounts by stage or company, with optional date bounds |
+| `list-activity-tool` | List recent CRM changes with actors, record links, and field-level differences |
+| `list-custom-fields-tool` | List active and inactive custom-field definitions, including choice options |
 
 ### Companies
 
@@ -207,7 +217,9 @@ The server provides 32 tools: one account tool, two cross-entity discovery tools
 | `attach-note-to-entities-tool` | Link a note to companies, people, or opportunities. Adds without removing existing links. |
 | `detach-note-from-entities-tool` | Unlink a note from companies, people, or opportunities |
 
-All list tools support `search`, `per_page` (default 15), and `page` parameters. Create and update tools accept `custom_fields` as key-value pairs when your team has custom fields configured.
+Entity list tools support `search`, `per_page` (default 15, maximum 25), and `page`. They also support date filters, custom-field filters, sorting, and selected relationship includes.
+
+List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs.
 
 ---
 
@@ -223,7 +235,7 @@ The server exposes five schema resources that describe each entity's fields, inc
 | `relaticle://schema/task` | Task fields and custom fields |
 | `relaticle://schema/note` | Note fields and custom fields |
 
-AI assistants read these schemas automatically to understand what data they can work with, including your team's custom fields.
+Resource support varies by MCP client. Use `get-crm-schema-tool` before a custom-field write when your client does not expose resources automatically.
 
 ---
 
@@ -263,8 +275,8 @@ Verify the MCP URL is correct: `https://mcp.relaticle.com`.
 
 ### Custom Fields Not Showing
 
-Custom fields are team-specific. If you don't see them, confirm they're configured for your team in **Settings > Custom Fields**. The AI assistant reads schema resources automatically to discover available fields.
+Custom fields are team-specific. If you don't see them, confirm they're configured for your team in **Settings > Custom Fields**. Then call `get-crm-schema-tool` for the entity type.
 
 ### Rate Limiting
 
-The MCP server uses the same rate limits as the REST API. If you hit limits, wait a moment and retry.
+MCP tool requests are limited to 120 per minute per authenticated user. OAuth authorization endpoints are limited to 20 per minute per IP address.

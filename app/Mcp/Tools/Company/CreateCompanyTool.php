@@ -9,11 +9,12 @@ use App\Http\Resources\V1\CompanyResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Create Company')]
 #[Description('Create a new company in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsOpenWorld(false)]
 final class CreateCompanyTool extends BaseCreateTool
 {
     protected function actionClass(): string
@@ -35,6 +36,7 @@ final class CreateCompanyTool extends BaseCreateTool
     {
         return [
             'name' => $schema->string()->description('The company name.')->required(),
+            'account_owner_id' => $schema->string()->description('Team member ID responsible for this company. Use whoami to discover valid IDs.'),
         ];
     }
 
@@ -42,6 +44,7 @@ final class CreateCompanyTool extends BaseCreateTool
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentTeam->allUsers()->pluck('id')->all())],
         ];
     }
 }

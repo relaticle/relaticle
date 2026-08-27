@@ -14,14 +14,17 @@ use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Update Task')]
 #[Description('Update an existing task in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class UpdateTaskTool extends BaseUpdateTool
 {
+    protected function openWorldHint(): bool
+    {
+        return true;
+    }
+
     protected function modelClass(): string
     {
         return Task::class;

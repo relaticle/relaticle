@@ -7,17 +7,15 @@ namespace App\Mcp\Tools\Note;
 use App\Actions\Note\ListNotes;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseListTool;
+use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('List Notes')]
 #[Description('List notes in the CRM with optional search and pagination.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class ListNotesTool extends BaseListTool
 {
     protected function actionClass(): string
@@ -48,6 +46,14 @@ final class ListNotesTool extends BaseListTool
         return [
             'notable_type' => $request->get('notable_type'),
             'notable_id' => $request->get('notable_id'),
+        ];
+    }
+
+    protected function additionalValidationRules(User $user): array
+    {
+        return [
+            'notable_type' => ['sometimes', 'string', Rule::in(['company', 'people', 'opportunity'])],
+            'notable_id' => ['sometimes', 'string', 'ulid'],
         ];
     }
 }

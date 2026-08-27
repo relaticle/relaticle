@@ -27,6 +27,7 @@ mutates(
     UpdateCompany::class,
     DeleteCompany::class,
     ListCompanies::class,
+    CompanyResource::class,
 );
 
 beforeEach(function () {
@@ -238,6 +239,17 @@ describe('includes', function (): void {
                 ->has('data.relationships.people')
                 ->etc()
             );
+    });
+
+    it('does not expose MCP-only task relationships through the public API', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=tasks")
+            ->assertOk()
+            ->assertJsonMissingPath('data.relationships.tasks')
+            ->assertJsonMissingPath('included');
     });
 
     it('does not include relations when not requested', function (): void {

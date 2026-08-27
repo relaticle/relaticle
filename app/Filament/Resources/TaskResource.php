@@ -118,7 +118,7 @@ final class TaskResource extends Resource
                     ->toggle(),
                 SelectFilter::make('assignees')
                     ->multiple()
-                    ->relationship('assignees', 'name', TeamMemberSelect::currentUserFirst())
+                    ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('creation_source')

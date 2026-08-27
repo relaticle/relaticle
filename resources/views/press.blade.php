@@ -1,7 +1,7 @@
 @php
     $facts = \App\Support\CompetitorFacts::all()['relaticle'];
 
-    // Derived from the facts file's `ai` field ("32 first-party MCP tools plus…")
+    // Derived from the facts file's `ai` field ("37 first-party MCP tools plus...")
     // rather than a fresh literal, so this number can never drift from the one
     // source of truth for public competitor/company claims.
     preg_match('/^(\d+)/', $facts['ai'], $mcpToolMatch);

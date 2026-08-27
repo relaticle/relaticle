@@ -4,20 +4,18 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Note;
 
+use App\Actions\Note\AttachNoteRelationships;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Attach Note Relationships')]
 #[Description('Attach a note to companies, people, or opportunities. Adds links without removing existing ones.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class AttachNoteToEntitiesTool extends BaseAttachTool
 {
     protected function modelClass(): string
@@ -33,6 +31,11 @@ final class AttachNoteToEntitiesTool extends BaseAttachTool
     protected function resourceClass(): string
     {
         return NoteResource::class;
+    }
+
+    protected function actionClass(): string
+    {
+        return AttachNoteRelationships::class;
     }
 
     /** @return array<int, string> */
@@ -62,21 +65,5 @@ final class AttachNoteToEntitiesTool extends BaseAttachTool
             'opportunity_ids' => ['sometimes', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
         ];
-    }
-
-    public function syncRelationships(Model $model, array $data): void
-    {
-        /** @var Note $model */
-        if (isset($data['company_ids'])) {
-            $model->companies()->syncWithoutDetaching($data['company_ids']);
-        }
-
-        if (isset($data['people_ids'])) {
-            $model->people()->syncWithoutDetaching($data['people_ids']);
-        }
-
-        if (isset($data['opportunity_ids'])) {
-            $model->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
-        }
     }
 }
