@@ -6,13 +6,30 @@
     $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
     $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
 
+    $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
+    $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+    $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
     // Rendered as a human duration so raising the config never leaks "1440 minutes" into the page.
     $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))
         ->cascade()
         ->forHumans(short: false, parts: 1);
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
+
+    if ($billingActive) {
+        $includedPlanQuestion = __('Is :name included with Relaticle Cloud?', ['name' => $assistantName]);
+        $includedPlanAnswer = __(
+            'Yes. New Cloud workspaces include :name during a :days-day Cloud Pro trial. Cloud Pro includes a :credits-credit monthly allowance and every supported cloud model. If the trial ends without a subscription, hosted access pauses. Self-hosted installs use the Free plan\'s :freeCredits-credit monthly allowance and require your own provider key or local model.',
+            ['name' => $assistantName, 'days' => $trialDays, 'credits' => $proCredits, 'freeCredits' => $freeCredits]
+        );
+    } else {
+        $includedPlanQuestion = __('Is :name included in the free plan?', ['name' => $assistantName]);
+        $includedPlanAnswer = __(
+            'Yes. Every Relaticle Cloud workspace gets :name with a :credits-credit monthly allowance on the free-tier model. A self-hosted install ships without a provider. You add your own key or local model, and pay that provider directly.',
+            ['name' => $assistantName, 'credits' => $freeCredits]
+        );
+    }
 
     $title = __(':name: AI Assistant for Relaticle CRM', ['name' => $assistantName]).' - Relaticle';
     $description = __(
@@ -43,11 +60,8 @@
             ),
         ],
         [
-            __('Is :name included in the free plan?', ['name' => $assistantName]),
-            __(
-                'Yes. On Relaticle Cloud every workspace, free or paid, gets :name with a :credits-credit monthly allowance on the free-tier model, and upgrading raises the allowance and unlocks the higher-tier models. A self-hosted install ships with no provider configured, so you add your own key or point it at a local model, and you pay that provider directly.',
-                ['name' => $assistantName, 'credits' => $freeCredits]
-            ),
+            $includedPlanQuestion,
+            $includedPlanAnswer,
         ],
     ];
 @endphp
