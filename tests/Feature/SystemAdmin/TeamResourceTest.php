@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\BillingStatus;
+use App\Enums\Plan;
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
@@ -15,7 +17,7 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\Membe
 use Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(TeamResource::class, MembersRelationManager::class, CompaniesRelationManager::class, PivotSafeTableQuery::class);
+mutates(BillingStatus::class, TeamResource::class, MembersRelationManager::class, CompaniesRelationManager::class, PivotSafeTableQuery::class);
 
 beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
@@ -84,4 +86,81 @@ it('deletes teams in bulk through the Jetstream deleter so members keep no dangl
 
     expect(Team::query()->whereKey([$team->getKey(), $second->getKey()])->count())->toBe(0)
         ->and($member->refresh()->current_team_id)->toBeNull();
+});
+
+function billingStatusTeam(): Team
+{
+    return User::factory()->withPersonalTeam()->create()->ownedTeams()->firstOrFail();
+}
+
+it('labels a workspace by why it has its plan, not by the plan alone', function (callable $arrange, BillingStatus $expected): void {
+    $team = billingStatusTeam();
+    $arrange($team);
+
+    expect($team->fresh()?->billingStatus())->toBe($expected);
+
+    livewire(ListTeams::class)
+        ->assertCanSeeTableRecords([$team])
+        ->assertSee($expected->getLabel());
+})->with([
+    'a trial reads Trial, never Pro' => [
+        fn (Team $team) => $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save(),
+        BillingStatus::Trialing,
+    ],
+    'a paid subscription reads Pro' => [
+        function (Team $team): void {
+            $team->forceFill(['plan' => Plan::Pro])->save();
+            $team->subscriptions()->create([
+                'type' => 'default',
+                'stripe_id' => 'sub_active',
+                'stripe_status' => 'active',
+                'stripe_price' => 'price_pro_monthly_test',
+                'quantity' => 1,
+            ]);
+        },
+        BillingStatus::Subscribed,
+    ],
+    'a lapsed subscription reads Past due, not Pro' => [
+        function (Team $team): void {
+            $team->forceFill(['plan' => Plan::Pro])->save();
+            $team->subscriptions()->create([
+                'type' => 'default',
+                'stripe_id' => 'sub_due',
+                'stripe_status' => 'past_due',
+                'stripe_price' => 'price_pro_monthly_test',
+                'quantity' => 1,
+            ]);
+        },
+        BillingStatus::PastDue,
+    ],
+    'a hand-assigned plan reads Granted, not Pro' => [
+        fn (Team $team) => $team->forceFill(['plan' => Plan::Pro])->save(),
+        BillingStatus::Granted,
+    ],
+    'an enterprise workspace reads Enterprise' => [
+        fn (Team $team) => $team->forceFill(['plan' => Plan::Enterprise])->save(),
+        BillingStatus::Enterprise,
+    ],
+    'a pre-billing workspace reads Free (legacy)' => [
+        fn (Team $team) => $team->forceFill(['hosted_free_grandfathered_at' => now()])->save(),
+        BillingStatus::Grandfathered,
+    ],
+]);
+
+it('prefers a live subscription over a trial that has not run out yet', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_converted',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+});
+
+it('reads a workspace with nothing bought and no trial as Free', function (): void {
+    expect(billingStatusTeam()->billingStatus())->toBe(BillingStatus::Free);
 });
