@@ -52,10 +52,6 @@ final readonly class GetCrmSummary
                 ])
                 ->all();
 
-            $totalWon = (float) $rows
-                ->filter(fn (array $row): bool => preg_match('/\bwon\b/i', $row['label']) === 1)
-                ->sum('total_amount');
-
             return [
                 'as_of' => [
                     'date' => $today->toDateString(),
@@ -67,7 +63,6 @@ final readonly class GetCrmSummary
                     'total' => $opportunities['total_count'],
                     'by_stage' => $byStage,
                     'total_pipeline_value' => $opportunities['total_amount'],
-                    'total_won_value' => $totalWon,
                     'truncated' => $opportunities['truncated'],
                 ],
                 'tasks' => $this->taskSummary($teamId, $today->clone()->utc(), $today->clone()->addDays(7)->utc()),

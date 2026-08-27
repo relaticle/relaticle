@@ -265,7 +265,7 @@ it('computes task due status in the caller timezone', function (): void {
             ->etc());
 });
 
-it('does not count an unwon stage as won revenue', function (): void {
+it('reports each stage separately so a caller can decide what counts as won', function (): void {
     $stage = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', $this->team->getKey())
@@ -298,7 +298,8 @@ it('does not count an unwon stage as won revenue', function (): void {
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
             ->where('opportunities.total_pipeline_value', 600)
-            ->where('opportunities.total_won_value', 100)
+            ->where('opportunities.by_stage.Closed Won.total_amount', 100)
+            ->where('opportunities.by_stage.Unwon.total_amount', 500)
             ->etc());
 });
 
