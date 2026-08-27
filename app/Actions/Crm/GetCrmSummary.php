@@ -15,6 +15,7 @@ use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -39,19 +40,21 @@ final readonly class GetCrmSummary
 
         return Cache::remember($cacheKey, 60, function () use ($user, $teamId, $timezone, $today): array {
             $opportunities = $this->aggregateOpportunities->execute($user, 'stage');
-            $byStage = [];
-            $totalWon = 0.0;
+            $rows = collect($opportunities['rows']);
 
-            foreach ($opportunities['rows'] as $row) {
-                $byStage[$row['label']] = [
-                    'count' => $row['count'],
-                    'total_amount' => $row['total_amount'],
-                ];
+            // Two stage options may share a name, so group rather than assign by label:
+            // assigning would drop every row but the last of each group.
+            $byStage = $rows
+                ->groupBy('label')
+                ->map(fn (Collection $group): array => [
+                    'count' => (int) $group->sum('count'),
+                    'total_amount' => (float) $group->sum('total_amount'),
+                ])
+                ->all();
 
-                if (preg_match('/\bwon\b/i', $row['label']) === 1) {
-                    $totalWon += $row['total_amount'];
-                }
-            }
+            $totalWon = (float) $rows
+                ->filter(fn (array $row): bool => preg_match('/\bwon\b/i', $row['label']) === 1)
+                ->sum('total_amount');
 
             return [
                 'as_of' => [

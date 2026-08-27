@@ -90,9 +90,13 @@ final readonly class AggregateOpportunities
         $mappedRows = [];
         foreach ($rows as $row) {
             $optionId = $row->stage_option_id;
-            $label = ($optionId !== null && isset($stageOptions[$optionId]))
-                ? (string) $stageOptions[$optionId]
-                : 'Unspecified';
+            // An opportunity with no stage and one pointing at a deleted option are
+            // different facts, so they must not share a label: callers key on it.
+            $label = match (true) {
+                $optionId === null => 'Unspecified',
+                isset($stageOptions[$optionId]) => (string) $stageOptions[$optionId],
+                default => "Unknown stage ({$optionId})",
+            };
             $mappedRows[] = [
                 'label' => $label,
                 'count' => (int) $row->count,
