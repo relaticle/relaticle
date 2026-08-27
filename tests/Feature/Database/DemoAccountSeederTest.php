@@ -24,6 +24,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Database\Seeders\DemoAccountSeeder;
@@ -83,6 +84,7 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
         ->and(Hash::check($password, (string) $reviewer->password))->toBeTrue()
         ->and($team)->not->toBeNull()
         ->and($team->name)->toBe(DemoAccountSeeder::TEAM_NAME)
+        ->and($team->slug)->toBe(DemoAccountSeeder::TEAM_SLUG)
         ->and($team->hosted_free_grandfathered_at)->not->toBeNull()
         ->and(resolve(HostedWorkspaceAccess::class)->allows($team))->toBeTrue();
 
@@ -201,4 +203,20 @@ it('seeds a deterministic reviewer workspace and safely refreshes it', function 
     ])->toBe($entityCounts)
         ->and(Hash::check($replacementPassword, (string) $reviewer->password))->toBeTrue()
         ->and(Company::query()->withoutGlobalScopes()->whereKey($otherCompany->getKey())->exists())->toBeTrue();
+});
+
+it('keeps the existing workspace slug when another team already holds the reviewer slug', function (): void {
+    config()->set('services.demo_account.password', 'runtime-secret-three');
+
+    $incumbent = Team::factory()->create(['slug' => DemoAccountSeeder::TEAM_SLUG]);
+
+    resolve(DemoAccountSeeder::class)->run();
+
+    $team = User::query()->where('email', DemoAccountSeeder::EMAIL)->firstOrFail()->personalTeam();
+
+    expect($team)->not->toBeNull()
+        ->and($team->name)->toBe(DemoAccountSeeder::TEAM_NAME)
+        ->and($team->slug)->not->toBe(DemoAccountSeeder::TEAM_SLUG)
+        ->and($team->slug)->not->toBeEmpty()
+        ->and($incumbent->refresh()->slug)->toBe(DemoAccountSeeder::TEAM_SLUG);
 });

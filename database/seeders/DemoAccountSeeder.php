@@ -33,6 +33,8 @@ final class DemoAccountSeeder extends Seeder
 
     public const string TEAM_NAME = 'Relaticle Reviewer Workspace';
 
+    public const string TEAM_SLUG = 'relaticle-reviewer-workspace';
+
     public const string INACTIVE_FIELD_CODE = 'reviewer_archived_segment';
 
     public const string INACTIVE_FIELD_NAME = 'Archived Segment';
@@ -58,6 +60,7 @@ final class DemoAccountSeeder extends Seeder
 
         $team->forceFill([
             'name' => self::TEAM_NAME,
+            'slug' => $this->reviewerSlug($team),
             'hosted_free_grandfathered_at' => now(),
             'trial_ends_at' => null,
             'scheduled_deletion_at' => null,
@@ -112,6 +115,27 @@ final class DemoAccountSeeder extends Seeder
         $user->forceFill($attributes)->save();
 
         return $user;
+    }
+
+    /**
+     * Team slugs are deliberately frozen after creation (`doNotGenerateSlugsOnUpdate`),
+     * so renaming the personal team to TEAM_NAME leaves it on the factory-derived slug
+     * the account was created with. Reviewers read this slug in every record URL the
+     * search and fetch tools return, so claim the readable one when it is available and
+     * keep the existing slug when another team already holds it.
+     */
+    private function reviewerSlug(Team $team): string
+    {
+        if ($team->slug === self::TEAM_SLUG) {
+            return self::TEAM_SLUG;
+        }
+
+        $taken = Team::query()
+            ->where('slug', self::TEAM_SLUG)
+            ->whereKeyNot($team->getKey())
+            ->exists();
+
+        return $taken ? $team->slug : self::TEAM_SLUG;
     }
 
     private function resetReviewerWorkspace(Team $team): void
