@@ -150,3 +150,12 @@ it('opens its window at midnight on the administrator calendar', function (): vo
         ->assertOk()
         ->assertCanNotSeeTableRecords([$team]);
 });
+
+it('stamps the table with the read time in the administrator zone', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsTopTeamsAdminInZone('Asia/Yerevan');
+
+    livewire(TopTeamsTableWidget::class)
+        ->assertOk()
+        ->assertSee('Updated 14:31 +04');
+});

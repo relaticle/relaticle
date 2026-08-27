@@ -20,7 +20,7 @@ final class RecordDistributionChartWidget extends ChartWidget
 
     protected static ?int $sort = 3;
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     protected ?string $maxHeight = '300px';
 
@@ -42,7 +42,7 @@ final class RecordDistributionChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'Distribution of new records in this period.';
+        return 'Distribution of new records in this period. '.ViewerTime::freshnessCaption();
     }
 
     protected function getType(): string

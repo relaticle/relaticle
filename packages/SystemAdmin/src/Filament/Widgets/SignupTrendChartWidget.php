@@ -19,7 +19,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
     protected static ?int $sort = 2;
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     protected ?string $maxHeight = '300px';
 
@@ -41,7 +41,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'New users and teams over time, by '.ViewerTime::timezone().' calendar days. The last point is today so far.';
+        return 'New users and teams over time, by '.ViewerTime::timezone().' calendar days. The last point is today so far. '.ViewerTime::freshnessCaption();
     }
 
     protected function getType(): string

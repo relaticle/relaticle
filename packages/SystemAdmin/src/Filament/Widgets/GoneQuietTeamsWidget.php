@@ -37,7 +37,8 @@ final class GoneQuietTeamsWidget extends BaseWidget
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
-            ->description('Teams active before this period with no activity in it.')
+            ->description('Teams active before this period with no activity in it. '.ViewerTime::freshnessCaption())
+            ->poll('60s')
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')

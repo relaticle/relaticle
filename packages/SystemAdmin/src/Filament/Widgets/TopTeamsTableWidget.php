@@ -39,6 +39,8 @@ final class TopTeamsTableWidget extends BaseWidget
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
+            ->description(ViewerTime::freshnessCaption())
+            ->poll('60s')
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')

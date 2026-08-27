@@ -29,7 +29,7 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     /** @var array<int, class-string> */
     private const array ENTITY_CLASSES = [Company::class, People::class, Task::class, Note::class, Opportunity::class];

@@ -76,4 +76,16 @@ final readonly class ViewerTime
 
         return [$start->setTimezone('UTC'), $end->setTimezone('UTC')];
     }
+
+    /**
+     * Wall-clock stamp for when the numbers on screen were read.
+     *
+     * Dashboard widgets poll rather than reload, so without this a tab left open
+     * overnight looks exactly like one opened a second ago. That is the reading
+     * error this caption exists to prevent.
+     */
+    public static function freshnessCaption(): string
+    {
+        return 'Updated '.self::now()->format('H:i T').'.';
+    }
 }
