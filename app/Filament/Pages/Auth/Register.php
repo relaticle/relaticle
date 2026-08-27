@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
+use App\Features\AuthSplitLayout;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use Filament\Actions\Action;
@@ -19,6 +20,7 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Laravel\Pennant\Feature;
 use Spatie\Honeypot\Http\Livewire\Concerns\HoneypotData;
 use Spatie\Honeypot\Http\Livewire\Concerns\UsesSpamProtection;
 
@@ -28,6 +30,20 @@ final class Register extends BaseRegister
     use UsesSpamProtection;
 
     public HoneypotData $extraFields;
+
+    public function getLayout(): string
+    {
+        if (Feature::inactive(AuthSplitLayout::class)) {
+            return parent::getLayout();
+        }
+
+        return 'filament.auth.layouts.split';
+    }
+
+    public function hasLogo(): bool
+    {
+        return Feature::inactive(AuthSplitLayout::class);
+    }
 
     public function mount(): void
     {

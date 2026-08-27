@@ -5,16 +5,32 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
+use App\Features\AuthSplitLayout;
 use Filament\Actions\Action;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
+use Laravel\Pennant\Feature;
 
 final class Login extends \Filament\Auth\Pages\Login
 {
     use DetectsTeamInvitation;
+
+    public function getLayout(): string
+    {
+        if (Feature::inactive(AuthSplitLayout::class)) {
+            return parent::getLayout();
+        }
+
+        return 'filament.auth.layouts.split';
+    }
+
+    public function hasLogo(): bool
+    {
+        return Feature::inactive(AuthSplitLayout::class);
+    }
 
     public function content(Schema $schema): Schema
     {

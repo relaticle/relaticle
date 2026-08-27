@@ -67,6 +67,7 @@ return [
         'social_auth' => (bool) env('RELATICLE_FEATURE_SOCIAL_AUTH', true),
         'documentation' => (bool) env('RELATICLE_FEATURE_DOCUMENTATION', true),
         'billing' => (bool) env('RELATICLE_FEATURE_BILLING', false),
+        'auth_split_layout' => (bool) env('RELATICLE_FEATURE_AUTH_SPLIT_LAYOUT', false),
         'support_menu' => (bool) env('RELATICLE_FEATURE_SUPPORT_MENU', false),
         'blog' => (bool) env('RELATICLE_FEATURE_BLOG', false),
     ],
