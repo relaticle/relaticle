@@ -27,6 +27,18 @@ it('updates the team default_email_sharing_tier on save', function (): void {
     expect($this->team->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
+it('shows each sharing tier with its explanation', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
+        ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
+        ->assertSee(EmailPrivacyTier::FULL->getDescription());
+});
+
+it('shows the workspace privacy sections in two columns on large screens', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->assertSeeHtml('--cols-lg: repeat(2, minmax(0, 1fr));');
+});
+
 it('creates ProtectedRecipient rows with type email on save', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->set('protected_emails', ['legal@acme.com', 'hr@acme.com'])
