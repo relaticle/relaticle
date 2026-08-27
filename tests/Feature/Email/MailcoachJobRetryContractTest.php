@@ -7,6 +7,7 @@ use App\Enums\TagAction;
 use App\Jobs\Email\ModifySubscriberTagsJob;
 use App\Jobs\Email\SyncRecencyBucketJob;
 use App\Jobs\Email\SyncSubscriberJob;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\Facades\Queue;
 
 mutates(SyncSubscriberJob::class, SyncRecencyBucketJob::class, ModifySubscriberTagsJob::class);
@@ -56,3 +57,10 @@ test('mailcoach jobs retry on attempts alone, with nothing able to swallow the e
         '60,300,900,1800,3600',
     ],
 ]);
+
+test('the unique subscriber sync bounds its lock so a killed worker cannot block an email forever', function (): void {
+    $job = new SyncSubscriberJob(SubscriberData::from(['email' => 'a@b.test']));
+
+    expect($job)->toBeInstanceOf(ShouldBeUnique::class)
+        ->and($job->uniqueFor)->toBeGreaterThan(array_sum([60, 300, 900, 3600]));
+});

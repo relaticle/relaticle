@@ -24,6 +24,14 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * Bounds the uniqueness lock. Completion and failure both release it, but a
+     * worker killed mid-retry (deploy, OOM) would otherwise hold it forever and
+     * permanently block this email from ever syncing again. Must outlast the
+     * retry span above (~81 minutes) so dedup still holds across the chain.
+     */
+    public int $uniqueFor = 5400;
+
     public function __construct(private readonly SubscriberData $data) {}
 
     public function handle(): void
