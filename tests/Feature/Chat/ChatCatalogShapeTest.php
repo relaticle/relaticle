@@ -59,3 +59,14 @@ it('never creates the two folded settings keys', function (): void {
         ->and($repository->checkIfPropertyExists('chat', 'auto_chain'))->toBeFalse()
         ->and($repository->checkIfPropertyExists('chat', 'model_costs'))->toBeFalse();
 });
+
+/**
+ * The package auto-discovers `app/Settings` only, and this class lives in a package.
+ * Unregistered it still resolves — the container autowires it and it loads itself —
+ * so nothing breaks loudly; it just gets no scoped binding, which means a fresh
+ * instance and a fresh query per resolve, on every request that boots Chat.
+ */
+it('registers the settings class so the container can scope it', function (): void {
+    expect(config('settings.settings'))->toContain(ChatSettings::class)
+        ->and(resolve(ChatSettings::class))->toBe(resolve(ChatSettings::class));
+});
