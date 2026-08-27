@@ -25,6 +25,7 @@ use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActiviti
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
 use Relaticle\SystemAdmin\Filament\Resources\SystemAdministrators\SystemAdministratorResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class ActivityResource extends Resource
 {
@@ -170,9 +171,14 @@ final class ActivityResource extends Resource
                         DatePicker::make('from')->label('From'),
                         DatePicker::make('until')->label('Until'),
                     ])
+                    /**
+                     * The picked dates are days on the administrator's calendar,
+                     * which is what the table renders too, so they widen to that
+                     * day's UTC bounds rather than being compared with whereDate.
+                     */
                     ->query(fn (Builder $query, array $data): Builder => $query
-                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '>=', $data['from']))
-                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '<=', $data['until']))),
+                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '>=', ViewerTime::startOfDayUtc((string) $data['from'])))
+                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '<=', ViewerTime::endOfDayUtc((string) $data['until'])))),
             ])
             ->recordActions([
                 ViewAction::make(),
