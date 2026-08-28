@@ -12,6 +12,29 @@
     $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
     $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
 
+    // Independent sentences rather than one with two holes in it: the catalog is editable at
+    // runtime, and a tier with no model rendered " is free on every plan".
+    $selfHostedNote = __('A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.');
+
+    $whichModelsAnswer = trim(implode(' ', array_filter([
+        $freeCloudModels === ''
+            ? __('Every plan can use any self-hosted model you connect yourself.')
+            : __(':freeModels on every plan.', ['freeModels' => $freeCloudModels]),
+        $paidCloudModels === ''
+            ? ''
+            : __('A paid plan additionally unlocks :paidModels, which cost more credits per reply.', ['paidModels' => $paidCloudModels]),
+        $selfHostedNote,
+    ])));
+
+    $modelChoiceLine = trim(implode(' ', array_filter([
+        $freeCloudModels === ''
+            ? __('Any self-hosted model you connect is free on every plan.')
+            : __(':freeModels is free on every plan.', ['freeModels' => $freeCloudModels]),
+        $paidCloudModels === ''
+            ? ''
+            : __('Switch to :paidModels on a paid plan when a harder question calls for it.', ['paidModels' => $paidCloudModels]),
+    ])));
+
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
     $proCredits = number_format(\App\Enums\Plan::Pro->credits());
@@ -60,10 +83,7 @@
         ],
         [
             __('Which models power :name?', ['name' => $assistantName]),
-            __(
-                ':freeModels on every plan. A paid plan additionally unlocks :paidModels, which cost more credits per reply. A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.',
-                ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels]
-            ),
+            $whichModelsAnswer,
         ],
         [
             $includedPlanQuestion,
@@ -344,7 +364,7 @@
                             {{ __('Transparent credits, your choice of model') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __(':freeModels is free on every plan. Switch to :paidModels on a paid plan when a harder question calls for it.', ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels]) }}
+                            {{ $modelChoiceLine }}
                         </p>
                     </div>
                 </div>
