@@ -35,6 +35,14 @@
             })"
     x-on:next-wizard-step.window="if ($event.detail.key === @js($key)) goToNextStep()"
     x-on:go-to-wizard-step.window="$event.detail.key === @js($key) && goToStep($event.detail.step)"
+    {{-- Enter advances the step; on the last one it submits via requestSubmit
+         so native validation still runs. Without this the wizard was mouse-only. --}}
+    x-on:keydown.enter="
+        if ($event.target.matches('input:not([type=checkbox]):not([type=radio])')) {
+            $event.preventDefault()
+            isLastStep() ? $el.closest('form').requestSubmit() : requestNextStep()
+        }
+    "
     wire:ignore.self
     x-effect="window.dispatchEvent(new CustomEvent('onboarding-step-changed', { detail: { index: getStepIndex(step) } }))"
     {{-- x-effect only re-runs when the step changes, so a listener that mounts mid-wizard

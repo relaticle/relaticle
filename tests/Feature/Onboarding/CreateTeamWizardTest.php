@@ -51,7 +51,28 @@ it('resolves every wizard heading from translations', function (): void {
         ->assertSee(__('filament/pages/teams.create_team.headings.invite'))
         ->assertSee(__('filament/pages/teams.create_team.headings.invite_description'))
         ->assertSee(__('filament/pages/teams.create_team.headings.invite_subheading'))
-        ->assertDontSee('filament/pages/teams.create_team.headings');
+        ->assertDontSee('filament/pages/teams.create_team.headings')
+        ->assertDontSee('Workspace heading')
+        ->assertDontSee('Attribution heading')
+        ->assertDontSee('Use case heading')
+        ->assertDontSee('Invite heading')
+        ->assertDontSee('Invite subheading')
+        ->assertDontSee('Onboarding referral source');
+});
+
+it('resolves every wizard form label from translations', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.form.workspace_name.label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.workspace_handle.label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.use_case_label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.invite_email_label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.invite_role_label'))
+        ->assertDontSee('filament/pages/teams.create_team.form');
 });
 
 it('renders wizard for users who already have a team', function (): void {
@@ -108,6 +129,56 @@ it('creates a team with onboarding fields', function (): void {
     expect($team)->not->toBeNull()
         ->and($team->slug)->toBe('acme-corp')
         ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Sales);
+});
+
+it('hides the account menu links while no workspace is bound, instead of sending them to the dashboard', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $this->get('/app/new')
+        ->assertSuccessful()
+        ->assertDontSee(__('filament/panel.user_menu.settings'))
+        ->assertDontSee(__('access-tokens.user_menu'));
+});
+
+it('shows the account menu links inside a workspace', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user);
+
+    $this->get('/app/'.$user->currentTeam->slug)
+        ->assertSuccessful()
+        ->assertSee(__('filament/panel.user_menu.settings'))
+        ->assertSee(__('access-tokens.user_menu'));
+});
+
+it('clears the sub-options when the use case changes, so a switch can never strand the wizard', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Switcher Co',
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound'],
+        ])
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        ])
+        ->assertFormSet(['onboarding_context' => []])
+        ->fillForm([
+            'onboarding_context' => ['applications'],
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = Team::query()->where('name', 'Switcher Co')->first();
+
+    expect($team)->not->toBeNull()
+        ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
+        ->and($team->onboarding_context)->toBe(['applications']);
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
