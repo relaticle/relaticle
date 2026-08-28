@@ -75,6 +75,12 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $firstName = explode(' ', $user->name)[0];
 
+        // The browser reports its timezone only after the first render, so the
+        // local hour is unknown on the very first visit: greet without the clock.
+        if ($user->timezone === null) {
+            return __('Welcome, :name.', ['name' => $firstName]);
+        }
+
         $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {

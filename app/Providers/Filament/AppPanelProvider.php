@@ -361,22 +361,22 @@ final class AppPanelProvider extends PanelProvider
                 },
             );
 
+        // Hidden without a bound tenant: the old panel-root fallback sent these
+        // to the dashboard, silently abandoning the create-workspace wizard.
         $accountMenuItems = [
             Action::make('settings')
                 ->label(__('filament/panel.user_menu.settings'))
                 ->icon('heroicon-m-cog-6-tooth')
-                ->url(fn (): string => $this->shouldRegisterMenuItem()
-                    ? url(Settings::getUrl())
-                    : url($panel->getPath())),
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(Settings::getUrl())),
         ];
 
         if (Features::hasApiFeatures()) {
             $accountMenuItems[] = Action::make('api_tokens')
                 ->label(__('access-tokens.user_menu'))
                 ->icon('heroicon-o-key')
-                ->url(fn (): string => $this->shouldRegisterMenuItem()
-                    ? url(AccessTokens::getUrl())
-                    : url($panel->getPath()));
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(AccessTokens::getUrl()));
         }
 
         $panel->userMenuItems([

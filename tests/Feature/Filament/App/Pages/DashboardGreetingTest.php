@@ -31,14 +31,16 @@ it('shows good evening for a Los Angeles user at 9pm local time', function (): v
     Livewire::test(Dashboard::class)->assertSee('Good evening');
 });
 
-it('falls back to app timezone when user has no timezone set', function (): void {
+it('greets without a time of day while the timezone is still unknown', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-04-19 10:00:00', new DateTimeZone('UTC')));
 
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => null]);
+    $user = User::factory()->withPersonalTeam()->create(['name' => 'Casey Lee', 'timezone' => null]);
     $this->actingAs($user);
     Filament::setTenant($user->currentTeam);
 
-    Livewire::test(Dashboard::class)->assertSee('Good morning');
+    Livewire::test(Dashboard::class)
+        ->assertSee('Welcome, Casey.')
+        ->assertDontSee('Good morning');
 });
 
 it('greets a fresh seeded workspace by the clock, with no assistant message in the greeting slot', function (): void {

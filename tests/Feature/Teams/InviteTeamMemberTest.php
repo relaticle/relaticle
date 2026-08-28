@@ -29,6 +29,17 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
+test('an invite with only an email defaults to the editor role', function () {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->assertFormSet(['role' => 'editor'])
+        ->fillForm(['email' => 'default-role@example.com'])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->sole();
+    expect($invitation->email)->toBe('default-role@example.com')
+        ->and($invitation->role)->toBe('editor');
+});
+
 test('team members can be invited to team', function () {
     livewire(AddTeamMember::class, ['team' => $this->team])
         ->fillForm([
