@@ -2,7 +2,7 @@ name: Brian Chesky
 company: airbnb
 custom_fields:
   emails:
-    - brian@airbnb.com
+    - brian@airbnb.example
   phone_number: "+14155550100"
   job_title: CEO & Co-founder
   linkedin: www.linkedin.com/in/brianchesky/
