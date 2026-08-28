@@ -17,6 +17,7 @@ no composer.json of their own). Service providers are registered in
 | `packages/ImportWizard` | CSV import flows |
 | `packages/Documentation` | Public docs pages |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
+| `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle — not for a new CRM entity (those go in `app/`). Package
@@ -453,22 +454,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 # Deployment
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
-
-=== herd rules ===
-
-# Laravel Herd
-
-- The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
-- Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
-
-=== tests rules ===
-
-# Test Enforcement
-
-- Test every code change by adding or updating a test.
-- Run the affected tests and ensure they pass.
-- Test the changed behavior and its important failure modes, but do not add tests beyond them.
-- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 

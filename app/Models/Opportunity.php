@@ -33,6 +33,13 @@ use Spatie\EloquentSortable\SortableTrait;
 /**
  * @property Carbon|null $deleted_at
  * @property CreationSource $creation_source
+ * @property Carbon|null $last_email_at
+ * @property Carbon|null $last_interaction_at
+ * @property Carbon|null $last_meeting_at
+ * @property int $email_count
+ * @property int $inbound_email_count
+ * @property int $outbound_email_count
+ * @property int $meeting_count
  */
 #[ObservedBy(OpportunityObserver::class)]
 #[Fillable([
@@ -80,6 +87,7 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
             'creation_source' => CreationSource::class,
             'last_email_at' => 'datetime',
             'last_interaction_at' => 'datetime',
+            'last_meeting_at' => 'datetime',
         ];
     }
 
@@ -116,6 +124,8 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
             ->logExcept([
                 'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at', 'order_column',
+                'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
+                'outbound_email_count', 'last_meeting_at', 'meeting_count',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

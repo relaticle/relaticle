@@ -12,6 +12,8 @@ use Filament\Notifications\Notification;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use LogicException;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -42,8 +44,10 @@ trait HasConnectedAccountActions
      *
      * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
      */
-    public function accountActions(ConnectedAccount $account, array $extraActions = []): ActionGroup
+    public function accountActions(Model $account, array $extraActions = []): ActionGroup
     {
+        throw_unless($account instanceof ConnectedAccount, LogicException::class, 'Account actions require a connected account.');
+
         $arguments = ['account_id' => $account->getKey()];
 
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
