@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\Billing as BillingFeature;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Services\ModelRegistry;
 use Symfony\Component\DomCrawler\Crawler;
 
 it('shows the legacy two-card page when billing is off', function (): void {
@@ -144,7 +145,7 @@ it('discloses the real per-model credit multiplier instead of a flat allowance c
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('What counts as an AI credit?'))
-        ->assertSee('3x for Opus 4.7', false)
+        ->assertSee('3x for Opus 5', false)
         ->assertSee('0.5 credits for every tool call')
         ->assertDontSee('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary.');
 });
@@ -193,8 +194,8 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertOk()
         ->assertDontSee('Gemini')
         ->assertSee(__('Which AI models does my plan unlock?'))
-        ->assertSee('Sonnet 4.6 and self-hosted models')
-        ->assertSee('Opus 4.7, GPT 5.5 and GPT 5.4');
+        ->assertSee('Sonnet 5 and self-hosted models')
+        ->assertSee('GPT 5.5, Opus 5 and GPT 5.4');
 });
 
 it('pins the exact membership of every model list derived from the chat catalog', function (): void {
@@ -209,11 +210,31 @@ it('pins the exact membership of every model list derived from the chat catalog'
     $this->get('/pricing')
         ->assertOk()
         // $freeCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Every plan can use Sonnet 4.6 and any self-hosted model you connect yourself.')
+        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
         // $paidCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Cloud Pro additionally unlocks Opus 4.7, GPT 5.5 and GPT 5.4 — the models with a higher credit multiplier.')
+        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4 — the models with a higher credit multiplier.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
-        ->assertSee('1x for Sonnet 4.6 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 4.7)', false);
+        ->assertSee('1x for Sonnet 5 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
+});
+
+/**
+ * What a plan includes is not a function of whether the web host currently holds an
+ * Anthropic key. Reading these lists through ModelRegistry::available() made a key
+ * rotation render "Every plan can use  and any self-hosted model you connect
+ * yourself" — a public sentence with a hole in it, invisible to the rest of this
+ * suite because phpunit.xml sets a fake key for every provider.
+ */
+it('names the models a plan includes even when this install holds no provider key', function (): void {
+    Feature::define(BillingFeature::class, true);
+    config(['ai.providers.anthropic.key' => null, 'ai.providers.openai.key' => null]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
+        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4', false)
+        ->assertSee('3x for Opus 5', false)
+        ->assertDontSee('Gemini');
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is on', function (): void {
@@ -247,4 +268,115 @@ it('does not overstate the self-hoster\'s lever over the credit cap', function (
         ->assertSee('no plan removes metering entirely')
         ->assertSee("doesn't reset the current period's balance")
         ->assertDontSee('raising or removing that cap is a matter of updating your own workspace\'s plan; there is no separate self-hosted billing UI for it.');
+});
+
+/**
+ * The catalog is editable at runtime now, so the marketing copy has to survive a
+ * catalog these sentences were not written against. Asking for the 1.0 / 1.5 / 3.0
+ * buckets by name printed "3x for )" the moment an operator retired the only 3x
+ * model, and left a model priced at any other multiplier out of the sentence
+ * entirely.
+ *
+ * @param  list<array{model:string,label:string,min_plan:string,credit_multiplier:float}>  $models
+ */
+function catalogOf(array $models): void
+{
+    config(['chat.models' => array_map(fn (array $model): array => [
+        'label' => $model['label'],
+        'provider' => 'anthropic',
+        'model' => $model['model'],
+        'min_plan' => $model['min_plan'],
+        'credit_multiplier' => $model['credit_multiplier'],
+        'input_per_mtok' => 1.0,
+        'output_per_mtok' => 2.0,
+        'auto' => true,
+        'enabled' => true,
+        'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'],
+        'verified_at' => null,
+    ], $models)]);
+
+    app()->forgetInstance(ModelRegistry::class);
+}
+
+/** The shapes an empty interpolation leaves behind. */
+function assertNoCopyHoles(string $html): void
+{
+    expect($html)
+        ->not->toMatch('/\dx for\s*[;)]/')
+        ->not->toMatch('/can use\s+and\b/')
+        ->not->toMatch('/unlocks\s+—/')
+        ->not->toMatch('/from\s+up to\b/')
+        ->not->toMatch('/simple\s+replies\b/')
+        ->not->toMatch('/^\s*is free on every plan/m');
+}
+
+it('names every offered model in exactly one multiplier clause', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    catalogOf([
+        ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
+        ['model' => 'b-2', 'label' => 'Beta Two', 'min_plan' => 'pro', 'credit_multiplier' => 2.0],
+        ['model' => 'c-7', 'label' => 'Gamma Seven', 'min_plan' => 'pro', 'credit_multiplier' => 7.5],
+    ]);
+
+    $html = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    assertNoCopyHoles($html);
+
+    // 2x and 7.5x are multipliers the old three-bucket copy could not express at all.
+    expect($html)->toContain('1x for Alpha One and self-hosted models')
+        ->toContain('2x for Beta Two')
+        ->toContain('7.5x for Gamma Seven');
+});
+
+it('leaves no hole when no model carries a given multiplier', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    catalogOf([
+        ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
+    ]);
+
+    $html = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    assertNoCopyHoles($html);
+
+    expect($html)->not->toContain('3x for');
+});
+
+it('leaves no hole when the catalog offers nothing on the free plan', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    catalogOf([
+        ['model' => 'b-2', 'label' => 'Beta Two', 'min_plan' => 'pro', 'credit_multiplier' => 2.0],
+    ]);
+
+    $html = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    assertNoCopyHoles($html);
+
+    expect($html)->toContain('Every plan can use any self-hosted model you connect yourself.');
+});
+
+it('leaves no hole when the catalog offers nothing on a paid plan', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    catalogOf([
+        ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
+    ]);
+
+    $html = (string) $this->get('/pricing')->assertOk()->getContent();
+
+    assertNoCopyHoles($html);
+
+    expect($html)->not->toContain('additionally unlocks');
+});
+
+it('keeps the shipped seed catalog free of copy holes on both public pages', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    config(['chat.models' => (require base_path('packages/Chat/config/chat.php'))['models']]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    assertNoCopyHoles((string) $this->get('/pricing')->assertOk()->getContent());
+    assertNoCopyHoles((string) $this->get('/ai')->assertOk()->getContent());
 });

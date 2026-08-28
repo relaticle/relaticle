@@ -11,34 +11,34 @@ mutates(AiModelResolver::class, ModelRegistry::class);
 
 it('falls back to Sonnet when the users preference is not allowed by their plan', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
-    $user->ai_preferences = ['default_model' => 'claude-opus'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, null);
 
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved['model'])->toBe('claude-sonnet-5');
 });
 
 it('honors the users preference when their plan allows it', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $user->currentTeam->plan = Plan::Pro;
     $user->currentTeam->save();
-    $user->ai_preferences = ['default_model' => 'claude-opus'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, null);
 
-    expect($resolved['model'])->toBe('claude-opus-4-7');
+    expect($resolved['model'])->toBe('claude-opus-5');
 });
 
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
-    $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5-5');
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5.5');
 
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved['model'])->toBe('claude-sonnet-5');
 });
 
 it('resolves Auto to Sonnet for any plan', function (): void {
@@ -46,7 +46,7 @@ it('resolves Auto to Sonnet for any plan', function (): void {
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
 
-    expect($resolved['model'])->toBe('claude-sonnet-4-6');
+    expect($resolved['model'])->toBe('claude-sonnet-5');
 });
 
 it('falls back to ClaudeSonnet when a Gemini model is requested', function (): void {
@@ -55,11 +55,11 @@ it('falls back to ClaudeSonnet when a Gemini model is requested', function (): v
     $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gemini-3-flash');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
 });
 
 it('resolves an explicit Ollama request when Ollama is configured', function (): void {
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
@@ -69,19 +69,19 @@ it('resolves an explicit Ollama request when Ollama is configured', function ():
 });
 
 it('falls back to Sonnet when Ollama is requested but not configured', function (): void {
-    config()->set('chat.models.6.model', null);
+    config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
 });
 
 it('resolves Auto to Ollama when no cloud provider is configured', function (): void {
     config()->set('ai.providers.anthropic.key', null);
     config()->set('ai.providers.openai.key', null);
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
@@ -91,18 +91,18 @@ it('resolves Auto to Ollama when no cloud provider is configured', function (): 
 });
 
 it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', function (): void {
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
 });
 
 it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
     config()->set('ai.providers.anthropic.key', null);
-    config()->set('chat.models.6.model', null);
+    config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
@@ -114,17 +114,17 @@ it('falls back to an available plan-gated model when the plan allows no configur
 it('falls back to Sonnet when no provider is configured at all', function (): void {
     config()->set('ai.providers.anthropic.key', null);
     config()->set('ai.providers.openai.key', null);
-    config()->set('chat.models.6.model', null);
+    config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
 });
 
 it('honors an Ollama default-model preference when configured', function (): void {
-    config()->set('chat.models.6.model', 'llama3.1:70b');
+    config()->set('chat.ollama.model', 'llama3.1:70b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalTeam()->create();
@@ -139,23 +139,23 @@ it('honors an Ollama default-model preference when configured', function (): voi
 it('labels explicit and auto resolutions', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
-    $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet');
+    $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet-5');
     $auto = resolve(AiModelResolver::class)->resolve($user, null);
 
     expect($explicit['source'])->toBe('explicit')
-        ->and($explicit['id'])->toBe('claude-sonnet')
+        ->and($explicit['id'])->toBe('claude-sonnet-5')
         ->and($auto['source'])->toBe('auto')
-        ->and($auto['id'])->toBe('claude-sonnet');
+        ->and($auto['id'])->toBe('claude-sonnet-5');
 });
 
 it('fails over to the next available chain entry', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
 
-    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet');
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5');
 
     expect($next)->not->toBeNull()
-        ->and($next['id'])->toBe('gpt-5-5')
+        ->and($next['id'])->toBe('gpt-5.5')
         ->and($next['provider'])->toBe('openai')
         ->and($next['source'])->toBe('auto');
 });

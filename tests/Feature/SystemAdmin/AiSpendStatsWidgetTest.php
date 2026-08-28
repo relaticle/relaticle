@@ -6,8 +6,10 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\ChatCatalog;
 
 mutates(AiSpendStatsWidget::class);
 
@@ -103,7 +105,8 @@ it('respects the dashboard period filter', function (): void {
 
 it('reports period ai cost in dollars from token usage', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -119,7 +122,8 @@ it('reports period ai cost in dollars from token usage', function (): void {
 });
 
 it('surfaces models with no configured rate as unpriced instead of silently treating them as free', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -136,7 +140,8 @@ it('surfaces models with no configured rate as unpriced instead of silently trea
 });
 
 it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -163,7 +168,8 @@ it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', 
 });
 
 it('treats a malformed rate entry as unpriced instead of coercing it to zero cost', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => null])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -180,7 +186,8 @@ it('treats a malformed rate entry as unpriced instead of coercing it to zero cos
 });
 
 it('ignores zero-token settlement rows instead of listing them as unpriced models', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     // settleReservedMinimum() books cancelled and timed-out turns under this
     // synthetic model with zero tokens — they cost nothing to serve.
@@ -198,19 +205,18 @@ it('ignores zero-token settlement rows instead of listing them as unpriced model
         ->assertDontSee('Unpriced models');
 });
 
-it('has a configured cost rate for every hosted model the app can select', function (): void {
-    /** @var array<string, mixed> $rates */
-    $rates = config('chat.model_costs');
+it('has a cost rate on every catalog entry the app can select', function (): void {
+    $registry = resolve(ModelRegistry::class);
 
     $hostedModels = collect(config('chat.models'))
-        ->reject(fn (array $model): bool => (bool) ($model['self_hosted'] ?? false))
+        ->filter(fn (array $entry): bool => ($entry['enabled'] ?? true) === true)
         ->pluck('model')
         ->all();
 
     expect($hostedModels)->not->toBeEmpty();
 
     foreach ($hostedModels as $model) {
-        expect($rates)->toHaveKey($model);
+        expect($registry->ratesFor((string) $model))->not->toBeNull("{$model} has no rate");
     }
 });
 
