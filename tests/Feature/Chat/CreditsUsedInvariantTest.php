@@ -71,7 +71,7 @@ it('reserve + settle + refund cycles move credits_used in lockstep with the chat
         team: $team,
         user: $user,
         type: AiCreditType::Chat,
-        model: 'claude-opus-4-7',
+        model: 'claude-opus-5',
         inputTokens: 100,
         outputTokens: 200,
         resolutionKey: 'turn-success',

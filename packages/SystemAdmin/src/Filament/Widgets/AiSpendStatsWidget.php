@@ -9,6 +9,7 @@ use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
 
 final class AiSpendStatsWidget extends StatsOverviewWidget
@@ -68,8 +69,9 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
             ? "{$topModelRow->model} ({$topModelRow->total})"
             : '—';
 
-        /** @var array<string, array{input_per_mtok: float, output_per_mtok: float}> $rates */
-        $rates = config('chat.model_costs', []);
+        // Rates live on the catalog entry now, disabled ones included, so a model
+        // that was retired from the picker still prices its historical rows.
+        $registry = resolve(ModelRegistry::class);
         $totalCost = 0.0;
         $unpriced = [];
 
@@ -84,13 +86,9 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 continue;
             }
 
-            $rate = $rates[$row->model] ?? null;
+            $rate = $registry->ratesFor((string) $row->model);
 
-            if (
-                ! is_array($rate)
-                || ! is_numeric($rate['input_per_mtok'] ?? null)
-                || ! is_numeric($rate['output_per_mtok'] ?? null)
-            ) {
+            if ($rate === null) {
                 $unpriced[] = $row->model;
 
                 continue;

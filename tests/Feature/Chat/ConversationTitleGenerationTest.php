@@ -363,7 +363,7 @@ it('titles from the assistant reply when the opening message named nothing', fun
         team: $this->team,
         message: 'hey',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     ))->handle(resolve(CreditService::class));
 
     Queue::assertPushed(
@@ -385,7 +385,7 @@ it('does not re-title at turn end when the conversation already has a generated 
         team: $this->team,
         message: 'how is globex doing',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     ))->handle(resolve(CreditService::class));
 
     Queue::assertNotPushed(GenerateConversationTitle::class);
@@ -425,7 +425,7 @@ it('titles at turn end from what the user typed, not from the rows the system wr
         team: $this->team,
         message: 'how is globex doing',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     ))->handle(resolve(CreditService::class));
 
     Queue::assertPushed(
