@@ -18,18 +18,34 @@ final readonly class ModelRegistry
     /** @var array<string, float> */
     private array $multipliers;
 
+    /**
+     * The catalog as it stood when this instance was built.
+     *
+     * Held rather than re-read because this is a `readonly` singleton: a method
+     * that called `config()` again would answer from a newer catalog than the
+     * descriptors, rates and multipliers beside it were built from, and a model
+     * present in one but not the other prices its turns at 1x.
+     *
+     * @var list<array<string, mixed>>
+     */
+    private array $entries;
+
+    /** @var list<array{id:string,label:string,provider:?string,model:?string,min_plan:string,credit_multiplier:int|float,supports_tools:bool,write_guard:string,self_hosted:bool}> */
+    private array $custom;
+
     public function __construct()
     {
         /** @var list<array<string, mixed>> $entries */
         $entries = config('chat.models', []);
 
-        $custom = $this->customFromConfig();
+        $this->entries = $entries;
+        $this->custom = $this->customFromConfig();
 
         $enabled = array_values(array_filter($entries, self::identified(...)));
 
         $this->models = [
             ...array_map(ModelDescriptor::fromEntry(...), $enabled),
-            ...array_map(ModelDescriptor::fromConfig(...), $custom),
+            ...array_map(ModelDescriptor::fromConfig(...), $this->custom),
         ];
 
         // Every entry, disabled ones included. A retired model still has to be priced
@@ -39,7 +55,7 @@ final readonly class ModelRegistry
         $rates = [];
         $multipliers = [];
 
-        foreach ([...$entries, ...$custom] as $entry) {
+        foreach ([...$entries, ...$this->custom] as $entry) {
             $model = $entry['model'] ?? null;
 
             if (! is_string($model)) {
@@ -177,18 +193,15 @@ final readonly class ModelRegistry
      */
     public function autoChain(): array
     {
-        /** @var list<array<string, mixed>> $entries */
-        $entries = config('chat.models', []);
-
         $chosen = array_filter(
-            $entries,
+            $this->entries,
             static fn (array $entry): bool => ($entry['auto'] ?? false) === true
                 && self::identified($entry),
         );
 
         return [
             ...array_map(ModelDescriptor::fromEntry(...), array_values($chosen)),
-            ...array_map(ModelDescriptor::fromConfig(...), $this->customFromConfig()),
+            ...array_map(ModelDescriptor::fromConfig(...), $this->custom),
         ];
     }
 
