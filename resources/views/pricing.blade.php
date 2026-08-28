@@ -1,3 +1,7 @@
+@php
+    $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
+@endphp
+
 <x-guest-layout
     title="Pricing - $19/mo flat, unlimited users - Relaticle"
     description="No per-seat pricing. One flat workspace plan at $19/mo billed yearly, with unlimited users and records. 14-day trial, no card. Self-host free forever."
@@ -248,7 +252,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach([
                         ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', '37', 'MCP Tools'],
+                        ['ri-robot-2-line', (string) $mcpToolCount, 'MCP Tools'],
                         ['ri-stack-line', '22', 'Field Types'],
                         ['ri-lock-line', '5-Layer', 'Authorization'],
                     ] as [$icon, $value, $label])
