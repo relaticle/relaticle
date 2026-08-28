@@ -278,3 +278,38 @@ because the gateway array_merges providerOptions last and would overwrite the gu
 because the attribute lets each gateway map "none" to its own spelling.
 Only NEW `(provider, model)` pairings are probed. Verifying the whole catalog on every
 save would let one provider with a stale key block edits to unrelated rows.
+
+## Register every package settings class in config/settings.php
+spatie/laravel-settings auto-discovers `app_path('Settings')` only, and every settings
+class here lives in `packages/<Name>/src/Settings`. An unregistered one still WORKS —
+the container autowires the concrete class and `Settings::__get()` loads it lazily — so
+nothing fails loudly and the omission survives review. What it costs: no `scoped`
+binding, so every `resolve()` is a fresh instance and its own query (three per
+`ManageAiSettings::save()`), and `SETTINGS_CACHE_ENABLED` can never reach the class
+while `ChatServiceProvider::boot()` reads it on every request, job and command.
+`config/settings.php` overrides only the `settings` key; `mergeConfigFrom` keeps the
+package's `migrations_paths`, `default_repository` and the rest as the base, so do not
+copy the whole vendor file in. `ChatCatalogShapeTest` pins the registration.
+
+## available() is "servable here", offered() is "what the product sells"
+`ModelRegistry::available()` requires `filled(ai.providers.<p>.key)`, so it answers a
+question about THIS INSTALL. The public `/pricing` and `/ai` pages must never route
+their model lists through it: the derived strings interpolate into sentences, so a key
+that is absent or rotated renders "Every plan can use  and any self-hosted model you
+connect yourself" and "1x for ; 1.5x for ; 3x for )" on a public page. The whole test
+suite is blind to it because `phpunit.xml` sets a fake key for every provider. Use
+`offered()` there — enabled, tool-capable, non-self-hosted, key-independent — which
+still cannot name a model `AiModelResolver::pick()` would refuse. `PricingPageTest`
+pins it with the keys nulled.
+
+## Never cache what you failed to learn
+`ProviderModelCatalog` caches only a non-empty listing; `ModelProbe` caches only a pass.
+An empty list or a rejection is what we could not learn, not what the provider offers,
+and a 24h `Cache::remember` over a vendor's bad minute blanks the model picker for a day.
+
+## composer test scripts need disableProcessTimeout
+Composer kills a script at 300s by default. `test:pest` had the guard and its siblings
+did not, so `composer test:pest:full` — the merge gate CLAUDE.md tells you to run —
+started aborting on the clock rather than on a test once the suite crossed five minutes.
+Every script that can run the whole suite or a slow subset now carries it. Add it to any
+new one.
