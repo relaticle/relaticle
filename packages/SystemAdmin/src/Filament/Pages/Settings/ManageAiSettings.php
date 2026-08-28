@@ -24,6 +24,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Artisan;
+use Laravel\Ai\Enums\Lab;
 use Relaticle\Chat\Services\ModelProbe;
 use Relaticle\Chat\Services\ProviderModelCatalog;
 use Relaticle\Chat\Settings\ChatSettings;
@@ -141,7 +142,7 @@ final class ManageAiSettings extends Page
                                     Toggle::make('enabled')->inline(false),
                                     Placeholder::make('measured')
                                         ->hiddenLabel()
-                                        ->content(fn (Get $get): string => $this->capabilitySummary($get('capabilities'))),
+                                        ->content(fn (Get $get): string => $this->capabilitySummary($get('capabilities'), (bool) $get('enabled'))),
                                 ])
                                 // How a model is presented and priced is set once and then
                                 // rarely touched, while the rest of the row is what an
@@ -446,10 +447,14 @@ final class ManageAiSettings extends Page
         return Plan::tryFrom(is_string($plan) ? $plan : '') ?? Plan::Pro;
     }
 
-    private function capabilitySummary(mixed $capabilities): string
+    /**
+     * `on save` is a promise only an enabled row keeps: verified() skips disabled
+     * entries, so a retired row would sit there claiming a probe that never runs.
+     */
+    private function capabilitySummary(mixed $capabilities, bool $enabled): string
     {
         if (! is_array($capabilities) || $capabilities === []) {
-            return 'on save';
+            return $enabled ? 'on save' : 'not probed';
         }
 
         $tools = ($capabilities['supports_tools'] ?? false) === true ? 'tools' : 'no tools';
@@ -492,6 +497,16 @@ final class ManageAiSettings extends Page
     }
 
     /**
+     * laravel/ai already spells every provider it supports, on the enum case name:
+     * `OpenAI`, `DeepSeek`, `xAI`. `headline()` renders those as `Openai`, `Deepseek`,
+     * `Xai`, so ask the enum first and fall back for a provider it does not know.
+     */
+    private function providerLabel(string $provider): string
+    {
+        return Lab::tryFrom($provider)?->name ?? str($provider)->headline()->toString();
+    }
+
+    /**
      * The providers this install can actually reach, plus whatever a stored row
      * already names.
      *
@@ -511,11 +526,11 @@ final class ManageAiSettings extends Page
         $options = collect($providers)
             ->filter(fn (array $connection): bool => filled($connection['key'] ?? null))
             ->keys()
-            ->mapWithKeys(fn (string $provider): array => [$provider => str($provider)->headline()->toString()])
+            ->mapWithKeys(fn (string $provider): array => [$provider => $this->providerLabel($provider)])
             ->all();
 
         if (is_string($current) && $current !== '' && ! array_key_exists($current, $options)) {
-            $options[$current] = str($current)->headline()->toString().' (no API key)';
+            $options[$current] = $this->providerLabel($current).' (no API key)';
         }
 
         return $options;

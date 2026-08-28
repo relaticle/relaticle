@@ -286,3 +286,29 @@ it('keeps probed capabilities when a save touches only the effort dial', functio
 
     expect(resolve(ModelRegistry::class)->find('claude-sonnet')?->supportsTools)->toBeTrue();
 });
+
+/**
+ * `headline()` renders `openai` as `Openai`. laravel/ai already spells each provider
+ * on its enum case name, so the panel does not have to keep its own list.
+ */
+it('spells a provider the way its vendor does', function (): void {
+    Http::fake(['api.openai.com/v1/models*' => Http::response(['data' => []])]);
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [catalogEntry(['provider' => 'openai', 'model' => 'gpt-5.5'])]]))
+        ->assertSuccessful()
+        ->assertSee('OpenAI')
+        ->assertDontSee('Openai');
+});
+
+/**
+ * verified() skips disabled entries, so a retired row showing "on save" promises a
+ * probe that never runs.
+ */
+it('does not promise a probe on a row that will never be probed', function (): void {
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [catalogEntry(['capabilities' => null, 'enabled' => false])]]))
+        ->assertSuccessful()
+        ->assertSee('not probed')
+        ->assertDontSee('on save');
+});
