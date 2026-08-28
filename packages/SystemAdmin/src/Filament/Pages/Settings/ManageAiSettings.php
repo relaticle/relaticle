@@ -27,9 +27,12 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
 use Laravel\Ai\Enums\Lab;
+use Relaticle\Chat\Enums\WriteGuard;
 use Relaticle\Chat\Services\ModelProbe;
 use Relaticle\Chat\Services\ProviderModelCatalog;
 use Relaticle\Chat\Settings\ChatSettings;
+use Relaticle\Chat\Support\CatalogEntry;
+use Relaticle\Chat\Support\Measurement;
 use UnitEnum;
 
 /**
@@ -260,7 +263,7 @@ final class ManageAiSettings extends Page
         /** @var list<array<string, mixed>> $submitted */
         $submitted = $data['models'] ?? [];
 
-        [$models, $failure] = $this->verified($this->normalizeModels($submitted));
+        [$models, $failure] = $this->verified($this->parseModels($submitted));
 
         if ($failure !== null) {
             Notification::make()
@@ -360,107 +363,59 @@ final class ManageAiSettings extends Page
      * being served, it is not a continuous audit. Switching a retired row back on is
      * therefore a probe, because nothing ever measured it.
      *
-     * @param  list<array<string, mixed>>  $models
+     * @param  list<CatalogEntry>  $entries
      * @return array{0: list<array<string, mixed>>, 1: string|null}
      */
-    private function verified(array $models): array
+    private function verified(array $entries): array
     {
         $probe = resolve(ModelProbe::class);
         $stored = $this->storedByPairing(resolve(ChatSettings::class)->models);
         $verified = [];
 
-        foreach ($models as $entry) {
-            $provider = $entry['provider'] ?? null;
-            $name = $entry['model'] ?? null;
+        foreach ($entries as $entry) {
+            $pairing = $entry->pairing();
 
-            if (! is_string($provider) || ! is_string($name) || $name === '') {
-                $verified[] = $entry;
+            $entry = $entry->withMeasurement($pairing === null ? null : ($stored[$pairing] ?? null));
 
-                continue;
-            }
-
-            $measured = $stored["{$provider}|{$name}"] ?? [];
-            $capabilities = $measured['capabilities'] ?? null;
-
-            $entry['capabilities'] = is_array($capabilities) && $capabilities !== [] ? $capabilities : null;
-            $entry['verified_at'] = $entry['capabilities'] === null ? null : ($measured['verified_at'] ?? null);
-
-            // A disabled entry is not served to anyone, so it does not earn an API
-            // call. Retired models kept only for pricing history land here.
-            if (($entry['enabled'] ?? true) !== true) {
-                $verified[] = $entry;
+            if (! $entry->needsProbe() || $pairing === null) {
+                $verified[] = $entry->toArray();
 
                 continue;
             }
 
-            if ($entry['capabilities'] !== null) {
-                $verified[] = $entry;
-
-                continue;
+            if (blank(config("ai.providers.{$entry->provider}.key"))) {
+                return [[], "{$entry->model}: no API key is configured for {$entry->provider}."];
             }
 
-            if (blank(config("ai.providers.{$provider}.key"))) {
-                return [[], "{$name}: no API key is configured for {$provider}."];
-            }
-
-            $report = $probe($provider, $name);
+            $report = $probe((string) $entry->provider, $entry->model);
 
             if ($report['ok'] === false) {
-                return [[], "{$name}: ".($report['error'] ?? 'unknown error')];
+                return [[], "{$entry->model}: ".($report['error'] ?? 'unknown error')];
             }
 
-            $entry['capabilities'] = [
-                'supports_tools' => $report['supports_tools'],
-                'write_guard' => $report['write_guard'],
-            ];
-            $entry['verified_at'] = now()->toIso8601String();
-
-            $verified[] = $entry;
+            $verified[] = $entry->withMeasurement(new Measurement(
+                supportsTools: $report['supports_tools'],
+                writeGuard: WriteGuard::from($report['write_guard']),
+                verifiedAt: now()->toIso8601String(),
+            ))->toArray();
         }
 
         return [$verified, null];
     }
 
     /**
-     * Form state is not config-shaped. A Select bound to an enum hands back a Plan
+     * Form state is not catalog-shaped. A Select bound to an enum hands back a Plan
      * instance, a numeric TextInput hands back a string, and a toggle can hand back
-     * "1" — all of which get JSON-encoded into the settings row as-is and then blow
-     * up in ModelDescriptor::fromEntry(), which type-hints the primitives a PHP
-     * config file used to supply. Coerce here, at the one boundary where the panel
-     * writes the catalog.
+     * "1". CatalogEntry is where that becomes a catalog row, with every scalar
+     * failing closed, so the panel no longer keeps its own coercion rules beside
+     * the ones every reader already applies.
      *
      * @param  list<array<string, mixed>>  $models
-     * @return list<array<string, mixed>>
+     * @return list<CatalogEntry>
      */
-    private function normalizeModels(array $models): array
+    private function parseModels(array $models): array
     {
-        return collect($models)
-            ->map(fn (array $model): array => [
-                ...$model,
-                'min_plan' => $this->plan($model['min_plan'] ?? null)->value,
-                'credit_multiplier' => is_numeric($model['credit_multiplier'] ?? null) ? (float) $model['credit_multiplier'] : 1.0,
-                'input_per_mtok' => is_numeric($model['input_per_mtok'] ?? null) ? (float) $model['input_per_mtok'] : null,
-                'output_per_mtok' => is_numeric($model['output_per_mtok'] ?? null) ? (float) $model['output_per_mtok'] : null,
-                // Cast rather than compare: a Filament toggle can hand back "1", and
-                // pint's strict_comparison fixer rewrites any `==` put here.
-                'auto' => (bool) ($model['auto'] ?? false),
-                'enabled' => (bool) ($model['enabled'] ?? true),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Fails closed: an entry with no readable plan is stored as the most
-     * restrictive one rather than becoming free for every workspace.
-     */
-    private function plan(mixed $plan): Plan
-    {
-        if ($plan instanceof Plan) {
-            return $plan;
-        }
-
-        return Plan::tryFrom(is_string($plan) ? $plan : '') ?? Plan::Pro;
+        return array_values(array_filter(array_map(CatalogEntry::fromArray(...), $models)));
     }
 
     /**
@@ -479,21 +434,24 @@ final class ManageAiSettings extends Page
      */
     private function capabilityBadge(Get $get): array
     {
-        $capabilities = $get('capabilities');
+        $measurement = Measurement::fromEntry([
+            'capabilities' => $get('capabilities'),
+            'verified_at' => $get('verified_at'),
+        ]);
 
-        if (! is_array($capabilities) || $capabilities === []) {
+        if (! $measurement instanceof Measurement) {
             return (bool) $get('enabled')
                 ? ['icon' => Heroicon::OutlinedClock, 'color' => 'warning', 'tooltip' => 'Not measured yet. Saving probes this model against its provider.']
                 : ['icon' => Heroicon::OutlinedMinusCircle, 'color' => 'gray', 'tooltip' => 'Disabled, so it is never probed and never served.'];
         }
 
-        $guard = is_string($capabilities['write_guard'] ?? null) ? $capabilities['write_guard'] : 'prompt';
+        $guard = $measurement->writeGuard->value;
 
-        if (($capabilities['supports_tools'] ?? false) !== true) {
+        if (! $measurement->supportsTools) {
             return ['icon' => Heroicon::OutlinedExclamationTriangle, 'color' => 'danger', 'tooltip' => "No tool calls, so this model is offered to nobody. Write guard: {$guard}."];
         }
 
-        $measured = $this->verifiedAgo($get('verified_at'));
+        $measured = $this->verifiedAgo($measurement->verifiedAt);
 
         if ($measured === null) {
             return ['icon' => Heroicon::OutlinedCheckCircle, 'color' => 'gray', 'tooltip' => "Declares tool calls and the {$guard} write guard, but no probe has run on this install."];
@@ -555,17 +513,19 @@ final class ManageAiSettings extends Page
     }
 
     /**
-     * The stored catalog keyed by pairing, which is what makes a measurement
-     * survive an operator deleting a row and adding it straight back.
+     * The measurements already on record, keyed by pairing. This is what makes a
+     * measurement survive an operator deleting a row and adding it straight back.
      *
      * @param  array<int, array<string, mixed>>  $models
-     * @return array<string, array<string, mixed>>
+     * @return array<string, Measurement>
      */
     private function storedByPairing(array $models): array
     {
         return collect($models)
-            ->filter(fn (mixed $model): bool => is_array($model) && is_string($model['provider'] ?? null) && is_string($model['model'] ?? null))
-            ->keyBy(fn (array $model): string => "{$model['provider']}|{$model['model']}")
+            ->map(fn (mixed $model): ?CatalogEntry => is_array($model) ? CatalogEntry::fromArray($model) : null)
+            ->filter(fn (?CatalogEntry $entry): bool => $entry?->pairing() !== null && $entry->measurement instanceof Measurement)
+            ->keyBy(fn (CatalogEntry $entry): string => (string) $entry->pairing())
+            ->map(fn (CatalogEntry $entry): Measurement => $entry->measurement)
             ->all();
     }
 

@@ -403,6 +403,32 @@ it('refuses a new pairing under a provider this install has no key for', functio
 });
 
 /**
+ * A Filament toggle submits "1", not `true`. CatalogEntry casts rather than
+ * compares for exactly that reason, and pint's `strict_comparison` fixer rewrites
+ * any `==` put there, so this pins the behaviour the comment defends.
+ */
+it('reads a toggle that submits a string rather than a boolean', function (): void {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response(['data' => []]),
+        'api.anthropic.com/v1/messages*' => Http::response(['id' => 'msg_1', 'content' => [], 'usage' => []]),
+    ]);
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['auto' => '1', 'enabled' => '1'])]]))
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
+
+    expect($entry['auto'])->toBeTrue()
+        ->and($entry['enabled'])->toBeTrue();
+
+    app()->forgetInstance(ModelRegistry::class);
+
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5'))->not->toBeNull();
+});
+
+/**
  * `headline()` renders `openai` as `Openai`. laravel/ai already spells each provider
  * on its enum case name, so the panel does not have to keep its own list.
  */

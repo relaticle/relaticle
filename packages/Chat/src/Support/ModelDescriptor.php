@@ -52,25 +52,23 @@ final readonly class ModelDescriptor
      * they are merged from env by ModelRegistry, and they keep the env-derived ids
      * they have always had because no operator types those either.
      *
-     * A missing capability record means nobody has probed this entry yet, so it
-     * gets the weaker guard. Claiming `api` without proof would tell the write path
-     * the provider refuses parallel tool calls when it may not.
-     *
-     * @param  array<string, mixed>  $entry
+     * An unmeasured entry gets the weaker guard. Claiming `api` without proof
+     * would tell the write path the provider refuses parallel tool calls when it
+     * may not.
      */
-    public static function fromEntry(array $entry): self
+    public static function fromCatalogEntry(CatalogEntry $entry): self
     {
-        $capabilities = is_array($entry['capabilities'] ?? null) ? $entry['capabilities'] : [];
+        $measurement = $entry->measurement;
 
         return new self(
-            id: (string) $entry['model'],
-            label: (string) $entry['label'],
-            provider: isset($entry['provider']) ? (string) $entry['provider'] : null,
-            model: isset($entry['model']) ? (string) $entry['model'] : null,
-            minPlan: Plan::from((string) $entry['min_plan']),
-            creditMultiplier: (float) $entry['credit_multiplier'],
-            supportsTools: ($capabilities['supports_tools'] ?? false) === true,
-            writeGuard: WriteGuard::from((string) ($capabilities['write_guard'] ?? WriteGuard::Prompt->value)),
+            id: $entry->model,
+            label: $entry->label,
+            provider: $entry->provider,
+            model: $entry->model,
+            minPlan: $entry->minPlan,
+            creditMultiplier: $entry->creditMultiplier,
+            supportsTools: $measurement instanceof Measurement && $measurement->supportsTools,
+            writeGuard: $measurement instanceof Measurement ? $measurement->writeGuard : WriteGuard::Prompt,
             selfHosted: false,
         );
     }

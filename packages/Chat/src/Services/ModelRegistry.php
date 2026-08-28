@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Enums\Plan;
+use Relaticle\Chat\Support\CatalogEntry;
 use Relaticle\Chat\Support\ModelDescriptor;
 
 final readonly class ModelRegistry
@@ -19,14 +20,14 @@ final readonly class ModelRegistry
     private array $multipliers;
 
     /**
-     * The catalog as it stood when this instance was built.
+     * The catalog as it stood when this instance was built, parsed once.
      *
      * Held rather than re-read because this is a `readonly` singleton: a method
      * that called `config()` again would answer from a newer catalog than the
      * descriptors, rates and multipliers beside it were built from, and a model
      * present in one but not the other prices its turns at 1x.
      *
-     * @var list<array<string, mixed>>
+     * @var list<CatalogEntry>
      */
     private array $entries;
 
@@ -35,16 +36,17 @@ final readonly class ModelRegistry
 
     public function __construct()
     {
-        /** @var list<array<string, mixed>> $entries */
-        $entries = config('chat.models', []);
+        /** @var list<array<string, mixed>> $stored */
+        $stored = config('chat.models', []);
 
-        $this->entries = $entries;
+        $this->entries = array_values(array_filter(array_map(CatalogEntry::fromArray(...), $stored)));
         $this->custom = $this->customFromConfig();
 
-        $enabled = array_values(array_filter($entries, self::identified(...)));
-
         $this->models = [
-            ...array_map(ModelDescriptor::fromEntry(...), $enabled),
+            ...array_map(
+                ModelDescriptor::fromCatalogEntry(...),
+                array_values(array_filter($this->entries, static fn (CatalogEntry $entry): bool => $entry->enabled)),
+            ),
             ...array_map(ModelDescriptor::fromConfig(...), $this->custom),
         ];
 
@@ -55,26 +57,18 @@ final readonly class ModelRegistry
         $rates = [];
         $multipliers = [];
 
-        foreach ([...$entries, ...$this->custom] as $entry) {
-            $model = $entry['model'] ?? null;
+        foreach ($this->entries as $entry) {
+            $rate = $entry->rate();
 
-            if (! is_string($model)) {
-                continue;
+            if ($rate !== null) {
+                $rates[$entry->model] = $rate;
             }
 
-            $input = $entry['input_per_mtok'] ?? null;
-            $output = $entry['output_per_mtok'] ?? null;
+            $multipliers[$entry->model] = $entry->creditMultiplier;
+        }
 
-            if (is_numeric($input) && is_numeric($output)) {
-                $rates[$model] = [
-                    'input_per_mtok' => (float) $input,
-                    'output_per_mtok' => (float) $output,
-                ];
-            }
-
-            if (is_numeric($entry['credit_multiplier'] ?? null)) {
-                $multipliers[$model] = (float) $entry['credit_multiplier'];
-            }
+        foreach ($this->custom as $entry) {
+            $multipliers[(string) $entry['model']] = (float) $entry['credit_multiplier'];
         }
 
         $this->rates = $rates;
@@ -195,32 +189,13 @@ final readonly class ModelRegistry
     {
         $chosen = array_filter(
             $this->entries,
-            static fn (array $entry): bool => ($entry['auto'] ?? false) === true
-                && self::identified($entry),
+            static fn (CatalogEntry $entry): bool => $entry->auto && $entry->enabled,
         );
 
         return [
-            ...array_map(ModelDescriptor::fromEntry(...), array_values($chosen)),
+            ...array_map(ModelDescriptor::fromCatalogEntry(...), array_values($chosen)),
             ...array_map(ModelDescriptor::fromConfig(...), $this->custom),
         ];
-    }
-
-    /**
-     * A row the catalog can offer. The model tag is the entry's identity, so a row
-     * without one is not a model missing its tag, it is not a model — and offering
-     * it would put an empty id in the picker and in `Rule::in()`.
-     *
-     * Pricing deliberately does not go through here: `$rates` and `$multipliers`
-     * are built over every entry, disabled ones included, because a retired model
-     * still has to price the transactions that name it.
-     *
-     * @param  array<string, mixed>  $entry
-     */
-    private static function identified(array $entry): bool
-    {
-        return ($entry['enabled'] ?? true) === true
-            && is_string($entry['model'] ?? null)
-            && $entry['model'] !== '';
     }
 
     /**
