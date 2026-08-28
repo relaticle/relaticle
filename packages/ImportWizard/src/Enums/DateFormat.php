@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use DateTimeImmutable;
 use DateTimeZone;
 use Filament\Support\Contracts\HasLabel;
+use Illuminate\Support\Facades\Date;
 
 /**
  * Supported date/datetime formats for CSV import parsing.
@@ -160,7 +161,7 @@ enum DateFormat: string implements HasLabel
             return null;
         }
 
-        return Carbon::instance($parsed);
+        return Date::instance($parsed);
     }
 
     /**
