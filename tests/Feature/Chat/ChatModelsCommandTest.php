@@ -13,7 +13,7 @@ it('lists the model registry via artisan', function (): void {
     config()->set('chat.ollama.model', 'qwen3:8b');
 
     $this->artisan('chat:models')
-        ->expectsOutputToContain('claude-sonnet')
+        ->expectsOutputToContain('claude-sonnet-5')
         ->expectsOutputToContain('ollama')
         ->assertExitCode(0);
 });
@@ -24,7 +24,7 @@ it('verifies a cloud model against its provider and reports what it measured', f
 
     resolve(ModelProbe::class)->forget('anthropic', 'claude-sonnet-5');
 
-    $this->artisan('chat:models', ['--probe' => 'claude-sonnet'])
+    $this->artisan('chat:models', ['--probe' => 'claude-sonnet-5'])
         ->expectsOutputToContain('write_guard')
         ->assertExitCode(0);
 });
@@ -35,7 +35,7 @@ it('fails with the provider message when the model is rejected', function (): vo
 
     resolve(ModelProbe::class)->forget('anthropic', 'claude-sonnet-5');
 
-    $this->artisan('chat:models', ['--probe' => 'claude-sonnet'])
+    $this->artisan('chat:models', ['--probe' => 'claude-sonnet-5'])
         ->expectsOutputToContain('model: nope')
         ->assertExitCode(1);
 });

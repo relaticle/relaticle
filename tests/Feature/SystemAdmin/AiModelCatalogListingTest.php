@@ -75,7 +75,7 @@ it('retries a failed listing rather than caching the emptiness for a day', funct
     $catalog = resolve(ProviderModelCatalog::class);
 
     expect($catalog('anthropic'))->toBe([])
-        ->and($catalog('anthropic'))->toBe(['claude-sonnet-5' => 1769904000]);
+        ->and($catalog('anthropic'))->toBe(['claude-sonnet-5' => ['label' => 'claude-sonnet-5', 'released_at' => 1769904000]]);
 });
 
 it('does not re-fetch a listing it already has', function (): void {

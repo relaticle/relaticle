@@ -11,7 +11,7 @@ mutates(AiModelResolver::class, ModelRegistry::class);
 
 it('falls back to Sonnet when the users preference is not allowed by their plan', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
-    $user->ai_preferences = ['default_model' => 'claude-opus'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
 
@@ -24,7 +24,7 @@ it('honors the users preference when their plan allows it', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $user->currentTeam->plan = Plan::Pro;
     $user->currentTeam->save();
-    $user->ai_preferences = ['default_model' => 'claude-opus'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
 
@@ -36,7 +36,7 @@ it('honors the users preference when their plan allows it', function (): void {
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
-    $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5-5');
+    $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5.5');
 
     expect($resolved['model'])->toBe('claude-sonnet-5');
 });
@@ -139,23 +139,23 @@ it('honors an Ollama default-model preference when configured', function (): voi
 it('labels explicit and auto resolutions', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
-    $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet');
+    $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet-5');
     $auto = resolve(AiModelResolver::class)->resolve($user, null);
 
     expect($explicit['source'])->toBe('explicit')
-        ->and($explicit['id'])->toBe('claude-sonnet')
+        ->and($explicit['id'])->toBe('claude-sonnet-5')
         ->and($auto['source'])->toBe('auto')
-        ->and($auto['id'])->toBe('claude-sonnet');
+        ->and($auto['id'])->toBe('claude-sonnet-5');
 });
 
 it('fails over to the next available chain entry', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
 
-    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet');
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5');
 
     expect($next)->not->toBeNull()
-        ->and($next['id'])->toBe('gpt-5-5')
+        ->and($next['id'])->toBe('gpt-5.5')
         ->and($next['provider'])->toBe('openai')
         ->and($next['source'])->toBe('auto');
 });

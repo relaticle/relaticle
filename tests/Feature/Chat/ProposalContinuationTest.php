@@ -239,7 +239,7 @@ it('clears the continuation flag when the resumed turn dies before it stores any
         team: $team,
         message: TurnContinuationService::PROMPT,
         conversationId: $this->convId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
         isContinuation: true,
     );
@@ -276,7 +276,7 @@ it('leaves the next job on the worker to store its own question as the user type
             team: $team,
             message: TurnContinuationService::PROMPT,
             conversationId: $this->convId,
-            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
             turnId: (string) Str::ulid(),
             isContinuation: true,
         ))->handle(resolve(CreditService::class));
@@ -290,7 +290,7 @@ it('leaves the next job on the worker to store its own question as the user type
         team: $team,
         message: 'What did we agree with Acme?',
         conversationId: $this->convId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
     ))->handle(resolve(CreditService::class));
 

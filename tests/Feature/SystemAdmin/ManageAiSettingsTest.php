@@ -74,7 +74,7 @@ it('carries a saved model all the way into the request the assistant sends', fun
 
     app()->forgetInstance(ModelRegistry::class);
 
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet')?->model)->toBe('claude-sonnet-5');
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->model)->toBe('claude-sonnet-5');
 });
 
 /**
@@ -155,7 +155,7 @@ it('carries Auto membership on the entry itself', function (): void {
         ->call('save')
         ->assertHasNoFormErrors();
 
-    expect(collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet')['auto'])->toBeFalse();
+    expect(collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5')['auto'])->toBeFalse();
 });
 
 it('records who changed which dial, and to what', function (): void {
@@ -220,7 +220,7 @@ it('keeps what is edited through the modal rather than the table', function (): 
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet');
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
 
     expect($entry['label'])->toBe('Sonnet 5 (fast)')
         ->and($entry['min_plan'])->toBe('enterprise')
@@ -230,7 +230,7 @@ it('keeps what is edited through the modal rather than the table', function (): 
 
     app()->forgetInstance(ModelRegistry::class);
 
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet')?->displayLabel())->toBe('Sonnet 5 (fast)');
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->displayLabel())->toBe('Sonnet 5 (fast)');
 });
 
 /**
@@ -250,14 +250,14 @@ it('falls back to the most restrictive plan and a full-price multiplier when a r
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet');
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
 
     expect($entry['min_plan'])->toBe('pro')
         ->and($entry['credit_multiplier'])->toEqual(1.0);
 
     app()->forgetInstance(ModelRegistry::class);
 
-    $descriptor = resolve(ModelRegistry::class)->find('claude-sonnet');
+    $descriptor = resolve(ModelRegistry::class)->find('claude-sonnet-5');
 
     expect($descriptor?->minPlan)->toBe(Plan::Pro)
         ->and($descriptor?->creditMultiplier)->toEqual(1.0);
@@ -278,14 +278,14 @@ it('keeps probed capabilities when a save touches only the effort dial', functio
         ->call('save')
         ->assertHasNoFormErrors();
 
-    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet');
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
 
     expect($entry['capabilities'])->toBe(['supports_tools' => true, 'write_guard' => 'api'])
         ->and($entry['verified_at'])->toBe('2026-08-27T09:00:00+00:00');
 
     app()->forgetInstance(ModelRegistry::class);
 
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet')?->supportsTools)->toBeTrue();
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->supportsTools)->toBeTrue();
 });
 
 /**

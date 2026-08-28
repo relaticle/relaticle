@@ -219,9 +219,16 @@ Edited from the sysadmin panel at /sysadmin/ai-models, seeded from `config/chat.
   one real step carrying the full CrmAssistant surface and reports what the provider
   accepted. An unprobed or rejected entry gets `prompt`, never `api`: claiming the API
   refuses parallel tool calls when it may not is the unsafe direction.
-- **`models[].key` is the stable id** stored in `ai_preferences.default_model`. Rename it
-  and every user who picked that model silently falls back to Auto. Change `model`, never
-  `key`.
+- **`models[].model` is the entry's id**, not just the tag sent to the provider: it is what
+  the picker stores in `localStorage['chat:model']`, what `?model=` carries, and what
+  `ai_credit_transactions.model` already records. So it is unique across the catalog
+  (`distinct()` on the panel's Select, and `ratesFor()` would otherwise let a retired row
+  price an active one), and retagging a row makes it a different model — every user who
+  had picked the old tag silently lands back on Auto, which the client does by sanitizing
+  its stored pick against the live options. That is the accepted cost of having no
+  operator-typed id to mistype or rename; add a succession pointer if it ever stops being
+  acceptable. `users.ai_preferences['default_model']` is read by `AiModelResolver` but has
+  never been written by any code path — check before assuming a preference is stored.
 - A disabled entry stays only so `AiSpendStatsWidget` can price historical
   `ai_credit_transactions` rows that still name its model. `ModelRegistry::ratesFor()`
   therefore reads disabled entries too, while `all()` skips them.

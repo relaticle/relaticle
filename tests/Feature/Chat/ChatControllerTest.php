@@ -208,7 +208,7 @@ it('accepts known model override values on chat.send', function (): void {
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
         'document' => ChatDocument::fromText('hello'),
-        'model' => 'claude-sonnet',
+        'model' => 'claude-sonnet-5',
     ])->assertOk();
     $conversationId = $createRes->json('conversation_id');
 
@@ -216,7 +216,7 @@ it('accepts known model override values on chat.send', function (): void {
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => ChatDocument::fromText('hello'),
-        'model' => 'claude-sonnet',
+        'model' => 'claude-sonnet-5',
     ])->assertOk();
 
     Queue::assertPushed(ProcessChatMessage::class);

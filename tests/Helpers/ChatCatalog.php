@@ -7,10 +7,13 @@ namespace Tests\Helpers;
 /**
  * Fixtures for the chat model catalog, in the shape ChatSettings stores.
  *
- * One home for the entry shape: `key`, the measured `capabilities` record and the
- * per-million prices are restated by every suite that touches the catalog — the
- * registry, the credit maths, the sysadmin page and the spend widget — so a change
- * to the stored shape used to mean hunting all of them.
+ * One home for the entry shape: the identifying `model` tag, the measured
+ * `capabilities` record and the per-million prices are restated by every suite that
+ * touches the catalog — the registry, the credit maths, the sysadmin page and the
+ * spend widget — so a change to the stored shape used to mean hunting all of them.
+ *
+ * Override `model` to get a second, distinct entry: it is the identity, so two
+ * entries sharing it are one model as far as every reader is concerned.
  */
 final class ChatCatalog
 {
@@ -21,7 +24,6 @@ final class ChatCatalog
     public static function entry(array $overrides = []): array
     {
         return array_merge([
-            'key' => 'claude-sonnet',
             'label' => 'Sonnet 5',
             'provider' => 'anthropic',
             'model' => 'claude-sonnet-5',

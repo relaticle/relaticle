@@ -25,10 +25,7 @@ final readonly class ModelRegistry
 
         $custom = $this->customFromConfig();
 
-        $enabled = array_values(array_filter(
-            $entries,
-            static fn (array $entry): bool => ($entry['enabled'] ?? true) === true,
-        ));
+        $enabled = array_values(array_filter($entries, self::identified(...)));
 
         $this->models = [
             ...array_map(ModelDescriptor::fromEntry(...), $enabled),
@@ -186,13 +183,31 @@ final readonly class ModelRegistry
         $chosen = array_filter(
             $entries,
             static fn (array $entry): bool => ($entry['auto'] ?? false) === true
-                && ($entry['enabled'] ?? true) === true,
+                && self::identified($entry),
         );
 
         return [
             ...array_map(ModelDescriptor::fromEntry(...), array_values($chosen)),
             ...array_map(ModelDescriptor::fromConfig(...), $this->customFromConfig()),
         ];
+    }
+
+    /**
+     * A row the catalog can offer. The model tag is the entry's identity, so a row
+     * without one is not a model missing its tag, it is not a model — and offering
+     * it would put an empty id in the picker and in `Rule::in()`.
+     *
+     * Pricing deliberately does not go through here: `$rates` and `$multipliers`
+     * are built over every entry, disabled ones included, because a retired model
+     * still has to price the transactions that name it.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private static function identified(array $entry): bool
+    {
+        return ($entry['enabled'] ?? true) === true
+            && is_string($entry['model'] ?? null)
+            && $entry['model'] !== '';
     }
 
     /**

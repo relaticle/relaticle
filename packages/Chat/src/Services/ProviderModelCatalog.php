@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Http;
  * sysadmin model catalog offers real names instead of a free-text box where a
  * typo becomes a production 404.
  *
+ * Each id carries the vendor's own display name when the vendor publishes one
+ * (Anthropic sends `display_name`; OpenAI's listing has no such field), which is
+ * what spares an operator from typing the one user-facing string in the catalog.
+ *
  * A provider without a key, without a listing endpoint, or that simply cannot be
  * reached yields an empty list, and the page falls back to whatever is already
  * saved. Never let this throw into a form render: an unreachable vendor must not
@@ -28,7 +32,9 @@ final readonly class ProviderModelCatalog
     private const int TTL_SECONDS = 86400;
 
     /**
-     * @return array<string, int> model id => release timestamp, 0 when unknown
+     * @return array<string, array{label: string, released_at: int}> model id => the
+     *                                                               vendor's display name (the id itself when it publishes none) and its
+     *                                                               release timestamp, 0 when unknown
      */
     public function __invoke(string $provider): array
     {
@@ -39,7 +45,7 @@ final readonly class ProviderModelCatalog
         $cached = Cache::get($this->cacheKey($provider));
 
         if (is_array($cached)) {
-            /** @var array<string, int> $cached */
+            /** @var array<string, array{label: string, released_at: int}> $cached */
             return $cached;
         }
 
@@ -59,11 +65,13 @@ final readonly class ProviderModelCatalog
 
     private function cacheKey(string $provider): string
     {
-        return "chat:model-catalog:{$provider}";
+        // Versioned: a payload cached in the old id => timestamp shape would be read
+        // back as one carrying labels and blow up in the form.
+        return "chat:model-catalog:v2:{$provider}";
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, array{label: string, released_at: int}>
      */
     private function fetch(string $provider): array
     {
@@ -87,9 +95,26 @@ final readonly class ProviderModelCatalog
 
         return collect($rows)
             ->filter(fn (array $row): bool => is_string($row['id'] ?? null))
-            ->mapWithKeys(fn (array $row): array => [(string) $row['id'] => $this->releasedAt($row)])
-            ->sortDesc()
+            ->mapWithKeys(fn (array $row): array => [(string) $row['id'] => [
+                'label' => $this->displayName($row),
+                'released_at' => $this->releasedAt($row),
+            ]])
+            ->sortByDesc(fn (array $row): int => $row['released_at'])
             ->all();
+    }
+
+    /**
+     * The vendor's own name for the model, falling back to the tag. A catalog entry
+     * has exactly one user-facing string and this is where it comes from, so an
+     * operator adding a model does not have to invent "Sonnet 5" by hand.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function displayName(array $row): string
+    {
+        $name = $row['display_name'] ?? null;
+
+        return is_string($name) && $name !== '' ? $name : (string) $row['id'];
     }
 
     /**

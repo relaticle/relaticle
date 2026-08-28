@@ -186,8 +186,10 @@ return [
     | self-hosted ones are merged in from SELF_HOSTED_AI_* / OLLAMA_* env at read
     | time, so `.env` stays their single source of truth.
     |
-    | Per entry: `key` is the stable id stored on a user's saved preference and must
-    | never be renamed. `auto` plus list order is the Auto failover chain, so it
+    | Per entry: `model` is the provider's own tag AND the entry's identity — the
+    | value the picker stores, `?model=` carries and `ai_credit_transactions.model`
+    | already records — so it is unique across the catalog and retagging a row makes
+    | it a different model. `auto` plus list order is the Auto failover chain, so it
     | cannot name a model nobody offers. `capabilities` is measured by ModelProbe
     | against a real request, never typed. A disabled entry stays only to price
     | historical ai_credit_transactions rows that still name its model.
@@ -208,17 +210,17 @@ return [
     ],
 
     'models' => [
-        ['key' => 'claude-sonnet', 'label' => 'Sonnet 5', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
-        ['key' => 'gpt-5-5', 'label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 5.00, 'output_per_mtok' => 30.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
-        ['key' => 'claude-opus', 'label' => 'Opus 5', 'provider' => 'anthropic', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
-        ['key' => 'gpt-5-4', 'label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.50, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
-        ['key' => 'gemini-3-flash', 'label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 0.50, 'output_per_mtok' => 3.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
-        ['key' => 'gemini-3-1-pro', 'label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.00, 'output_per_mtok' => 12.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
+        ['label' => 'Sonnet 5', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 5.00, 'output_per_mtok' => 30.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'Opus 5', 'provider' => 'anthropic', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.50, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 0.50, 'output_per_mtok' => 3.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
+        ['label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.00, 'output_per_mtok' => 12.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
 
         // Retired: no longer offered, kept only so the sysadmin spend widget can
         // price ai_credit_transactions rows that still name these models.
-        ['key' => 'retired:claude-sonnet-4-6', 'label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
-        ['key' => 'retired:claude-opus-4-7', 'label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
+        ['label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
+        ['label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
     ],
 
 ];

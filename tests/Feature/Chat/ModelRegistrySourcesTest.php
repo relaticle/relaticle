@@ -18,12 +18,12 @@ function freshRegistry(): ModelRegistry
 it('excludes disabled entries from the catalog', function (): void {
     config()->set('chat.models', [
         ChatCatalog::entry(),
-        ChatCatalog::entry(['key' => 'gone', 'enabled' => false]),
+        ChatCatalog::entry(['model' => 'claude-gone-1', 'enabled' => false]),
     ]);
 
     $ids = array_map(fn (ModelDescriptor $model): string => $model->id, freshRegistry()->all());
 
-    expect($ids)->toContain('claude-sonnet')->not->toContain('gone');
+    expect($ids)->toContain('claude-sonnet-5')->not->toContain('claude-gone-1');
 });
 
 it('reads capabilities from the probe record, not from input', function (): void {
@@ -31,7 +31,7 @@ it('reads capabilities from the probe record, not from input', function (): void
         ChatCatalog::entry(['capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt']]),
     ]);
 
-    $descriptor = freshRegistry()->find('claude-sonnet');
+    $descriptor = freshRegistry()->find('claude-sonnet-5');
 
     expect($descriptor?->supportsTools)->toBeFalse()
         ->and($descriptor?->writeGuard->value)->toBe('prompt');
@@ -44,21 +44,21 @@ it('reads capabilities from the probe record, not from input', function (): void
 it('treats a missing capability record as the weaker guard', function (): void {
     config()->set('chat.models', [ChatCatalog::entry(['capabilities' => null])]);
 
-    expect(freshRegistry()->find('claude-sonnet')?->writeGuard->value)->toBe('prompt');
+    expect(freshRegistry()->find('claude-sonnet-5')?->writeGuard->value)->toBe('prompt');
 });
 
 it('takes the auto chain from the entries in list order', function (): void {
     config()->set('chat.models', [
-        ChatCatalog::entry(['key' => 'first', 'auto' => true]),
-        ChatCatalog::entry(['key' => 'excluded', 'auto' => false]),
-        ChatCatalog::entry(['key' => 'second', 'auto' => true]),
+        ChatCatalog::entry(['model' => 'claude-first-1', 'auto' => true]),
+        ChatCatalog::entry(['model' => 'claude-excluded-1', 'auto' => false]),
+        ChatCatalog::entry(['model' => 'claude-second-1', 'auto' => true]),
     ]);
     config()->set('chat.self_hosted.url');
     config()->set('chat.self_hosted.models');
 
     $chain = array_map(fn (ModelDescriptor $model): string => $model->id, freshRegistry()->autoChain());
 
-    expect($chain)->toBe(['first', 'second']);
+    expect($chain)->toBe(['claude-first-1', 'claude-second-1']);
 });
 
 /**
@@ -68,13 +68,13 @@ it('takes the auto chain from the entries in list order', function (): void {
  * fall back to.
  */
 it('appends env self-hosted models to the end of the auto chain', function (): void {
-    config()->set('chat.models', [ChatCatalog::entry(['key' => 'cloud', 'auto' => true])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-cloud-1', 'auto' => true])]);
     config()->set('chat.self_hosted.url', 'http://localhost:11434');
     config()->set('chat.self_hosted.models', 'qwen3:8b');
 
     $chain = array_map(fn (ModelDescriptor $model): string => $model->id, freshRegistry()->autoChain());
 
-    expect($chain)->toBe(['cloud', 'selfhosted:qwen3:8b']);
+    expect($chain)->toBe(['claude-cloud-1', 'selfhosted:qwen3:8b']);
 });
 
 it('merges self-hosted models from env, never from settings', function (): void {
@@ -88,7 +88,6 @@ it('merges self-hosted models from env, never from settings', function (): void 
 it('prices a retired model from its disabled entry', function (): void {
     config()->set('chat.models', [
         ChatCatalog::entry([
-            'key' => 'retired:claude-opus-4-7',
             'model' => 'claude-opus-4-7',
             'enabled' => false,
             'input_per_mtok' => 5,
@@ -104,4 +103,18 @@ it('reports no rates for a model that carries none', function (): void {
     config()->set('chat.models', [ChatCatalog::entry(['input_per_mtok' => null, 'output_per_mtok' => null])]);
 
     expect(freshRegistry()->ratesFor('claude-sonnet-5'))->toBeNull();
+});
+
+/**
+ * The model tag is the entry's identity, so a row without one cannot be offered:
+ * an empty id would reach the picker and `Rule::in()` on the send endpoint.
+ */
+it('drops an entry that carries no model tag', function (): void {
+    config()->set('chat.models', [ChatCatalog::entry(), ChatCatalog::entry(['model' => ''])]);
+    config()->set('chat.self_hosted.url');
+    config()->set('chat.self_hosted.models');
+
+    $ids = array_map(fn (ModelDescriptor $model): string => $model->id, freshRegistry()->all());
+
+    expect($ids)->toBe(['claude-sonnet-5']);
 });

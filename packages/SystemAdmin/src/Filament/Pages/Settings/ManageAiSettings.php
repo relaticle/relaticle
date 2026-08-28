@@ -88,7 +88,7 @@ final class ManageAiSettings extends Page
                                 // reaches first, which ones are on) and rows make that
                                 // legible in a way one card per model does not.
                                 ->table([
-                                    TableColumn::make('Key')->markAsRequired(),
+                                    TableColumn::make('Label')->markAsRequired(),
                                     TableColumn::make('Provider')->markAsRequired(),
                                     TableColumn::make('Model')->markAsRequired(),
                                     TableColumn::make('Auto'),
@@ -96,9 +96,12 @@ final class ManageAiSettings extends Page
                                     TableColumn::make('Verified'),
                                 ])
                                 ->schema([
-                                    TextInput::make('key')
+                                    // The one string a user ever reads. It is filled from the
+                                    // provider's own listing when the model is chosen, so this
+                                    // is an override rather than a thing to invent.
+                                    TextInput::make('label')
                                         ->required()
-                                        ->distinct(),
+                                        ->extraAttributes(['style' => 'min-width: 9rem']),
                                     Select::make('provider')
                                         ->options(fn (Get $get): array => $this->providerOptions($get('provider')))
                                         ->required()
@@ -111,13 +114,19 @@ final class ManageAiSettings extends Page
                                         ->options(fn (Get $get): array => $this->modelOptions($get('provider'), $get('model')))
                                         ->searchable()
                                         ->required()
+                                        // The tag is the entry's identity, and prices and
+                                        // multipliers are keyed by it across the whole
+                                        // catalog, disabled rows included. Two rows naming
+                                        // one tag would silently let the later row price
+                                        // the earlier one's transactions.
+                                        ->distinct()
                                         // Required fields have nothing to clear, and the clear
                                         // button overflows the column into Auto.
                                         ->selectablePlaceholder(false)
                                         ->live()
                                         ->afterStateUpdated(function (Set $set, Get $get, mixed $state): void {
                                             if (is_string($state) && $state !== '' && blank($get('label'))) {
-                                                $set('label', $state);
+                                                $set('label', $this->listedLabel($get('provider'), $state));
                                             }
                                         })
                                         ->helperText(fn (Get $get): ?string => $this->unlistedNote($get('provider'), $get('model')))
@@ -130,8 +139,8 @@ final class ManageAiSettings extends Page
                                     // components without giving them a column, and a field
                                     // missing from the schema is dropped from getState() —
                                     // so leaving these out would silently discard every
-                                    // label, plan and price on the next save.
-                                    Hidden::make('label'),
+                                    // plan and price on the next save.
+                                    //
                                     // A row whose modal was never opened must not hand an
                                     // expensive model to every free workspace.
                                     Hidden::make('min_plan')->default(Plan::Pro->value),
@@ -155,13 +164,9 @@ final class ManageAiSettings extends Page
                                         ->icon('heroicon-o-cog-6-tooth')
                                         ->color('gray')
                                         ->modalHeading('Model configuration')
-                                        ->modalDescription('How this model is named in the picker, who may reach it, and what a turn on it costs.')
+                                        ->modalDescription('Who may reach this model and what a turn on it costs.')
                                         ->modalWidth(Width::Medium)
                                         ->schema([
-                                            TextInput::make('label')
-                                                ->label('Label')
-                                                ->required()
-                                                ->helperText('The name users see in the model picker.'),
                                             Select::make('min_plan')
                                                 ->label('Minimum plan')
                                                 ->options(Plan::class)
@@ -184,7 +189,7 @@ final class ManageAiSettings extends Page
                                                 ->minValue(0),
                                         ])
                                         ->fillForm(fn (array $arguments, Repeater $component): array => collect($component->getItemState($arguments['item']))
-                                            ->only(['label', 'min_plan', 'credit_multiplier', 'input_per_mtok', 'output_per_mtok'])
+                                            ->only(['min_plan', 'credit_multiplier', 'input_per_mtok', 'output_per_mtok'])
                                             ->all())
                                         ->action(function (array $arguments, array $data, Repeater $component): void {
                                             $state = $component->getState();
@@ -499,6 +504,24 @@ final class ManageAiSettings extends Page
         }
 
         return rescue(fn (): string => Date::parse($verifiedAt)->diffForHumans(), null, report: false);
+    }
+
+    /**
+     * The vendor's own name for a model it lists, or the tag when it publishes none
+     * (OpenAI) or cannot be reached. Never blank: `label` is required, and a blank
+     * one would fail validation on a row the operator never typed into.
+     */
+    private function listedLabel(mixed $provider, string $model): string
+    {
+        if (! is_string($provider) || $provider === '') {
+            return $model;
+        }
+
+        $listed = resolve(ProviderModelCatalog::class)($provider)[$model] ?? null;
+
+        return is_array($listed) && is_string($listed['label'] ?? null) && $listed['label'] !== ''
+            ? $listed['label']
+            : $model;
     }
 
     /**

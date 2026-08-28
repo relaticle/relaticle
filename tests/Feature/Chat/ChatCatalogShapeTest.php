@@ -12,9 +12,9 @@ use Spatie\LaravelSettings\SettingsRepositories\SettingsRepository;
  * rather than merely unlikely.
  */
 it('seeds one catalog carrying Auto membership, price and probed capabilities', function (): void {
-    $sonnet = collect(resolve(ChatSettings::class)->models)->firstWhere('key', 'claude-sonnet');
+    $sonnet = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
 
-    expect($sonnet['model'])->toBe('claude-sonnet-5')
+    expect($sonnet)->not->toHaveKey('key')
         ->and($sonnet['auto'])->toBeTrue()
         ->and($sonnet['enabled'])->toBeTrue()
         // Compared numerically, not identically: JSON has a single number type, so a
@@ -30,17 +30,17 @@ it('seeds one catalog carrying Auto membership, price and probed capabilities', 
 it('keeps Auto order as list order', function (): void {
     $auto = collect(resolve(ChatSettings::class)->models)
         ->filter(fn (array $entry): bool => $entry['auto'] === true)
-        ->pluck('key')
+        ->pluck('model')
         ->values()
         ->all();
 
-    expect($auto)->toBe(['claude-sonnet', 'gpt-5-5']);
+    expect($auto)->toBe(['claude-sonnet-5', 'gpt-5.5']);
 });
 
 it('leaves self-hosted models out of settings so env stays their only source', function (): void {
-    $keys = collect(resolve(ChatSettings::class)->models)->pluck('key');
+    $tags = collect(resolve(ChatSettings::class)->models)->pluck('model');
 
-    expect($keys)->not->toContain('ollama');
+    expect($tags)->not->toContain('ollama');
 });
 
 it('keeps a retired model as a disabled entry so historical spend stays priced', function (): void {

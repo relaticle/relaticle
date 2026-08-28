@@ -42,8 +42,15 @@ final readonly class ModelDescriptor
     /**
      * A descriptor for a stored catalog entry.
      *
+     * The provider's own model tag is the id. A stored entry carries no separate
+     * identifier: one that an operator types is one an operator can mistype or
+     * rename, and the tag is already the identity everywhere it is persisted
+     * (`ai_credit_transactions.model`, `ModelRegistry::ratesFor()`). Retagging a
+     * row is therefore a new model by construction, which is what it is.
+     *
      * `selfHosted` is false by construction: self-hosted models are never stored,
-     * they are merged from env by ModelRegistry.
+     * they are merged from env by ModelRegistry, and they keep the env-derived ids
+     * they have always had because no operator types those either.
      *
      * A missing capability record means nobody has probed this entry yet, so it
      * gets the weaker guard. Claiming `api` without proof would tell the write path
@@ -56,7 +63,7 @@ final readonly class ModelDescriptor
         $capabilities = is_array($entry['capabilities'] ?? null) ? $entry['capabilities'] : [];
 
         return new self(
-            id: (string) $entry['key'],
+            id: (string) $entry['model'],
             label: (string) $entry['label'],
             provider: isset($entry['provider']) ? (string) $entry['provider'] : null,
             model: isset($entry['model']) ? (string) $entry['model'] : null,
