@@ -51,7 +51,7 @@
                             {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
                         </x-filament::badge>
 
-                        {{ $this->accountActions($account, [$this->editSettingsAction()]) }}
+                        {{ $this->accountActions($account->getKey(), $account->status, [$this->editSettingsAction()]) }}
                     </div>
                 </div>
             @endforeach
