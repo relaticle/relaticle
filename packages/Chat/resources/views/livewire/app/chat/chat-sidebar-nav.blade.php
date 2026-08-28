@@ -239,7 +239,7 @@
                 >
                     <button
                         type="button"
-                        @click="window.Livewire.dispatch('chat:open-all-chats')"
+                        @click="window.dispatchEvent(new CustomEvent('chat:open-all-chats'))"
                         class="fi-sidebar-item-btn w-full text-start opacity-60 transition hover:opacity-100"
                         aria-label="{{ __('Open all chats') }}"
                     >
