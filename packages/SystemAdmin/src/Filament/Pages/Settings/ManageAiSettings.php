@@ -8,7 +8,6 @@ use App\Enums\Plan;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -18,12 +17,15 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Form;
+use Filament\Schemas\Components\Icon;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Date;
 use Laravel\Ai\Enums\Lab;
 use Relaticle\Chat\Services\ModelProbe;
 use Relaticle\Chat\Services\ProviderModelCatalog;
@@ -140,9 +142,9 @@ final class ManageAiSettings extends Page
                                     Hidden::make('output_per_mtok'),
                                     Toggle::make('auto')->inline(false),
                                     Toggle::make('enabled')->inline(false),
-                                    Placeholder::make('measured')
-                                        ->hiddenLabel()
-                                        ->content(fn (Get $get): string => $this->capabilitySummary($get('capabilities'), (bool) $get('enabled'))),
+                                    Icon::make(fn (Get $get): Heroicon => $this->capabilityBadge($get)['icon'])
+                                        ->color(fn (Get $get): string => $this->capabilityBadge($get)['color'])
+                                        ->tooltip(fn (Get $get): string => $this->capabilityBadge($get)['tooltip']),
                                 ])
                                 // How a model is presented and priced is set once and then
                                 // rarely touched, while the rest of the row is what an
@@ -448,18 +450,55 @@ final class ManageAiSettings extends Page
     }
 
     /**
-     * `on save` is a promise only an enabled row keeps: verified() skips disabled
-     * entries, so a retired row would sit there claiming a probe that never runs.
+     * The Verified column: an icon an operator can scan a whole catalog down, and a
+     * tooltip carrying the detail the column has no room for. Filament renders that
+     * tooltip as the icon's visually-hidden text too, so the meaning is not
+     * hover-only.
+     *
+     * Four states, because they are four different claims: this install watched the
+     * provider accept a real request, the row only declares what it inherited from
+     * the config seed, the provider will not serve tools so ModelRegistry hides the
+     * row from every picker, or nothing has been measured yet. That last one is a
+     * promise only an enabled row keeps, since verified() skips disabled entries.
+     *
+     * @return array{icon: Heroicon, color: string, tooltip: string}
      */
-    private function capabilitySummary(mixed $capabilities, bool $enabled): string
+    private function capabilityBadge(Get $get): array
     {
+        $capabilities = $get('capabilities');
+
         if (! is_array($capabilities) || $capabilities === []) {
-            return $enabled ? 'on save' : 'not probed';
+            return (bool) $get('enabled')
+                ? ['icon' => Heroicon::OutlinedClock, 'color' => 'warning', 'tooltip' => 'Not measured yet. Saving probes this model against its provider.']
+                : ['icon' => Heroicon::OutlinedMinusCircle, 'color' => 'gray', 'tooltip' => 'Disabled, so it is never probed and never served.'];
         }
 
-        $tools = ($capabilities['supports_tools'] ?? false) === true ? 'tools' : 'no tools';
+        $guard = is_string($capabilities['write_guard'] ?? null) ? $capabilities['write_guard'] : 'prompt';
 
-        return $tools.' · '.($capabilities['write_guard'] ?? 'prompt');
+        if (($capabilities['supports_tools'] ?? false) !== true) {
+            return ['icon' => Heroicon::OutlinedExclamationTriangle, 'color' => 'danger', 'tooltip' => "No tool calls, so this model is offered to nobody. Write guard: {$guard}."];
+        }
+
+        $measured = $this->verifiedAgo($get('verified_at'));
+
+        if ($measured === null) {
+            return ['icon' => Heroicon::OutlinedCheckCircle, 'color' => 'gray', 'tooltip' => "Declares tool calls and the {$guard} write guard, but no probe has run on this install."];
+        }
+
+        return ['icon' => Heroicon::OutlinedCheckBadge, 'color' => 'success', 'tooltip' => "The provider accepted a real request {$measured}. Tool calls, {$guard} write guard."];
+    }
+
+    /**
+     * A stored timestamp is written by verified(), but the settings row is editable
+     * outside the panel, and an unparseable one must not take the page down.
+     */
+    private function verifiedAgo(mixed $verifiedAt): ?string
+    {
+        if (! is_string($verifiedAt) || $verifiedAt === '') {
+            return null;
+        }
+
+        return rescue(fn (): string => Date::parse($verifiedAt)->diffForHumans(), null, report: false);
     }
 
     /**

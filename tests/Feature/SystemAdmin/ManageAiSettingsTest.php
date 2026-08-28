@@ -11,6 +11,7 @@ use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Settings\ChatSettings;
 use Relaticle\SystemAdmin\Filament\Pages\Settings\ManageAiSettings;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\ChatCatalog;
 
 mutates(ManageAiSettings::class);
 
@@ -33,7 +34,7 @@ beforeEach(function (): void {
 function catalogState(array $overrides = []): array
 {
     return array_merge([
-        'models' => [catalogEntry()],
+        'models' => [ChatCatalog::entry()],
         'anthropic_effort' => 'high',
     ], $overrides);
 }
@@ -54,7 +55,7 @@ it('offers only providers this install has a key for', function (): void {
     config(['ai.providers.gemini.key' => null]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['provider' => 'gemini', 'model' => 'gemini-3-flash'])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['provider' => 'gemini', 'model' => 'gemini-3-flash'])]]))
         ->assertSuccessful()
         ->assertSee('Gemini (no API key)')
         ->assertDontSee('Cohere');
@@ -92,7 +93,7 @@ it('refuses to store a model the provider rejects, and says why', function (): v
     $before = resolve(ChatSettings::class)->models;
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['model' => 'claude-imaginary'])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['model' => 'claude-imaginary'])]]))
         ->call('save')
         ->assertNotified();
 
@@ -150,7 +151,7 @@ it('carries Auto membership on the entry itself', function (): void {
     ]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['auto' => false])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['auto' => false])]]))
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -210,7 +211,7 @@ it('keeps what is edited through the modal rather than the table', function (): 
     ]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry([
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry([
             'label' => 'Sonnet 5 (fast)',
             'min_plan' => 'enterprise',
             'input_per_mtok' => 4.5,
@@ -245,7 +246,7 @@ it('falls back to the most restrictive plan and a full-price multiplier when a r
     ]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['min_plan' => null, 'credit_multiplier' => null])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['min_plan' => null, 'credit_multiplier' => null])]]))
         ->call('save')
         ->assertHasNoFormErrors();
 
@@ -269,7 +270,7 @@ it('keeps probed capabilities when a save touches only the effort dial', functio
     ]);
 
     $settings = resolve(ChatSettings::class);
-    $settings->models = [catalogEntry(['verified_at' => '2026-08-27T09:00:00+00:00'])];
+    $settings->models = [ChatCatalog::entry(['verified_at' => '2026-08-27T09:00:00+00:00'])];
     $settings->save();
 
     livewire(ManageAiSettings::class)
@@ -295,20 +296,61 @@ it('spells a provider the way its vendor does', function (): void {
     Http::fake(['api.openai.com/v1/models*' => Http::response(['data' => []])]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['provider' => 'openai', 'model' => 'gpt-5.5'])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['provider' => 'openai', 'model' => 'gpt-5.5'])]]))
         ->assertSuccessful()
         ->assertSee('OpenAI')
         ->assertDontSee('Openai');
 });
 
 /**
- * verified() skips disabled entries, so a retired row showing "on save" promises a
- * probe that never runs.
+ * The Verified column is an icon, and Filament renders its tooltip as the icon's
+ * visually-hidden text, so what an operator is told is assertable as rendered text.
+ *
+ * verified() skips disabled entries, so a retired row promising a probe on save
+ * promises one that never runs.
  */
 it('does not promise a probe on a row that will never be probed', function (): void {
     livewire(ManageAiSettings::class)
-        ->fillForm(catalogState(['models' => [catalogEntry(['capabilities' => null, 'enabled' => false])]]))
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['capabilities' => null, 'enabled' => false])]]))
         ->assertSuccessful()
-        ->assertSee('not probed')
-        ->assertDontSee('on save');
+        ->assertSee('Disabled, so it is never probed')
+        ->assertDontSee('Saving probes this model');
+});
+
+it('promises a probe on an enabled row nothing has measured yet', function (): void {
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['capabilities' => null])]]))
+        ->assertSuccessful()
+        ->assertSee('Saving probes this model');
+});
+
+/**
+ * The config seed declares capabilities for models nobody has probed here, and a
+ * column headed "Verified" must not launder that into a measurement.
+ */
+it('separates a capability this install measured from one the row merely declares', function (): void {
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['verified_at' => null])]]))
+        ->assertSuccessful()
+        ->assertSee('no probe has run on this install')
+        ->assertDontSee('accepted a real request');
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['verified_at' => now()->subHour()->toIso8601String()])]]))
+        ->assertSuccessful()
+        ->assertSee('accepted a real request 1 hour ago')
+        ->assertDontSee('no probe has run on this install');
+});
+
+/**
+ * ModelRegistry hides a row without tool support from every picker, so the column
+ * has to read as a problem rather than as a quieter kind of pass.
+ */
+it('flags a row the provider will not serve tools on', function (): void {
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry([
+            'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'],
+        ])]]))
+        ->assertSuccessful()
+        ->assertSee('No tool calls, so this model is offered to nobody');
 });
