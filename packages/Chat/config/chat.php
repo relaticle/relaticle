@@ -85,6 +85,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Anthropic Reasoning Effort
+    |--------------------------------------------------------------------------
+    |
+    | How deeply Anthropic thinks per turn: low, medium, high, xhigh or max.
+    | Sampling parameters (temperature, top_p) were removed on Opus 4.7 and every
+    | model since, and a request carrying one is rejected outright, so this is the
+    | only quality-versus-cost dial those models expose. It is load-bearing rather
+    | than cosmetic from Opus 5 onward, where thinking is on by default and a turn
+    | spends output tokens before it writes a word. `high` is Anthropic's own
+    | default; an unrecognised value falls back to it.
+    */
+
+    'anthropic_effort' => env('CHAT_ANTHROPIC_EFFORT', 'high'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Provider Stream-Start Rate (per second, per provider)
     |--------------------------------------------------------------------------
     |
@@ -162,16 +178,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Chat Model Registry
+    | Chat Model Catalog
     |--------------------------------------------------------------------------
     |
-    | The user-facing model catalog. Each entry references a provider defined in
-    | config/ai.php. `auto` is synthetic (handled by the resolver) and is not
-    | listed here. Self-hosted custom models are merged in from SELF_HOSTED_AI_*
-    | env at boot. `supports_tools:false` hides a model (Gemini, until laravel/ai
-    | supports tool_config). `write_guard`: api = provider enforces one write per
-    | turn; prompt = relies on the prompt + the approval gate.
+    | The seed for the user-facing model catalog, copied into settings on first
+    | migrate and editable from the sysadmin panel thereafter. Cloud models only:
+    | self-hosted ones are merged in from SELF_HOSTED_AI_* / OLLAMA_* env at read
+    | time, so `.env` stays their single source of truth.
+    |
+    | Per entry: `model` is the provider's own tag AND the entry's identity — the
+    | value the picker stores, `?model=` carries and `ai_credit_transactions.model`
+    | already records — so it is unique across the catalog and retagging a row makes
+    | it a different model. `auto` plus list order is the Auto failover chain, so it
+    | cannot name a model nobody offers. `capabilities` is measured by ModelProbe
+    | against a real request, never typed. A disabled entry stays only to price
+    | historical ai_credit_transactions rows that still name its model.
+    |
+    | Prices are USD per million tokens, vendor list price, short-context tier.
+    | Long-context requests bill higher (gpt-5.x above 272k input, gemini-3.1-pro
+    | above 200k), so the sysadmin figure is an estimate rather than an invoice.
     */
+
+    'ollama' => [
+        'model' => env('OLLAMA_MODEL'),
+    ],
 
     'self_hosted' => [
         'url' => env('SELF_HOSTED_AI_URL'),
@@ -179,41 +209,18 @@ return [
         'models' => env('SELF_HOSTED_AI_MODELS'),
     ],
 
-    'auto_chain' => ['claude-sonnet', 'gpt-5-5', 'ollama'],
-
     'models' => [
-        ['id' => 'claude-sonnet', 'label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
-        ['id' => 'claude-opus', 'label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
-        ['id' => 'gpt-5-5', 'label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
-        ['id' => 'gpt-5-4', 'label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => true, 'write_guard' => 'api', 'self_hosted' => false],
-        ['id' => 'gemini-3-flash', 'label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
-        ['id' => 'gemini-3-1-pro', 'label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'supports_tools' => false, 'write_guard' => 'prompt', 'self_hosted' => false],
-        ['id' => 'ollama', 'label' => 'Ollama', 'provider' => 'ollama', 'model' => env('OLLAMA_MODEL'), 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'supports_tools' => true, 'write_guard' => 'prompt', 'self_hosted' => true],
-    ],
+        ['label' => 'Sonnet 5', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 5.00, 'output_per_mtok' => 30.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'Opus 5', 'provider' => 'anthropic', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.50, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 0.50, 'output_per_mtok' => 3.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
+        ['label' => 'Gemini 3.1 Pro', 'provider' => 'gemini', 'model' => 'gemini-3.1-pro', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.00, 'output_per_mtok' => 12.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => false, 'write_guard' => 'prompt'], 'verified_at' => null],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Model Cost Rates (USD per million tokens)
-    |--------------------------------------------------------------------------
-    |
-    | Keys must match the `model` values above and any historical model strings
-    | in ai_credit_transactions. Models without an entry are surfaced as
-    | "unpriced" in the sysadmin cost widget — never silently zero.
-    |
-    | Vendor list prices, short-context tier. Long-context requests bill higher
-    | (gpt-5.x above 272k input, gemini-3.1-pro above 200k), so the widget's
-    | figure is an estimate rather than an invoice. Re-check when a vendor
-    | changes its price list. Ollama is self-hosted (no per-token API cost) and
-    | its model id is env-driven, so it has no entry.
-    */
-
-    'model_costs' => [
-        'claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00],
-        'claude-opus-4-7' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 25.00],
-        'gpt-5.5' => ['input_per_mtok' => 5.00, 'output_per_mtok' => 30.00],
-        'gpt-5.4' => ['input_per_mtok' => 2.50, 'output_per_mtok' => 15.00],
-        'gemini-3-flash' => ['input_per_mtok' => 0.50, 'output_per_mtok' => 3.00],
-        'gemini-3.1-pro' => ['input_per_mtok' => 2.00, 'output_per_mtok' => 12.00],
+        // Retired: no longer offered, kept only so the sysadmin spend widget can
+        // price ai_credit_transactions rows that still name these models.
+        ['label' => 'Sonnet 4.6', 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
+        ['label' => 'Opus 4.7', 'provider' => 'anthropic', 'model' => 'claude-opus-4-7', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => false, 'capabilities' => null, 'verified_at' => null],
     ],
 
 ];

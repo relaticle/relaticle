@@ -66,6 +66,8 @@ final class SystemAdminPanelProvider extends PanelProvider
 
     public function boot(): void
     {
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'system-admin');
+
         // Blog MCP requests are not Filament panel requests, so the panel-scoped
         // policy discovery in AppServiceProvider never sees them.
         foreach (self::BLOG_MODEL_POLICIES as $model => $policy) {

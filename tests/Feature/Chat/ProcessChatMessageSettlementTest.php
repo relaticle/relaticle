@@ -77,7 +77,7 @@ it('settles the reserved minimum when the turn already streamed before failing',
 
     $job = new ProcessChatMessage(
         user: $user, team: $team, message: 'hi', conversationId: 'c-2',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: $turnId,
     );
 
@@ -131,7 +131,7 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
 
     $job = new ProcessChatMessage(
         user: $user, team: $team, message: 'hi', conversationId: 'c-3',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: $turnId,
     );
 
