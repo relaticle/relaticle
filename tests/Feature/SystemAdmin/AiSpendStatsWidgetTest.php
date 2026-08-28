@@ -9,6 +9,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\ChatCatalog;
 
 mutates(AiSpendStatsWidget::class);
 
@@ -104,7 +105,7 @@ it('respects the dashboard period filter', function (): void {
 
 it('reports period ai cost in dollars from token usage', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
-    config()->set('chat.models', [catalogEntry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
     app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
@@ -121,7 +122,7 @@ it('reports period ai cost in dollars from token usage', function (): void {
 });
 
 it('surfaces models with no configured rate as unpriced instead of silently treating them as free', function (): void {
-    config()->set('chat.models', [catalogEntry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
     app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
@@ -139,7 +140,7 @@ it('surfaces models with no configured rate as unpriced instead of silently trea
 });
 
 it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', function (): void {
-    config()->set('chat.models', [catalogEntry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
     app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
@@ -167,7 +168,7 @@ it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', 
 });
 
 it('treats a malformed rate entry as unpriced instead of coercing it to zero cost', function (): void {
-    config()->set('chat.models', [catalogEntry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => null])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => null])]);
     app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
@@ -185,7 +186,7 @@ it('treats a malformed rate entry as unpriced instead of coercing it to zero cos
 });
 
 it('ignores zero-token settlement rows instead of listing them as unpriced models', function (): void {
-    config()->set('chat.models', [catalogEntry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
     app()->forgetInstance(ModelRegistry::class);
 
     // settleReservedMinimum() books cancelled and timed-out turns under this

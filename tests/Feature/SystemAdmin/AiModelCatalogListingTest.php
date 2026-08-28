@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Relaticle\Chat\Services\ProviderModelCatalog;
 use Relaticle\SystemAdmin\Filament\Pages\Settings\ManageAiSettings;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\ChatCatalog;
 
 /**
  * The model field is a picker over the provider's own listing, not a free-text box,
@@ -33,7 +34,7 @@ it('flags a stored model id the provider is no longer listing', function (): voi
     ]])]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(['models' => [catalogEntry(['model' => 'claude-retired-0'])], 'anthropic_effort' => 'high'])
+        ->fillForm(['models' => [ChatCatalog::entry(['model' => 'claude-retired-0'])], 'anthropic_effort' => 'high'])
         ->assertSuccessful()
         ->assertSee('not listed by the provider');
 });
@@ -44,7 +45,7 @@ it('says nothing about a model the provider does list', function (): void {
     ]])]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(['models' => [catalogEntry(['model' => 'claude-sonnet-5'])], 'anthropic_effort' => 'high'])
+        ->fillForm(['models' => [ChatCatalog::entry(['model' => 'claude-sonnet-5'])], 'anthropic_effort' => 'high'])
         ->assertSuccessful()
         ->assertDontSee('not listed by the provider');
 });
@@ -57,7 +58,7 @@ it('says nothing when the provider returned no list at all', function (): void {
     Http::fake(['api.anthropic.com/v1/models*' => Http::response([], 500)]);
 
     livewire(ManageAiSettings::class)
-        ->fillForm(['models' => [catalogEntry(['model' => 'claude-retired-0'])], 'anthropic_effort' => 'high'])
+        ->fillForm(['models' => [ChatCatalog::entry(['model' => 'claude-retired-0'])], 'anthropic_effort' => 'high'])
         ->assertSuccessful()
         ->assertDontSee('not listed by the provider');
 });

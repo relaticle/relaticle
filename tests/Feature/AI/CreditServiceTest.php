@@ -10,6 +10,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
+use Tests\Helpers\ChatCatalog;
 
 mutates(CreditService::class);
 
@@ -109,8 +110,8 @@ it('calculates credits with model multiplier', function (): void {
  */
 it('charges a retired model the multiplier it was retired on', function (): void {
     config()->set('chat.models', [
-        catalogEntry(),
-        catalogEntry([
+        ChatCatalog::entry(),
+        ChatCatalog::entry([
             'key' => 'retired:claude-opus-4-7',
             'model' => 'claude-opus-4-7',
             'credit_multiplier' => 3.0,
