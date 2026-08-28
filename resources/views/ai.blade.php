@@ -1,11 +1,10 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
 
-    // Through the registry, not the raw catalog: it drops models this install cannot
-    // serve (no provider key) and ones a probe measured as unable to call tools, so the
-    // page never names a model the assistant could not actually run.
-    $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->available())
-        ->reject(fn (\Relaticle\Chat\Support\ModelDescriptor $model): bool => $model->selfHosted)
+    // offered(), not available(): this page describes what a plan includes, so it must
+    // not change because this install is missing a provider key. It still drops models
+    // a probe measured as unable to call tools, which the assistant could never run.
+    $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
         ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
             'label' => $model->displayLabel(),
             'min_plan' => $model->minPlan->value,

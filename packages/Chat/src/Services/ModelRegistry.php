@@ -95,6 +95,26 @@ final readonly class ModelRegistry
     }
 
     /**
+     * What the product offers, whether or not this install holds the key.
+     *
+     * `available()` answers a different question — servable HERE — and the public
+     * pricing and AI pages must not be answering that one. A rotated key is an
+     * outage, not a change to what a plan includes, and routing marketing copy
+     * through it renders "Every plan can use  and any self-hosted model you connect
+     * yourself" with a hole where the name belongs. `supports_tools` still applies:
+     * a model AiModelResolver::pick() can never select must never be advertised.
+     *
+     * @return list<ModelDescriptor>
+     */
+    public function offered(): array
+    {
+        return array_values(array_filter(
+            $this->models,
+            static fn (ModelDescriptor $m): bool => ! $m->selfHosted && $m->supportsTools,
+        ));
+    }
+
+    /**
      * Voice input is servable on this install: the feature is switched on and
      * the transcription provider is configured. Same availability shape the
      * model picker uses for a cloud provider (ModelDescriptor::isAvailable()),

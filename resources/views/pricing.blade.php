@@ -41,14 +41,14 @@
                 // max(1, ceil(multiplier + toolCalls * toolBonus)).
                 $opusReplies = intdiv((int) \App\Enums\Plan::Pro->credits(), 3);
 
-                // Read through the registry rather than the raw catalog so this list can never
-                // name a model the app won't actually serve: ModelRegistry::available() drops
-                // the entries whose measured capabilities say they cannot call tools (both
-                // Gemini models today) and the ones whose provider has no key on this install.
-                // AiModelResolver::pick() can never select those, so the page must not claim a
-                // plan "unlocks" them even though they sit in the catalog with a real price.
-                $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->available())
-                    ->reject(fn (\Relaticle\Chat\Support\ModelDescriptor $model): bool => $model->selfHosted)
+                // offered(), not available(): this list can never name a model the app won't
+                // serve, because it drops the entries whose measured capabilities say they
+                // cannot call tools (both Gemini models today) and AiModelResolver::pick()
+                // can never select those. It deliberately does NOT drop models whose provider
+                // has no key on this install: what Cloud Pro includes is not a function of
+                // whether the web host currently holds an Anthropic key, and filtering on
+                // that renders these sentences with a hole where the model names belong.
+                $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
                     ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
                         'label' => $model->displayLabel(),
                         'min_plan' => $model->minPlan->value,

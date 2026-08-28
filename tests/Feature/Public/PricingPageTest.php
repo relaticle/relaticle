@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\Billing as BillingFeature;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Services\ModelRegistry;
 
 it('shows the legacy two-card page when billing is off', function (): void {
     Feature::define(BillingFeature::class, false);
@@ -203,6 +204,26 @@ it('pins the exact membership of every model list derived from the chat catalog'
         ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4 — the models with a higher credit multiplier.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
         ->assertSee('1x for Sonnet 5 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
+});
+
+/**
+ * What a plan includes is not a function of whether the web host currently holds an
+ * Anthropic key. Reading these lists through ModelRegistry::available() made a key
+ * rotation render "Every plan can use  and any self-hosted model you connect
+ * yourself" — a public sentence with a hole in it, invisible to the rest of this
+ * suite because phpunit.xml sets a fake key for every provider.
+ */
+it('names the models a plan includes even when this install holds no provider key', function (): void {
+    Feature::define(BillingFeature::class, true);
+    config(['ai.providers.anthropic.key' => null, 'ai.providers.openai.key' => null]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
+        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4', false)
+        ->assertSee('3x for Opus 5', false)
+        ->assertDontSee('Gemini');
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is on', function (): void {
