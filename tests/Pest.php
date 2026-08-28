@@ -45,30 +45,6 @@ function livewire(string $component, array $params = []): Testable
 }
 
 /**
- * One catalog entry in the shape ChatSettings stores.
- *
- * @param  array<string, mixed>  $overrides
- * @return array<string, mixed>
- */
-function catalogEntry(array $overrides = []): array
-{
-    return array_merge([
-        'key' => 'claude-sonnet',
-        'label' => 'Sonnet 5',
-        'provider' => 'anthropic',
-        'model' => 'claude-sonnet-5',
-        'min_plan' => 'free',
-        'credit_multiplier' => 1.0,
-        'input_per_mtok' => 3.0,
-        'output_per_mtok' => 15.0,
-        'auto' => true,
-        'enabled' => true,
-        'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'],
-        'verified_at' => null,
-    ], $overrides);
-}
-
-/**
  * Invoke the chat conversation broadcast channel authorization callback.
  *
  * The conversation channel is registered on boot; if the broadcaster has not yet
