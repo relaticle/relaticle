@@ -344,18 +344,21 @@ final class ManageAiSettings extends Page
     }
 
     /**
-     * Probes every newly introduced (provider, model) pairing and writes back what
-     * the provider reported.
+     * Probes every (provider, model) pairing nothing has measured yet and writes
+     * back what the provider reported.
      *
-     * Capabilities are never taken from the form. A model the provider will not
-     * serve must not be storable as enabled and tool-capable, which is exactly how
-     * Opus 4.7 went down in production (Sentry RELATICLE-CRM-6D).
+     * Capabilities are never taken from the form, they are taken from the stored
+     * catalog or from a probe. The form is redrawn from whatever the operator last
+     * saw and a re-added row carries none at all, so trusting it would store an
+     * enabled model as tool-incapable and drop it out of every picker — the silent
+     * failure this gate exists to stop (Sentry RELATICLE-CRM-6D).
      *
-     * Only NEW pairings are probed. Verifying the whole catalog on every save would
-     * mean one provider with a stale key blocks edits to unrelated entries,
-     * including the effort dial. What is already stored is the status quo whether
-     * or not it still works; this gate stops a bad pairing being introduced, it is
-     * not a continuous audit.
+     * A pairing already carrying a measurement is skipped. Re-verifying the whole
+     * catalog on every save would mean one provider with a stale key blocks edits to
+     * unrelated entries, including the effort dial. What is already measured is the
+     * status quo whether or not it still works; this gate stops an UNMEASURED model
+     * being served, it is not a continuous audit. Switching a retired row back on is
+     * therefore a probe, because nothing ever measured it.
      *
      * @param  list<array<string, mixed>>  $models
      * @return array{0: list<array<string, mixed>>, 1: string|null}
@@ -363,12 +366,24 @@ final class ManageAiSettings extends Page
     private function verified(array $models): array
     {
         $probe = resolve(ModelProbe::class);
-        $known = $this->pairings(resolve(ChatSettings::class)->models);
+        $stored = $this->storedByPairing(resolve(ChatSettings::class)->models);
         $verified = [];
 
         foreach ($models as $entry) {
             $provider = $entry['provider'] ?? null;
             $name = $entry['model'] ?? null;
+
+            if (! is_string($provider) || ! is_string($name) || $name === '') {
+                $verified[] = $entry;
+
+                continue;
+            }
+
+            $measured = $stored["{$provider}|{$name}"] ?? [];
+            $capabilities = $measured['capabilities'] ?? null;
+
+            $entry['capabilities'] = is_array($capabilities) && $capabilities !== [] ? $capabilities : null;
+            $entry['verified_at'] = $entry['capabilities'] === null ? null : ($measured['verified_at'] ?? null);
 
             // A disabled entry is not served to anyone, so it does not earn an API
             // call. Retired models kept only for pricing history land here.
@@ -378,13 +393,7 @@ final class ManageAiSettings extends Page
                 continue;
             }
 
-            if (! is_string($provider) || ! is_string($name) || $name === '') {
-                $verified[] = $entry;
-
-                continue;
-            }
-
-            if (in_array("{$provider}|{$name}", $known, true)) {
+            if ($entry['capabilities'] !== null) {
                 $verified[] = $entry;
 
                 continue;
@@ -546,15 +555,17 @@ final class ManageAiSettings extends Page
     }
 
     /**
+     * The stored catalog keyed by pairing, which is what makes a measurement
+     * survive an operator deleting a row and adding it straight back.
+     *
      * @param  array<int, array<string, mixed>>  $models
-     * @return list<string>
+     * @return array<string, array<string, mixed>>
      */
-    private function pairings(array $models): array
+    private function storedByPairing(array $models): array
     {
         return collect($models)
             ->filter(fn (mixed $model): bool => is_array($model) && is_string($model['provider'] ?? null) && is_string($model['model'] ?? null))
-            ->map(fn (array $model): string => "{$model['provider']}|{$model['model']}")
-            ->values()
+            ->keyBy(fn (array $model): string => "{$model['provider']}|{$model['model']}")
             ->all();
     }
 

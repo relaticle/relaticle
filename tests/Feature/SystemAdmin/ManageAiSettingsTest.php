@@ -289,6 +289,120 @@ it('keeps probed capabilities when a save touches only the effort dial', functio
 });
 
 /**
+ * The measurement is the stored one, never the form's.
+ *
+ * A repeater row an operator deletes and adds straight back carries no
+ * `capabilities` at all, and the pairing is still stored, so the probe used to be
+ * skipped and the entry written back unmeasured — dropping the model out of every
+ * picker and off the public pricing page. That is the silent failure this page
+ * exists to prevent, arriving through the page itself.
+ */
+it('keeps a stored measurement when a row is deleted and added straight back', function (): void {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response(['data' => []]),
+        'api.anthropic.com/v1/messages*' => Http::response([], 500),
+    ]);
+
+    $settings = resolve(ChatSettings::class);
+    $settings->models = [ChatCatalog::entry(['verified_at' => '2026-08-27T09:00:00+00:00'])];
+    $settings->save();
+
+    $reAdded = ChatCatalog::entry();
+    unset($reAdded['capabilities'], $reAdded['verified_at']);
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [$reAdded]]))
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
+
+    expect($entry['capabilities'])->toBe(['supports_tools' => true, 'write_guard' => 'api'])
+        ->and($entry['verified_at'])->toBe('2026-08-27T09:00:00+00:00');
+
+    app()->forgetInstance(ModelRegistry::class);
+
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->supportsTools)->toBeTrue();
+});
+
+/**
+ * A new row is added disabled, so its first save stores the pairing without probing
+ * it. Switching it on is therefore the moment it first becomes servable, and the
+ * pairing already being stored must not be what lets it skip the gate.
+ */
+it('probes a stored row that has never been measured when it is switched on', function (): void {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response(['data' => []]),
+        'api.anthropic.com/v1/messages*' => Http::response(['id' => 'msg_1', 'content' => [], 'usage' => []]),
+    ]);
+
+    $settings = resolve(ChatSettings::class);
+    $settings->models = [ChatCatalog::entry(['enabled' => false, 'capabilities' => null])];
+    $settings->save();
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['enabled' => true, 'capabilities' => null])]]))
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $entry = collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-sonnet-5');
+
+    expect($entry['capabilities'])->toBe(['supports_tools' => true, 'write_guard' => 'api'])
+        ->and($entry['verified_at'])->not->toBeNull();
+
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), '/v1/messages'));
+});
+
+/**
+ * Capabilities carried in on the form state are the one thing that must never
+ * survive a retag: the row still shows the previous model's measurement, and the
+ * new pairing has none.
+ */
+it('probes a retagged row rather than inheriting the old tag\'s measurement', function (): void {
+    Http::fake([
+        'api.anthropic.com/v1/models*' => Http::response(['data' => []]),
+        'api.anthropic.com/v1/messages*' => Http::response([
+            'type' => 'error',
+            'error' => ['type' => 'not_found_error', 'message' => 'model: claude-imaginary'],
+        ], 404),
+    ]);
+
+    $settings = resolve(ChatSettings::class);
+    $settings->models = [ChatCatalog::entry()];
+    $settings->save();
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry(['model' => 'claude-imaginary'])]]))
+        ->call('save')
+        ->assertNotified();
+
+    expect(collect(resolve(ChatSettings::class)->models)->firstWhere('model', 'claude-imaginary'))->toBeNull();
+});
+
+/**
+ * The provider dropdown is key-gated, so this branch is not reachable through the
+ * page today. It stays the server-side floor: a catalog edited outside the panel,
+ * or a key rotated away between render and save, must not store a model nothing
+ * can serve.
+ */
+it('refuses a new pairing under a provider this install has no key for', function (): void {
+    config(['ai.providers.gemini.key' => null]);
+
+    $before = resolve(ChatSettings::class)->models;
+
+    livewire(ManageAiSettings::class)
+        ->fillForm(catalogState(['models' => [ChatCatalog::entry([
+            'provider' => 'gemini',
+            'model' => 'gemini-4-ultra',
+            'capabilities' => null,
+        ])]]))
+        ->call('save')
+        ->assertNotified();
+
+    expect(resolve(ChatSettings::class)->models)->toBe($before);
+});
+
+/**
  * `headline()` renders `openai` as `Openai`. laravel/ai already spells each provider
  * on its enum case name, so the panel does not have to keep its own list.
  */
