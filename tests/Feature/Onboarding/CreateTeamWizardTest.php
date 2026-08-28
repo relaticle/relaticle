@@ -60,6 +60,21 @@ it('resolves every wizard heading from translations', function (): void {
         ->assertDontSee('Onboarding referral source');
 });
 
+it('resolves every wizard form label from translations', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.form.workspace_name.label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.workspace_handle.label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.use_case_label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.invite_email_label'))
+        ->assertSee(__('filament/pages/teams.create_team.form.invite_role_label'))
+        ->assertDontSee('filament/pages/teams.create_team.form');
+});
+
 it('renders wizard for users who already have a team', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 

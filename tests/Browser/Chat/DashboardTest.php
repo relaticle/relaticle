@@ -51,7 +51,7 @@ it('uses a white composer surface in light mode', function (): void {
 });
 
 it('shows greeting on the dashboard', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withTeam()->create(['timezone' => 'UTC']);
     $team = $user->ownedTeams()->first();
 
     $this->visit('/app/login')

@@ -269,7 +269,9 @@ final class CreateTeam extends RegisterTenant
                     ->live()
                     // Stale sub-options from the previous use case are invisible yet
                     // fail validation silently, stranding the wizard on this step.
-                    ->afterStateUpdated(fn (Set $set): mixed => $set('onboarding_context', [])),
+                    ->afterStateUpdated(function (Set $set): void {
+                        $set('onboarding_context', []);
+                    }),
 
                 ToggleButtons::make('onboarding_context')
                     ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
