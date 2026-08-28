@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Relaticle\Chat\Services\ProviderModelCatalog;
 use Relaticle\SystemAdmin\Filament\Pages\Settings\ManageAiSettings;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -59,4 +60,31 @@ it('says nothing when the provider returned no list at all', function (): void {
         ->fillForm(['models' => [catalogEntry(['model' => 'claude-retired-0'])], 'anthropic_effort' => 'high'])
         ->assertSuccessful()
         ->assertDontSee('not listed by the provider');
+});
+
+/**
+ * A vendor having a bad minute must not blank the picker for a day. Same rule as
+ * ModelProbe: an empty list is what we could not learn, not what the provider offers.
+ */
+it('retries a failed listing rather than caching the emptiness for a day', function (): void {
+    Http::fakeSequence()
+        ->push([], 500)
+        ->push(['data' => [['id' => 'claude-sonnet-5', 'created_at' => '2026-02-01T00:00:00Z']]]);
+
+    $catalog = resolve(ProviderModelCatalog::class);
+
+    expect($catalog('anthropic'))->toBe([])
+        ->and($catalog('anthropic'))->toBe(['claude-sonnet-5' => 1769904000]);
+});
+
+it('does not re-fetch a listing it already has', function (): void {
+    Http::fake(['api.anthropic.com/v1/models*' => Http::response(['data' => [
+        ['id' => 'claude-sonnet-5', 'created_at' => '2026-02-01T00:00:00Z'],
+    ]])]);
+
+    $catalog = resolve(ProviderModelCatalog::class);
+    $catalog('anthropic');
+    $catalog('anthropic');
+
+    Http::assertSentCount(1);
 });

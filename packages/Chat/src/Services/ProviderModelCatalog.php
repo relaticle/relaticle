@@ -18,6 +18,10 @@ use Illuminate\Support\Facades\Http;
  * reached yields an empty list, and the page falls back to whatever is already
  * saved. Never let this throw into a form render: an unreachable vendor must not
  * take the settings page down with it.
+ *
+ * Only a real listing is cached. A vendor having a bad minute must not blank the
+ * model picker for a day, which is the same reason ModelProbe never caches a
+ * failure: an empty list is what we could not learn, not what the provider offers.
  */
 final readonly class ProviderModelCatalog
 {
@@ -32,11 +36,20 @@ final readonly class ProviderModelCatalog
             return [];
         }
 
-        return Cache::remember(
-            $this->cacheKey($provider),
-            self::TTL_SECONDS,
-            fn (): array => rescue(fn (): array => $this->fetch($provider), [], report: false),
-        );
+        $cached = Cache::get($this->cacheKey($provider));
+
+        if (is_array($cached)) {
+            /** @var array<string, int> $cached */
+            return $cached;
+        }
+
+        $models = rescue(fn (): array => $this->fetch($provider), [], report: false);
+
+        if ($models !== []) {
+            Cache::put($this->cacheKey($provider), $models, self::TTL_SECONDS);
+        }
+
+        return $models;
     }
 
     public function forget(string $provider): void
