@@ -33,7 +33,6 @@
                     : 'var(--collapsed-sidebar-width)';
             },
         }"
-        @chat:open-all-chats.window="open = true"
         :style="{ insetInlineStart: sidebarOffset }"
         x-effect="if (open) $nextTick(() => $el.querySelector('input[type=search]')?.focus())"
         x-show="open"
