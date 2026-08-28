@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use Relaticle\Chat\Enums\WriteGuard;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Chat\Support\CatalogEntry;
+use Relaticle\Chat\Support\Measurement;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Tests\Helpers\ChatCatalog;
 
 mutates(ModelRegistry::class);
+mutates(CatalogEntry::class);
+mutates(Measurement::class);
 
 function freshRegistry(): ModelRegistry
 {
@@ -117,4 +122,26 @@ it('drops an entry that carries no model tag', function (): void {
     $ids = array_map(fn (ModelDescriptor $model): string => $model->id, freshRegistry()->all());
 
     expect($ids)->toBe(['claude-sonnet-5']);
+});
+
+/**
+ * `api` means the provider itself refuses parallel tool calls, which is what makes
+ * the sequential approval flow unbypassable. A row whose guard cannot be read has
+ * proved nothing, so it gets the weaker one: asserting `api` without proof would
+ * tell the write path a guarantee the provider never gave.
+ */
+it('falls back to the weaker write guard when a stored one is unreadable', function (): void {
+    config()->set('chat.models', [ChatCatalog::entry([
+        'capabilities' => ['supports_tools' => true, 'write_guard' => 'totally-not-a-guard'],
+    ])]);
+
+    expect(freshRegistry()->find('claude-sonnet-5')?->writeGuard)->toBe(WriteGuard::Prompt);
+});
+
+it('keeps a stored write guard the enum does know', function (): void {
+    config()->set('chat.models', [ChatCatalog::entry([
+        'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'],
+    ])]);
+
+    expect(freshRegistry()->find('claude-sonnet-5')?->writeGuard)->toBe(WriteGuard::Api);
 });
