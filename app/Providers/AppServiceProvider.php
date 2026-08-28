@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Enums\CrmEntity;
 use App\Enums\Plan;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
@@ -17,20 +18,15 @@ use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
-use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
-use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
-use App\Models\Note;
-use App\Models\Opportunity;
 use App\Models\Passport\AuthCode as McpAuthCode;
-use App\Models\People;
 use App\Models\PersonalAccessToken;
-use App\Models\Task;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -475,11 +471,7 @@ final class AppServiceProvider extends ServiceProvider
         Relation::enforceMorphMap([
             'team' => Team::class,
             'user' => User::class,
-            'people' => People::class,
-            'company' => Company::class,
-            'opportunity' => Opportunity::class,
-            'task' => Task::class,
-            'note' => Note::class,
+            ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
             'email' => Email::class,
             'connected_account' => ConnectedAccount::class,
@@ -522,17 +514,31 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureCustomFieldSchemaInvalidation(): void
     {
-        $invalidate = function (CustomField $field): void {
+        $invalidate = static function (CustomField $field): void {
             $tenantId = $field->getAttribute('tenant_id');
             $entityType = $field->getAttribute('entity_type');
 
             if ((is_string($tenantId) || is_int($tenantId)) && is_string($entityType)) {
-                CustomFieldFilterSchema::forget($tenantId, $entityType);
+                McpSchemaCache::forget($tenantId, $entityType);
             }
         };
 
         CustomField::saved($invalidate);
         CustomField::deleted($invalidate);
+
+        // An option carries its own tenant_id, so clearing that tenant's five entity
+        // schemas beats one SELECT per option row: team creation seeds sixteen of
+        // them inside the registration transaction.
+        $invalidateOption = static function (CustomFieldOption $option): void {
+            $tenantId = $option->getAttribute('tenant_id');
+
+            if (is_string($tenantId) || is_int($tenantId)) {
+                McpSchemaCache::forgetTenant($tenantId);
+            }
+        };
+
+        CustomFieldOption::saved($invalidateOption);
+        CustomFieldOption::deleted($invalidateOption);
     }
 
     /**

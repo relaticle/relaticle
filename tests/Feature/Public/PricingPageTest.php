@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\Billing as BillingFeature;
 use Laravel\Pennant\Feature;
+use Symfony\Component\DomCrawler\Crawler;
 
 it('shows the legacy two-card page when billing is off', function (): void {
     Feature::define(BillingFeature::class, false);
@@ -31,6 +32,16 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertDontSee('One workspace price as your team grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');
+});
+
+it('advertises all MCP tools in the feature metrics', function (): void {
+    $response = $this->get('/pricing')->assertOk();
+    $crawler = new Crawler((string) $response->getContent());
+    $toolCount = $crawler
+        ->filterXPath('//*[normalize-space(text())="MCP Tools"]/preceding-sibling::div[1]')
+        ->text();
+
+    expect($toolCount)->toBe('37');
 });
 
 it('emits product json-ld on the pricing page', function (): void {

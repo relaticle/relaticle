@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
@@ -211,4 +212,36 @@ it('has a configured cost rate for every hosted model the app can select', funct
     foreach ($hostedModels as $model) {
         expect($rates)->toHaveKey($model);
     }
+});
+
+function actAsAiSpendAdminInZone(string $timezone): void
+{
+    test()->actingAs(SystemAdministrator::factory()->create(['timezone' => $timezone]), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+}
+
+it('ends the comparison window at the same elapsed point as today, on the administrator calendar', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsAiSpendAdminInZone('Asia/Yerevan');
+
+    /**
+     * For a 7 day period the comparison window runs from midnight on Aug 14 in
+     * Yerevan (2026-08-13 20:00 UTC) to 14:31 on Aug 20 there (2026-08-20 10:31
+     * UTC), which is the same elapsed time the current window covers.
+     */
+    $spend = fn (string $utc, int $credits): AiCreditTransaction => AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'credits_charged' => $credits,
+        'created_at' => Date::parse($utc, 'UTC'),
+    ]);
+
+    $spend('2026-08-13 19:00:00', 7);   // Aug 13 23:00 in Yerevan, before the window opens
+    $spend('2026-08-13 21:00:00', 50);  // Aug 14 01:00 in Yerevan, inside
+    $spend('2026-08-20 11:00:00', 9);   // Aug 20 15:00 in Yerevan, past the elapsed point
+
+    $component = livewire(AiSpendStatsWidget::class, ['pageFilters' => ['period' => '7']])->assertOk();
+    $stats = invade($component->instance())->getStats();
+
+    expect($stats[1]->getDescription())->toBe('Previous period: 50');
 });

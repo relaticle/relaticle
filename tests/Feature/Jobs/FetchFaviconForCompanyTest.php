@@ -117,3 +117,33 @@ test('downloads the favicon through the guarded client and stores it', function 
     Http::assertSent(fn ($request): bool => $request->url() === 'https://1.1.1.1/favicon.png');
     expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
 });
+
+test('downloads the favicon when the company carries several custom field values', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentTeam)->create();
+
+    foreach ([CompanyField::DOMAINS->value => ['example.com'], CompanyField::LINKEDIN->value => 'www.linkedin.com/company/example'] as $code => $value) {
+        CustomFieldValue::forceCreate([
+            'tenant_id' => $this->user->currentTeam->getKey(),
+            'entity_type' => 'company',
+            'entity_id' => $company->getKey(),
+            'custom_field_id' => CustomField::query()->where('code', $code)->forEntity(Company::class)->firstOrFail()->getKey(),
+            'json_value' => $value,
+        ]);
+    }
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://1.1.1.1/favicon.png');
+    $favicon->shouldReceive('getIconSize')->andReturn(180);
+    $favicon->shouldReceive('getIconType')->andReturn('apple-touch-icon');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+
+    $pngBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    Http::fake(['https://1.1.1.1/favicon.png' => Http::response($pngBytes, 200)]);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
+});

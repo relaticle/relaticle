@@ -8,12 +8,10 @@ use App\Actions\People\DeletePeople;
 use App\Mcp\Tools\BaseDeleteTool;
 use App\Models\People;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Delete Person')]
 #[Description('Delete a person (contact) from the CRM (soft delete).')]
-#[IsDestructive]
-#[IsOpenWorld(false)]
 final class DeletePeopleTool extends BaseDeleteTool
 {
     protected function modelClass(): string

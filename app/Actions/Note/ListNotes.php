@@ -43,7 +43,7 @@ final readonly class ListNotes
                 AllowedFilter::partial('title'),
                 AllowedFilter::scope('notable_type', 'forNotableType'),
                 AllowedFilter::scope('notable_id', 'forNotableId'),
-                AllowedFilter::custom('custom_fields', new CustomFieldFilter('note')),
+                CustomFieldFilter::allowedFilter('note'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '<=', $value)),
             )

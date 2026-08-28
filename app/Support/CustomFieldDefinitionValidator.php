@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
 use Closure;
@@ -45,7 +46,7 @@ final readonly class CustomFieldDefinitionValidator
         $maxOptions = self::maxOptions();
 
         return Validator::make(self::normalize($data), [
-            'entity_type' => ['required', Rule::in(CreateCustomField::VALID_ENTITY_TYPES), self::withinFieldCap($tenantId, $entityType)],
+            'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType)],
             'type' => ['required', Rule::in(CreateCustomField::ALLOWED_TYPES)],
             'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
                 $tenantId,
@@ -56,7 +57,7 @@ final readonly class CustomFieldDefinitionValidator
             'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
         ], [
-            'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CreateCustomField::VALID_ENTITY_TYPES).'.',
+            'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
             'type.in' => 'Field type ":input" is not supported via chat. Allowed types: '.implode(', ', CreateCustomField::ALLOWED_TYPES).'.',
             'name.required' => 'A field name is required.',
             'name.max' => 'Field names must be 50 characters or fewer.',

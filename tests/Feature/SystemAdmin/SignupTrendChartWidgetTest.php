@@ -111,3 +111,12 @@ it('counts only non-personal teams in the teams series', function (): void {
 
     expect(signupTrendSeries('New Teams')['Aug 27'])->toBe(1);
 });
+
+it('stamps the chart with the read time in the administrator zone', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsSignupTrendAdmin('Asia/Yerevan');
+
+    livewire(SignupTrendChartWidget::class)
+        ->assertOk()
+        ->assertSee('Updated 14:31 +04');
+});

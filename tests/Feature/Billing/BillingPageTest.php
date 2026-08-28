@@ -2,16 +2,26 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\CreateProCheckout;
+use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
+use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
-mutates(Billing::class);
+mutates(
+    Billing::class,
+    CreateProCheckout::class,
+    CreditPackCatalog::class,
+    HostedWorkspaceAccess::class,
+    StartProTrial::class,
+);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);
@@ -69,6 +79,14 @@ it('offers the trial to a hosted workspace that never received one', function ()
         ->assertSee('$19')
         ->assertSee(__('billing.pro_plan.billed_yearly'))
         ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
+});
+
+it('advertises all 37 MCP tools on the authenticated billing page', function (): void {
+    billingPageOwner();
+
+    livewire(Billing::class)
+        ->assertSee('REST API and 37-tool MCP server')
+        ->assertDontSee('REST API and 32-tool MCP server');
 });
 
 it('starts a trial via the page action', function (): void {

@@ -29,9 +29,18 @@ final class CompanyExporter extends Exporter
             ExportColumn::make('creator.name'),
             ExportColumn::make('accountOwner.name'),
             ExportColumn::make('name'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
+
+            /**
+             * Sysadmin exports are not converted, so the header names the zone the
+             * values are actually in. See the app panel's BaseExporter for the
+             * converting variant.
+             */
+            ExportColumn::make('created_at')
+                ->label('Created At (UTC)'),
+            ExportColumn::make('updated_at')
+                ->label('Updated At (UTC)'),
+            ExportColumn::make('deleted_at')
+                ->label('Deleted At (UTC)'),
             ExportColumn::make('creation_source'),
 
             // Add all custom fields automatically

@@ -7,7 +7,6 @@ namespace Relaticle\SystemAdmin\Filament\Widgets;
 use App\Enums\BillingStatus;
 use App\Models\Team;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -40,6 +39,8 @@ final class TopTeamsTableWidget extends BaseWidget
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
+            ->description(ViewerTime::freshnessCaption())
+            ->poll('60s')
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')
@@ -131,19 +132,27 @@ final class TopTeamsTableWidget extends BaseWidget
     private function buildQuery(): Builder
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
+        [$start, $end] = ViewerTime::periodUtc($days);
 
         $userMorphAlias = (new User)->getMorphClass();
 
+        /**
+         * `created_at` is a UTC-bearing `timestamp without time zone`, so it is
+         * relabelled as UTC before being shifted into the viewer's zone. Without
+         * that, two events either side of the viewer's midnight count as two
+         * active days for anyone who is not on UTC.
+         *
+         * Binding order follows the placeholders in the select list: the zone
+         * comes before the causer alias.
+         */
         $activity = DB::table('activity_log')
             ->selectRaw(<<<'SQL'
                 team_id,
                 COUNT(DISTINCT (subject_type, subject_id)) AS records_touched,
-                COUNT(DISTINCT created_at::date) AS active_days,
+                COUNT(DISTINCT (created_at AT TIME ZONE 'UTC' AT TIME ZONE ?)::date) AS active_days,
                 COUNT(DISTINCT causer_id) FILTER (WHERE causer_type = ?) AS active_members,
                 MAX(created_at) AS last_activity
-            SQL, [$userMorphAlias])
+            SQL, [ViewerTime::timezone(), $userMorphAlias])
             ->whereNotNull('team_id')
             ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
             ->groupBy('team_id');

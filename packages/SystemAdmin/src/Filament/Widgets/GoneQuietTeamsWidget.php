@@ -6,7 +6,6 @@ namespace Relaticle\SystemAdmin\Filament\Widgets;
 
 use App\Enums\CreationSource;
 use App\Models\Team;
-use Carbon\CarbonImmutable;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
@@ -15,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 /**
  * Teams that created records before the selected period but none inside it:
@@ -37,7 +37,8 @@ final class GoneQuietTeamsWidget extends BaseWidget
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
-            ->description('Teams active before this period with no activity in it.')
+            ->description('Teams active before this period with no activity in it. '.ViewerTime::freshnessCaption())
+            ->poll('60s')
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')
@@ -78,8 +79,7 @@ final class GoneQuietTeamsWidget extends BaseWidget
     private function buildQuery(): Builder
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
+        [$start, $end] = ViewerTime::periodUtc($days);
         $startStr = $start->toDateTimeString();
         $endStr = $end->toDateTimeString();
         $systemSource = CreationSource::SYSTEM->value;

@@ -34,7 +34,7 @@ final readonly class PersonalAccessTokenObserver
         }
 
         dispatch(new ModifySubscriberTagsJob(
-            $user->mailcoach_subscriber_uuid,
+            (string) $user->id,
             [SubscriberTagEnum::HasApiToken->value],
             TagAction::Add,
         ))->afterCommit();

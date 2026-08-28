@@ -72,31 +72,69 @@ describe('Home page', function () {
 });
 
 describe('Legal pages', function () {
-    it('displays the terms of service page with current pricing terms', function () {
-        $response = $this->get('/terms-of-service');
+    it('displays the terms of service page with product-specific content as :format', function (array $headers, string $contentType) {
+        $response = $this->get('/terms-of-service', $headers);
 
         $response->assertStatus(200);
+        expect($response->headers->get('Content-Type'))->toStartWith($contentType);
+
         $response->assertSee('Terms of Service');
         $response->assertSee('Relaticle');
-        $response->assertSee('August 26, 2026');
-        $response->assertSee('Self-hosted software has no license fee under AGPL-3.0.');
-        $response->assertSee('The hosted Cloud service may offer trial, free, and paid plans.');
-        $response->assertSee('Current pricing and included features appear on the pricing page or during checkout.');
-        $response->assertSee('Charges apply only after you accept the displayed paid terms.');
-        $response->assertSee('Price changes apply prospectively after notice.');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
-        $response->assertDontSee('Both the Cloud and Self-Hosted options are available at no cost.');
-    });
+    })->with([
+        'HTML' => [[], 'text/html'],
+        'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+    ]);
 
-    it('displays the privacy policy page with product-specific content', function () {
-        $response = $this->get('/privacy-policy');
+    it('displays the privacy policy page with current MCP disclosures as :format', function (array $headers, string $contentType) {
+        $response = $this->get('/privacy-policy', $headers);
 
         $response->assertStatus(200);
+        expect($response->headers->get('Content-Type'))->toStartWith($contentType);
+
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
+        $response->assertSee('August 26, 2026');
+        $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
+        $response->assertSee('That integration may send authorized data to its provider.');
+        $response->assertSee('Relaticle does not sell CRM data.');
+        $response->assertSee('Relaticle does not use CRM data for advertising.');
+        $response->assertSee('Relaticle does not train AI models on CRM data.');
+        $response->assertSee('You can authorize an MCP client or AI provider to access your CRM data.');
+        $response->assertSee('The provider receives only data requested through authorized tools.');
+        $response->assertSee('The provider processes that data under its own terms and privacy policy.');
+        $response->assertSee('Disconnecting the provider or revoking its token stops future access.');
+        $response->assertSee('Relaticle enforces workspace and token scope on every tool request.');
+        $response->assertSee('MCP write tools can change CRM records.');
+        $response->assertSee('Task assignment operations can send transactional notifications.');
+        $response->assertSee('User names, email addresses, and identifiers.');
+        $response->assertSee('Team names and identifiers.');
+        $response->assertSee('Team-member names, emails, and identifiers.');
+        $response->assertSee('Token ability names.');
+        $response->assertSee('Companies, people, opportunities, tasks, and notes.');
+        $response->assertSee('Record identifiers and canonical record URLs.');
+        $response->assertSee('Contact details.');
+        $response->assertSee('Custom-field definitions, options, and values.');
+        $response->assertSee('Relationships between records.');
+        $response->assertSee('Opportunity stages and amounts.');
+        $response->assertSee('Activity actors, field changes, and timestamps.');
+        $response->assertSee('Record creation and update timestamps.');
+        $response->assertSee('Pagination and count metadata.');
+        $response->assertSee('Tool responses can include record identifiers, timestamps, pagination metadata, and count metadata.');
+        $response->assertSee('Access tokens.');
+        $response->assertSee('Refresh tokens.');
+        $response->assertSee('Passwords.');
+        $response->assertSee('API keys.');
+        $response->assertSee('Authentication secrets.');
         $response->assertDontSee('registered mail');
-    });
+        $response->assertDontSee('We do not share your CRM data with any third party.');
+        $response->assertDontSee('Your data stays entirely on your servers.');
+        $response->assertDontSee('internal timestamps');
+    })->with([
+        'HTML' => [[], 'text/html'],
+        'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+    ]);
 });
 
 describe('Documentation pages', function () {

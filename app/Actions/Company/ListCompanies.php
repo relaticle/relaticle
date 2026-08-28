@@ -41,7 +41,7 @@ final readonly class ListCompanies
         )
             ->allowedFilters(
                 AllowedFilter::partial('name'),
-                AllowedFilter::custom('custom_fields', new CustomFieldFilter('company')),
+                CustomFieldFilter::allowedFilter('company'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('companies.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('companies.created_at', '<=', $value)),
             )
