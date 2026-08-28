@@ -1,13 +1,13 @@
 <div>
     <div
         x-data="{
-            open: false,
+            open: @entangle('isOpen'),
             viewportWidth: window.innerWidth,
             init() {
                 this.keydownHandler = (e) => {
                     if (e.key === 'Escape' && this.open) {
                         e.preventDefault();
-                        this.open = false;
+                        $wire.close();
                     }
                 };
                 window.addEventListener('keydown', this.keydownHandler);
@@ -47,7 +47,7 @@
     >
         {{-- Panel body --}}
         <div
-            @click.outside="open = false"
+            @click.outside="if (open) $wire.close()"
             x-transition:enter="motion-safe:transition motion-safe:ease-out motion-safe:duration-200"
             x-transition:enter-start="motion-safe:-translate-x-full"
             x-transition:enter-end="motion-safe:translate-x-0"
@@ -64,7 +64,7 @@
                     <a
                         href="{{ $newChatUrl }}"
                         wire:navigate
-                        @click="open = false"
+                        @click="$wire.close()"
                         aria-label="{{ __('New chat') }}"
                         title="{{ __('New chat') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
@@ -74,7 +74,7 @@
 
                     <button
                         type="button"
-                        @click="open = false"
+                        @click="$wire.close()"
                         aria-label="{{ __('Close all chats panel') }}"
                         class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
@@ -180,7 +180,7 @@
                                 <a
                                     href="{{ $chatUrl }}"
                                     wire:navigate
-                                    @click="open = false"
+                                    @click="$wire.close()"
                                     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                                 >
                                     <x-heroicon-o-chat-bubble-left class="h-4 w-4 text-gray-400" />
