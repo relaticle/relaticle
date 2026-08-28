@@ -208,7 +208,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach([
                         ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', '32', 'MCP Tools'],
+                        ['ri-robot-2-line', '37', 'MCP Tools'],
                         ['ri-stack-line', '22', 'Field Types'],
                         ['ri-lock-line', '5-Layer', 'Authorization'],
                     ] as [$icon, $value, $label])

@@ -2,7 +2,7 @@
 title: MCP Server
 description: Connect AI assistants like Claude to your CRM.
 order: 2
-updated: "2026-08-26"
+updated: "2026-08-28"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update contacts, and more -- all from a natural conversation.
@@ -24,9 +24,11 @@ With the Relaticle MCP server, your AI assistant can:
 
 ---
 
-## Prerequisites
+## Connect to Relaticle
 
-Before connecting an AI assistant, you need an access token:
+Clients with OAuth support need only the MCP endpoint. ChatGPT and Claude open Relaticle's consent screen and let you choose one workspace.
+
+Clients without OAuth support need a personal access token:
 
 1. Log in to Relaticle
 2. Click your avatar in the top-right corner
@@ -34,7 +36,7 @@ Before connecting an AI assistant, you need an access token:
 4. Click **Create** and give your token a name
 5. Copy the token -- it won't be shown again
 
-The token scopes your access to the team you select when creating it. All MCP operations use that team's data.
+The token scopes your access to the workspace you select when creating it. All MCP operations use that workspace's data.
 
 ---
 
@@ -49,9 +51,9 @@ The MCP endpoint advertises OAuth metadata at:
 - `https://mcp.relaticle.com/.well-known/oauth-authorization-server`
 - `https://mcp.relaticle.com/.well-known/oauth-protected-resource`
 
-Clients that support Dynamic Client Registration (RFC 7591) — including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors — register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`).
+Clients that support Dynamic Client Registration (RFC 7591), including Claude.ai, Claude Desktop, Claude Code, and ChatGPT custom connectors, register themselves automatically and walk you through a one-click consent flow. PKCE is required (`S256`).
 
-At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected — subscribe first, or the connector would have no data to read.
+At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected. Subscribe first, or the connector would have no data to read.
 
 Access tokens last 30 days and refresh tokens 90 days; supported clients refresh silently in the background.
 
@@ -67,9 +69,23 @@ For Cursor, VS Code, MCP Inspector, or any client without OAuth support, create 
 
 ## Setup by Client
 
-The MCP server endpoint is `https://mcp.relaticle.com`. Replace `YOUR_TOKEN` in the examples below with the access token you created above.
+The MCP server endpoint is `https://mcp.relaticle.com`. ChatGPT and Claude use OAuth. The remaining examples use a personal access token.
 
-### Claude Desktop
+### ChatGPT
+
+1. Open **Settings → Security and login** and enable **Developer mode**.
+2. Open **ChatGPT Plugins** and select the plus button.
+3. Enter `Relaticle` and `https://mcp.relaticle.com`.
+4. Connect, sign in to Relaticle, and choose one workspace.
+
+### Claude
+
+1. Open **Customize → Connectors**.
+2. Select the plus button, then **Add custom connector**.
+3. Enter `Relaticle` and `https://mcp.relaticle.com`.
+4. Connect, sign in to Relaticle, and choose one workspace.
+
+### Claude Desktop with a personal access token
 
 Add this to your Claude Desktop configuration file (`claude_desktop_config.json`):
 
@@ -87,7 +103,7 @@ Add this to your Claude Desktop configuration file (`claude_desktop_config.json`
 }
 ```
 
-### Claude Code
+### Claude Code with a personal access token
 
 Add the server from your terminal:
 
@@ -98,7 +114,7 @@ claude mcp add relaticle \
   --header "Authorization: Bearer YOUR_TOKEN"
 ```
 
-### Cursor
+### Cursor with a personal access token
 
 Add this to your Cursor MCP configuration (`.cursor/mcp.json`):
 
@@ -116,7 +132,7 @@ Add this to your Cursor MCP configuration (`.cursor/mcp.json`):
 }
 ```
 
-### VS Code (GitHub Copilot)
+### VS Code with a personal access token
 
 Add this to your VS Code settings (`.vscode/mcp.json`):
 

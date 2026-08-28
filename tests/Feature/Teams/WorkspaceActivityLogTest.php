@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Support\ActivityLog\RequestActivityBatch;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
@@ -361,6 +362,7 @@ test('a custom field edit reads as an update, not its raw event name', function 
 test('filtering on updated covers custom field edits too', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Field Edited Co']);
     Company::factory()->for($this->team)->create(['name' => 'Untouched Co'])->delete();
+    app()->forgetInstance(RequestActivityBatch::class);
 
     activity()
         ->performedOn($company)

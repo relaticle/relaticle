@@ -212,11 +212,30 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
     $notionOpportunity = Opportunity::query()->where('team_id', $team->getKey())->where('name', 'Notion API Integration')->firstOrFail();
     $notionTask = Task::query()->where('team_id', $team->getKey())->where('title', 'Integration meeting with Ivan')->firstOrFail();
     $notionNote = Note::query()->where('team_id', $team->getKey())->where('title', 'API integration possibilities')->firstOrFail();
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+    $executiveEmails = People::query()
+        ->where('team_id', $team->getKey())
+        ->whereIn('name', ['Brian Chesky', 'Dylan Field', 'Ivan Zhao', 'Tim Cook'])
+        ->withCustomFieldValues()
+        ->get()
+        ->mapWithKeys(fn (People $person): array => [$person->name => $person->getCustomFieldValue($emailField)])
+        ->all();
 
     expect($ivan->company_id)->toBe($notion->getKey())
         ->and($notionOpportunity->company_id)->toBe($notion->getKey())
         ->and($notionTask->people()->whereKey($ivan->getKey())->exists())->toBeTrue()
-        ->and($notionNote->companies()->whereKey($notion->getKey())->exists())->toBeTrue();
+        ->and($notionNote->companies()->whereKey($notion->getKey())->exists())->toBeTrue()
+        ->and($executiveEmails)->toBe([
+            'Brian Chesky' => ['brian@airbnb.example'],
+            'Dylan Field' => ['dylan@figma.example'],
+            'Ivan Zhao' => ['ivan@notion.example'],
+            'Tim Cook' => ['tim@apple.example'],
+        ]);
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
