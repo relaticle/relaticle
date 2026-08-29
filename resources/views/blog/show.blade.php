@@ -66,7 +66,7 @@
                         </div>
                     @endif
 
-                    <x-ink::related-posts :posts="$relatedPosts" />
+                    <x-blog.related-posts :posts="$relatedPosts" />
                 </article>
 
                 <!-- Right Sidebar: Table of Contents -->

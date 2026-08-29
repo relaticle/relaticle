@@ -470,6 +470,24 @@ describe('Blog pages', function () {
             ->assertSee($post->title);
     });
 
+    it('renders the post cover uncropped on the index', function () {
+        Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('storage/ink/cover.png')
+            ->assertSee('aspect-video');
+    });
+
+    it('renders related posts through the shared card on a post page', function () {
+        $category = Category::factory()->create();
+        [$post, $related] = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($related->title);
+    });
+
     it('canonicalises a paginated listing to its own page', function () {
         Post::factory()->published()->count(config('ink.per_page') + 1)->create();
 
