@@ -6,8 +6,12 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
+use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -159,4 +163,20 @@ it('renders Connect Gmail and hides Connect Outlook for now', function (): void 
         ->assertActionExists('connectGmail')
         ->assertActionVisible('connectGmail')
         ->assertActionHidden('connectAzure');
+});
+
+it('shows only accounts and templates in the email settings cluster', function (): void {
+    expect(EmailAccountsPage::shouldRegisterNavigation())->toBeTrue()
+        ->and(EmailTemplateResource::shouldRegisterNavigation())->toBeTrue()
+        ->and(EmailSignaturesPage::shouldRegisterNavigation())->toBeFalse()
+        ->and(EmailAccessRequestsPage::shouldRegisterNavigation())->toBeFalse()
+        ->and(UserEmailPrivacyPage::shouldRegisterNavigation())->toBeFalse();
+
+    $this->get(EmailAccountsPage::getUrl(tenant: $this->team))
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/email-accounts.navigation_label'), false)
+        ->assertSee(__('filament/resources/email-template.navigation_label'), false)
+        ->assertDontSee(__('filament/pages/email-access-requests.navigation_label'), false)
+        ->assertDontSee(__('filament/pages/email-privacy-settings.navigation_label'), false)
+        ->assertDontSee(__('filament/pages/user-email-privacy.navigation_label'), false);
 });

@@ -28,6 +28,8 @@ final class EmailAccessRequestsPage extends Page implements HasTable
 
     protected static ?string $navigationLabel = null;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $cluster = EmailSettings::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';

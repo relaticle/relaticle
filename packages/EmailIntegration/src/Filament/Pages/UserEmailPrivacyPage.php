@@ -22,6 +22,8 @@ final class UserEmailPrivacyPage extends Page
 
     protected static ?string $title = null;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?int $navigationSort = 5;
 
     /**
