@@ -14,5 +14,6 @@ return [
         'last_used' => 'Last used',
         'continue_with' => 'Continue with :provider',
         'passkey_retry' => 'Try the passkey again',
+        'unsupported' => 'Passkeys are not supported in this browser.',
     ],
 ];

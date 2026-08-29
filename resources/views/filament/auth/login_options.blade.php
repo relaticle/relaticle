@@ -36,12 +36,18 @@
                     window.location.href = response.redirect;
                 }
             } catch (e) {
-                if (e?.constructor?.name !== 'UserCancelledError') {
+                if (e?.name !== 'UserCancelledError') {
                     this.error = e.message;
                 }
             }
         },
         async verify() {
+            if (!window.Passkeys?.verify || !this.supported) {
+                this.error = @js(__('auth.login.unsupported'));
+
+                return;
+            }
+
             this.loading = true;
             this.error = null;
 
@@ -57,7 +63,7 @@
 
                 window.location.href = response?.redirect ?? '{{ filament()->getPanel('app')->getUrl() }}';
             } catch (e) {
-                if (e?.constructor?.name !== 'UserCancelledError') {
+                if (e?.name !== 'UserCancelledError') {
                     this.error = e.message;
                 }
             } finally {

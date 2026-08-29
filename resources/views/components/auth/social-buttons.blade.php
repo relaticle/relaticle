@@ -9,6 +9,7 @@
         color="gray"
         class="w-full justify-center"
         x-on:click="localStorage.setItem('relaticle:last-login', 'google')"
+        x-bind:class="$wire?.authMethod === 'social:google' && 'ring-2 ring-primary-500 dark:ring-primary-400'"
     >
         <span class="flex items-center">
             <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -34,6 +35,7 @@
             color="gray"
             class="w-full justify-center"
             x-on:click="localStorage.setItem('relaticle:last-login', 'microsoft')"
+            x-bind:class="$wire?.authMethod === 'social:microsoft' && 'ring-2 ring-primary-500 dark:ring-primary-400'"
         >
             <span class="flex items-center">
                 <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24">
