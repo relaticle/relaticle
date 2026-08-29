@@ -1,6 +1,7 @@
 <x-documentation::shell
-    :title="$page->title . ' - ' . config('app.name')"
+    :title="__(':title - :brand Help Centre', ['title' => $page->title, 'brand' => config('app.name')])"
     :description="$page->description"
+    og-type="article"
     :nav="$nav"
     :current-path="$currentPath">
     <x-slot:breadcrumbs>

@@ -76,10 +76,13 @@
             <div>
                 <h2 class="font-display text-base font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('Still stuck?') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ __('Ask the team and other Relaticle users in Discord, or open an issue on GitHub.') }}
+                    {{ __('Message the team directly, ask other Relaticle users in Discord, or open an issue on GitHub.') }}
                 </p>
             </div>
             <div class="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
+                <x-marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="ri-mail-line">
+                    {{ __('Contact us') }}
+                </x-marketing.button>
                 <x-marketing.button variant="secondary" size="sm" href="{{ route('discord') }}" icon="ri-discord-fill" :external="true">
                     {{ __('Join Discord') }}
                 </x-marketing.button>

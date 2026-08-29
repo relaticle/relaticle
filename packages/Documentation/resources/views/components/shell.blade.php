@@ -3,6 +3,7 @@
     'description',
     'ogTitle' => null,
     'ogDescription' => null,
+    'ogType' => 'website',
     'nav' => [],
     'currentPath' => null,
 ])
@@ -14,7 +15,8 @@
         :title="$title"
         :description="$description"
         :og-title="$ogTitle ?? $title"
-        :og-description="$ogDescription ?? $description" />
+        :og-description="$ogDescription ?? $description"
+        :og-type="$ogType" />
 
     {{-- documentation.js before app.js on purpose: app.js calls Alpine.start()
          as it executes, and the shell's x-data reaches for window.RelaticleDocs
@@ -188,7 +190,7 @@
         <div class="min-w-0 flex-1">
             <main id="docs-content" tabindex="-1" class="px-5 py-9 sm:px-8 lg:px-12 lg:py-12">
                 @isset($breadcrumbs)
-                    <nav aria-label="{{ __('Breadcrumb') }}" class="mb-7 text-[13px] text-gray-500 dark:text-gray-400">
+                    <nav aria-label="{{ __('Breadcrumb') }}" {{ $breadcrumbs->attributes->class('mb-7 text-[13px] text-gray-500 dark:text-gray-400') }}>
                         {{ $breadcrumbs }}
                     </nav>
                 @endisset

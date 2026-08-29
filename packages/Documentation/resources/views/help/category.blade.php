@@ -1,9 +1,9 @@
 <x-documentation::shell
-    :title="$category->title . ' - ' . config('app.name')"
+    :title="__(':title - :brand Help Centre', ['title' => $category->title, 'brand' => config('app.name')])"
     :description="$category->description"
     :nav="$nav"
     :current-path="$currentPath">
-    <x-slot:breadcrumbs>
+    <x-slot:breadcrumbs class="mx-auto max-w-[45rem]">
         <ol class="flex flex-wrap items-center gap-2">
             <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help Centre') }}</a></li>
             <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
@@ -11,7 +11,7 @@
         </ol>
     </x-slot:breadcrumbs>
 
-    <div class="max-w-[45rem]">
+    <div class="mx-auto max-w-[45rem]">
         <div class="flex items-start gap-4">
             <span class="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 sm:inline-flex dark:bg-primary-500/10 dark:text-primary-400">
                 <x-documentation::doc-icon :topic="$category->path" class="h-5 w-5" />
