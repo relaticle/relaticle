@@ -180,7 +180,7 @@
         </nav>
     </div>
 
-    <div class="mx-auto flex w-full max-w-[100rem]">
+    <div class="mx-auto flex w-full max-w-[90rem]">
         <aside class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 border-r border-gray-200/70 lg:block dark:border-white/[0.06]">
             <nav aria-label="{{ __('Documentation navigation') }}" class="docs-scroll h-full overflow-y-auto px-6 py-9">
                 <x-documentation::sidebar-nav :nav="$nav" :current-path="$currentPath" />
@@ -189,12 +189,6 @@
 
         <div class="min-w-0 flex-1">
             <main id="docs-content" tabindex="-1" class="px-5 py-9 sm:px-8 lg:px-12 lg:py-12">
-                @isset($breadcrumbs)
-                    <nav aria-label="{{ __('Breadcrumb') }}" {{ $breadcrumbs->attributes->class('mb-7 text-[13px] text-gray-500 dark:text-gray-400') }}>
-                        {{ $breadcrumbs }}
-                    </nav>
-                @endisset
-
                 {{ $slot }}
             </main>
 

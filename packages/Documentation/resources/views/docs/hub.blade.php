@@ -9,7 +9,7 @@
     :title="$baseTitle . ' - ' . config('app.name')"
     :description="$pageDescription"
     :nav="$nav">
-    <div class="mx-auto max-w-3xl">
+    <div class="mx-auto max-w-5xl">
         <p class="text-pico font-semibold tracking-[0.08em] text-primary-600 uppercase dark:text-primary-400">
             {{ __('Build on Relaticle') }}
         </p>
