@@ -1,5 +1,5 @@
 <div
-    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null))"
+    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null), @js($turnInFlight))"
     x-on:keydown="onChatRootKeydown($event)"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     x-on:chat:editor-arrow-up.window="if ($event.detail?.context === @js($context ?? 'conversation')) maybeEditLastUserMessage()"
@@ -29,7 +29,7 @@
 
 @script
 <script>
-Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt) => ({
+Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt, turnInFlight) => ({
     ...window.ChatModules.transcriptModule({
         messagesUrl: @js(url('/chat/messages')),
         {{-- Templated on the conversation id for the same reason the switcher's
@@ -252,6 +252,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.subscribeToConversation(this.conversationId);
         }
 
+        // A turn is mid-flight server-side (reload during a running turn): show
+        // it as one from the first paint, exactly as the chat:resuming handler
+        // does for a resume this tab never sent. The watchdog bounds a job that
+        // died without broadcasting; stream_end/failure clear it as usual.
+        if (turnInFlight && this.conversationId) {
+            this.isStreaming = true;
+            this.currentToolStatus = null;
+            this.startStreamTimeout();
+        }
+
         // Land at the latest message when reopening an existing conversation.
         // Without this, the messages container starts scrolled to the top
         // (oldest message), forcing the user to scroll down to see context.
@@ -340,7 +350,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         this.beforeUnloadHandler = (e) => {
-            if (!this.isStreaming) return;
+            // A streaming turn is reload-safe (TurnPresence restores it), so
+            // only undelivered input warrants the prompt: a send the server
+            // has not accepted yet, or a message queued behind the stream.
+            const undelivered = this.queuedSend
+                || this.messages.some((m) => m.role === 'user' && m.sendState === 'sending');
+            if (!undelivered) return;
             // Browsers show their own generic prompt; custom strings are ignored.
             e.preventDefault();
             e.returnValue = '';

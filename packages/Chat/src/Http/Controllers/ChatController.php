@@ -41,6 +41,7 @@ use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TranscriptScope;
+use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class ChatController
 {
@@ -192,6 +193,15 @@ final readonly class ChatController
         $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
 
         $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
+
+        TurnPresence::begin(
+            $conversation,
+            turnId: $turnId,
+            message: $parsed['text'],
+            document: $validated['document'],
+            mentions: $parsed['mentions'],
+            pageContext: $pageContext,
+        );
 
         dispatch(new ProcessChatMessage(
             user: $user,

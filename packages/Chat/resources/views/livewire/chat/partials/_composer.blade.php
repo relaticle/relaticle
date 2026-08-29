@@ -33,7 +33,11 @@
                  the decision buttons pinned. Scrolling here instead would push
                  Approve below the fold on any plan taller than the dock. --}}
             <div class="flex max-h-[55vh] min-h-0 flex-col">
-                <livewire:chat.proposal-card :context="$context ?? 'conversation'" wire:key="proposal-dock-{{ $context ?? 'conversation' }}" />
+                <livewire:chat.proposal-card
+                    :context="$context ?? 'conversation'"
+                    :initial-pending-action-id="$initialProposalId ?? null"
+                    wire:key="proposal-dock-{{ $context ?? 'conversation' }}"
+                />
             </div>
         </div>
 

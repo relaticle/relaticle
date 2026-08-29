@@ -49,6 +49,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\Chat\Support\TurnPresence;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Throwable;
 
@@ -139,6 +140,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
                 message: __('billing.access.paused_chat'),
             ));
+            TurnPresence::clear($this->conversationId, $this->turnId);
 
             return;
         }
@@ -174,6 +176,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
             );
             $this->releaseAuth();
+            TurnPresence::clear($this->conversationId, $this->turnId);
 
             return;
         }
@@ -233,6 +236,7 @@ final class ProcessChatMessage implements ShouldQueue
                 message: 'The assistant could not start. Please try again.',
             ));
             $this->releaseAuth();
+            TurnPresence::clear($this->conversationId, $this->turnId);
 
             return;
         }
@@ -305,6 +309,7 @@ final class ProcessChatMessage implements ShouldQueue
                     conversationId: $this->conversationId,
                     message: 'Generation stopped.',
                 ));
+                TurnPresence::clear($this->conversationId, $this->turnId);
 
                 return;
             }
@@ -342,6 +347,12 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
                 $this->suggestNextSteps($streamedResponse);
+
+                // Both rows are persisted by now (RememberConversation's own
+                // then() ran before this one), so a reload can rebuild the turn
+                // from the database. Any throw above lands in failed(), which
+                // clears too.
+                TurnPresence::clear($this->conversationId, $this->turnId);
             });
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
@@ -536,6 +547,10 @@ final class ProcessChatMessage implements ShouldQueue
             conversationId: $this->conversationId,
             message: $this->failureMessage($exception),
         ));
+
+        // Last, after persistFailedTurn: a reload landing mid-failed() must
+        // never find the marker gone AND the rows unpersisted at once.
+        TurnPresence::clear($this->conversationId, $this->turnId);
     }
 
     private function failureMessage(?Throwable $exception): string
