@@ -30,7 +30,7 @@ final class TeamMemberAddedListener
         }
 
         dispatch(new ModifySubscriberTagsJob(
-            $owner->mailcoach_subscriber_uuid,
+            (string) $owner->id,
             [SubscriberTagEnum::HasTeamMembers->value],
             TagAction::Add,
         ))->afterCommit();

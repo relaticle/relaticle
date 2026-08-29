@@ -2,16 +2,26 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\CreateProCheckout;
+use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Billing\CreditPackCatalog;
+use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
-mutates(Billing::class);
+mutates(
+    Billing::class,
+    CreateProCheckout::class,
+    CreditPackCatalog::class,
+    HostedWorkspaceAccess::class,
+    StartProTrial::class,
+);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);
@@ -48,27 +58,35 @@ it('shows trial CTA to an owner who never trialed', function (): void {
         ->assertSee(__('billing.trial.start_button'));
 });
 
-it('hides the trial CTA once the user used a trial', function (): void {
-    [$user] = billingPageOwner();
-    $user->forceFill(['pro_trial_used_at' => now()])->save();
+it('hides the trial CTA once the workspace used its trial', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['pro_trial_used_at' => now()])->save();
 
     livewire(Billing::class)
         ->assertDontSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.upgrade.button'));
 });
 
-it('does not offer a manual trial to a new hosted workspace', function (): void {
+it('offers the trial to a hosted workspace that never received one', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $team] = billingPageOwner();
     $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
     livewire(Billing::class)
-        ->assertDontSee(__('billing.trial.start_button'))
+        ->assertSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.paused.title'))
-        ->assertSee(__('billing.upgrade.unlock'))
+        ->assertSee(__('billing.upgrade.now'))
         ->assertSee('$19')
         ->assertSee(__('billing.pro_plan.billed_yearly'))
         ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
+});
+
+it('advertises all 37 MCP tools on the authenticated billing page', function (): void {
+    billingPageOwner();
+
+    livewire(Billing::class)
+        ->assertSee('REST API and 37-tool MCP server')
+        ->assertDontSee('REST API and 32-tool MCP server');
 });
 
 it('starts a trial via the page action', function (): void {
@@ -80,9 +98,9 @@ it('starts a trial via the page action', function (): void {
         ->and($team->onGenericTrial())->toBeTrue();
 });
 
-it('refuses a manual trial to a new hosted workspace even when called directly', function (): void {
+it('refuses a second trial on a workspace even when called directly', function (): void {
     [, $team] = billingPageOwner();
-    $team->forceFill(['hosted_free_grandfathered_at' => null])->save();
+    $team->forceFill(['pro_trial_used_at' => now()])->save();
 
     livewire(Billing::class)->call('startTrial');
 
@@ -302,4 +320,13 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
     livewire(Billing::class)
         ->assertSee('/ '.number_format(Plan::Pro->credits()))
         ->assertDontSee('/ '.number_format(2050));
+});
+
+it('names the workspace in the upgrade confirmation step', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['name' => 'Acme Manufacturing'])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.upgrade.confirm_title'))
+        ->assertSee(__('billing.upgrade.confirm_button', ['workspace' => 'Acme Manufacturing']));
 });

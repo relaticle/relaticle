@@ -17,9 +17,11 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 
 final class DeleteTeam extends BaseLivewireComponent
 {
+    #[Locked]
     public Team $team;
 
     public function mount(Team $team): void

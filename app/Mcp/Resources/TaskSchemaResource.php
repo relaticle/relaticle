@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Resources;
 
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
+use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use Laravel\Mcp\Request;
@@ -17,7 +18,7 @@ use Laravel\Mcp\Server\Resource;
 #[Description('Schema for tasks including available custom fields. Read this before creating or updating tasks.')]
 #[Uri('relaticle://schema/task')]
 #[MimeType('application/json')]
-final class TaskSchemaResource extends Resource
+final class TaskSchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
 
@@ -39,7 +40,13 @@ final class TaskSchemaResource extends Resource
         /** @var User $user */
         $user = $request->user();
 
-        $schema = [
+        return Response::text(json_encode($this->toSchema($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    }
+
+    /** @return array<string, mixed> */
+    public function toSchema(User $user): array
+    {
+        return [
             'entity' => 'task',
             'description' => 'Action items and to-dos.',
             'fields' => [
@@ -75,7 +82,5 @@ final class TaskSchemaResource extends Resource
             ],
             'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators.',
         ];
-
-        return Response::text(json_encode($schema, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

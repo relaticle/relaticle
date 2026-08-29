@@ -18,12 +18,14 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 
 final class UpdateTeamName extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    #[Locked]
     public Team $team;
 
     public bool $slugManuallyEdited = false;
@@ -94,13 +96,11 @@ final class UpdateTeamName extends BaseLivewireComponent
 
         resolve(UpdateTeamNameAction::class)->update($this->authUser(), $team, $data);
 
+        $this->sendNotification();
+
         if ($team->slug !== $oldSlug) {
             $this->redirect(EditTeam::getUrl(tenant: $team));
-
-            return;
         }
-
-        $this->sendNotification();
     }
 
     public function render(): View

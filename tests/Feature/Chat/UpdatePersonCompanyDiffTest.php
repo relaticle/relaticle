@@ -37,10 +37,10 @@ it('proposal display_data contains a Company field when company_id is changed', 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'company_id' => (string) $newCompany->getKey(),
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -65,10 +65,10 @@ it('proposal display_data does not include Company field when company_id is not 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'name' => 'Robert Smith',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())
@@ -91,10 +91,10 @@ it('shows empty old company when person had no company and a new one is assigned
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'company_id' => (string) $newCompany->getKey(),
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
         ->where('team_id', $this->team->getKey())

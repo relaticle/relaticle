@@ -25,7 +25,7 @@ final class TasksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tasks';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-check-circle';
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-clipboard-document-check';
 
     public function form(Schema $schema): Schema
     {

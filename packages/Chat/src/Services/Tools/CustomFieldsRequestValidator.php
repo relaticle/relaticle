@@ -13,6 +13,10 @@ use Relaticle\CustomFields\Facades\CustomFieldsType;
 
 final readonly class CustomFieldsRequestValidator
 {
+    public function __construct(
+        private CustomFieldOptionMap $optionMap,
+    ) {}
+
     /**
      * Validate the LLM-submitted custom_fields payload for the given entity.
      *
@@ -21,9 +25,16 @@ final readonly class CustomFieldsRequestValidator
      * with either a clean payload (keys by code, values normalized for the
      * action layer) or an error string suitable for tool output.
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields): CustomFieldsValidationResult
+    /**
+     * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
+     */
+    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null): CustomFieldsValidationResult
     {
-        if (! is_array($rawCustomFields) || $rawCustomFields === []) {
+        $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
+
+        // An update touches only the submitted codes; a create must also satisfy
+        // every required field, so it runs the rules even with an empty payload.
+        if ($rawCustomFields === [] && $isUpdate) {
             return new CustomFieldsValidationResult(cleanFields: [], error: null);
         }
 
@@ -37,7 +48,7 @@ final readonly class CustomFieldsRequestValidator
             return $translated;
         }
 
-        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: true)
+        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
             ->toRules($translated->cleanFields);
 
         $validator = Validator::make(['custom_fields' => $translated->cleanFields], $rules);
@@ -76,12 +87,23 @@ final readonly class CustomFieldsRequestValidator
     {
         $clean = [];
         $byCode = $fields->keyBy('code');
+        $optionMap = $this->optionMap->fromFields($fields);
 
         foreach ($raw as $code => $value) {
             $field = $byCode->get($code);
 
             if (! $field instanceof CustomField) {
                 $clean[$code] = $value;
+
+                continue;
+            }
+
+            // Clearing is a null write, so null must reach the rule set rather than
+            // being rejected here as a malformed option label. A field that really is
+            // required then fails on its own `required` rule with a truthful message,
+            // instead of the model being told the value can never be unset.
+            if ($value === null) {
+                $clean[$code] = null;
 
                 continue;
             }
@@ -101,7 +123,7 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
-            $optionsByLabel = $field->options->keyBy('name');
+            $entry = $optionMap[(string) $field->code] ?? ['ids' => [], 'labels' => []];
 
             if ($dataType->isMultiChoiceField()) {
                 if (! is_array($value)) {
@@ -113,14 +135,14 @@ final readonly class CustomFieldsRequestValidator
 
                 $translated = [];
                 foreach ($value as $label) {
-                    $option = $optionsByLabel->get((string) $label);
-                    if ($option === null) {
+                    $optionId = $this->optionMap->idFor($entry, (string) $label);
+                    if ($optionId === null) {
                         return new CustomFieldsValidationResult(
                             cleanFields: [],
                             error: "custom_fields.{$code} option \"{$label}\" is not one of the configured choices.",
                         );
                     }
-                    $translated[] = $option->id;
+                    $translated[] = $optionId;
                 }
 
                 $clean[$code] = $translated;
@@ -135,15 +157,15 @@ final readonly class CustomFieldsRequestValidator
                 );
             }
 
-            $option = $optionsByLabel->get((string) $value);
-            if ($option === null) {
+            $optionId = $this->optionMap->idFor($entry, (string) $value);
+            if ($optionId === null) {
                 return new CustomFieldsValidationResult(
                     cleanFields: [],
                     error: "custom_fields.{$code} option \"{$value}\" is not one of the configured choices.",
                 );
             }
 
-            $clean[$code] = $option->id;
+            $clean[$code] = $optionId;
         }
 
         return new CustomFieldsValidationResult(cleanFields: $clean, error: null);

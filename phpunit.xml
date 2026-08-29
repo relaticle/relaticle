@@ -8,9 +8,16 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
+         defaultTestSuite="Default"
          colors="true"
 >
     <testsuites>
+        <testsuite name="Default">
+            <directory>tests/Arch</directory>
+            <directory>tests/PHPStan</directory>
+            <directory>tests/Smoke</directory>
+            <directory>tests/Feature</directory>
+        </testsuite>
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
         </testsuite>
@@ -49,13 +56,16 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="relaticle_testing"/>
+        <!-- DB_DATABASE deliberately comes from .env.testing so parallel
+             workspaces can isolate their testing databases; CI pins its own
+             value in phpunit.ci.xml. -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
+        <env name="HONEYPOT_ENABLED" value="false"/>
         <env name="RELATICLE_FEATURE_BLOG" value="true"/>
     </php>
 </phpunit>

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Filament\Pages\Dashboard;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -55,9 +57,12 @@ final readonly class AcceptTeamInvitationController
 
         $user->switchTeam($invitation->team);
 
-        return redirect(config('fortify.home'))
-            ->banner(__('Great! You have accepted the invitation to join the :team team.', [ // @phpstan-ignore method.notFound
-                'team' => $invitation->team->name,
-            ]));
+        Notification::make()
+            ->title(__('teams.join.accepted.title'))
+            ->body(__('teams.join.accepted.body', ['team' => $invitation->team->name]))
+            ->success()
+            ->send();
+
+        return redirect()->to(Dashboard::getUrl(['tenant' => $invitation->team]));
     }
 }

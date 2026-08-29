@@ -16,7 +16,7 @@ same run (`environment.md` self-heal).
   (`environment.md` §4) before any queued journey.
 - **agent-browser's Chromium may not resolve Herd's Reverb vhost / wrong websocket
   host.** (verified: 2026-06-10, PR 322 — looked like a degraded channel, was a stale JS
-  bundle + wrong-host websocket; cleared by `npm run build` + host fix.)
+  bundle + wrong-host websocket; cleared by `pnpm run build` + host fix.)
   Detect: repeated websocket errors in `agent-browser console`.
   Avoid: preflight checks Echo connectivity; rebuild before declaring `blocked`.
 - **Sync queue silently invalidates queued-flow verification** (`release()`, retries,

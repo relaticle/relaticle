@@ -25,17 +25,11 @@ final class NewSubscriberListener
             ? SubscriberTagEnum::SignupSourceSocial->value
             : SubscriberTagEnum::SignupSourceOrganic->value;
 
-        $tags = [SubscriberTagEnum::Verified->value, $signupSourceTag];
-
-        $team = $user->currentTeam;
-
-        if ($team?->onboarding_use_case) {
-            $tags[] = $team->onboarding_use_case->toSubscriberTag();
-        }
-
-        if ($team?->onboarding_referral_source) {
-            $tags[] = $team->onboarding_referral_source->toSubscriberTag();
-        }
+        $tags = [
+            SubscriberTagEnum::Verified->value,
+            $signupSourceTag,
+            ...($user->currentTeam?->onboardingSubscriberTags() ?? []),
+        ];
 
         [$firstName, $lastName] = $this->splitName($user->name);
 

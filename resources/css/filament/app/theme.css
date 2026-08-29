@@ -143,6 +143,12 @@
         padding-block: calc(var(--spacing) * 1.7);
     }
 
+    /* Filament ships these at 1rem, which reads a size larger than every other
+       label in the panel and than the sidebar footer directly beneath. */
+    .fi-sidebar-item-label {
+        @apply text-sm;
+    }
+
     .fi-sidebar-item-icon {
         width: calc(var(--spacing) * 5);
         height: calc(var(--spacing) * 5);
@@ -170,11 +176,63 @@
 
 /* Top Navigation Bar */
 .fi-topbar {
-    @apply min-h-14;
+    @apply min-h-16;
 }
 
 .fi-topbar nav {
     @apply px-4 lg:px-6;
+}
+
+.fi-topbar-page-heading {
+    @apply flex min-w-0 max-w-[50vw] items-center gap-x-3 text-sm font-semibold text-gray-950 dark:text-white;
+
+    .fi-topbar-page-title {
+        @apply min-w-0 truncate;
+    }
+
+    /* Below md the labels drop and the switcher stays as an icon pair, so
+       phones keep a way to reach the board; the links carry aria-labels. */
+    .fi-view-switcher {
+        @apply inline-flex shrink-0;
+    }
+
+    .fi-view-switcher-label {
+        @apply hidden md:inline;
+    }
+}
+
+.fi-header-page-heading-only {
+    display: contents;
+}
+
+.fi-board-header .fi-header-heading {
+    display: none;
+}
+
+body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
+    display: none;
+}
+
+@media (width < 64rem) {
+    body:has([data-page-heading]) .fi-topbar-start {
+        @apply flex min-w-0 flex-1;
+    }
+}
+
+@media (width >= 64rem) {
+    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-inline-end: calc(var(--spacing) * 11);
+    }
+
+    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-top: calc(var(--spacing) * 4);
+        margin-inline-start: calc(var(--spacing) * 1);
+        margin-inline-end: calc(var(--spacing) * 9);
+
+        .fi-tenant-menu-trigger {
+            padding: calc(var(--spacing) * 1);
+        }
+    }
 }
 
 /* Button Enhancements */
@@ -390,6 +448,10 @@
 /* Avatar */
 .fi-avatar {
     @apply rounded-full;
+}
+
+.fi-user-avatar {
+    @apply ring-1 ring-gray-950/10 dark:ring-white/15;
 }
 
 /* User Menu */
@@ -654,3 +716,6 @@
         color: #9ca3af;
     }
 }
+
+/* Chat record chips moved to resources/css/theme.css: the marketing hero
+   mock renders the same chips and only loads that shared bundle. */

@@ -7,7 +7,6 @@ namespace Relaticle\Chat\Tools\People;
 use App\Actions\People\UpdatePeople;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -41,20 +40,30 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
         return 'Person';
     }
 
+    protected function ownedForeignKeys(): array
+    {
+        return [
+            'company_id' => Company::class,
+        ];
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [
             'name' => $schema->string()->description('The new person name.'),
-            'company_id' => $schema->string()->description('The new company ID.'),
+            'company_id' => $schema->string()->description('The new company ULID. Pass null to unlink the person from their company.'),
         ];
     }
 
     protected function extractActionData(Request $request): array
     {
-        return array_filter([
-            'name' => $request['name'] ?? null,
-            'company_id' => $request['company_id'] ?? null,
-        ], fn (mixed $v): bool => $v !== null);
+        $data = array_filter(['name' => $request['name'] ?? null], fn (mixed $v): bool => $v !== null);
+
+        if (array_key_exists('company_id', $request->all())) {
+            $data['company_id'] = $this->stringOrNull($request, 'company_id');
+        }
+
+        return $data;
     }
 
     protected function buildDisplayData(Request $request, Model $model): array
@@ -73,17 +82,19 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
             ];
         }
 
-        $newCompanyId = $this->stringOrNull($request, 'company_id');
-        if ($newCompanyId !== null) {
+        if (array_key_exists('company_id', $request->all())) {
+            $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
-                'old' => $this->nameForId($model->getAttribute('company_id'), Company::class, 'name', $team),
-                'new' => $this->nameForId($newCompanyId, Company::class, 'name', $team),
+                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $team),
+                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $team),
+                '_oldValue' => $model->getAttribute('company_id'),
+                '_newValue' => $newCompanyId,
             ];
         }
 
         return [
-            'title' => 'Update Person',
+            'title' => __('Update Person'),
             'summary' => "Update person \"{$model->getAttribute('name')}\"",
             'fields' => $fields,
         ];
@@ -94,22 +105,5 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
         $value = $request[$key] ?? null;
 
         return is_string($value) && $value !== '' ? $value : null;
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function nameForId(?string $id, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($id === null || $id === '') {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
     }
 }

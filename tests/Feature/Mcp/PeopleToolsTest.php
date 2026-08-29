@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\GetPeopleTool;
@@ -14,12 +20,26 @@ use App\Models\Scopes\TeamScope;
 use App\Models\Team;
 use App\Models\User;
 
-beforeEach(function () {
+mutates(
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreatePeopleTool::class,
+    DeletePeopleTool::class,
+    GetPeopleTool::class,
+    ListPeopleTool::class,
+    SerializesRelatedModels::class,
+    UpdatePeopleTool::class,
+);
+
+beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     People::clearBootedModels();
 });
 
@@ -46,6 +66,24 @@ it('can update a person via MCP tool', function (): void {
     expect($person->refresh()->name)->toBe('New Name');
 });
 
+it('allows an update to resubmit its own unique custom-field value', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdatePeopleTool::class, [
+            'id' => $person->id,
+            'custom_fields' => ['emails' => ['unique@example.com']],
+        ])
+        ->assertOk();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdatePeopleTool::class, [
+            'id' => $person->id,
+            'custom_fields' => ['emails' => ['unique@example.com']],
+        ])
+        ->assertOk();
+});
+
 it('can delete a person via MCP tool', function (): void {
     $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Jane Doe']);
 
@@ -59,8 +97,8 @@ it('can delete a person via MCP tool', function (): void {
     expect($person->refresh()->trashed())->toBeTrue();
 });
 
-describe('team scoping', function () {
-    beforeEach(function () {
+describe('team scoping', function (): void {
+    beforeEach(function (): void {
         People::addGlobalScope(new TeamScope);
     });
 

@@ -8,17 +8,20 @@ use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
-use Relaticle\CustomFields\Services\TenantContextService;
 
 final class AddCustomFieldOptionsTool implements Tool
 {
+    use ReportsValidationFailures;
     use ResolvesOwnedCustomField;
     use WithConversationContext;
 
@@ -58,60 +61,42 @@ final class AddCustomFieldOptionsTool implements Tool
         if (! $user->ownsTeam($user->currentTeam)) {
             return (string) json_encode([
                 'error' => 'Only team owners can manage custom field options.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $entityType = (string) ($request['entity_type'] ?? '');
         $code = (string) ($request['code'] ?? '');
 
         if ($entityType === '' || $code === '') {
-            return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.']);
-        }
-
-        $options = is_array($request['options'] ?? null) ? $request['options'] : [];
-
-        if ($options === []) {
-            return (string) json_encode(['error' => 'At least one option must be provided.']);
+            return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.'], JSON_UNESCAPED_SLASHES);
         }
 
         $teamId = $user->currentTeam->getKey();
         $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
 
         if (! $field instanceof CustomField) {
-            return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."]);
+            return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
         }
 
         if (! in_array($field->type, CreateCustomField::CHOICE_TYPES, true)) {
             return (string) json_encode([
                 'error' => "Field type \"{$field->type}\" does not support options. Only select, multi-select, radio, checkbox-list, and toggle-buttons fields can have options added.",
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
-
-        $maxOptions = (int) config('chat.max_field_options', 50);
-
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
 
         try {
-            $existingCount = $field->options()->withoutGlobalScopes()->count();
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
-
-        if (($existingCount + count($options)) > $maxOptions) {
-            return (string) json_encode([
-                'error' => 'Adding '.count($options)." more options would exceed the {$maxOptions} options limit for this field (currently has {$existingCount}).",
+            $validated = CustomFieldDefinitionValidator::forNewOptions($user, $field, [
+                'options' => $request['options'] ?? null,
             ]);
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         }
 
-        $optionNames = array_map(
-            static fn (mixed $o): string => is_array($o) ? (string) ($o['name'] ?? '') : (string) $o,
-            $options,
-        );
+        $optionNames = array_column($validated['options'], 'name');
 
         $actionData = [
             '_record_id' => $field->getKey(),
-            'options' => $options,
+            'options' => $validated['options'],
         ];
 
         $displayData = [
@@ -131,17 +116,19 @@ final class AddCustomFieldOptionsTool implements Tool
             entityType: 'custom_field',
             actionData: $actionData,
             displayData: $displayData,
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => 'AddCustomFieldOptions',
             'entity_type' => 'custom_field',
             'operation' => 'create',
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

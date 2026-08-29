@@ -7,7 +7,11 @@ Usage:
     python3 check_regressions.py --test                  # self-tests (incl. the REG-001 missed-regression lock)
 
 Reads:
-    <skill>/regressions.json                 (the ledger, next to this script's parent dir)
+    ~/.claude/business-review/relaticle/regressions.json
+                                             (the ledger — MACHINE-LOCAL, deliberately not in
+                                              the repo: the repo is public and the ledger
+                                              records production incident history. Override
+                                              with $BR_LEDGER. Bootstrapped empty if missing.)
     <REVIEW_DIR>/pr-files.txt                (touched files, one per line)
     <REVIEW_DIR>/pr-diff.patch               (unified diff; added-line patterns)
     <REVIEW_DIR>/diff-classification.json    (optional; change_types)
@@ -16,12 +20,16 @@ Reads:
 Writes:
     <REVIEW_DIR>/regression-checks.json      ({matched: [{id, class, severity, check, repro}]})
 
+Match mode refuses to run (exit 1) when NEITHER pr-files.txt NOR pr-diff.patch exists —
+"0 matched" against absent inputs is a vacuous pass, not a sweep.
+
 Exit codes: 0 ok / gate passed, 1 gate failed or error, 2 bad usage. Pure stdlib.
 """
 from __future__ import annotations
 
 import fnmatch
 import json
+import os
 import re
 import sys
 import tempfile
@@ -29,9 +37,29 @@ from pathlib import Path
 
 FRONTMATTER_RE = re.compile(r"<!--json\s*\n(.*?)\n-->", re.DOTALL)
 
+DEFAULT_LEDGER = "~/.claude/business-review/relaticle/regressions.json"
 
-def load_ledger(skill_dir: Path) -> list[dict]:
-    ledger_path = skill_dir / "regressions.json"
+LEDGER_SKELETON = {
+    "_doc": "Regression ledger — confirmed findings converted into standing checks. "
+            "Machine-local (kept out of the public repo; records production incident history). "
+            "Read by check_regressions.py in Stage 1; fix mode appends an entry for every "
+            "confirmed-then-fixed finding. See references/regression-ledger.md.",
+    "entries": [],
+}
+
+
+def resolve_ledger_path() -> Path:
+    return Path(os.environ.get("BR_LEDGER", DEFAULT_LEDGER)).expanduser()
+
+
+def ensure_ledger(ledger_path: Path) -> None:
+    if ledger_path.exists():
+        return
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(json.dumps(LEDGER_SKELETON, indent=1))
+
+
+def load_ledger(ledger_path: Path) -> list[dict]:
     if not ledger_path.exists():
         return []
     data = json.loads(ledger_path.read_text())
@@ -75,7 +103,7 @@ def entry_matches(entry: dict, files: list[str], patch_text: str, change_types: 
     return True
 
 
-def run_match(review_dir: Path, skill_dir: Path) -> dict:
+def run_match(review_dir: Path, ledger_path: Path) -> dict:
     files_path = review_dir / "pr-files.txt"
     patch_path = review_dir / "pr-diff.patch"
     files = files_path.read_text().split() if files_path.exists() else []
@@ -96,7 +124,7 @@ def run_match(review_dir: Path, skill_dir: Path) -> dict:
             "check": e.get("check", ""),
             "repro": e.get("repro", []),
         }
-        for e in load_ledger(skill_dir)
+        for e in load_ledger(ledger_path)
         if entry_matches(e, files, patch_text, change_types)
     ]
     out = {"matched": matched}
@@ -156,9 +184,8 @@ def _selftest() -> int:
         work = Path(tmp)
         review = work / "review"
         review.mkdir()
-        skill = work / "skill"
-        skill.mkdir()
-        (skill / "regressions.json").write_text(json.dumps({"entries": [
+        ledger = work / "regressions.json"
+        ledger.write_text(json.dumps({"entries": [
             {"id": "REG-001", "class": "enum-case-added", "severity": "critical",
              "trigger": {"paths": ["app/Enums/", "packages/*/src/Enums/"],
                           "added_line_pattern": r"^\+\s*case\s+\w+"},
@@ -173,7 +200,7 @@ def _selftest() -> int:
             "--- a/packages/Chat/src/Enums/AiCreditType.php\n"
             "+++ b/packages/Chat/src/Enums/AiCreditType.php\n"
             "+    case Reservation = 'reservation';\n")
-        out = run_match(review, skill)
+        out = run_match(review, ledger)
         check("T1 REG-001 matches PR-326-shaped diff",
               any(e["id"] == "REG-001" for e in out["matched"]))
 
@@ -202,15 +229,38 @@ def _selftest() -> int:
         (review / "pr-files.txt").write_text("app/Livewire/SomeForm.php\n")
         (review / "pr-diff.patch").write_text("+    public function store()\n")
         (review / "diff-classification.json").write_text('{"change_types": ["form"]}')
-        out = run_match(review, skill)
+        out = run_match(review, ledger)
         check("T5 change_types trigger matches", any(e["id"] == "REG-002" for e in out["matched"]))
 
         # T6: no false match on unrelated diff
         (review / "pr-files.txt").write_text("README.md\n")
         (review / "pr-diff.patch").write_text("+ docs only\n")
         (review / "diff-classification.json").write_text('{"change_types": []}')
-        out = run_match(review, skill)
+        out = run_match(review, ledger)
         check("T6 unrelated diff matches nothing", out["matched"] == [])
+
+        # T7: match mode REFUSES to run without diff inputs (no vacuous '0 matched')
+        empty_review = work / "empty-review"
+        empty_review.mkdir()
+        os.environ["BR_LEDGER"] = str(ledger)
+        try:
+            rc = main(["check_regressions.py", str(empty_review)])
+        finally:
+            del os.environ["BR_LEDGER"]
+        check("T7 missing inputs exit non-zero", rc == 1)
+        check("T7 no regression-checks.json written",
+              not (empty_review / "regression-checks.json").exists())
+
+        # T8: a missing ledger is bootstrapped as an empty skeleton, then matches nothing
+        fresh_ledger = work / "nested" / "regressions.json"
+        os.environ["BR_LEDGER"] = str(fresh_ledger)
+        try:
+            rc = main(["check_regressions.py", str(review)])
+        finally:
+            del os.environ["BR_LEDGER"]
+        check("T8 bootstrap run exits 0", rc == 0)
+        check("T8 skeleton created", fresh_ledger.exists()
+              and json.loads(fresh_ledger.read_text()).get("entries") == [])
 
     if fails:
         for f in fails:
@@ -230,7 +280,6 @@ def main(argv: list[str]) -> int:
     if not review_dir.is_dir():
         print(f"error: REVIEW_DIR not found: {review_dir}", file=sys.stderr)
         return 1
-    skill_dir = Path(__file__).resolve().parent.parent
 
     if "--plan" in argv[2:]:
         failures = gate_plan(review_dir)
@@ -242,7 +291,19 @@ def main(argv: list[str]) -> int:
         print("Regression gate passed.")
         return 0
 
-    out = run_match(review_dir, skill_dir)
+    if not (review_dir / "pr-files.txt").exists() and not (review_dir / "pr-diff.patch").exists():
+        print(
+            "error: neither pr-files.txt nor pr-diff.patch exists in "
+            f"{review_dir} — refusing to report a vacuous '0 matched'. "
+            "Write the touched-file list and diff first.",
+            file=sys.stderr,
+        )
+        return 1
+
+    ledger_path = resolve_ledger_path()
+    ensure_ledger(ledger_path)
+    out = run_match(review_dir, ledger_path)
+    print(f"ledger: {ledger_path}")
     print(f"{len(out['matched'])} ledger entr(y/ies) matched -> {review_dir / 'regression-checks.json'}")
     for e in out["matched"]:
         print(f"  {e['id']} [{e['severity']}] {e['class']}")

@@ -17,6 +17,8 @@ use Override;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationResource\Pages\ListAgentConversations;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationResource\Pages\ViewAgentConversation;
+use Relaticle\SystemAdmin\Filament\Resources\AgentConversationResource\RelationManagers\MessagesRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use UnitEnum;
 
 final class AgentConversationResource extends Resource
@@ -42,8 +44,16 @@ final class AgentConversationResource extends Resource
             ->components([
                 Section::make([
                     TextEntry::make('title'),
-                    TextEntry::make('team.name')->label('Team')->placeholder('—'),
-                    TextEntry::make('user.name')->label('User')->placeholder('—'),
+                    TextEntry::make('team.name')
+                        ->label('Team')
+                        ->placeholder('—')
+                        ->color('primary')
+                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                    TextEntry::make('user.name')
+                        ->label('User')
+                        ->placeholder('—')
+                        ->color('primary')
+                        ->url(RecordLink::to(UserResource::class, 'user')),
                     TextEntry::make('messages_count')->label('Messages')->state(fn (AgentConversation $record): int => $record->messages()->count()),
                     TextEntry::make('id')->label('Conversation ID')->copyable(),
                     TextEntry::make('created_at')->dateTime(),
@@ -67,12 +77,16 @@ final class AgentConversationResource extends Resource
                     ->label('Team')
                     ->placeholder('—')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'team')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->placeholder('—')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'user')),
                 TextColumn::make('messages_count')
                     ->label('Messages')
                     ->counts('messages')
@@ -86,6 +100,14 @@ final class AgentConversationResource extends Resource
             ->recordActions([
                 ViewAction::make(),
             ]);
+    }
+
+    #[Override]
+    public static function getRelations(): array
+    {
+        return [
+            MessagesRelationManager::class,
+        ];
     }
 
     #[Override]

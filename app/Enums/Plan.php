@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-enum Plan: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum Plan: string implements HasColor, HasLabel
 {
     case Free = 'free';
     case Pro = 'pro';
@@ -15,12 +18,43 @@ enum Plan: string
         return self::Free;
     }
 
-    public function label(): string
+    /**
+     * Resolve the plan a Stripe price id belongs to, using the price map in
+     * `config('services.stripe.prices')` where each key is `<plan>_<interval>`.
+     */
+    public static function fromStripePrice(?string $priceId): ?self
+    {
+        if ($priceId === null) {
+            return null;
+        }
+
+        /** @var array<string, string|null> $prices */
+        $prices = config('services.stripe.prices', []);
+
+        foreach ($prices as $key => $mappedPriceId) {
+            if ($mappedPriceId !== null && $mappedPriceId === $priceId) {
+                return self::tryFrom(explode('_', $key)[0]);
+            }
+        }
+
+        return null;
+    }
+
+    public function getLabel(): string
     {
         return match ($this) {
             self::Free => 'Free',
             self::Pro => 'Pro',
             self::Enterprise => 'Enterprise',
+        };
+    }
+
+    public function getColor(): string
+    {
+        return match ($this) {
+            self::Free => 'gray',
+            self::Pro => 'success',
+            self::Enterprise => 'primary',
         };
     }
 

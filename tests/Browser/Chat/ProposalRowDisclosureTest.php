@@ -1,0 +1,355 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\People;
+use App\Models\Task;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
+use Tests\Helpers\ChatBrowser;
+use Tests\Helpers\ChatDocument;
+
+/**
+ * A decided proposal in the transcript is an audit line whose whole row is the
+ * disclosure: clicking anywhere on it opens the fields. The record keeps its own
+ * small link at the end of the title, so reaching the record stays one click but
+ * is never what an imprecise click on the row does.
+ */
+function seedDecidedProposal(User $user, int|string $teamId, string $conversationId, People $person): void
+{
+    $pending = PendingAction::query()->create([
+        'team_id' => $teamId,
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\People\\CreatePeople',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['name' => $person->name],
+        'display_data' => [
+            'title' => 'Create Person',
+            'summary' => "Create person \"{$person->name}\"",
+            'fields' => [['label' => 'Name', 'value' => $person->name]],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['id' => (string) $person->id, 'type' => 'people'],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'CreatePersonTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreatePeople',
+                'entity_type' => 'people',
+                'operation' => 'create',
+                'data' => ['name' => $person->name],
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+it('opens the fields from anywhere on the row and reaches the record only from the title link', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $person = People::factory()->for($team)->create(['name' => 'Sam']);
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'decided proposal', $conversationId);
+    seedDecidedProposal($user, $team->getKey(), $conversationId, $person);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Sam')
+        ->assertSee('Create')
+        ->assertMissing('[data-proposal-details]')
+        ->assertVisible('[data-proposal-record-chip]')
+        ->assertVisible('[data-proposal-record-link]');
+
+    // The toggle covers the row, and the record link is the only interactive
+    // element the pointer can reach on top of it.
+    $hitTest = $page->script(<<<'JS'
+        (() => {
+            const row = document.querySelector('[data-proposal-row]');
+            const link = document.querySelector('[data-proposal-record-link]');
+            const chip = document.querySelector('[data-proposal-record-chip]');
+            const rowBox = row.getBoundingClientRect();
+            const linkBox = link.getBoundingClientRect();
+
+            const at = (x, y) => {
+                const el = document.elementFromPoint(x, y);
+                return el && el.closest('[data-proposal-record-link]') ? 'link'
+                    : el && el.closest('[data-proposal-row]') ? 'row'
+                    : 'other';
+            };
+
+            return {
+                rowTag: row.tagName,
+                linkTag: link.tagName,
+                chipText: chip.textContent.trim(),
+                chipType: chip.dataset.recordType,
+                expanded: row.getAttribute('aria-expanded'),
+                anchorsInsideToggle: row.querySelectorAll('a').length,
+                atSummary: at(rowBox.left + 40, rowBox.top + rowBox.height / 2),
+                atStatusPill: at(rowBox.right - 90, rowBox.top + rowBox.height / 2),
+                atLink: at(linkBox.left + linkBox.width / 2, linkBox.top + linkBox.height / 2),
+                rowWidth: Math.round(rowBox.width),
+                linkWidth: Math.round(linkBox.width),
+            };
+        })();
+    JS);
+
+    expect($hitTest['rowTag'])->toBe('BUTTON')
+        ->and($hitTest['linkTag'])->toBe('A')
+        ->and($hitTest['chipText'])->toBe('Sam')
+        ->and($hitTest['chipType'])->toBe('people')
+        ->and($hitTest['expanded'])->toBe('false')
+        ->and($hitTest['anchorsInsideToggle'])->toBe(0)
+        ->and($hitTest['atSummary'])->toBe('row')
+        ->and($hitTest['atStatusPill'])->toBe('row')
+        ->and($hitTest['atLink'])->toBe('link')
+        ->and($hitTest['rowWidth'])->toBeGreaterThan($hitTest['linkWidth'] * 5);
+
+    // Clicking the row opens the fields and stays in the conversation.
+    $page->click('[data-proposal-row]')
+        ->assertVisible('[data-proposal-details]')
+        ->assertAriaAttribute('[data-proposal-row]', 'expanded', 'true')
+        ->assertSeeIn('[data-proposal-details]', 'Sam')
+        ->assertPathIs("/app/{$team->slug}/chats/{$conversationId}");
+
+    $page->click('[data-proposal-row]')
+        ->assertMissing('[data-proposal-details]');
+
+    // The link, and only the link, leaves for the record.
+    $page->click('[data-proposal-record-link]')
+        ->assertPathIs("/app/{$team->slug}/people/{$person->id}");
+});
+
+it('leads each decided batch item with the record pill, beside its outcome chip', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $task = Task::factory()->for($team)->create(['title' => 'Send proposal to Meridian']);
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'decided batch', $conversationId);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $team->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [
+            ['title' => 'Send proposal to Meridian'],
+            ['title' => 'Book onboarding session'],
+        ]],
+        'display_data' => [
+            'title' => 'Create Tasks',
+            'summary' => 'Create 2 tasks',
+            'items' => [
+                ['title' => 'Create Task', 'summary' => 'Create task "Send proposal to Meridian"', 'fields' => [['label' => 'Title', 'value' => 'Send proposal to Meridian']]],
+                ['title' => 'Create Task', 'summary' => 'Create task "Book onboarding session"', 'fields' => [['label' => 'Title', 'value' => 'Book onboarding session']]],
+            ],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['items' => [
+            ['status' => 'approved', 'id' => (string) $task->id],
+            ['status' => 'rejected'],
+        ]],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'CreateTaskTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateTask',
+                'entity_type' => 'task',
+                'operation' => 'create',
+                'data' => $pending->action_data,
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks');
+
+    $page->click('[data-proposal-row]')
+        ->assertVisible('[data-proposal-details]');
+
+    $items = $page->script(<<<'JS'
+        (() => {
+            const details = document.querySelector('[data-proposal-details]');
+            const chips = Array.from(details.querySelectorAll('[data-proposal-record-chip]'));
+
+            return {
+                chipLabels: chips.map((chip) => chip.textContent.trim()),
+                chipTypes: chips.map((chip) => chip.dataset.recordType),
+                outcomes: details.textContent.includes('Created') && details.textContent.includes('Skipped'),
+            };
+        })();
+    JS);
+
+    expect($items['chipLabels'])->toBe(['Send proposal to Meridian', 'Book onboarding session'])
+        ->and($items['chipTypes'])->toBe(['task', 'task'])
+        ->and($items['outcomes'])->toBeTrue();
+});
+
+/**
+ * A partially-skipped batch finalizes as Approved, so the header cannot echo
+ * that status: it reports the per-item counts instead. A batch that wrote
+ * nothing finalizes as Rejected and keeps the plain chip, which says more than
+ * "0 created" would.
+ *
+ * @param  list<array<string, mixed>>  $resultItems
+ */
+function seedResolvedBatch(User $user, int|string $teamId, string $conversationId, PendingActionStatus $status, array $resultItems): void
+{
+    $pending = PendingAction::query()->create([
+        'team_id' => $teamId,
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Task\\CreateTask',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'task',
+        'action_data' => ['_batch' => true, 'records' => [
+            ['title' => 'Draft the renewal note'],
+            ['title' => 'Book onboarding session'],
+        ]],
+        'display_data' => [
+            'title' => 'Create Tasks',
+            'summary' => 'Create 2 tasks',
+            'items' => [
+                ['title' => 'Create Task', 'summary' => 'Create task "Draft the renewal note"', 'fields' => [['label' => 'Title', 'value' => 'Draft the renewal note']]],
+                ['title' => 'Create Task', 'summary' => 'Create task "Book onboarding session"', 'fields' => [['label' => 'Title', 'value' => 'Book onboarding session']]],
+            ],
+        ],
+        'status' => $status,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['items' => $resultItems],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'CreateTaskTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateTask',
+                'entity_type' => 'task',
+                'operation' => 'create',
+                'data' => $pending->action_data,
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+it('heads a part-skipped batch with per-item counts rather than its Approved status', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+    $task = Task::factory()->for($team)->create(['title' => 'Draft the renewal note']);
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'part-skipped batch', $conversationId);
+    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Approved, [
+        ['status' => 'approved', 'id' => (string) $task->id],
+        ['status' => 'rejected'],
+    ]);
+
+    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks')
+        ->script(<<<'JS'
+            (() => {
+                const row = document.querySelector('[data-proposal-row]').parentElement;
+
+                return row.textContent.replace(/\s+/g, ' ').trim();
+            })();
+        JS);
+
+    expect($header)->toContain('1 created')
+        ->and($header)->toContain('1 skipped')
+        ->and($header)->not->toContain('Approved');
+});
+
+it('heads a fully-skipped batch with Rejected, since it wrote nothing', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $team->getKey(), 'fully-skipped batch', $conversationId);
+    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Rejected, [
+        ['status' => 'rejected'],
+        ['status' => 'rejected'],
+    ]);
+
+    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+        ->assertSee('Create 2 tasks')
+        ->script(<<<'JS'
+            (() => {
+                const row = document.querySelector('[data-proposal-row]').parentElement;
+
+                return row.textContent.replace(/\s+/g, ' ').trim();
+            })();
+        JS);
+
+    expect($header)->toContain('Rejected')
+        ->and($header)->not->toContain('skipped');
+});

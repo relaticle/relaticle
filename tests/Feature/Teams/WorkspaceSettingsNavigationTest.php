@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\ActivityLog;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\User;
@@ -13,7 +14,7 @@ use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(Members::class, CustomFields::class);
+mutates(Members::class, CustomFields::class, ActivityLog::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -39,10 +40,11 @@ test('every workspace settings page renders the same tab strip', function (): vo
         __('teams.tabs.general'),
         __('teams.tabs.members'),
         __('teams.tabs.custom_fields'),
+        __('teams.tabs.activity'),
         __('teams.tabs.billing'),
     ];
 
-    foreach ([EditTeam::class, Members::class, CustomFields::class, Billing::class] as $page) {
+    foreach ([EditTeam::class, Members::class, CustomFields::class, ActivityLog::class, Billing::class] as $page) {
         expect(workspaceTabLabels(app($page)))
             ->toBe($expected, "[{$page}] should render the full tab strip");
     }
@@ -65,6 +67,7 @@ test('a workspace admin can open every tab', function (): void {
         EditTeam::getUrl(tenant: $this->team),
         Members::getUrl(tenant: $this->team),
         CustomFields::getUrl(tenant: $this->team),
+        ActivityLog::getUrl(tenant: $this->team),
     ] as $url) {
         $this->get($url)->assertSuccessful();
     }
@@ -78,6 +81,16 @@ test('a user outside the workspace cannot open the members tab', function (): vo
     $this->actingAs(User::factory()->withTeam()->create())
         ->get($url)
         ->assertNotFound();
+});
+
+test('the tab strip hides activity from members without the admin role', function (): void {
+    $editor = User::factory()->create();
+    $this->team->users()->attach($editor, ['role' => 'editor']);
+
+    $this->actingAs($editor);
+
+    expect(workspaceTabLabels(app(EditTeam::class)))
+        ->not->toContain(__('teams.tabs.activity'));
 });
 
 test('the tab strip drops billing when the feature is off', function (): void {

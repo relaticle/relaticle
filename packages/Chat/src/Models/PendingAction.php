@@ -23,6 +23,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
  * @property string $team_id
  * @property string $user_id
  * @property string|null $conversation_id
+ * @property string|null $turn_id
  * @property string|null $message_id
  * @property string $action_class
  * @property PendingActionOperation $operation
@@ -38,6 +39,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
     'team_id',
     'user_id',
     'conversation_id',
+    'turn_id',
     'message_id',
     'action_class',
     'operation',

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\TeamRole;
+use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,8 +30,7 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return redirect(config('fortify.home'))
-                ->banner(__('You are already a member of :team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+            return $this->redirectToTeam($team, __('teams.join.already_member.title'));
         }
 
         return view('teams.join-via-link', ['team' => $team, 'token' => $token]);
@@ -49,8 +50,7 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return redirect(config('fortify.home'))
-                ->banner(__('You are already a member of :team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+            return $this->redirectToTeam($team, __('teams.join.already_member.title'));
         }
 
         /** @var User $owner */
@@ -66,8 +66,22 @@ final readonly class JoinTeamViaLinkController
         $user->unsetRelation('teams');
         $user->switchTeam($team);
 
-        return redirect(config('fortify.home'))
-            ->banner(__('You have joined the :team team.', ['team' => $team->name])); // @phpstan-ignore method.notFound
+        return $this->redirectToTeam(
+            $team,
+            __('teams.join.joined.title'),
+            __('teams.join.joined.body', ['team' => $team->name]),
+        );
+    }
+
+    private function redirectToTeam(Team $team, string $title, ?string $body = null): RedirectResponse
+    {
+        Notification::make()
+            ->title($title)
+            ->body($body)
+            ->success()
+            ->send();
+
+        return redirect()->to(Dashboard::getUrl(['tenant' => $team]));
     }
 
     private function resolveTeam(string $token): Team|View

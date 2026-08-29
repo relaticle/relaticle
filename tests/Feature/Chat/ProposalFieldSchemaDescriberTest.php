@@ -149,3 +149,19 @@ it('omits deferred record-link and assignee core fields', function (): void {
         ->and($codes)->not->toContain('opportunity_ids')
         ->and($codes)->not->toContain('assignee_ids');
 });
+
+it('reports a custom field the tenant marked required as required', function (): void {
+    $linkedin = CustomField::query()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'linkedin')
+        ->first();
+
+    expect($linkedin)->not->toBeNull('seeded company linkedin field is required for this test');
+
+    $linkedin->forceFill(['validation_rules' => ['required' => true]])->save();
+
+    $fields = describerFor()->describe($this->user, 'company', ['name' => 'Acme Corp']);
+
+    expect(fieldByCode($fields, 'linkedin')['required'])->toBeTrue();
+});

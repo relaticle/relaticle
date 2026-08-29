@@ -47,7 +47,7 @@ final readonly class FirstChatUsageTagger
         }
 
         dispatch(new ModifySubscriberTagsJob(
-            $user->mailcoach_subscriber_uuid,
+            (string) $user->id,
             [SubscriberTagEnum::HasAiUsage->value],
             TagAction::Add,
         ))->afterCommit();

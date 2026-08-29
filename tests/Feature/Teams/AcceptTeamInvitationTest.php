@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -25,7 +26,8 @@ test('valid invitation can be accepted', function () {
 
     $this->actingAs($this->user)
         ->get($acceptUrl)
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]))
+        ->assertSessionHas('filament.notifications');
 
     expect($this->team->fresh()->hasUser($this->user))->toBeTrue();
     expect(TeamInvitation::find($invitation->id))->toBeNull();

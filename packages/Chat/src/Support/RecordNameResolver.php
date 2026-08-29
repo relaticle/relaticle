@@ -1,0 +1,145 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\Chat\Support;
+
+use App\Models\Team;
+use Illuminate\Database\Eloquent\Model;
+use Relaticle\Chat\Models\PendingAction;
+
+/**
+ * Turns the record ids a proposal carries into the names its card shows.
+ *
+ * Every write tool needs this and each one used to keep a private copy. It also
+ * has to understand plan references: `$ref:<pending_action_id>` names a record an
+ * earlier step will create, so there is nothing in the database to look up. A
+ * reference resolves to the proposed name plus the step it comes from, without
+ * that, the row would resolve to an empty string and be dropped, and the user
+ * would approve a link they were never shown.
+ */
+final readonly class RecordNameResolver
+{
+    /**
+     * @param  class-string<Model>  $modelClass
+     */
+    public function name(mixed $id, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
+    {
+        return $this->names([$id], $modelClass, $team, $nameAttribute);
+    }
+
+    /**
+     * @param  array<array-key, mixed>|null  $ids
+     * @param  class-string<Model>  $modelClass
+     */
+    public function names(?array $ids, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
+    {
+        if ($ids === null || $ids === []) {
+            return '';
+        }
+
+        // One query for the stored ids, not one per id. This runs inside the
+        // streaming job while each proposal card is built, so with batch writes
+        // (chat.max_batch_size records, each linking several others) a per-id
+        // lookup put hundreds of SELECTs on the turn before anything rendered.
+        // References are the exception: they name a record no earlier step has
+        // created yet, so there is nothing to batch and each is resolved alone.
+        $storedIds = array_values(array_filter(
+            $ids,
+            static fn (mixed $id): bool => ! PlanReference::is($id) && is_string($id) && $id !== '',
+        ));
+
+        $resolved = [];
+
+        if ($storedIds !== []) {
+            $query = $modelClass::query()->whereKey($storedIds);
+
+            if ($team instanceof Team) {
+                $query->where('team_id', $team->getKey());
+            }
+
+            $resolved = $query
+                ->pluck($nameAttribute, (new $modelClass)->getKeyName())
+                ->mapWithKeys(static fn (mixed $name, mixed $key): array => [(string) $key => (string) $name])
+                ->all();
+        }
+
+        $names = [];
+
+        foreach ($ids as $id) {
+            $name = PlanReference::is($id)
+                ? $this->pendingName($id, $team)
+                : ($resolved[is_string($id) ? $id : ''] ?? '');
+
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return implode(', ', $names);
+    }
+
+    /**
+     * The proposed name of a record an earlier step of this turn will create,
+     * labelled with that step's position so the card says where it comes from.
+     */
+    private function pendingName(mixed $reference, ?Team $team): string
+    {
+        $target = PlanReference::target($reference);
+
+        if ($target === null) {
+            return '';
+        }
+
+        // Scoped by team even though the write tools validate the reference before
+        // buildDisplayData runs: that call ordering is the only thing standing between
+        // a hallucinated $ref and another tenant's proposed record name on the card, and
+        // this resolver should not depend on its caller getting the order right.
+        $query = PendingAction::query();
+
+        if ($team instanceof Team) {
+            $query->where('team_id', $team->getKey());
+        }
+
+        $action = $query->find(PlanReference::actionId($target));
+
+        if (! $action instanceof PendingAction) {
+            return '';
+        }
+
+        $titleKey = ProposalCoreFields::titleKey($action->entity_type);
+        // A batched proposal keeps its records under `records`, so the title lives on
+        // the referenced record, not on action_data. recordAtOrEmpty() answers both
+        // shapes: a single-record proposal is its own record at index 0.
+        $record = ProposalPayload::from($action)->recordAtOrEmpty(PlanReference::index($target) ?? 0);
+        $title = $record[$titleKey] ?? null;
+
+        if (! is_string($title) || $title === '') {
+            return '';
+        }
+
+        $step = $this->stepNumber($action);
+
+        return $step === null
+            ? $title
+            : __(':name (step :step)', ['name' => $title, 'step' => $step]);
+    }
+
+    /**
+     * 1-based position of the referenced proposal within its turn.
+     */
+    private function stepNumber(PendingAction $action): ?int
+    {
+        if ($action->turn_id === null) {
+            return null;
+        }
+
+        // Keys are ULIDs, so they sort in creation order: counting the turn's
+        // proposals up to and including this one gives its step number.
+        return PendingAction::query()
+            ->where('team_id', $action->team_id)
+            ->where('turn_id', $action->turn_id)
+            ->where('id', '<=', $action->getKey())
+            ->count();
+    }
+}

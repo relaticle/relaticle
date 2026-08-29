@@ -68,7 +68,7 @@ it('serves tools/list to a bearer token issued to a super administrator', functi
 it('denies a tool call outside the token abilities', function (): void {
     $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
     $token = $admin->createToken('e2e-restricted', ['posts:read'])->plainTextToken;
-    $category = Category::create(['name' => 'Engineering']);
+    $category = Category::factory()->create(['name' => 'Engineering']);
 
     $this->withHeader('Authorization', "Bearer {$token}")
         ->withHeader('Accept', 'application/json')

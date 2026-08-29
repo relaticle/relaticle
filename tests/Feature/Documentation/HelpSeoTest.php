@@ -12,6 +12,7 @@ use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
+use Relaticle\Ink\Models\Post;
 
 mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class);
 
@@ -42,6 +43,7 @@ it('emits article and breadcrumb json-ld on a help article', function (): void {
         ->and($html)->toContain('"headline":"Create your first company"')
         ->and($html)->toContain('"description":"Add a company record and fill in the fields your team actually uses."')
         ->and($html)->toContain('"mainEntityOfPage":"'.$url.'"')
+        ->and($html)->toContain('"publisher":{"@type":"Organization","name":"'.config('app.name').'"')
         ->and($html)->toContain('"position":1')
         ->and($html)->toContain('"position":2')
         ->and($html)->toContain('"position":3');
@@ -109,7 +111,9 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
 
         preg_match('/<title>(.*?)<\/title>/', $html, $match);
 
-        $expected = "{$page->title} - {$brand}";
+        $expected = $page->area === DocUrl::HELP
+            ? "{$page->title} - {$brand} Help Centre"
+            : "{$page->title} - {$brand}";
 
         if (($match[1] ?? null) !== $expected || substr_count($match[1] ?? '', " - {$brand}") !== 1) {
             $offenders[] = "{$page->path} -> ".($match[1] ?? '(no title)');
@@ -117,6 +121,16 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
     }
 
     expect($offenders)->toBe([]);
+});
+
+it('marks content pages as articles and the hubs as websites in open graph', function (): void {
+    $article = $this->get('/help/getting-started/create-your-first-company')->assertOk()->getContent();
+    $guide = $this->get('/developers/mcp')->assertOk()->getContent();
+    $hub = $this->get('/help')->assertOk()->getContent();
+
+    expect($article)->toContain('<meta property="og:type" content="article" />')
+        ->and($guide)->toContain('<meta property="og:type" content="article" />')
+        ->and($hub)->toContain('<meta property="og:type" content="website" />');
 });
 
 it('lazy-loads article images', function (): void {
@@ -135,7 +149,20 @@ it('serves an llms.txt indexing help and docs', function (): void {
     expect($body)->toContain('/help/getting-started/create-your-first-company')
         ->and($body)->toContain('/developers/self-hosting')
         ->and($body)->toContain('Help Centre')
-        ->and($body)->toContain('Documentation');
+        ->and($body)->toContain('Documentation')
+        ->and($body)->toContain('/compare/relaticle-vs-twenty')
+        ->and($body)->toContain('/compare/relaticle-vs-espocrm')
+        ->and($body)->toContain('/alternatives/attio')
+        ->and($body)->toContain('/alternatives/hubspot')
+        ->and($body)->toContain('/press');
+});
+
+it('lists the product pages in llms.txt', function (): void {
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    expect($body)->toContain(route('ai'))
+        ->and($body)->toContain(route('selfHosted'))
+        ->and($body)->toContain(config('chat.assistant_name'));
 });
 
 it('gives the search index anchors that equal the real heading ids the renderer emits', function (): void {
@@ -222,4 +249,18 @@ it('busts the cached search index on a front-matter-only title edit', function (
 
     expect($firstRecord['title'])->toBe('Original title')
         ->and($secondRecord['title'])->toBe('Updated title');
+});
+
+it('caps the blog section of llms.txt instead of listing every post ever published', function (): void {
+    Post::factory()->count(55)->published()->create();
+
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    $blogLinks = preg_match_all('#\- \[[^\]]*\]\('.preg_quote(route('blog.index'), '#').'/[^)]+\)#', (string) $body);
+
+    // /llms.txt is public, uncached, and written for crawlers, so the one section
+    // that grows with the database needs a ceiling. The docs and help sections
+    // above it are already bounded by their on-disk manifests.
+    expect($blogLinks)->toBeLessThanOrEqual(50)
+        ->and($blogLinks)->toBeGreaterThan(0);
 });

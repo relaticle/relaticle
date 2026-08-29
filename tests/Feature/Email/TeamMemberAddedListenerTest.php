@@ -26,8 +26,8 @@ test('dispatches has-team-members tag for team owner when member is added', func
 
     event(new TeamMemberAdded($owner->currentTeam, $member));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->subscriberUuid === 'mc-uuid-owner'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($owner): bool {
+        return invade($job)->userId === (string) $owner->id
             && invade($job)->tags === [SubscriberTagEnum::HasTeamMembers->value]
             && invade($job)->action === TagAction::Add;
     });

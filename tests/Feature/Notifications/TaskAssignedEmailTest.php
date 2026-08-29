@@ -10,6 +10,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Pennant\Feature;
 
+mutates(NotifyTaskAssignees::class);
+
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
     Mail::fake();
@@ -24,7 +26,7 @@ it('emails a newly assigned user when their email channel is on', function (): v
     $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
 
-    resolve(NotifyTaskAssignees::class)->execute($task);
+    resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
     defer()->invoke();
 
     Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $m): bool => $m->hasTo($assignee->email));
@@ -38,7 +40,7 @@ it('does not email when the email channel is off (default)', function (): void {
     $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
 
-    resolve(NotifyTaskAssignees::class)->execute($task);
+    resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
     defer()->invoke();
 
     Mail::assertNothingQueued();
@@ -53,7 +55,7 @@ it('skips the in-app notification when the in-app channel is off', function (): 
     $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'X']);
     $task->assignees()->attach($assignee);
 
-    resolve(NotifyTaskAssignees::class)->execute($task);
+    resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
     defer()->invoke();
 
     expect($assignee->fresh()->notifications()->count())->toBe(0);

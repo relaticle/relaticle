@@ -25,8 +25,6 @@
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    @stack('turnstile')
-
     @stack('header')
 
     @if(app()->isProduction() && !empty(config('services.fathom.site_id')))

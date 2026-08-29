@@ -28,6 +28,7 @@ final readonly class ProposalDisplayBuilder
         'opportunity' => ['title' => 'Create Opportunity', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create opportunity'],
         'task' => ['title' => 'Create Task', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create task'],
         'note' => ['title' => 'Create Note', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create note'],
+        'team_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
     ];
 
     public function __construct(

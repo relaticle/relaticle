@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Effective date:** March 20, 2026
+**Effective date:** August 26, 2026
 
 These Terms of Service ("Terms") govern your use of Relaticle, an open-source CRM platform provided by Relaticle ("we", "us", "our"). By accessing or using our services, you agree to these Terms.
 
@@ -46,7 +46,7 @@ Access to the REST API and MCP server is governed by API tokens scoped to specif
 
 ## 6. Pricing
 
-Relaticle is free to use. Both the Cloud and Self-Hosted options are available at no cost. We may introduce paid features in the future, but existing free functionality will remain free.
+Self-hosted software has no license fee under AGPL-3.0. The hosted Cloud service may offer trial, free, and paid plans. Current pricing and included features appear on the pricing page or during checkout. Charges apply only after you accept the displayed paid terms. Price changes apply prospectively after notice.
 
 ## 7. Availability
 

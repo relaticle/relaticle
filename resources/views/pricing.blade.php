@@ -1,7 +1,11 @@
+@php
+    $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
+@endphp
+
 <x-guest-layout
-    title="Pricing - Relaticle"
-    description="Relaticle pricing. No per-seat pricing — flat workspace plans. Unlimited users and records. Self-host free forever."
-    ogTitle="Pricing - Relaticle"
+    title="Pricing - $19/mo flat, unlimited users - Relaticle"
+    description="No per-seat pricing. One flat workspace plan at $19/mo billed yearly, with unlimited users and records. 14-day trial, no card. Self-host free forever."
+    ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
@@ -35,29 +39,57 @@
                 $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
                 $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
 
-                // Sourced from packages/Chat/config/chat.php's model catalog ('credit_multiplier'
-                // per model) and 'tool_call_credit_bonus'. Settlement formula verified in
-                // packages/Chat/src/Services/CreditService.php::calculateCredits():
-                // max(1, ceil(multiplier + toolCalls * toolBonus)).
-                $opusReplies = intdiv((int) \App\Enums\Plan::Pro->credits(), 3);
 
-                // Filtered from config rather than hardcoded so this list can never name a model
-                // the app won't actually serve. Gemini 3 Flash and Gemini 3.1 Pro carry
-                // 'supports_tools' => false in chat.php, which makes ModelDescriptor::isAvailable()
-                // (packages/Chat/src/Support/ModelDescriptor.php:49) return false unconditionally —
-                // AiModelResolver::pick() can never select them, so they must not appear here even
-                // though they're in the catalog with real min_plan/credit_multiplier values.
-                $toolCapableCloudModels = collect(config('chat.models', []))
-                    ->filter(fn (array $model): bool => ($model['supports_tools'] ?? false) === true && ($model['self_hosted'] ?? false) === false);
+                // offered(), not available(): this list can never name a model the app won't
+                // serve, because it drops the entries whose measured capabilities say they
+                // cannot call tools (both Gemini models today) and AiModelResolver::pick()
+                // can never select those. It deliberately does NOT drop models whose provider
+                // has no key on this install: what Cloud Pro includes is not a function of
+                // whether the web host currently holds an Anthropic key, and filtering on
+                // that renders these sentences with a hole where the model names belong.
+                $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
+                    ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
+                        'label' => $model->displayLabel(),
+                        'min_plan' => $model->minPlan->value,
+                        'credit_multiplier' => $model->creditMultiplier,
+                    ]);
                 $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
                 $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
-                $multiplierOneModels = $toolCapableCloudModels->where('credit_multiplier', 1.0)->pluck('label')->join(', ', ' and ');
-                $multiplierOneHalfModels = $toolCapableCloudModels->where('credit_multiplier', 1.5)->pluck('label')->join(', ', ' and ');
-                $multiplierThreeModels = $toolCapableCloudModels->where('credit_multiplier', 3.0)->pluck('label')->join(', ', ' and ');
+
+                // Grouped, not three hardcoded tiers. The catalog is editable at runtime, so
+                // asking for the 1.0 / 1.5 / 3.0 buckets by name printed "3x for )" the moment
+                // an operator retired the only 3x model, and silently omitted any model priced
+                // at a fourth multiplier. Self-hosted models ride the 1x bucket because
+                // ModelRegistry gives them that multiplier.
+                $multiplierClauses = $toolCapableCloudModels
+                    ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
+                    ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
+
+                $multiplierClauses->put('1', $multiplierClauses->has('1')
+                    ? __(':models and self-hosted models', ['models' => $multiplierClauses->get('1')])
+                    : __('self-hosted models'));
+
+                $creditMultiplierList = $multiplierClauses
+                    ->sortKeys(SORT_NUMERIC)
+                    ->map(fn (string $models, string $multiplier): string => __(':multiplierx for :models', ['multiplier' => $multiplier, 'models' => $models]))
+                    ->join('; ');
+
+                // The worked example names the cheapest and dearest models the catalog
+                // actually offers, so retiring either cannot leave the sentence describing a
+                // model nobody can pick.
+                $sortedByCost = $toolCapableCloudModels->sortBy('credit_multiplier')->values();
+                $cheapestModel = $sortedByCost->first()['label'] ?? __('a 1x model');
+                $dearestEntry = $sortedByCost->last() ?? ['label' => __('a higher-multiplier model'), 'credit_multiplier' => 1.0];
+                $dearestReplyCost = max(1, (int) ceil($dearestEntry['credit_multiplier'] + 1.0));
 
                 $creditFaqAnswer = __(
-                    'Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (1x for :oneX and self-hosted models; 1.5x for :oneFiveX; 3x for :threeX), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple Sonnet 4.6 reply with no tool calls costs 1 credit; an Opus 4.7 reply that touches two records costs 4. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
-                    ['oneX' => $multiplierOneModels, 'oneFiveX' => $multiplierOneHalfModels, 'threeX' => $multiplierThreeModels]
+                    'Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (:multipliers), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple reply from :cheapestModel with no tool calls costs 1 credit; a reply from :dearestModel that touches two records costs :dearestCost. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
+                    [
+                        'multipliers' => $creditMultiplierList,
+                        'cheapestModel' => $cheapestModel,
+                        'dearestModel' => $dearestEntry['label'],
+                        'dearestCost' => $dearestReplyCost,
+                    ]
                 );
 
                 // "Cloud Pro" is the billing-on marketing name only — under billing-off there is
@@ -69,10 +101,17 @@
                 // No Enterprise plan card or checkout path exists anywhere in the codebase, so
                 // whether it's an actual purchasable offering isn't something the code can confirm
                 // — it's mentioned nowhere in this page's visible copy for that reason.
-                $modelsUnlockAnswer = __(
-                    'Every plan can use :freeModels and any self-hosted model you connect yourself. :paidPlan additionally unlocks :paidModels — the models with a higher credit multiplier.',
-                    ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]
-                );
+                // Two independent sentences rather than one with two holes in it: a catalog
+                // with no free-tier model rendered "Every plan can use  and any self-hosted
+                // model you connect yourself", which is the failure this shape removes.
+                $modelsUnlockAnswer = trim(implode(' ', array_filter([
+                    $freeCloudModels === ''
+                        ? __('Every plan can use any self-hosted model you connect yourself.')
+                        : __('Every plan can use :freeModels and any self-hosted model you connect yourself.', ['freeModels' => $freeCloudModels]),
+                    $paidCloudModels === ''
+                        ? ''
+                        : __(':paidPlan additionally unlocks :paidModels — the models with a higher credit multiplier.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
+                ])));
 
                 $rateLimitAnswer = __(
                     'Yes — a per-minute cap shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
@@ -88,11 +127,16 @@
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle — no self-hosted maintenance required');
                     $hostedPlanAnswer = __(
-                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from Sonnet 4.6 up to Opus 4.7, the REST API, the 30-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below) — as a reference point, :credits credits covers roughly :credits simple Sonnet 4.6 replies, or around :opusReplies Opus 4.7 replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
+                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from :cheapestModel up to :dearestModel, the REST API, the 37-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
                             'price' => '$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)',
                             'credits' => $proCredits,
-                            'opusReplies' => number_format($opusReplies),
+                            'cheapestModel' => $cheapestModel,
+                            'dearestModel' => $dearestEntry['label'],
+                            // Settlement formula, packages/Chat/src/Services/CreditService.php
+                            // ::calculateCredits(): max(1, ceil(multiplier + toolCalls * toolBonus)).
+                            // Before tool calls that is just the multiplier.
+                            'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                             'days' => $trialDays,
                         ]
                     );
@@ -103,7 +147,7 @@
                 } else {
                     $hostedPriceCell = __('$0/mo per workspace');
                     $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
-                    $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 30-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support — no credit card required.');
+                    $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 37-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support. No credit card is required.');
                     $planLimitAnswer = __(
                         'CRM data itself is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. The AI assistant is metered, though: every workspace defaults to the Free plan\'s :credits credits a month (self-hosted included — see "Are self-hosted installs exempt from AI credit limits?" below), resetting every calendar month. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
                         ['credits' => $freeCredits]
@@ -129,12 +173,10 @@
                 </div>
 
                 {{--
-                    A <table> here would collapse to a run-on line for the markdown-response
-                    channel (GPTBot/ClaudeBot/PerplexityBot): the app's configured league/
-                    html-to-markdown driver runs with `strip_tags: true` and does not register
-                    TableConverter, so table cells lose their separators. <ul>/<li>/<p> (category
-                    names are CSS-bold, not <strong> — no semantic-bold tag is used) all have
-                    registered converters and were verified to survive conversion — each row
+                    List layout kept for responsive styling; tables DO convert to
+                    markdown since the TableAwareLeagueDriver landed. <ul>/<li>/<p>
+                    (category names are CSS-bold, not <strong> — no semantic-bold
+                    tag is used) were verified to survive conversion — each row
                     below reads as "Category" / "Self-Hosted: X" / "Hosted: Y" in markdown.
                 --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -210,7 +252,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     @foreach([
                         ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', '30', 'MCP Tools'],
+                        ['ri-robot-2-line', (string) $mcpToolCount, 'MCP Tools'],
                         ['ri-stack-line', '22', 'Field Types'],
                         ['ri-lock-line', '5-Layer', 'Authorization'],
                     ] as [$icon, $value, $label])
@@ -221,6 +263,13 @@
                         </div>
                     @endforeach
                 </div>
+
+                {{-- Two of the tiles above are the whole subject of a page each. --}}
+                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('What the AI assistant and MCP server do') }}</a>
+                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
+                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Run it free on your own server') }}</a>
+                </p>
             </div>
 
             {{-- Help CTA --}}
@@ -248,18 +297,26 @@
                 ->name('Relaticle')
                 ->description('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.')
                 ->url(route('pricing'))
+                ->image([
+                    asset('images/product-preview-16x9.jpg'),
+                    asset('images/product-preview-4x3.jpg'),
+                    asset('images/product-preview-1x1.jpg'),
+                ])
+                ->brand(\Spatie\SchemaOrg\Schema::brand()->name('Relaticle'))
                 ->offers($billingActive
                     ? [
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Self-hosted')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Cloud Pro')
                             ->price('19')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Per workspace, billed yearly at $228/year ($19/mo); $24/mo billed monthly.'),
                     ]
@@ -268,12 +325,14 @@
                             ->name('Self-hosted')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Cloud')
                             ->price('0')
                             ->priceCurrency('USD')
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free hosted plan, managed by Relaticle.'),
                     ]

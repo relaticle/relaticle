@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Documentation\Http\Controllers;
 
+use App\Support\CompetitorFacts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
@@ -16,12 +18,20 @@ use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
+use Relaticle\Ink\Models\Post;
 
 final readonly class HelpController
 {
     private const string AREA = DocUrl::HELP;
 
     private const string DOCS_CATEGORY = 'docs/guides';
+
+    /**
+     * How many blog posts /llms.txt lists. The doc and help sections above it are
+     * bounded by their on-disk manifests; the blog is the only section that grows
+     * with the database, on an uncached route whose whole audience is crawlers.
+     */
+    private const int LLMS_TXT_BLOG_LIMIT = 50;
 
     public function __construct(
         private DocsRepository $repository,
@@ -125,7 +135,117 @@ final readonly class HelpController
             array_push($lines, '', '## '.__('Developer Documentation'), '', ...$docs);
         }
 
+        array_push($lines, '', '## '.__('Product'), '', ...$this->llmsTxtProductEntries());
+
+        $comparisons = $this->llmsTxtComparisonEntries();
+
+        if ($comparisons !== []) {
+            array_push($lines, '', '## '.__('Comparisons & Alternatives'), '', ...$comparisons);
+        }
+        $lines[] = '';
+        $lines[] = '## '.__('Company');
+        $lines[] = '';
+        $lines[] = sprintf(
+            '- [%s](%s): %s',
+            __('Press Kit & Facts'),
+            route('press'),
+            __('Founding date, license, GitHub stars, pricing, tech stack, and product screenshots.'),
+        );
+
+        $blog = $this->llmsTxtBlogEntries();
+
+        if ($blog !== []) {
+            array_push($lines, '', '## '.__('Blog'), '', ...$blog);
+        }
+
         return implode("\n", $lines)."\n";
+    }
+
+    /** @return list<string> */
+    private function llmsTxtProductEntries(): array
+    {
+        $assistantName = (string) config('chat.assistant_name');
+
+        return [
+            sprintf(
+                '- [%s](%s): %s',
+                __(':name, the AI Assistant', ['name' => $assistantName]),
+                route('ai'),
+                __('What the built-in AI assistant does, the approval flow, model choice, and MCP access.'),
+            ),
+            sprintf(
+                '- [%s](%s): %s',
+                __('Self-Hosted CRM'),
+                route('selfHosted'),
+                __('Run Relaticle on your own server with Docker Compose, AGPL-3.0, and local AI via Ollama.'),
+            ),
+        ];
+    }
+
+    /** @return list<string> */
+    private function llmsTxtComparisonEntries(): array
+    {
+        $facts = CompetitorFacts::all();
+        $entries = [];
+
+        /** @var array<int, string> $compare */
+        $compare = config('comparisons.compare', []);
+
+        foreach ($compare as $slug) {
+            $entries[] = sprintf(
+                '- [%s](%s): %s',
+                __('Relaticle vs :name', ['name' => $facts[$slug]['name']]),
+                route('compare.show', ['competitor' => $slug]),
+                __('License, pricing, GitHub activity, tech stack, and AI/MCP support compared with dated, sourced facts.'),
+            );
+        }
+
+        /** @var array<int, string> $alternatives */
+        $alternatives = config('comparisons.alternatives', []);
+
+        foreach ($alternatives as $slug) {
+            $entries[] = sprintf(
+                '- [%s](%s): %s',
+                __(':name Alternative', ['name' => $facts[$slug]['name']]),
+                route('alternatives.show', ['competitor' => $slug]),
+                __('Why teams switch from :name to an open-source, self-hosted CRM, with the CSV migration path.', ['name' => $facts[$slug]['name']]),
+            );
+        }
+
+        return $entries;
+    }
+
+    /** @return list<string> */
+    private function llmsTxtBlogEntries(): array
+    {
+        if (! Route::has('blog.index')) {
+            return [];
+        }
+
+        $entries = [sprintf(
+            '- [%s](%s): %s',
+            __('Engineering Blog'),
+            route('blog.index'),
+            __('Engineering posts on building an open-source, AI-native CRM.'),
+        )];
+
+        $posts = Post::query()
+            ->published()
+            ->latest('published_at')
+            ->limit(self::LLMS_TXT_BLOG_LIMIT)
+            ->toBase()
+            ->get(['title', 'slug', 'excerpt']);
+
+        foreach ($posts as $post) {
+            $entries[] = sprintf(
+                '- [%s](%s): %s',
+                $post->title,
+                route('blog.show', ['slug' => $post->slug]),
+                $post->excerpt,
+            );
+        }
+
+        return $entries;
     }
 
     /** @return list<string> */

@@ -22,7 +22,7 @@ beforeEach(function (): void {
 });
 
 it('shows the Ollama model in the chat picker when configured', function (): void {
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     Livewire::test(ChatInterface::class)
@@ -30,7 +30,7 @@ it('shows the Ollama model in the chat picker when configured', function (): voi
 });
 
 it('hides the Ollama model from the chat picker when not configured', function (): void {
-    config()->set('chat.models.6.model', null);
+    config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
     Livewire::test(ChatInterface::class)
@@ -42,12 +42,12 @@ it('hides cloud models whose provider key is not configured', function (): void 
     app()->forgetInstance(ModelRegistry::class);
 
     Livewire::test(ChatInterface::class)
-        ->assertSee('Sonnet 4.6', stripInitialData: false)
+        ->assertSee('Sonnet 5', stripInitialData: false)
         ->assertDontSee('GPT 5.5', stripInitialData: false);
 });
 
 it('shows the Ollama model on the dashboard picker when configured', function (): void {
-    config()->set('chat.models.6.model', 'qwen3:14b');
+    config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     livewire(Dashboard::class)
@@ -55,7 +55,7 @@ it('shows the Ollama model on the dashboard picker when configured', function ()
 });
 
 it('hides the Ollama model from the dashboard picker when not configured', function (): void {
-    config()->set('chat.models.6.model', null);
+    config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
     livewire(Dashboard::class)
@@ -67,7 +67,7 @@ it('drives the chat picker from the model registry', function (): void {
     app()->forgetInstance(ModelRegistry::class);
 
     Livewire::test(ChatInterface::class)
-        ->assertSee('Sonnet 4.6', stripInitialData: false)   // anthropic key set in tests
+        ->assertSee('Sonnet 5', stripInitialData: false)   // anthropic key set in tests
         ->assertSee('Auto', stripInitialData: false)
         ->assertDontSee('GPT 5.5', stripInitialData: false)   // openai key nulled → hidden
         ->assertDontSee('Gemini 3 Flash', stripInitialData: false); // supports_tools=false → never shown

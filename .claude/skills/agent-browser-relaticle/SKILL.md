@@ -182,12 +182,18 @@ await comp2.call("callMountedAction");
 
 ## 6. Environment hazards (dated)
 
+- **Factory/fresh teams redirect every app-panel page to /billing** (verified:
+  2026-08-25): `EnsureHostedWorkspaceAccess` allows only subscribed teams or
+  `trial_ends_at` in the future, and factory teams have neither, so login lands on
+  `/app/<slug>/billing` and stays there. Fix before browsing:
+  `$team->forceFill(['trial_ends_at' => now()->addDays(14)])->save();` (LocalSeeder's
+  user is already provisioned; this bites ChatQaSeeder and factory users).
 - **Shared local Redis across Herd apps**: another app's Horizon can consume this app's
   queue jobs (verified: 2026-06-11 — Journey ate Relaticle chat jobs). Use a dedicated
   `REDIS_DB` in `.env`; before queue-dependent testing, dispatch a sentinel job and
   confirm THIS checkout's worker consumed it.
 - **Reverb/websockets**: agent-browser's Chromium may use a wrong websocket host or a
-  stale built bundle — looks like a dead page, is an env defect. `npm run build`, check
+  stale built bundle — looks like a dead page, is an env defect. `pnpm run build`, check
   `agent-browser console` for websocket errors (verified: 2026-06-10).
 - **419 CSRF after idle** → `agent-browser reload` and retry once (verified: 2026-05).
 - **A failed Livewire request leaves a full-screen error overlay in the DOM** (Laravel
@@ -199,6 +205,18 @@ await comp2.call("callMountedAction");
 - **Stale session after branch switches** → first action of a batch is a fresh login.
 - **AI credits drain during chat testing** → re-seed `LocalSeeder` to top up before
   chat-heavy flows.
+- **Screenshot pipeline can serve STALE FRAMES from a dead target** (verified:
+  2026-08-18): after long sessions / viewport changes, `screenshot` kept returning a
+  frame that no longer matched the DOM (evals said dark theme + correct state; PNG
+  showed an old light half-render). Detection: `eval 'document.body.style.outline="40px
+  solid red"'` → screenshot → if no red border, the pipeline is stale. Fix:
+  `pkill -9 -f agent-browser; sleep 3`, new session, re-login. Don't debug the "bug"
+  in the PNG before running the red-outline probe. UPDATE (verified: 2026-08-23): the
+  pkill+new-session fix did NOT clear it, a fresh session's very first screenshots
+  again failed the red-outline probe (dark-mode text read black in the PNG while
+  `getComputedStyle` + `elementFromPoint` at the same coordinates said white). When
+  the probe fails twice, stop shooting: assert via DOM reads (computed styles,
+  elementFromPoint, rects) and treat those as the truth for visual verification.
 
 ## 7. DB-assert (corroboration only — the UI is the proof)
 

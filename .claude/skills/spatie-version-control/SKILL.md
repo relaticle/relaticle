@@ -23,69 +23,22 @@ Apply Spatie's Git and version control conventions for consistent repository man
 - In scope: Git operations, repository naming, branch naming, commit messages, merge strategies.
 - Out of scope: Code style, deployment pipelines, CI/CD configuration.
 
-## Repository Naming
+## Workflow
 
-### Site source code
+1. Identify the Git operation or repository convention involved.
+2. Read `references/spatie-version-control-guidelines.md` and focus on the relevant sections.
+3. Apply the project-stage rules before branch, commit, merge, or cleanup guidance.
 
-Use the main domain name in lowercase, without `www`:
-- Good: `spatie.be`
-- Bad: `https://www.spatie.be`, `www.spatie.be`, `Spatie.be`
+## Core Rules (Summary)
 
-### Subdomains
+- Name site repositories after their lowercase naked domain and other repositories with kebab-case.
+- Keep `main` stable and deployable after launch, and remove stale branches.
+- Use `develop` during initial development; use feature branches once a project is live.
+- Use only lowercase letters and hyphens in branch names.
+- Write descriptive, present-tense, granular commits.
+- Rebase regularly and generally squash feature branches when merging.
+- Treat history-rewriting and destructive Git commands with the cautions in the reference.
 
-Include the subdomain in the repo name:
-- Good: `guidelines.spatie.be`
-- Bad: `spatie.be-guidelines`
+## References
 
-### Packages and other projects
-
-Use kebab-case:
-- Good: `laravel-backup`, `spoon`
-- Bad: `LaravelBackup`, `Spoon`
-
-## Branches
-
-### Initial development
-
-- Maintain `main` and `develop` branches.
-- Commit through `develop`, not directly to `main`.
-- Feature branches are optional; if used, branch from `develop`.
-
-### Live projects
-
-- Delete the `develop` branch.
-- All commits to `main` must come through feature branches.
-- Prefer squashing commits on merge.
-
-### Branch naming
-
-- Use lowercase letters and hyphens only.
-- Good: `feature-mailchimp`, `fix-deliverycosts`, `updates-june-2016`
-- Bad: `feature/mailchimp`, `random-things`, `develop`
-
-## Commits
-
-### Message format
-
-- Always use **present tense**.
-- Good: `Update deps`, `Fix vat calculation in delivery costs`
-- Bad: `wip`, `commit`, `a lot`, `solid`
-
-### Granularity
-
-- Prefer small, focused commits over large ones.
-- Use `git add -p` for interactive staging to create granular commits.
-
-## Merging
-
-- Rebase regularly to reduce merge conflicts.
-- For deploying feature branches: use `git merge <branch> --squash`.
-- If push is denied: use `git rebase` (not merge).
-
-## Pull Requests
-
-- Optional but useful for peer review, merge validation, and historical reference.
-
----
-
-Source: https://spatie.be/guidelines/version-control
+- `references/spatie-version-control-guidelines.md`

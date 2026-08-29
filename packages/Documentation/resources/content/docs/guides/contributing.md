@@ -25,7 +25,7 @@ Visit `http://localhost:8000` to access the application.
 
 | Component | Technology                            |
 |-----------|---------------------------------------|
-| Backend | PHP 8.4, Laravel 13                   |
+| Backend | PHP 8.5, Laravel 13                   |
 | Admin UI | Filament 5                            |
 | Frontend | Livewire 4, Alpine.js, Tailwind CSS 4 |
 | Database | PostgreSQL                             |
@@ -67,9 +67,9 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 
 ### Requirements
 
-- **PHP 8.4+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
+- **PHP 8.5+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
 - **PostgreSQL 17+**
-- **Node.js 20+**
+- **Node.js 22+** with pnpm
 - **Composer 2+**
 
 ### Manual Installation
@@ -78,12 +78,12 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 git clone https://github.com/Relaticle/relaticle.git
 cd relaticle
 composer install
-npm install
+pnpm install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan storage:link
-npm run build
+pnpm run build
 composer run dev
 ```
 
@@ -157,7 +157,7 @@ For production deployment instructions, including Docker setup, environment conf
 | Queue not processing | `php artisan queue:restart` |
 | File upload errors | `chmod -R 775 storage bootstrap/cache` |
 | Slow queries | Use Laravel Telescope to identify, then add indexes |
-| View cache issues | `php artisan view:clear && npm run build` |
+| View cache issues | `php artisan view:clear && pnpm run build` |
 
 ---
 

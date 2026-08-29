@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Models\Team;
+use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use Closure;
@@ -19,14 +20,15 @@ use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Mail\TeamInvitation;
 use Laravel\Jetstream\Rules\Role;
-use Laravel\Jetstream\TeamInvitation as TeamInvitationModel;
 
 final readonly class InviteTeamMember implements InvitesTeamMembers
 {
     /**
      * Invite a new team member to the given team.
+     *
+     * @return TeamInvitationModel the created invitation
      */
-    public function invite(User $user, Team $team, string $email, ?string $role = null): void
+    public function invite(User $user, Team $team, string $email, ?string $role = null): TeamInvitationModel
     {
         Gate::forUser($user)->authorize('addTeamMember', $team);
 
@@ -36,14 +38,23 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         $expiryDays = (int) config('jetstream.invitation_expiry_days', 7);
 
+        /** @var TeamInvitationModel $invitation */
         $invitation = $team->teamInvitations()->create([
             'email' => $email,
             'role' => $role,
             'expires_at' => now()->addDays($expiryDays),
         ]);
 
-        /** @var TeamInvitationModel $invitation */
-        Mail::to($email)->send(new TeamInvitation($invitation));
+        // Queued, and deferred to after the transaction commits. The chat
+        // approval path runs this inside PendingActionService::approve()'s
+        // transaction while it holds lockForUpdate() on the pending action, so
+        // a synchronous send made a third-party SMTP round trip decide how long
+        // that row stayed locked. afterCommit() is what keeps the queue push
+        // itself out of the transaction too: a rolled back approval must not
+        // leave a real invitation email on its way.
+        Mail::to($email)->queue(new TeamInvitation($invitation)->afterCommit());
+
+        return $invitation;
     }
 
     /**

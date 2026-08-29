@@ -12,6 +12,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Support\TurnPresence;
 
 function seedConversation(User $user, string $conversationId): void
 {
@@ -38,7 +39,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
@@ -48,7 +49,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
     });
 });
 
-it('settles the reserved minimum (not refund) when the job fails', function (): void {
+it('refunds the reservation when the job fails without ever streaming', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     seedConversation($user, 'conv-123');
@@ -66,14 +67,16 @@ it('settles the reserved minimum (not refund) when the job fails', function (): 
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
-    expect($balance->credits_used)->toBe(1)
-        ->and($balance->credits_remaining)->toBe(99);
+
+    // handle() never ran, so the reservation goes back rather than being charged.
+    expect($balance->credits_used)->toBe(0)
+        ->and($balance->credits_remaining)->toBe(100);
 });
 
 it('binds auth context so tool classes can resolve the current user', function (): void {
@@ -112,11 +115,15 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
         team: $team,
         message: 'hello',
         conversationId: 'conv-paused',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: 'turn-paused',
     );
 
+    TurnPresence::begin('conv-paused', turnId: 'turn-paused', message: 'hello');
+
     $job->handle($credits);
+
+    expect(TurnPresence::current('conv-paused'))->toBeNull();
 
     Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-paused'
         && $event->message === __('billing.access.paused_chat'));

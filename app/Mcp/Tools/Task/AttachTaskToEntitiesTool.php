@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Task;
 
+use App\Actions\Task\AttachTaskRelationships;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Models\Task;
@@ -11,17 +12,19 @@ use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Attach Task Relationships')]
 #[Description('Attach a task to companies, people, opportunities, or assign to users. Adds links without removing existing ones.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class AttachTaskToEntitiesTool extends BaseAttachTool
 {
+    protected function openWorldHint(): bool
+    {
+        return true;
+    }
+
     protected function modelClass(): string
     {
         return Task::class;
@@ -35,6 +38,11 @@ final class AttachTaskToEntitiesTool extends BaseAttachTool
     protected function resourceClass(): string
     {
         return TaskResource::class;
+    }
+
+    protected function actionClass(): string
+    {
+        return AttachTaskRelationships::class;
     }
 
     /** @return array<int, string> */
@@ -70,25 +78,5 @@ final class AttachTaskToEntitiesTool extends BaseAttachTool
             'assignee_ids' => ['sometimes', 'array'],
             'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
         ];
-    }
-
-    public function syncRelationships(Model $model, array $data): void
-    {
-        /** @var Task $model */
-        if (isset($data['company_ids'])) {
-            $model->companies()->syncWithoutDetaching($data['company_ids']);
-        }
-
-        if (isset($data['people_ids'])) {
-            $model->people()->syncWithoutDetaching($data['people_ids']);
-        }
-
-        if (isset($data['opportunity_ids'])) {
-            $model->opportunities()->syncWithoutDetaching($data['opportunity_ids']);
-        }
-
-        if (isset($data['assignee_ids'])) {
-            $model->assignees()->syncWithoutDetaching($data['assignee_ids']);
-        }
     }
 }

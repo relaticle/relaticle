@@ -64,9 +64,11 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
 <link rel="manifest" href="/site.webmanifest" />
 
-{{-- Preload critical fonts (discovered late if left to CSS) --}}
-<link rel="preload" as="font" href="/fonts/inter/InterVariable.woff2" type="font/woff2" crossorigin />
-<link rel="preload" as="font" href="/fonts/satoshi/Satoshi-Variable.woff2" type="font/woff2" crossorigin />
+{{-- Preload critical fonts (discovered late if left to CSS). These must resolve through
+     the manifest exactly like the @font-face rules do: a preload that does not match the
+     URL the CSS asks for is downloaded twice rather than reused. --}}
+<link rel="preload" as="font" href="{{ Vite::asset('resources/fonts/inter/InterVariable.woff2') }}" type="font/woff2" crossorigin />
+<link rel="preload" as="font" href="{{ Vite::asset('resources/fonts/satoshi/Satoshi-Variable.woff2') }}" type="font/woff2" crossorigin />
 
 @stack('preload')
 

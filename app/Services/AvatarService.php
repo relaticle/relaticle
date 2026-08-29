@@ -9,6 +9,8 @@ use Illuminate\Support\Str;
 
 final readonly class AvatarService
 {
+    private const string CACHE_VERSION = 'v2';
+
     /**
      * Minimum contrast ratio for WCAG AA compliance.
      */
@@ -48,7 +50,7 @@ final readonly class AvatarService
         // Add custom colors to cache key if provided
         $bgColorKey = in_array($bgColor, [null, '', '0'], true) ? '' : "_bg{$bgColor}";
         $textColorKey = in_array($textColor, [null, '', '0'], true) ? '' : "_txt{$textColor}";
-        $cacheKey = 'avatar_'.hash('sha256', "{$name}_{$size}{$bgColorKey}{$textColorKey}_initials{$initialCount}");
+        $cacheKey = self::CACHE_VERSION.'_avatar_'.hash('sha256', "{$name}_{$size}{$bgColorKey}{$textColorKey}_initials{$initialCount}");
 
         return $this->cache->remember(
             $cacheKey,
@@ -67,7 +69,7 @@ final readonly class AvatarService
      */
     public function generateAuto(string $name, int $size = 64, int $initialCount = 2): string
     {
-        $cacheKey = 'avatar_auto_'.hash('sha256', "{$name}_{$size}_initials{$initialCount}");
+        $cacheKey = self::CACHE_VERSION.'_avatar_auto_'.hash('sha256', "{$name}_{$size}_initials{$initialCount}");
 
         return $this->cache->remember(
             $cacheKey,
@@ -158,8 +160,11 @@ final readonly class AvatarService
         $normalizedName = Str::ascii($name);
         $nameParts = array_values(array_filter(preg_split('/[\s\-_\.]+/', $normalizedName) ?: []));
 
+        // Str::ascii() empties names written entirely in a non-transliterable script
+        // (CJK, Hebrew, Thai), which used to leave every such workspace showing "?".
+        // Fall back to the name's own leading characters, read multibyte-safely.
         if ($nameParts === []) {
-            return '?';
+            return $this->initialsFromRawName($name, $count);
         }
 
         // For single initial mode, just return the first letter of the first name part
@@ -217,6 +222,25 @@ final readonly class AvatarService
     }
 
     /**
+     * Initials for names the ASCII transliterator cannot represent at all.
+     */
+    private function initialsFromRawName(string $name, int $count): string
+    {
+        /** @var list<string> $parts */
+        $parts = array_values(array_filter(preg_split('/[\s\-_\.]+/u', $name) ?: []));
+
+        if ($parts === []) {
+            return '?';
+        }
+
+        if ($count === 1 || count($parts) === 1) {
+            return mb_substr($parts[0], 0, $count);
+        }
+
+        return mb_substr($parts[0], 0, 1).mb_substr(end($parts), 0, 1);
+    }
+
+    /**
      * Get a deterministic background color based on the name.
      */
     private function getBackgroundColor(string $name): string
@@ -243,15 +267,22 @@ final readonly class AvatarService
      */
     private function generateSvg(string $initials, string $bgColor, string $textColor, int $size): string
     {
-        // Adjust font size based on initials length
-        $fontSize = strlen($initials) > 1 ? 44 : 48;
+        // Byte length would read a single CJK glyph as 3 characters and shrink it.
+        $fontSize = mb_strlen($initials) > 1 ? 40 : 46;
+
+        // Initials derive from a user-supplied name, so they can carry characters that
+        // are markup here. Unescaped, a workspace named "<script>x" produced initials
+        // of "<S" and an SVG that no longer parsed, leaving a broken avatar.
+        $initials = e($initials);
 
         return <<<SVG
         <svg xmlns="http://www.w3.org/2000/svg" width="{$size}" height="{$size}" viewBox="0 0 100 100">
-            <rect x="0" y="0" width="100" height="100" fill="{$bgColor}" />
-            <text x="50%" y="50%" alignment-baseline="middle" dominant-baseline="middle" text-anchor="middle"
-                  dy=".1em" fill="{$textColor}" font-family="Arial, Helvetica, sans-serif"
-                  font-size="{$fontSize}" font-weight="medium" letter-spacing="-1">
+            <rect width="100" height="100" fill="{$bgColor}" />
+            <circle cx="12" cy="4" r="70" fill="#ffffff" fill-opacity="0.12" />
+            <circle cx="96" cy="102" r="50" fill="#000000" fill-opacity="0.04" />
+            <text x="50" y="52" dominant-baseline="middle" text-anchor="middle"
+                  fill="{$textColor}" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                  font-size="{$fontSize}" font-weight="600" letter-spacing="-1.5">
                 {$initials}
             </text>
         </svg>

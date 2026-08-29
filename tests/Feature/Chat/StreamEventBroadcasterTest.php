@@ -2,16 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Responses\Data\ToolCall as DataToolCall;
 use Laravel\Ai\Responses\Data\ToolResult as DataToolResult;
 use Laravel\Ai\Streaming\Events\StreamStart;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
+use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 
 it('skips read-tool results entirely', function (): void {
     $dataToolResult = new DataToolResult(
@@ -170,4 +176,48 @@ it('swallows BroadcastException and does not rethrow', function (): void {
     );
 
     expect(fn () => $broadcaster->broadcast($event))->not->toThrow(BroadcastException::class);
+});
+
+it('carries the proposal expiry to the client without writing it into the stored tool result', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    $convId = '019dfa00-5555-7000-8000-0000000000ee';
+    DB::table('agent_conversations')->insert([
+        'id' => $convId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $tool = resolve(CreateCompanyTool::class);
+    $tool->setConversationId($convId);
+    $storedResult = $tool->handle(new Request(['records' => [['name' => 'Expiring Co']]]));
+
+    $action = PendingAction::query()->latest('id')->firstOrFail();
+
+    $event = new ToolResult(
+        id: 'evt-expiry',
+        toolResult: new DataToolResult(
+            id: 'tool-id-expiry',
+            name: 'CreateCompanyTool',
+            arguments: [],
+            result: $storedResult,
+        ),
+        successful: true,
+        error: null,
+        timestamp: time(),
+    );
+
+    $broadcast = json_decode((string) StreamEventBroadcaster::payloadFor($event)['with']['result'], true);
+
+    expect($broadcast['expires_at'])->toBe($action->expires_at->toIso8601String());
+
+    // The value the message persists is replayed to the model on every later turn,
+    // so it must stay byte-identical to what the tool returned.
+    expect(json_decode($storedResult, true))->not->toHaveKey('expires_at');
 });

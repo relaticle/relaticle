@@ -16,9 +16,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
+use Laravel\Ai\Events\AgentFailed;
+use Laravel\Ai\Events\StepFailed;
+use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
 use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
@@ -30,7 +34,9 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Chat\Settings\ChatSettings;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
+use Relaticle\Chat\Support\AgentRunTelemetry;
 
 final class ChatServiceProvider extends ServiceProvider
 {
@@ -39,6 +45,8 @@ final class ChatServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/chat.php', 'chat');
 
         $this->app->singleton(ModelRegistry::class);
+
+        $this->registerRoutes();
 
         // Replace laravel/ai's store so superseded (regenerated/edited-away)
         // turns disappear from the agent's history, not just the UI.
@@ -49,14 +57,41 @@ final class ChatServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->applyStoredSettings();
         $this->registerCommands();
-        $this->registerRoutes();
         $this->registerChannels();
         $this->registerViews();
         $this->registerLivewireComponents();
         $this->registerMigrations();
         $this->registerRenderHooks();
         $this->registerInsightsCacheInvalidation();
+        $this->registerRunTelemetry();
+    }
+
+    /**
+     * Push the runtime-editable model catalog over the config seed defaults.
+     *
+     * Guarded because the settings table does not exist on a fresh install's
+     * first `migrate`, nor while the app boots to run that migration; until then
+     * the config values in chat.php simply stay in force. Runs before
+     * ModelRegistry can be resolved (it is a singleton that reads config once in
+     * its constructor), which is why this is the first line of boot().
+     */
+    private function applyStoredSettings(): void
+    {
+        rescue(fn () => config(resolve(ChatSettings::class)->toConfig()), report: false);
+    }
+
+    /**
+     * Correlate a failed turn to the step or tool that killed it, which the
+     * job-level failure hook cannot see.
+     */
+    private function registerRunTelemetry(): void
+    {
+        Event::listen(
+            [AgentFailed::class, StepFailed::class, ToolFailed::class],
+            AgentRunTelemetry::class,
+        );
     }
 
     private function registerCommands(): void
@@ -69,12 +104,36 @@ final class ChatServiceProvider extends ServiceProvider
         ]);
     }
 
+    /**
+     * Registered from register(), not boot(), and pinned to the app panel's own
+     * domain when there is one. Both halves are load-bearing in production,
+     * where the panel is subdomain-routed (APP_PANEL_DOMAIN) and its tenant
+     * routes lose the "/app" prefix: `{tenant:slug}/{resource}/{record}` then
+     * reads `/r/people/{id}` as tenant "r" plus the People resource, and every
+     * chip in a transcript 404s.
+     *
+     * - RouteCollection::get() returns every domain route ahead of every
+     *   domainless one, so an unqualified chat route loses to the panel no
+     *   matter which provider registered first.
+     * - Filament registers panel routes from its own vendor provider's boot(),
+     *   which runs before every app provider's boot(), so a chat route added
+     *   during boot is always the later of the two.
+     *
+     * Both "r" and "chat" are reserved team slugs, so no legitimate tenant URL
+     * can live under either prefix and winning the match here is correct.
+     * tests/Feature/Routing/AppPanelRoutingTest.php pins both routing modes.
+     */
     private function registerRoutes(): void
     {
-        Route::middleware('web')
-            ->group(function (): void {
-                $this->loadRoutesFrom(__DIR__.'/../routes/chat.php');
-            });
+        $route = Route::middleware('web');
+
+        if (is_string($domain = config('app.app_panel_domain')) && $domain !== '') {
+            $route->domain($domain);
+        }
+
+        $route->group(function (): void {
+            $this->loadRoutesFrom(__DIR__.'/../routes/chat.php');
+        });
     }
 
     private function registerChannels(): void
@@ -111,16 +170,10 @@ final class ChatServiceProvider extends ServiceProvider
             }
         };
 
-        Company::saved($invalidate);
-        Company::deleted($invalidate);
-        People::saved($invalidate);
-        People::deleted($invalidate);
-        Opportunity::saved($invalidate);
-        Opportunity::deleted($invalidate);
-        Task::saved($invalidate);
-        Task::deleted($invalidate);
-        Note::saved($invalidate);
-        Note::deleted($invalidate);
+        foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+            $model::saved($invalidate);
+            $model::deleted($invalidate);
+        }
     }
 
     private function registerRenderHooks(): void
@@ -133,6 +186,11 @@ final class ChatServiceProvider extends ServiceProvider
         FilamentView::registerRenderHook(
             PanelsRenderHook::SIDEBAR_NAV_END,
             fn (): View|Factory => view('chat::filament.app.chat-sidebar-nav-hook'),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::TENANT_MENU_AFTER,
+            fn (): View|Factory => view('chat::filament.app.chat-sidebar-toggle-hook'),
         );
 
         FilamentView::registerRenderHook(

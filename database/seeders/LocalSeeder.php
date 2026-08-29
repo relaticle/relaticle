@@ -4,19 +4,27 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
+use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class LocalSeeder extends Seeder
 {
@@ -58,6 +66,7 @@ final class LocalSeeder extends Seeder
             });
 
         $this->topUpAiCreditsForLocalTeams();
+        $this->seedViewerTimezoneBoundaryFixture();
         //
         //        // Set the current user and tenant.
         //        Auth::setUser($user);
@@ -93,6 +102,81 @@ final class LocalSeeder extends Seeder
         //                $opportunity->saveCustomFieldValue($customFields->get('stage'), $customFields->get('stage')->options->random()->id);
         //            })
         //            ->create();
+    }
+
+    /**
+     * Fixture for walking the sysadmin panel's timezone behaviour by hand.
+     *
+     * Every row lands on one of two instants on the same UTC day: 19:00 UTC is
+     * 23:00 that evening in Asia/Yerevan, and 21:00 UTC is 01:00 the NEXT
+     * morning there. So an administrator on Yerevan must see the pair split
+     * across two calendar days while one on UTC sees them on the same day, and
+     * the 21:00 row must appear in the Yerevan administrator's "today".
+     *
+     * Paired with two administrators, one zoned and one not, this is what makes
+     * a wrong answer visible rather than merely plausible.
+     */
+    private function seedViewerTimezoneBoundaryFixture(): void
+    {
+        $evening = Date::now('UTC')->subDay()->setTime(19, 0);
+        $afterMidnight = Date::now('UTC')->subDay()->setTime(21, 0);
+
+        SystemAdministrator::query()->firstOrCreate(['email' => 'yerevan@relaticle.com'], [
+            'name' => 'Yerevan Administrator',
+            'password' => bcrypt('password'),
+            'role' => SystemAdministratorRole::SuperAdministrator,
+            'email_verified_at' => now(),
+            'timezone' => 'Asia/Yerevan',
+        ]);
+
+        SystemAdministrator::query()->firstOrCreate(['email' => 'utc@relaticle.com'], [
+            'name' => 'UTC Administrator',
+            'password' => bcrypt('password'),
+            'role' => SystemAdministratorRole::SuperAdministrator,
+            'email_verified_at' => now(),
+            'timezone' => null,
+        ]);
+
+        foreach (['Evening' => $evening, 'AfterMidnight' => $afterMidnight] as $label => $instant) {
+            $owner = User::factory()->withTeam()->create([
+                'name' => "Boundary {$label}",
+                'email' => 'boundary-'.mb_strtolower($label).'-'.Str::lower(Str::ulid()).'@example.test',
+                'created_at' => $instant,
+                'updated_at' => $instant,
+            ]);
+
+            $team = $owner->currentTeam;
+            $team->forceFill([
+                'name' => "Boundary {$label} Team",
+                'personal_team' => false,
+                'created_at' => $instant,
+                'updated_at' => $instant,
+            ])->save();
+
+            foreach ([Company::class, People::class, Task::class, Note::class, Opportunity::class] as $model) {
+                $model::withoutEvents(fn () => $model::factory()->for($team)->create([
+                    'creator_id' => $owner->id,
+                    'creation_source' => CreationSource::WEB,
+                    'created_at' => $instant,
+                    'updated_at' => $instant,
+                ]));
+            }
+
+            Activity::query()->withoutGlobalScope(TeamScope::class)->create([
+                'log_name' => 'crm',
+                'description' => "boundary {$label}",
+                'event' => 'updated',
+                'subject_type' => 'company',
+                'subject_id' => (string) Str::ulid(),
+                'causer_type' => 'user',
+                'causer_id' => $owner->id,
+                'team_id' => $team->id,
+                'properties' => [],
+                'created_at' => $instant,
+            ]);
+        }
+
+        $this->command?->info('Seeded viewer-timezone boundary fixture at 19:00 and 21:00 UTC yesterday.');
     }
 
     /**

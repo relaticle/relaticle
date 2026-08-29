@@ -2,7 +2,7 @@ name: Tim Cook
 company: apple
 custom_fields:
   emails:
-    - tim@apple.com
+    - tim@apple.example
   phone_number: "+14155550103"
   job_title: CEO
   linkedin: www.linkedin.com/in/timcook/

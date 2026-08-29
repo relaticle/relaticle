@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 return [
     'title' => 'Notifications',
-    'subtitle' => 'Customize your notification settings to stay informed without being overwhelmed.',
 
     'digest' => [
         'heading' => 'Daily digest',
         'title' => 'Enable daily digest',
         'description' => 'Includes tasks overdue and due today. Sent every morning if any tasks are due or overdue.',
+    ],
+
+    'onboarding' => [
+        'subject' => 'Your workspace is waiting',
+        'mail_heading' => ':name, your workspace is still waiting',
+        'mail_button' => 'Continue in Rela',
     ],
 
     'collaboration' => [

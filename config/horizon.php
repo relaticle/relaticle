@@ -88,7 +88,7 @@ return [
     'waits' => [
         'redis:default' => 60,
         'redis:imports' => 120,
-        'redis:chat' => 30,
+        'redis-chat:chat' => 30,
     ],
 
     /*
@@ -291,7 +291,7 @@ return [
                 'nice' => 0,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',
@@ -305,21 +305,23 @@ return [
             ],
         ],
 
+        // Horizon merges `defaults` into every environment, so a supervisor is
+        // switched off with maxProcesses 0 and never by omission.
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 2,
             ],
             'supervisor-2' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 0,
             ],
             'supervisor-3' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 0,
             ],
             'supervisor-imports' => [
-                'maxProcesses' => 5,
+                'maxProcesses' => 2,
             ],
             'chat-supervisor' => [
-                'connection' => 'redis',
+                'connection' => 'redis-chat',
                 'queue' => ['chat'],
                 'balance' => 'auto',
                 'autoScalingStrategy' => 'time',

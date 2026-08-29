@@ -15,7 +15,7 @@
     <style>
         @font-face {
             font-family: 'Inter';
-            src: url('/fonts/inter/InterVariable.woff2') format('woff2');
+            src: url('{{ Vite::asset('resources/fonts/inter/InterVariable.woff2') }}') format('woff2');
             font-weight: 100 900;
             font-display: swap;
         }

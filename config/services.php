@@ -57,11 +57,6 @@ return [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
 
-    'turnstile' => [
-        'key' => env('TURNSTILE_SITE_KEY'),
-        'secret' => env('TURNSTILE_SECRET_KEY'),
-    ],
-
     'stripe' => [
         'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
         'prices' => [
@@ -72,9 +67,5 @@ return [
             'small' => ['price' => env('STRIPE_PRICE_CREDITS_1K'), 'credits' => 1_000],
             'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
         ],
-    ],
-
-    'demo_account' => [
-        'password' => env('DEMO_ACCOUNT_PASSWORD'),
     ],
 ];

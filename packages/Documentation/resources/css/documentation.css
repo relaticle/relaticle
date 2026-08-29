@@ -149,8 +149,10 @@ html {
     @apply my-10 border-gray-200 dark:border-white/10;
 }
 
+/* Screenshots are captured in light mode only; dimming them keeps a dark
+   page from getting a full-brightness white block per image. */
 .prose-docs img {
-    @apply my-5 rounded-lg border border-gray-200 dark:border-white/10;
+    @apply my-5 rounded-lg border border-gray-200 dark:border-white/10 dark:brightness-90;
 }
 
 .prose-docs table {

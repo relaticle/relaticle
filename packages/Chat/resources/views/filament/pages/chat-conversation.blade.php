@@ -16,7 +16,9 @@
         </script>
     @endunless
 
-    <div class="-mx-6 -mb-6 flex flex-1 flex-col" style="height: calc(100vh - 10rem);">
+    {{-- The shared page heading lives in the topbar. The conversation surface
+         starts directly beneath it and fills the remaining viewport. --}}
+    <div class="-mx-6 -mb-6 -mt-8 flex flex-1 flex-col" style="height: calc(100dvh - 4rem);">
         <livewire:chat.chat-interface
             :conversation-id="$conversationId"
             :initial-message="$initialMessage"

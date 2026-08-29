@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -20,7 +21,6 @@ use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
-use Relaticle\Chat\Services\ChatContextService;
 use Relaticle\Chat\Services\MyTasksService;
 
 final class Dashboard extends Page
@@ -69,36 +69,24 @@ final class Dashboard extends Page
         }
     }
 
-    /**
-     * Prompt suggestions under the composer. Same source as the chat drawer's,
-     * so the two surfaces never drift apart.
-     *
-     * @return array<int, array{label: string, prompt: string}>
-     */
-    #[Computed]
-    public function starterPrompts(): array
-    {
-        return resolve(ChatContextService::class)->getSuggestedPrompts([
-            'record_type' => null,
-            'record_id' => null,
-            'record_name' => null,
-        ]);
-    }
-
     public function getGreeting(): string
     {
         /** @var User $user */
         $user = Filament::auth()->user();
         $firstName = explode(' ', $user->name)[0];
 
-        /** @var string $timezone */
-        $timezone = $user->timezone ?? config('app.timezone');
-        $hour = Date::now($timezone)->hour;
+        // The browser reports its timezone only after the first render, so the
+        // local hour is unknown on the very first visit: greet without the clock.
+        if ($user->timezone === null) {
+            return __('Welcome, :name.', ['name' => $firstName]);
+        }
+
+        $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {
-            $hour < 12 => "Good morning, {$firstName}.",
-            $hour < 18 => "Good afternoon, {$firstName}.",
-            default => "Good evening, {$firstName}.",
+            $hour < 12 => __('Good morning, :name.', ['name' => $firstName]),
+            $hour < 18 => __('Good afternoon, :name.', ['name' => $firstName]),
+            default => __('Good evening, :name.', ['name' => $firstName]),
         };
     }
 
@@ -117,6 +105,35 @@ final class Dashboard extends Page
             : new Collection;
     }
 
+    #[Computed]
+    public function canCompleteTasks(): bool
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+        $team = $user->currentTeam;
+
+        return $team !== null && resolve(MyTasksService::class)->hasDoneOption($team);
+    }
+
+    public function completeTask(string $taskId): void
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+
+        // Scoped to the current tenant: the status custom field resolves against
+        // it, so a task from another of the user's teams would get a foreign
+        // field id written onto it. A row that no longer resolves (completed in
+        // another tab, deleted meanwhile) is not an error: the desired end state
+        // is already true, so just refresh instead of throwing a 404 over Home.
+        $task = Task::query()->where('team_id', Filament::getTenant()?->getKey())->find($taskId);
+
+        if ($task instanceof Task) {
+            resolve(CompleteTask::class)->execute($user, $task);
+        }
+
+        unset($this->myTasks);
+    }
+
     public function getTasksIndexUrl(): string
     {
         return TaskResource::getUrl('index', [
@@ -127,6 +144,7 @@ final class Dashboard extends Page
     public function createTaskAction(): CreateAction
     {
         return $this->configureCreateTaskAction(CreateAction::make('createTask'))
+            ->color('gray')
             ->label(__('filament/pages/dashboard.tasks.create_action_label'));
     }
 
@@ -140,13 +158,25 @@ final class Dashboard extends Page
 
     private function configureCreateTaskAction(CreateAction $action): CreateAction
     {
+        /** @var array<int, string> $submittedAssigneeIds */
+        $submittedAssigneeIds = [];
+
         return $action
             ->model(Task::class)
             ->icon('heroicon-o-plus')
             ->slideOver()
             ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-            ->after(function (Task $record): void {
-                resolve(NotifyTaskAssignees::class)->execute($record);
+            ->before(function () use ($action, &$submittedAssigneeIds): void {
+                $submittedAssignees = $action->getRawData()['assignees'] ?? [];
+
+                if (! is_array($submittedAssignees)) {
+                    $submittedAssignees = [];
+                }
+
+                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
+            })
+            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
+                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
             });
     }
 }

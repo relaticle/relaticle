@@ -9,11 +9,13 @@ use App\Actions\Profile\RemoveUserProfilePhoto;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\SameOriginUrl;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use DateTimeZone;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
@@ -21,6 +23,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use League\Flysystem\UnableToCheckFileExistence;
@@ -34,9 +37,28 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $data = $this->authUser()->only(['name', 'email']);
+        $data = $this->authUser()->only(['name', 'email', 'timezone']);
 
         $this->form->fill($data);
+    }
+
+    /**
+     * IANA identifiers labelled with their current UTC offset, so the list is
+     * scannable without knowing every region name by heart.
+     *
+     * @return array<string, string>
+     */
+    private function timezoneOptions(): array
+    {
+        $options = [];
+
+        foreach (DateTimeZone::listIdentifiers() as $identifier) {
+            $offset = Date::now($identifier)->format('P');
+
+            $options[$identifier] = "{$identifier} (UTC{$offset})";
+        }
+
+        return $options;
     }
 
     public function form(Schema $schema): Schema
@@ -75,6 +97,13 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->email()
                             ->required()
                             ->unique(Filament::auth()->user() !== null ? Filament::auth()->user()::class : self::class, ignorable: $this->authUser()),
+                        Select::make('timezone')
+                            ->label(__('profile.form.timezone.label'))
+                            ->helperText(__('profile.form.timezone.helper_text'))
+                            ->placeholder(__('profile.form.timezone.placeholder'))
+                            ->options($this->timezoneOptions())
+                            ->searchable()
+                            ->native(false),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
@@ -126,7 +155,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $this->form->fill([
-            ...$this->authUser()->only(['name', 'email']),
+            ...$this->authUser()->only(['name', 'email', 'timezone']),
             'profile_photo_path' => null,
         ]);
 

@@ -9,6 +9,7 @@
 - [Control Flow](#control-flow)
 - [Laravel Conventions](#laravel-conventions)
 - [Strings and Formatting](#strings-and-formatting)
+- [Method Chaining](#method-chaining)
 - [Enums](#enums)
 - [Comments](#comments)
 - [Whitespace](#whitespace)
@@ -17,7 +18,7 @@
 - [Authorization](#authorization)
 - [Translations](#translations)
 - [API Routing](#api-routing)
-- [Testing](#testing)
+- [Test Classes](#test-classes)
 - [Quick Reference](#quick-reference)
 
 ## Core Laravel Principle
@@ -65,6 +66,7 @@ public function getUsers(): Collection
 ### Docblock Rules
 
 - Don't use docblocks for fully type-hinted methods (unless description needed)
+- Only add descriptions that provide context beyond the signature, and write them as full sentences with a period.
 - Always import classnames in docblocks; never use fully qualified names:
 
 ```php
@@ -90,13 +92,10 @@ use Spatie\Url\Url;
 function someFunction(array $myArray, int $typedArgument) {}
 ```
 
-- Use array shape notation for fixed keys, put each key on its own line:
+- Use array shape notation for fixed keys:
 
 ```php
-/** @return array{
-   first: SomeClass,
-   second: SomeClass,
-} */
+/** @return array{first: SomeClass, second: SomeClass} */
 ```
 
 ## Control Flow
@@ -155,6 +154,7 @@ Route::post('users', [UsersController::class, 'store'])->name('users.store');
 - Use plural resource names (`PostsController`)
 - Stick to CRUD methods (`index`, `create`, `store`, `show`, `edit`, `update`, `destroy`)
 - Extract new controllers for non-CRUD actions
+- Treat this as a loose guideline rather than a rule that must always be enforced.
 
 ```php
 // Instead of PostsController@favorite, extract:
@@ -219,6 +219,27 @@ $this->comment("Processed {$items->count()} items.");
 
 ```php
 $greeting = "Hi, I am {$name}.";
+```
+
+## Method Chaining
+
+- Once a chained call breaks across lines, start every subsequent `->` on a new line.
+- Keeping every `->` on one line is fine, especially when accessing a property.
+- Never mix single-line and multi-line chaining.
+
+```php
+$availability = $ticketShop
+    ->orders()
+    ->getEventProductAvailability(
+        new GetEventProductAvailabilityParams(
+            productCode: $this->productCode,
+            eventId: $eventId,
+        ),
+    );
+
+$user->team->update([
+    'billing_plan' => BillingPlan::Pro,
+]);
 ```
 
 ## Enums
@@ -343,18 +364,17 @@ Validator::extend('organisation_type', function ($attribute, $value) {
 /errors/1/occurrences
 ```
 
-## Testing
+## Test Classes
 
-- Keep test classes in same file when possible
-- Use descriptive test method names
-- Follow the arrange-act-assert pattern
+- Keep classes created for a specific test case in the same test file when possible.
+- Move test support classes into dedicated files when they are reused across tests.
 
 ## Quick Reference
 
 ### Naming Conventions
 
 - Classes: PascalCase (`UserController`, `OrderStatus`)
-- Methods and variables: camelCase (`getUserName`, `$firstName`)
+- Non-public-facing string-like names: camelCase (`getUserName`, `$firstName`)
 - Routes: kebab-case (`/open-source`, `/user-profile`)
 - Config files: kebab-case (`pdf-generator.php`)
 - Config keys: snake_case (`chrome_path`)
@@ -372,15 +392,12 @@ Validator::extend('organisation_type', function ($attribute, $value) {
 - Resources and Transformers: plural + `Resource` or `Transformer` (`UsersResource`)
 - Enums: descriptive name, no prefix (`OrderStatus`, `BookingType`)
 
-### Migrations
-
-- Do not write down methods in migrations, only up methods
-
 ### Code Quality Reminders
 
 - Use typed properties over docblocks
 - Prefer early returns over nested if/else
 - Use constructor property promotion when all properties can be promoted
+- Never mix single-line and multi-line method chaining
 - Avoid `else` statements when possible
 - Use string interpolation over concatenation
 - Always use curly braces for control structures

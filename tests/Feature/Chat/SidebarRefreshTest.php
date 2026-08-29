@@ -14,31 +14,26 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentTeam);
 });
 
-it('registers chat:conversation-created listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
+/**
+ * The three listener-registration tests this replaces asserted wiring that
+ * provably did nothing: this component is nested inside Filament's sidebar, so
+ * its own re-render is discarded and only the parent's paints. What has to hold
+ * now is that anything changing the list asks Filament for that parent repaint.
+ */
+it('asks filament to repaint the sidebar when a conversation is deleted', function (): void {
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-repaint',
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'team_id' => $this->user->current_team_id,
+        'title' => 'Delete me',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-created', '$refresh');
-});
-
-it('registers chat:conversation-deleted listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
-
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-deleted', '$refresh');
-});
-
-it('registers chat:conversation-renamed listener', function (): void {
-    $instance = Livewire::test(ChatSidebarNav::class)->instance();
-
-    $reflection = new ReflectionMethod($instance, 'getListeners');
-    $listeners = $reflection->invoke($instance);
-
-    expect($listeners)->toHaveKey('chat:conversation-renamed', '$refresh');
+    Livewire::test(ChatSidebarNav::class)
+        ->call('deleteConversation', 'c-repaint')
+        ->assertDispatched('refresh-sidebar');
 });
 
 it('deletes a conversation via livewire action', function (): void {
@@ -101,4 +96,33 @@ it('hides the "All chats" trigger when 7 or fewer chats exist', function (): voi
 
     Livewire::test(ChatSidebarNav::class)
         ->assertDontSee('Open all chats');
+});
+
+/**
+ * The rows carry live per-row Alpine state (an open rename input, a saving
+ * flag), and this list is repainted whenever a rename or a delete changes it.
+ * Unkeyed, Livewire morphs the <li> elements positionally, so the element
+ * holding an open rename input is reused for whatever conversation slid into
+ * its index.
+ */
+it('gives each conversation row an identity the morph can follow', function (): void {
+    $ids = ['c-key-1', 'c-key-2', 'c-key-3'];
+
+    foreach ($ids as $index => $id) {
+        DB::table('agent_conversations')->insert([
+            'id' => $id,
+            'participant_type' => 'user',
+            'participant_id' => $this->user->getKey(),
+            'team_id' => $this->user->current_team_id,
+            'title' => "Chat {$index}",
+            'created_at' => now()->subMinutes(10 - $index),
+            'updated_at' => now()->subMinutes(10 - $index),
+        ]);
+    }
+
+    $html = Livewire::test(ChatSidebarNav::class)->html();
+
+    foreach ($ids as $id) {
+        expect($html)->toContain('wire:key="conversation-'.$id.'"');
+    }
 });

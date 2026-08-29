@@ -9,7 +9,6 @@ use App\Enums\Notifications\NotificationType;
 use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
@@ -28,6 +27,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Laravel\Jetstream\Contracts\DeletesUsers;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
@@ -35,6 +35,8 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
 final class UserResource extends Resource
 {
@@ -122,7 +124,9 @@ final class UserResource extends Resource
                         ->label('Verified')
                         ->boolean(),
                     TextEntry::make('currentTeam.name')
-                        ->label('Current Team'),
+                        ->label('Current Team')
+                        ->color('primary')
+                        ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
                     TextEntry::make('last_login_at')
                         ->label('Last Login')
                         ->dateTime()
@@ -159,7 +163,9 @@ final class UserResource extends Resource
                     ->falseIcon('heroicon-o-x-mark'),
                 TextColumn::make('currentTeam.name')
                     ->label('Current Team')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
                 TextColumn::make('last_login_at')
                     ->label('Last Login')
                     ->dateTime()
@@ -197,7 +203,9 @@ final class UserResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    SafeDelete::bulkAction(function (User $record): void {
+                        resolve(DeletesUsers::class)->delete($record);
+                    }),
                 ]),
             ]);
     }

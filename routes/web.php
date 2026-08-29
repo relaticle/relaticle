@@ -5,13 +5,16 @@ declare(strict_types=1);
 use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
+use App\Http\Controllers\AlternativesController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use App\Http\Middleware\AddVaryAcceptHeader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
@@ -35,10 +38,10 @@ Route::middleware('guest')->group(function () {
     if (Feature::active(SocialAuth::class)) {
         Route::get('/auth/redirect/{provider}', RedirectController::class)
             ->name('auth.socialite.redirect')
-            ->middleware('throttle:10,1');
+            ->middleware('throttle:10,1,socialite-redirect');
         Route::get('/auth/callback/{provider}', CallbackController::class)
             ->name('auth.socialite.callback')
-            ->middleware('throttle:10,1');
+            ->middleware('throttle:10,1,socialite-callback');
     }
 
     Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
@@ -48,13 +51,18 @@ Route::middleware('guest')->group(function () {
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
 
-Route::middleware(ProvideMarkdownResponse::class)->group(function (): void {
+Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);
     Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
     Route::get('/privacy-policy', PrivacyPolicyController::class)->name('policy.show');
     Route::get('/pricing', fn () => view('pricing'))->name('pricing');
+    Route::get('/press', fn () => view('press'))->name('press');
+    Route::get('/ai', fn () => view('ai'))->name('ai');
+    Route::get('/self-hosted', fn () => view('self-hosted'))->name('selfHosted');
+    Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
+    Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');
-    Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1', ProtectAgainstSpam::class]);
+    Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1,contact-form', ProtectAgainstSpam::class]);
 });
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
@@ -63,14 +71,18 @@ Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::cla
     ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
     ->name('team-invitations.accept');
 
-Route::middleware(['auth', 'verified', AuthenticateSession::class, 'throttle:10,1'])
+Route::middleware(['auth', 'verified', AuthenticateSession::class])
     ->group(function (): void {
+        // Separate buckets: a shared one lets repeated views of the invite page
+        // spend the allowance the accept POST needs.
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
+            ->middleware('throttle:10,1,team-join-show')
             ->name('teams.join');
 
         Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
             ->where('token', '[A-Za-z0-9]{40}')
+            ->middleware('throttle:10,1,team-join-confirm')
             ->name('teams.join.confirm');
     });
 

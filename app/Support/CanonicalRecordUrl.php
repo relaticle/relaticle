@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\CrmEntity;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
@@ -11,6 +12,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use Filament\Actions\EditAction;
+use Filament\Resources\Resource as FilamentResource;
 use Throwable;
 
 /**
@@ -27,36 +29,25 @@ use Throwable;
  */
 final readonly class CanonicalRecordUrl
 {
-    /** @var array<string, string> */
-    private const array SEGMENTS = [
-        'company' => 'companies',
-        'person' => 'people',
-        'opportunity' => 'opportunities',
-        'task' => 'tasks',
-        'note' => 'notes',
-    ];
-
-    /** @var list<string> */
-    private const array MODAL_TYPES = ['task', 'note'];
-
-    public function build(string $type, string $recordId, Team $team): ?string
+    public function build(CrmEntity $entity, string $recordId, Team $team): ?string
     {
+        // The match sits outside the try on purpose: catching Throwable there would
+        // swallow the UnhandledMatchError a newly added entity raises, turning a
+        // missing case into a silently null URL. Only the route lookup is guarded.
+        $resource = $this->resource($entity);
+        $modalManaged = $this->isModalManaged($entity);
+
         try {
-            return match ($type) {
-                'company' => CompanyResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-                'person' => PeopleResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-                'opportunity' => OpportunityResource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team),
-                'task' => TaskResource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team),
-                'note' => NoteResource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team),
-                default => null,
-            };
+            return $modalManaged
+                ? $resource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team)
+                : $resource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team);
         } catch (Throwable) {
             return null;
         }
     }
 
     /**
-     * @return array{type: string, id: string}|null
+     * @return array{entity: CrmEntity, id: string}|null
      */
     public function parse(string $url): ?array
     {
@@ -74,23 +65,63 @@ final readonly class CanonicalRecordUrl
 
         // Past the tenant slug: [{tenant}, {segment}, {record?}]
         $segment = $segments[1] ?? null;
-        $type = $segment === null ? null : array_search($segment, self::SEGMENTS, true);
+        $entity = $segment === null ? null : $this->entityForSegment($segment);
 
-        if (! is_string($type)) {
+        if (! $entity instanceof CrmEntity) {
             return null;
         }
 
-        if (in_array($type, self::MODAL_TYPES, true)) {
+        if ($this->isModalManaged($entity)) {
             $recordId = $this->queryParam($url, 'tableActionRecord');
 
-            return $recordId === null ? null : ['type' => $type, 'id' => $recordId];
+            return $recordId === null ? null : ['entity' => $entity, 'id' => $recordId];
         }
 
         $recordId = $segments[2] ?? null;
 
         return is_string($recordId)
-            ? ['type' => $type, 'id' => $recordId]
+            ? ['entity' => $entity, 'id' => $recordId]
             : null;
+    }
+
+    private function entityForSegment(string $segment): ?CrmEntity
+    {
+        foreach (CrmEntity::cases() as $entity) {
+            if ($this->segment($entity) === $segment) {
+                return $entity;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return class-string<FilamentResource> */
+    private function resource(CrmEntity $entity): string
+    {
+        return match ($entity) {
+            CrmEntity::Company => CompanyResource::class,
+            CrmEntity::People => PeopleResource::class,
+            CrmEntity::Opportunity => OpportunityResource::class,
+            CrmEntity::Task => TaskResource::class,
+            CrmEntity::Note => NoteResource::class,
+        };
+    }
+
+    /**
+     * Read from the resource rather than restated here, so a resource that sets its
+     * own $slug stays parseable by the same class that emitted the URL.
+     */
+    private function segment(CrmEntity $entity): string
+    {
+        return $this->resource($entity)::getSlug();
+    }
+
+    private function isModalManaged(CrmEntity $entity): bool
+    {
+        return match ($entity) {
+            CrmEntity::Task, CrmEntity::Note => true,
+            CrmEntity::Company, CrmEntity::People, CrmEntity::Opportunity => false,
+        };
     }
 
     /**

@@ -20,10 +20,12 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
@@ -41,6 +43,8 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\NumberFormat;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
+use Relaticle\ImportWizard\Exceptions\MissingRequiredFieldException;
+use Relaticle\ImportWizard\Exceptions\UnparsableDateException;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
@@ -81,11 +85,24 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, array{field: CustomField, values: array<int, string>}> */
     private array $pendingTagOptions = [];
 
+    /**
+     * Zone the CSV's naive datetimes are interpreted in — the importer's own, so an
+     * imported value lands on the same instant as the same string typed into the form.
+     * Resolved once in handle() because the job runs on the queue with no session.
+     */
+    private string $importerTimezone = 'UTC';
+
     public function __construct(
         private readonly string $importId,
         private readonly string $teamId,
     ) {
         $this->onQueue('imports');
+    }
+
+    /** @return list<FailOnException> */
+    public function middleware(): array
+    {
+        return [new FailOnException([LogicException::class])];
     }
 
     public function handle(): void
@@ -103,6 +120,10 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $store->ensureProcessedColumn();
+
+        throw_if($store->query()->where('processed', false)->whereNull('match_action')->exists(), LogicException::class, 'Import match resolution is incomplete.');
+
+        $this->importerTimezone = $import->user?->effectiveTimezone() ?? (string) config('app.timezone');
 
         $importer = $import->getImporter();
         $mappings = $import->columnMappings();
@@ -243,6 +264,11 @@ final class ExecuteImportJob implements ShouldQueue
 
         try {
             $data = $this->buildDataFromRow($row, $fieldMappings);
+
+            if ($isCreate) {
+                $this->assertRequiredFieldsPresent($data, $importer);
+            }
+
             $existing = $isCreate
                 ? (null)
                 : $existingRecords[(string) $effectiveMatchedId] ?? $this->findExistingRecord($importer, $effectiveMatchedId);
@@ -283,8 +309,6 @@ final class ExecuteImportJob implements ShouldQueue
 
                 $this->storeEntityLinkRelationships($record, $pendingRelationships, $context);
 
-                $results[$isCreate ? 'created' : 'updated']++;
-
                 $storedCustomFieldData = ImportDataStorage::pull($record);
                 $batchableData = array_intersect_key($storedCustomFieldData, $customFieldDefs->all());
                 $remainingData = array_diff_key($storedCustomFieldData, $batchableData);
@@ -296,6 +320,11 @@ final class ExecuteImportJob implements ShouldQueue
                 }
 
                 $importer->afterSave($record, $context);
+
+                // Counted last. A rollback undoes the record but not a PHP counter, so
+                // incrementing before the custom-field pass could report a row as created
+                // that the database no longer holds.
+                $results[$isCreate ? 'created' : 'updated']++;
             });
 
             $this->markProcessed($row);
@@ -588,6 +617,35 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     /**
+     * A required field that arrives blank used to be written straight through, producing
+     * records like a company whose name is the empty string: invisible in the list, absent
+     * from search, and counted as a successful import. The wizard flags these at the review
+     * step, but nothing re-checked them at write time, so continuing past the warning
+     * created them anyway.
+     *
+     * Only enforced on create. An update legitimately carries a partial payload — a blank
+     * cell there means "leave this column alone", not "erase the name".
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws MissingRequiredFieldException
+     */
+    private function assertRequiredFieldsPresent(array $data, BaseImporter $importer): void
+    {
+        foreach ($importer->allFields()->required() as $field) {
+            if (! array_key_exists($field->key, $data)) {
+                continue;
+            }
+
+            $value = $data[$field->key];
+
+            if (is_string($value) ? trim($value) === '' : blank($value)) {
+                throw new MissingRequiredFieldException($field->label);
+            }
+        }
+    }
+
+    /**
      * Emit a key only for a mapped column whose cell the row actually carried, so that key
      * presence downstream means "carried" and a blank value means "carried empty" rather
      * than "withheld". Without the reject, a skipped or errored cell would arrive as null
@@ -645,6 +703,8 @@ final class ExecuteImportJob implements ShouldQueue
 
     /**
      * Apply format-aware conversion for date/datetime and float custom field values.
+     *
+     * @throws UnparsableDateException when a date column holds something that is not a date
      */
     private function convertCustomFieldValue(mixed $value, CustomField $cf, ?ColumnData $columnData): mixed
     {
@@ -654,12 +714,25 @@ final class ExecuteImportJob implements ShouldQueue
 
         $dataType = $cf->typeData->dataType;
 
+        // A cell holding only whitespace means "no value", not a malformed date. It is
+        // cleared downstream, so it must not reach the parser and be failed as garbage.
+        if ($dataType->isDateOrDateTime() && trim($value) === '') {
+            return $value;
+        }
+
         if ($dataType === FieldDataType::DATE || $dataType === FieldDataType::DATE_TIME) {
             $format = $columnData instanceof ColumnData ? ($columnData->dateFormat ?? DateFormat::ISO) : DateFormat::ISO;
-            $parsed = $format->parse($value, $dataType->isTimestamp());
+            $parsed = $format->parse($value, $dataType->isTimestamp(), $this->importerTimezone);
 
+            /**
+             * An unparseable date used to be returned as-is, which the SafeValueConverter
+             * then blanked to null: the row imported, the value vanished, and the summary
+             * still said "0 failed". Silently dropping data the user handed us is worse
+             * than refusing the row, so fail it and let the existing failed-row path
+             * surface the column and the offending value.
+             */
             if (! $parsed instanceof Carbon) {
-                return $value;
+                throw new UnparsableDateException($cf->name, $value, $format);
             }
 
             return $dataType === FieldDataType::DATE

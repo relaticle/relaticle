@@ -28,15 +28,7 @@ final class GenerateSitemapCommand extends Command
      */
     public function handle(DocsRepository $docsRepository): void
     {
-        // /dashboard and /forgot-password are not linked from any crawled page
-        // (their only links live behind auth or on token-gated invitation
-        // pages) -- they're excluded as a deliberate, untested guard rather
-        // than covered behavior.
-        $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
-
-        $sitemap = SitemapGenerator::create(config('app.url'))
-            ->shouldCrawl(fn (string $url): bool => ! in_array(parse_url($url, PHP_URL_PATH), $excluded, true))
-            ->getSitemap();
+        $sitemap = $this->crawlMarketingSitemap();
 
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
@@ -45,6 +37,19 @@ final class GenerateSitemapCommand extends Command
         }
 
         $sitemap->writeToFile(public_path('sitemap.xml'));
+    }
+
+    private function crawlMarketingSitemap(): Sitemap
+    {
+        // /dashboard and /forgot-password are not linked from any crawled page
+        // (their only links live behind auth or on token-gated invitation
+        // pages) -- they're excluded as a deliberate, untested guard rather
+        // than covered behavior.
+        $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
+
+        return SitemapGenerator::create(config('app.url'))
+            ->shouldCrawl(fn (string $url): bool => ! in_array(parse_url($url, PHP_URL_PATH), $excluded, true))
+            ->getSitemap();
     }
 
     /**

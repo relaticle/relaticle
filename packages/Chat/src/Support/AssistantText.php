@@ -37,4 +37,21 @@ final readonly class AssistantText
 
         return $text;
     }
+
+    /**
+     * The reply the user should keep. A turn that called tools and then wrote
+     * text keeps only the text written after the last tool call: anything the
+     * model wrote before a tool call is narration ("Let me look that up") or
+     * an acknowledgment it will restate once the result is in. A turn whose
+     * last tool call produced no further text keeps everything, so the only
+     * text it wrote is never lost.
+     */
+    public static function finalReply(string $fullText, string $afterLastToolCall, bool $hadToolCalls): string
+    {
+        if (! $hadToolCalls || trim($afterLastToolCall) === '') {
+            return self::collapseRepeated($fullText);
+        }
+
+        return self::collapseRepeated(trim($afterLastToolCall));
+    }
 }

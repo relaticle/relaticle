@@ -13,6 +13,12 @@ Treat every change like it's going through senior code review:
 
 - This project uses **PostgreSQL exclusively** — do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
 - Migrations must only have `up()` methods — do not write `down()` methods
+- Every datetime column is `timestamp without time zone` holding **UTC**. Never write one from
+  the database clock — no `DB::raw('now()')`, `CURRENT_TIMESTAMP`, or `->useCurrent()` /
+  `->useCurrentOnUpdate()` column defaults. Those resolve against the *session* timezone and
+  write local wall-clock into a UTC column. Pass a PHP-side `now()` instead:
+  `->update(['used_at' => now()])`. The pgsql connection pins `'timezone' => 'UTC'` so the two
+  agree today; do not rely on that — it is the safety net, not the contract.
 
 ## Pre-Commit Quality Checks
 
@@ -23,6 +29,11 @@ Before committing any changes, always run these checks in order:
 3. `vendor/bin/phpstan analyse` — ensure no new static analysis errors
 4. `composer test:type-coverage` — type coverage must stay at 100%
 5. `php artisan test --compact` — run relevant tests (use `--filter` for targeted runs)
+
+`--dirty` only covers files with uncommitted changes, so a file you committed
+earlier in the branch stops being checked and its style break surfaces only in
+CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
+--parallel`, whole repo).
 
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
 

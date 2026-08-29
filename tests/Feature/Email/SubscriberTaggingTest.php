@@ -26,8 +26,8 @@ test('creating the first company dispatches has-crm-data tag job', function (): 
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->subscriberUuid === 'mc-uuid-123'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
+        return invade($job)->userId === (string) $user->id
             && invade($job)->tags === [SubscriberTagEnum::HasCrmData->value]
             && invade($job)->action === TagAction::Add;
     });
@@ -94,8 +94,8 @@ test('creating first personal access token dispatches has-api-token tag job', fu
 
     $user->createToken('test-token', ['*']);
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->subscriberUuid === 'mc-uuid-456'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
+        return invade($job)->userId === (string) $user->id
             && invade($job)->tags === [SubscriberTagEnum::HasApiToken->value]
             && invade($job)->action === TagAction::Add;
     });

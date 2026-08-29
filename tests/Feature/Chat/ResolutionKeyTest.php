@@ -14,7 +14,7 @@ it('derives a stable resolution key from the turn id', function (): void {
         team: $team,
         message: 'hi',
         conversationId: 'c-1',
-        resolved: ['provider' => null, 'model' => 'auto'],
+        resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'],
         turnId: '01TURNAAAAAAAAAAAAAAAAAAAA',
     );
 

@@ -27,6 +27,7 @@ mutates(
     UpdateCompany::class,
     DeleteCompany::class,
     ListCompanies::class,
+    CompanyResource::class,
 );
 
 beforeEach(function () {
@@ -240,6 +241,17 @@ describe('includes', function (): void {
             );
     });
 
+    it('does not expose MCP-only task relationships through the public API', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=tasks")
+            ->assertOk()
+            ->assertJsonMissingPath('data.relationships.tasks')
+            ->assertJsonMissingPath('included');
+    });
+
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
@@ -276,7 +288,7 @@ describe('includes', function (): void {
 
 describe('custom fields', function (): void {
     beforeEach(function (): void {
-        $this->section = CustomFieldSection::create([
+        $this->section = CustomFieldSection::factory()->create([
             'tenant_id' => $this->team->id,
             'entity_type' => 'company',
             'name' => 'General',
@@ -290,7 +302,7 @@ describe('custom fields', function (): void {
     it('can create a company with custom fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -325,7 +337,7 @@ describe('custom fields', function (): void {
     it('can update a company with custom fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -362,7 +374,7 @@ describe('custom fields', function (): void {
     it('validates custom field values on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -402,7 +414,7 @@ describe('custom fields', function (): void {
     it('does not leak available field names in validation errors', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -435,7 +447,7 @@ describe('custom fields', function (): void {
     it('rejects invalid option ID for select custom field on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
+        $field = CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -465,7 +477,7 @@ describe('custom fields', function (): void {
     it('accepts valid option ID for select custom field on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
+        $field = CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -496,7 +508,7 @@ describe('custom fields', function (): void {
     it('rejects invalid option ID for select custom field on update', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
+        $field = CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -528,7 +540,7 @@ describe('custom fields', function (): void {
     it('rejects invalid option IDs for multi-select custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
+        $field = CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -559,7 +571,7 @@ describe('custom fields', function (): void {
     it('accepts valid option IDs for multi-select custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
+        $field = CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -589,7 +601,7 @@ describe('custom fields', function (): void {
     it('handles orphaned custom field values gracefully', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->team])->create();
 
-        $customField = CustomField::create([
+        $customField = CustomField::factory()->create([
             'tenant_id' => $this->team->getKey(),
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -700,7 +712,7 @@ describe('custom fields', function (): void {
     it('rejects invalid email in email custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -725,7 +737,7 @@ describe('custom fields', function (): void {
     it('accepts valid items in email custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -749,7 +761,7 @@ describe('custom fields', function (): void {
     it('rejects invalid phone number in phone custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
@@ -774,7 +786,7 @@ describe('custom fields', function (): void {
     it('accepts valid items in phone custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',

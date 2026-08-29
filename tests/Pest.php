@@ -20,7 +20,10 @@ use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Playwright\Playwright;
+use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
+
+PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)

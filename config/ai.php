@@ -117,6 +117,7 @@ return [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
+            'apps_challenge_token' => env('OPENAI_APPS_CHALLENGE_TOKEN'),
         ],
 
         'openrouter' => [

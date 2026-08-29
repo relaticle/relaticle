@@ -19,4 +19,8 @@ return [
     'tenant_menu' => [
         'import_history' => 'Import History',
     ],
+
+    'selects' => [
+        'member_self' => ':name (You)',
+    ],
 ];

@@ -20,7 +20,7 @@ final readonly class DigestService
 {
     public function forUser(User $user): DigestPayload
     {
-        $timezone = $user->timezone ?? (string) config('app.timezone');
+        $timezone = $user->effectiveTimezone();
         $startOfToday = Date::now($timezone)->startOfDay()->utc();
         $windowEnd = $startOfToday->copy()->addDay();
 

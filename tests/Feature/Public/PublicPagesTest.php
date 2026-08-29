@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
+use App\Mcp\Servers\RelaticleServer;
 use App\Models\User;
+use App\Support\CompetitorFacts;
 use App\Support\DetectsPublicMarkdownRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
@@ -44,27 +46,97 @@ describe('Home page', function () {
         $response->assertSee('alt="Relaticle companies list showing account owner, ICP status, and website domain for each company"', false);
         $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
     });
+
+    it('fills the mockup frame with every hero screenshot rather than letting it letterbox', function () {
+        $html = (string) $this->get('/')->assertStatus(200)->getContent();
+
+        // The frame is a constant 826x640 from `lg` up and the screenshots are
+        // captured at that ratio, but the frame turns portrait on a phone. Without
+        // object-cover the image sits at its own aspect inside a taller box and
+        // leaves a dead band under it (measured: 124px at desktop, over half the
+        // frame on a phone). object-left-top keeps the crop off the right, so the
+        // sidebar the alt text describes is never the part that goes.
+        expect(substr_count($html, 'object-cover object-left-top'))->toBe(3)
+            ->and($html)->not->toContain('hero-preview-image w-full h-auto');
+    });
+
+    it('uses an existing raster logo in the organization json-ld', function () {
+        $html = (string) $this->get('/')->assertStatus(200)->getContent();
+
+        preg_match('#<script type="application/ld\+json">(.+?)</script>#s', $html, $matches);
+
+        $graph = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
+        $organization = collect($graph['@graph'])->firstWhere('@type', 'Organization');
+
+        expect($organization['logo'])->toEndWith('/web-app-manifest-512x512.png')
+            ->and(file_exists(public_path('web-app-manifest-512x512.png')))->toBeTrue();
+    });
 });
 
 describe('Legal pages', function () {
-    it('displays the terms of service page with product-specific content', function () {
-        $response = $this->get('/terms-of-service');
+    it('displays the terms of service page with product-specific content as :format', function (array $headers, string $contentType) {
+        $response = $this->get('/terms-of-service', $headers);
 
         $response->assertStatus(200);
+        expect($response->headers->get('Content-Type'))->toStartWith($contentType);
+
         $response->assertSee('Terms of Service');
         $response->assertSee('Relaticle');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
-    });
+    })->with([
+        'HTML' => [[], 'text/html'],
+        'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+    ]);
 
-    it('displays the privacy policy page with product-specific content', function () {
-        $response = $this->get('/privacy-policy');
+    it('displays the privacy policy page with current MCP disclosures as :format', function (array $headers, string $contentType) {
+        $response = $this->get('/privacy-policy', $headers);
 
         $response->assertStatus(200);
+        expect($response->headers->get('Content-Type'))->toStartWith($contentType);
+
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
+        $response->assertSee('August 26, 2026');
+        $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
+        $response->assertSee('That integration may send authorized data to its provider.');
+        $response->assertSee('Relaticle does not sell CRM data.');
+        $response->assertSee('Relaticle does not use CRM data for advertising.');
+        $response->assertSee('Relaticle does not train AI models on CRM data.');
+        $response->assertSee('You can authorize an MCP client or AI provider to access your CRM data.');
+        $response->assertSee('The provider receives only data requested through authorized tools.');
+        $response->assertSee('The provider processes that data under its own terms and privacy policy.');
+        $response->assertSee('Disconnecting the provider or revoking its token stops future access.');
+        $response->assertSee('Relaticle enforces workspace and token scope on every tool request.');
+        $response->assertSee('MCP write tools can change CRM records.');
+        $response->assertSee('Task assignment operations can send transactional notifications.');
+        $response->assertSee('User names, email addresses, and identifiers.');
+        $response->assertSee('Team names and identifiers.');
+        $response->assertSee('Team-member names, emails, and identifiers.');
+        $response->assertSee('Token ability names.');
+        $response->assertSee('Companies, people, opportunities, tasks, and notes.');
+        $response->assertSee('Record identifiers and canonical record URLs.');
+        $response->assertSee('Contact details.');
+        $response->assertSee('Custom-field definitions, options, and values.');
+        $response->assertSee('Relationships between records.');
+        $response->assertSee('Opportunity stages and amounts.');
+        $response->assertSee('Activity actors, field changes, and timestamps.');
+        $response->assertSee('Record creation and update timestamps.');
+        $response->assertSee('Pagination and count metadata.');
+        $response->assertSee('Tool responses can include record identifiers, timestamps, pagination metadata, and count metadata.');
+        $response->assertSee('Access tokens.');
+        $response->assertSee('Refresh tokens.');
+        $response->assertSee('Passwords.');
+        $response->assertSee('API keys.');
+        $response->assertSee('Authentication secrets.');
         $response->assertDontSee('registered mail');
-    });
+        $response->assertDontSee('We do not share your CRM data with any third party.');
+        $response->assertDontSee('Your data stays entirely on your servers.');
+        $response->assertDontSee('internal timestamps');
+    })->with([
+        'HTML' => [[], 'text/html'],
+        'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+    ]);
 });
 
 describe('Documentation pages', function () {
@@ -125,6 +197,24 @@ describe('Pricing page', function () {
 
         $response->assertStatus(200);
         $response->assertSee('No per-seat pricing');
+    });
+});
+
+describe('MCP tool count', function () {
+    it('quotes the registered tool count on every marketing page that claims one', function (): void {
+        $registered = new ReflectionClass(RelaticleServer::class)->getDefaultProperties()['tools'];
+        $count = CompetitorFacts::mcpToolCount();
+
+        expect($count)->toBe(count($registered));
+
+        foreach (['/', '/pricing', '/press'] as $path) {
+            $text = preg_replace('/\s+/', ' ', strip_tags($this->get($path)->assertOk()->getContent()));
+
+            preg_match_all('/(\d+)[ -](?:first-party )?(?:MCP )?tools?\b/i', (string) $text, $matches);
+
+            expect($matches[1])->not->toBeEmpty()
+                ->and(array_values(array_unique($matches[1])))->toBe([(string) $count]);
+        }
     });
 });
 
@@ -200,9 +290,13 @@ describe('Hero AI tab — conversation', function () {
         $response->assertSee('Call Sarah Chen');
         $response->assertSee('Send proposal to Trellis Labs');
         $response->assertSee('Schedule demo with Kovra Systems');
-        $response->assertSee('Mark them all as done');
-        // Approval action card shows the operation badge ("Update") + summary.
-        $response->assertSee('Update');
+        $response->assertSee('Mark the Kovra demo as done');
+        // The proposal docks at the composer and resolves into the audit card.
+        // The decided row names the record as a chip plus an operation label,
+        // so assert the label, not a "Update task \"...\"" sentence that a
+        // restyle of the row legitimately changes.
+        $response->assertSee('Review before continuing');
+        $response->assertSee('Save changes');
         $response->assertSee('Add Sarah Chen');
         $response->assertSee('VP of Engineering');
     });
@@ -213,11 +307,60 @@ describe('Hero AI tab — conversation', function () {
         $response->assertStatus(200);
         // Exchange 1
         $response->assertSee('You have 3 overdue tasks');
-        // Exchange 2 climax
-        $response->assertSee('Mark 3 tasks complete');
-        $response->assertSee('Call Sarah Chen · Send proposal · Schedule demo');
-        // Exchange 3
-        $response->assertSee('Added Sarah and linked her to Kovra Systems');
+        // Exchange 2 climax. Approving resumes the turn, so the line under the
+        // decided row is the agent's own reply, as in the shipped transcript.
+        $response->assertSee('Review the proposal below to update the task');
+        $response->assertSee('has been marked done');
+        // Exchange 3 is a WRITE, so it is gated by review exactly like exchange 2
+        // (CreatePersonTool returns a proposal for approval). It must never show
+        // a create landing unattended.
+        $response->assertSee('Review the proposal below to add her to Kovra Systems');
+        $response->assertSee('has been created and linked to');
+        // The turn ends on the next-step strip (NextStepSuggester), which is
+        // what the shipped transcript puts at its floor once nothing is docked.
+        $response->assertSee('Create a task for Sarah');
+    });
+
+    it('gates every write in the demo behind a review, like the real tools do', function () {
+        $body = (string) $this->get('/')->assertSuccessful()->getContent();
+
+        // Both writes the demo performs are proposals in the product
+        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
+        // so each must reach the transcript carrying an Approved outcome, and
+        // the dock must offer a decision for each before it lands. Advertising
+        // an unattended write would contradict the review-before-write contract
+        // the demo's own second exchange is built to show off.
+        //
+        // Asserted on the review CHROME rather than on a card heading: the row
+        // renders the record as a chip plus an operation label, and pinning that
+        // wording made this test fail on a pure restyle while the invariant it
+        // guards -- no write without an approval -- still held.
+        expect(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2)
+            ->and(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
+            ->and($body)->toContain('Review the proposal below to update the task')
+            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems');
+    });
+
+    it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
+        $body = (string) $this->get('/')->assertSuccessful()->getContent();
+
+        // The user bubble is neutral gray, never brand-tinted: see the comment
+        // on _transcript.blade.php's bubble. In this panel the only brand color
+        // belongs to the docked proposal, which is what the eye should find.
+        expect($body)->toContain('rounded-br-md bg-gray-100')
+            ->and($body)->not->toContain('rounded-br-md bg-primary-50')
+            ->and($body)->not->toContain('rounded-br-md bg-primary-600');
+
+        // A decided proposal collapses to one line carrying the dock's identity:
+        // an operation-tinted entity tile and the record label in bold, NOT a
+        // record pill (chips are reserved for inline clickable references).
+        expect($body)->toContain('Create Person')
+            ->and($body)->toContain('Update Task')
+            ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
+
+        // Read results render as a records_table with a chip-linked core column,
+        // not the deleted chat/data-table component.
+        expect($body)->toContain('chat-chip');
     });
 });
 
@@ -325,6 +468,24 @@ describe('Blog pages', function () {
         $this->get('/blog')
             ->assertStatus(200)
             ->assertSee($post->title);
+    });
+
+    it('renders the post cover uncropped on the index', function () {
+        Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('storage/ink/cover.png')
+            ->assertSee('aspect-video');
+    });
+
+    it('renders related posts through the shared card on a post page', function () {
+        $category = Category::factory()->create();
+        [$post, $related] = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($related->title);
     });
 
     it('canonicalises a paginated listing to its own page', function () {
@@ -648,7 +809,7 @@ describe('Hero AI tab — animation timeline', function () {
         $response->assertSuccessful();
         $body = $response->getContent();
 
-        // Hovering between the preview and the Ask Relaticle tab must not
+        // Hovering between the preview and the Ask Rela tab must not
         // cancel timers and call animateChat(), because that restarts the demo.
         expect($body)
             ->not->toContain('@mouseenter="pause()"')
@@ -683,7 +844,7 @@ describe('Hero AI tab — animation timeline', function () {
             ->toContain('scrollToShow')
             ->toContain("scrollToShow('.mcp-user-2')")
             ->toContain("scrollToShow('.mcp-user-3')")
-            ->toContain("scrollToShow('.mcp-action-card')")
+            ->toContain("scrollToShow('.mcp-audit-card')")
             ->not->toContain('scrollMessageIntoView')
             ->not->toContain('typeStart2 - 100')
             ->not->toContain('typeStart3 - 100');
@@ -715,22 +876,28 @@ describe('Hero AI tab — entry phase', function () {
         $response->assertSee("This week's pipeline review", false);
     });
 
-    it('shows three example prompt chips to anchor the demo', function () {
+    it('does not offer canned starter prompts, matching the real dashboard', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
 
-        $response->assertSee("What's overdue this week?", false);
-        $response->assertSee("Show this week's pipeline", false);
-        $response->assertSee('Add a new contact');
+        // The starter chips were removed from the product: an empty composer
+        // makes no suggestions. The mock must not reintroduce them.
+        $response->assertDontSee('CRM overview');
+        $response->assertDontSee('Recent companies');
+        $response->assertDontSee('Pipeline summary');
     });
 
-    it('renders the empty My Tasks section mirroring the dashboard', function () {
+    it('renders a populated My Tasks section mirroring the dashboard', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
 
-        $response->assertSee(__('filament/pages/dashboard.tasks.empty.title'));
-        $response->assertSee(__('filament/pages/dashboard.tasks.empty.description'));
+        // Populated, not the zero-state: a frame selling an AI CRM must not
+        // depict an empty CRM, and the real dashboard shows the list with
+        // overdue dates called out.
         $response->assertSee(__('filament/pages/dashboard.tasks.view_all'));
+        $response->assertSee('Call Sarah Chen');
+        $response->assertSee('Renewal prep for Daniel Okafor');
+        $response->assertDontSee(__('filament/pages/dashboard.tasks.empty.title'));
     });
 
     it('renders a second composer scoped with entry IDs', function () {

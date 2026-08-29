@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers;
 
+use App\Models\Task;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\SystemAdmin\Filament\Resources\TaskResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class TasksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tasks';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-check-circle';
+    protected static string|\BackedEnum|null $icon = 'heroicon-o-clipboard-document-check';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -29,10 +33,14 @@ final class TasksRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('title')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(fn (Task $record): string => TaskResource::getUrl('view', ['record' => $record])),
                 TextColumn::make('creator.name')
                     ->label('Created by')
-                    ->sortable(),
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'creator')),
                 TextColumn::make('creation_source')
                     ->badge()
                     ->label('Source'),

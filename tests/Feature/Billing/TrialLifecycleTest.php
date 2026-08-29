@@ -37,19 +37,30 @@ it('starts a pro trial for an eligible owner', function (): void {
     expect($started)->toBeTrue()
         ->and($team->refresh()->plan)->toBe(Plan::Pro)
         ->and($team->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue()
-        ->and($user->refresh()->pro_trial_used_at)->not->toBeNull()
+        ->and($team->pro_trial_used_at)->not->toBeNull()
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits());
 });
 
-it('does not start a second trial for the same user even on another team', function (): void {
+it('starts a separate trial for each workspace the user creates', function (): void {
     [$user, $team] = trialOwnerAndTeam();
     app(StartProTrial::class)->execute($user, $team);
 
     $otherTeam = Team::factory()->create(['user_id' => $user->getKey(), 'personal_team' => false]);
 
-    expect(app(StartProTrial::class)->execute($user, $otherTeam->refresh()))->toBeFalse()
-        ->and($otherTeam->refresh()->plan)->toBe(Plan::Free)
-        ->and($otherTeam->trial_ends_at)->toBeNull();
+    expect(app(StartProTrial::class)->execute($user, $otherTeam->refresh()))->toBeTrue()
+        ->and($otherTeam->refresh()->plan)->toBe(Plan::Pro)
+        ->and($otherTeam->trial_ends_at?->isSameDay(now()->addDays(14)))->toBeTrue();
+});
+
+it('does not start a second trial on a workspace that already used one', function (): void {
+    [$user, $team] = trialOwnerAndTeam();
+    app(StartProTrial::class)->execute($user, $team);
+
+    $team->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+
+    expect(app(StartProTrial::class)->execute($user, $team->refresh()))->toBeFalse()
+        ->and($team->refresh()->plan)->toBe(Plan::Free)
+        ->and($team->trial_ends_at)->toBeNull();
 });
 
 it('refuses a trial to a non-owner', function (): void {
@@ -121,6 +132,26 @@ it('emails the owner when the trial ends in three days', function (): void {
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+});
+
+it('skips ownerless workspaces without aborting trial reminders', function (): void {
+    $this->travelTo(now()->startOfDay()->addHours(12));
+    Mail::fake();
+
+    [$deletedOwner, $ownerlessTeam] = trialOwnerAndTeam();
+    $ownerlessTeam->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+    $deletedOwner->delete();
+
+    [, $ownedTeam] = trialOwnerAndTeam();
+    $ownedTeam->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(
+        ProTrialEndingSoonMail::class,
+        fn (ProTrialEndingSoonMail $mail): bool => $mail->team->is($ownedTeam),
+    );
+    Mail::assertQueuedCount(1);
 });
 
 it('does not email when the trial is outside the three-day window', function (): void {

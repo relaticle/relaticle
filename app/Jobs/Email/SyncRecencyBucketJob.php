@@ -8,14 +8,15 @@ use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\ThrottlesExceptionsWithRedis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
 
 #[Tries(5)]
+#[Backoff(60, 300, 900, 3600)]
 final class SyncRecencyBucketJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -40,17 +41,6 @@ final class SyncRecencyBucketJob implements ShouldQueue
         User::query()
             ->whereKey($this->userId)
             ->update(['subscriber_recency_bucket' => $this->newBucket]);
-    }
-
-    /** @return array<ThrottlesExceptionsWithRedis> */
-    public function middleware(): array
-    {
-        return [new ThrottlesExceptionsWithRedis(1, 1)->backoff(1)->report()];
-    }
-
-    public function retryUntil(): \DateTime
-    {
-        return now()->addHour();
     }
 
     public function failed(\Throwable $exception): void

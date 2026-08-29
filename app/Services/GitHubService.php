@@ -23,8 +23,9 @@ final readonly class GitHubService
     public function getStarsCount(string $owner = 'Relaticle', string $repo = 'relaticle', int $cacheMinutes = 15): int
     {
         $cacheKey = "github_stars_{$owner}_{$repo}";
+        $lastGoodKey = "{$cacheKey}_last_good";
 
-        return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo): int {
+        return (int) Cache::remember($cacheKey, now()->addMinutes($cacheMinutes), function () use ($owner, $repo, $lastGoodKey): int {
             try {
                 /** @var Response $response */
                 $response = Http::withHeaders([
@@ -32,17 +33,18 @@ final readonly class GitHubService
                 ])->get("https://api.github.com/repos/{$owner}/{$repo}");
 
                 if ($response->successful()) {
-                    return (int) $response->json('stargazers_count', 0);
+                    $stars = (int) $response->json('stargazers_count', 0);
+                    Cache::forever($lastGoodKey, $stars);
+
+                    return $stars;
                 }
 
                 Log::warning('Failed to fetch GitHub stars: '.$response->status());
-
-                return 0;
             } catch (Exception $e) {
                 Log::error('Error fetching GitHub stars: '.$e->getMessage());
-
-                return 0;
             }
+
+            return (int) Cache::get($lastGoodKey, 0);
         });
     }
 

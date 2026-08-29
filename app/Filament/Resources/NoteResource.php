@@ -84,12 +84,12 @@ final class NoteResource extends Resource
                     ->toggledHiddenByDefault(),
                 TextColumn::make('created_at')
                     ->label(__('filament/resources/note.fields.created_at.label'))
-                    ->dateTime('Y-m-d H:i:s')
+                    ->dateTime()
                     ->sortable()
                     ->toggleable(),
                 TextColumn::make('updated_at')
                     ->label(__('filament/resources/note.fields.updated_at.label'))
-                    ->dateTime('Y-m-d H:i:s')
+                    ->dateTime()
                     ->sortable()
                     ->toggleable()
                     ->toggledHiddenByDefault(),

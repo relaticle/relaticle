@@ -33,15 +33,6 @@ final class ChatSidePanel extends BaseLivewireComponent
     public ?string $recordName = null;
 
     /**
-     * Prompts for the chat interface's empty state. Computed regardless of panel
-     * state, because the interface renders them the moment the panel opens
-     * rather than on the next navigation.
-     *
-     * @var array<int, array{label: string, prompt: string}>
-     */
-    public array $starterPrompts = [];
-
-    /**
      * @var array<string, string>
      */
     protected $listeners = [
@@ -75,16 +66,6 @@ final class ChatSidePanel extends BaseLivewireComponent
     }
 
     /**
-     * Called when the dashboard hero input sends a message.
-     * Opens the panel and forwards the message to the embedded chat.
-     */
-    public function handleSendFromDashboard(string $message, string $source = 'dashboard'): void
-    {
-        $this->isOpen = true;
-        $this->dispatch('chat:send-message', message: $message);
-    }
-
-    /**
      * Resolve context for a URL supplied by the browser.
      *
      * Null means "no URL available" (a direct call outside a page context),
@@ -101,14 +82,11 @@ final class ChatSidePanel extends BaseLivewireComponent
         $this->recordType = $context['record_type'];
         $this->recordId = $context['record_id'];
         $this->recordName = $context['record_name'];
-        $this->starterPrompts = $contextService->getSuggestedPrompts($context);
-
         $this->dispatch(
             'chat:context-updated',
             type: $this->recordType,
             id: $this->recordId,
             label: $this->recordName,
-            prompts: $this->starterPrompts,
         );
     }
 

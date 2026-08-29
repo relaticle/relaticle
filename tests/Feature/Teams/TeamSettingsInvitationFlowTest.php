@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
 use App\Filament\Pages\Team\Members;
 use App\Livewire\App\Teams\AddTeamMember;
@@ -72,7 +73,28 @@ test('admin invites by email and the invitation appears in the pending list', fu
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->assertCanSeeTableRecords([$invitation]);
 
-    Mail::assertSent(TeamInvitationMail::class);
+    Mail::assertQueued(TeamInvitationMail::class);
+});
+
+test('inviting keeps the admin on the members tab and refreshes the pending list', function () {
+    Mail::fake();
+
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->fillForm([
+            'email' => 'invitee@example.com',
+            'role' => 'editor',
+        ])
+        ->call('addTeamMember', $this->team)
+        ->assertNoRedirect()
+        ->assertDispatched('teamInvitationSent')
+        ->assertSchemaStateSet([
+            'email' => null,
+            'role' => 'editor',
+        ]);
+
+    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+        ->dispatch('teamInvitationSent')
+        ->assertCanSeeTableRecords($this->team->fresh()->teamInvitations);
 });
 
 test('admin can resend a pending invitation', function () {
@@ -87,7 +109,11 @@ test('admin can resend a pending invitation', function () {
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
-    Mail::assertSent(TeamInvitationMail::class, fn ($mail) => $mail->hasTo('pending@example.com'));
+    Mail::assertNotSent(TeamInvitationMail::class);
+    Mail::assertQueued(
+        TeamInvitationMail::class,
+        fn (TeamInvitationMail $mail): bool => $mail->hasTo('pending@example.com') && $mail->afterCommit === true,
+    );
 });
 
 test('admin can revoke a pending invitation', function () {
@@ -123,7 +149,7 @@ test('onboarding-generated invite link still works for an authenticated user', f
 
     $this->actingAs($joiner)
         ->post(route('teams.join.confirm', ['token' => $token]))
-        ->assertRedirect(config('fortify.home'));
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
         ->and($joiner->fresh()->current_team_id)->toBe($team->id);

@@ -256,3 +256,71 @@ it('does not expose record on pending or rejected actions', function (): void {
     expect($action)->not->toBeNull();
     expect($action['record'] ?? null)->toBeNull();
 });
+
+it('rehydrates a pending proposal with the instant it lapses', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    $convId = '019df800-4444-7000-8000-000000000005';
+    DB::table('agent_conversations')->insert([
+        'id' => $convId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $user->currentTeam->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $pending = PendingAction::query()->create([
+        'team_id' => $user->currentTeam->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $convId,
+        'action_class' => 'App\\Actions\\People\\CreatePeople',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['name' => 'Angel'],
+        'display_data' => ['title' => 'Create Person'],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(1440),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => '019df800-4444-7000-8000-000000000050',
+        'conversation_id' => $convId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'crm',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'role' => 'assistant',
+        'content' => 'I have proposed creating a person.',
+        'tool_results' => json_encode([[
+            'id' => 'toolu_'.uniqid(),
+            'name' => 'CreatePersonTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'entity_type' => 'people',
+                'operation' => 'create',
+                'data' => ['name' => 'Angel'],
+                'display' => ['title' => 'Create Person'],
+            ]),
+        ]]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0];
+
+    // Without this the client cannot tell a lapsed proposal from a live one, and
+    // since the composer is hidden while one is docked, a tab left open past the
+    // expiry is left with no way to type. The sweeper broadcasts nothing.
+    expect($action['status'])->toBe('pending')
+        ->and($action['expires_at'])->toBe($pending->expires_at->toIso8601String());
+});

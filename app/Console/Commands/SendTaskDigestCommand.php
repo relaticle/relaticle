@@ -75,8 +75,7 @@ final class SendTaskDigestCommand extends Command
 
     private function sendForUser(User $user, DigestService $digestService): bool
     {
-        $timezone = $user->timezone ?? (string) config('app.timezone');
-        $localNow = Date::now($timezone);
+        $localNow = Date::now($user->effectiveTimezone());
 
         if ($localNow->hour !== 8) {
             return false;

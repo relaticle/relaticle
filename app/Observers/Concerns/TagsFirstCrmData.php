@@ -53,7 +53,7 @@ trait TagsFirstCrmData
         }
 
         dispatch(new ModifySubscriberTagsJob(
-            $user->mailcoach_subscriber_uuid,
+            (string) $user->id,
             [SubscriberTagEnum::HasCrmData->value],
             TagAction::Add,
         ))->afterCommit();

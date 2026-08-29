@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Enums\CrmEntity;
 use App\Enums\Plan;
+use App\Filament\CustomFields\DateFieldType;
+use App\Filament\CustomFields\DateTimeFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -15,29 +18,30 @@ use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
-use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
-use App\Models\Note;
-use App\Models\Opportunity;
 use App\Models\Passport\AuthCode as McpAuthCode;
-use App\Models\People;
 use App\Models\PersonalAccessToken;
-use App\Models\Task;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Onboarding\ActivationSteps;
 use App\Services\Billing\HostedWorkspaceAccess;
+use App\Services\DockerHubService;
 use App\Services\GitHubService;
-use App\Services\TurnstileClient;
+use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -54,7 +58,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
-use Laravel\Ai\AiManager;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -67,13 +70,14 @@ use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Comments\CommentsConfig;
 use Relaticle\CustomFields\CustomFields;
+use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
-use RyanChandler\LaravelCloudflareTurnstile\Contracts\ClientInterface;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
+use Spatie\Onboard\OnboardingSteps;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -84,8 +88,6 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
-
-        $this->app->scoped(AiManager::class, fn (Application $app): \App\Ai\AiManager => new \App\Ai\AiManager($app));
 
         // Ink registers its public routes from packageBooted(), which runs after every
         // provider's register(). Read the config key App\Features\Blog resolves from
@@ -106,11 +108,35 @@ final class AppServiceProvider extends ServiceProvider
         // them — the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
 
-        // The turnstile package's own client discards Cloudflare's `success`
-        // flag and sets no timeout — see App\Services\TurnstileClient. Our
-        // provider registers after the package's, so this binding wins;
-        // Turnstile::fake() still swaps it, as it goes through the facade.
-        $this->app->scoped(ClientInterface::class, fn (): TurnstileClient => new TurnstileClient);
+        // Caches creation-source facts per team for the lifetime of a
+        // request/job — scoped so a queue worker resets it between jobs.
+        $this->app->scoped(WorkspaceActivationFacts::class);
+
+        // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
+        // makes every team share one OnboardingStep instance. Its complete()
+        // memoizes through once(), keyed on that shared object rather than the
+        // model, so the first team evaluated in a process poisons the answer for
+        // every later one — wrong onboarding state in any request or Horizon
+        // worker that touches two workspaces. Rebinding per resolve gives each
+        // lookup its own step objects, so once() memoizes within one lookup as
+        // intended. Registration lives here because a fresh registry starts empty.
+        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+            $steps = new OnboardingSteps;
+
+            ActivationSteps::registerOn($steps);
+
+            return $steps;
+        });
+
+        // Spatie's LeagueDriver never registers TableConverter, so <table>
+        // markup collapses to a run-on line in the markdown-response channel.
+        // Our provider registers after the package's, so this binding wins.
+        $this->app->singleton(
+            'markdown-response.driver.league',
+            fn (): TableAwareLeagueDriver => new TableAwareLeagueDriver(
+                config('markdown-response.driver_options.league.options', []),
+            ),
+        );
     }
 
     /**
@@ -342,6 +368,19 @@ final class AppServiceProvider extends ServiceProvider
             fn (Request $request) => Limit::perMinute(20)->by($request->ip()),
         );
 
+        // Transcription reserves no credit, so the limiters are the only ceiling on
+        // provider spend. The per-minute and per-day buckets on the route are keyed
+        // per user and stay that way; this one is the ACCOUNT ceiling that was
+        // missing, because billing and credits are per team and an N-seat workspace
+        // otherwise multiplied the daily allowance by N with nothing to notice.
+        RateLimiter::for('transcribe-team-daily', function (Request $request): Limit {
+            /** @var User|null $user */
+            $user = $request->user();
+            $team = $user?->currentTeam;
+
+            return Limit::perMinutes(1440, 240)->by('transcribe-team:'.($team?->getKey() ?? $request->ip()));
+        });
+
         RateLimiter::for('chat-send', function (Request $request) {
             /** @var User|null $user */
             $user = $request->user();
@@ -417,15 +456,12 @@ final class AppServiceProvider extends ServiceProvider
         Relation::enforceMorphMap([
             'team' => Team::class,
             'user' => User::class,
-            'people' => People::class,
-            'company' => Company::class,
-            'opportunity' => Opportunity::class,
-            'task' => Task::class,
-            'note' => Note::class,
+            ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
+            'team_invitation' => TeamInvitation::class,
         ]);
 
         // Use custom models for custom-fields package
@@ -433,6 +469,56 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+
+        // Replaces the package's definitions so custom-field dates read the same as the
+        // native columns beside them: `date-time` swaps the table column, which otherwise
+        // renders stored UTC to every viewer (App\Filament\CustomFields\DateTimeColumn),
+        // and both swap the infolist entry, which otherwise hardcodes `Y-m-d H:i:s` on
+        // record pages (App\Filament\CustomFields\DateTimeEntry).
+        //
+        // `date` gets the entry only. A bare date has no time of day, so converting one
+        // would move it a day for every viewer west of UTC.
+        CustomFieldsType::register([
+            'date-time' => DateTimeFieldType::class,
+            'date' => DateFieldType::class,
+        ]);
+
+        $this->configureCustomFieldSchemaInvalidation();
+    }
+
+    /**
+     * The AI list tools memoise which custom fields are filterable, per tenant and
+     * entity, for a minute. Hooking the model rather than the actions keeps the
+     * Filament management page — which writes definitions directly — from leaving
+     * the assistant insisting a field the user just added does not exist.
+     */
+    private function configureCustomFieldSchemaInvalidation(): void
+    {
+        $invalidate = static function (CustomField $field): void {
+            $tenantId = $field->getAttribute('tenant_id');
+            $entityType = $field->getAttribute('entity_type');
+
+            if ((is_string($tenantId) || is_int($tenantId)) && is_string($entityType)) {
+                McpSchemaCache::forget($tenantId, $entityType);
+            }
+        };
+
+        CustomField::saved($invalidate);
+        CustomField::deleted($invalidate);
+
+        // An option carries its own tenant_id, so clearing that tenant's five entity
+        // schemas beats one SELECT per option row: team creation seeds sixteen of
+        // them inside the registration transaction.
+        $invalidateOption = static function (CustomFieldOption $option): void {
+            $tenantId = $option->getAttribute('tenant_id');
+
+            if (is_string($tenantId) || is_int($tenantId)) {
+                McpSchemaCache::forgetTenant($tenantId);
+            }
+        };
+
+        CustomFieldOption::saved($invalidateOption);
+        CustomFieldOption::deleted($invalidateOption);
     }
 
     /**
@@ -448,6 +534,38 @@ final class AppServiceProvider extends ServiceProvider
             }
 
             return $action;
+        });
+
+        /**
+         * Datetimes are stored in UTC; every panel renders and accepts them in the
+         * signed-in account's chosen zone. Read by both table/infolist output and
+         * DateTimePicker input, so one closure keeps display and entry symmetrical.
+         *
+         * TimezoneManager is a single global slot, so this must stay the only writer
+         * — a second FilamentTimezone::set() anywhere would silently replace it, and
+         * which one survived would depend on service provider boot order. It lives
+         * here rather than in a panel provider for the same reason: the resolution
+         * spans every panel.
+         *
+         * The account is read through the current panel's own guard and by attribute
+         * rather than by class, so App\Models\User and SystemAdministrator are both
+         * served without this layer naming the sysadmin package. Returning null falls
+         * back to config('app.timezone'), which covers an unset zone, a zone that is
+         * no longer a valid identifier, an account type that has no zone at all, and
+         * any request outside a panel.
+         */
+        FilamentTimezone::set(function (): ?string {
+            if (Filament::getCurrentPanel() === null) {
+                return null;
+            }
+
+            $timezone = Filament::auth()->user()?->getAttribute('timezone');
+
+            if (! is_string($timezone)) {
+                return null;
+            }
+
+            return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
     }
 
@@ -465,6 +583,10 @@ final class AppServiceProvider extends ServiceProvider
                 'githubStars' => $starsCount,
                 'formattedGithubStars' => $formattedStarsCount,
             ]);
+        });
+
+        Facades\View::composer('home.partials.works-with', function (View $view): void {
+            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
     }
 }

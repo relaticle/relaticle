@@ -8,10 +8,8 @@ use App\Actions\Note\CreateNote;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
@@ -32,6 +30,20 @@ final class CreateNoteTool extends BaseWriteCreateTool
     protected function entityType(): string
     {
         return 'note';
+    }
+
+    protected function ownedForeignKeyLists(): array
+    {
+        return [
+            'company_ids' => Company::class,
+            'people_ids' => People::class,
+            'opportunity_ids' => Opportunity::class,
+        ];
+    }
+
+    protected function nameAttribute(): string
+    {
+        return 'title';
     }
 
     protected function entitySchema(JsonSchema $schema): array
@@ -63,17 +75,17 @@ final class CreateNoteTool extends BaseWriteCreateTool
         $title = (string) ($record['title'] ?? '');
         $fields = [['label' => 'Title', 'value' => $title]];
 
-        $peopleNames = $this->namesForIds($this->idListFromArray($record, 'people_ids'), People::class, 'name', $team);
+        $peopleNames = $this->recordNames()->names($this->idListFromArray($record, 'people_ids'), People::class, $team);
         if ($peopleNames !== '') {
             $fields[] = ['label' => 'Linked people', 'value' => $peopleNames];
         }
 
-        $companyNames = $this->namesForIds($this->idListFromArray($record, 'company_ids'), Company::class, 'name', $team);
+        $companyNames = $this->recordNames()->names($this->idListFromArray($record, 'company_ids'), Company::class, $team);
         if ($companyNames !== '') {
             $fields[] = ['label' => 'Linked companies', 'value' => $companyNames];
         }
 
-        $opportunityNames = $this->namesForIds($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, 'name', $team);
+        $opportunityNames = $this->recordNames()->names($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, $team);
         if ($opportunityNames !== '') {
             $fields[] = ['label' => 'Linked opportunities', 'value' => $opportunityNames];
         }
@@ -83,24 +95,5 @@ final class CreateNoteTool extends BaseWriteCreateTool
             'summary' => "Create note \"{$title}\"",
             'fields' => $fields,
         ];
-    }
-
-    /**
-     * @param  list<string>|null  $ids
-     * @param  class-string<Model>  $modelClass
-     */
-    private function namesForIds(?array $ids, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($ids === null || $ids === []) {
-            return '';
-        }
-
-        $instance = new $modelClass;
-        $query = $modelClass::query()->whereIn($instance->getKeyName(), $ids);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return $query->pluck($nameAttribute)->implode(', ');
     }
 }

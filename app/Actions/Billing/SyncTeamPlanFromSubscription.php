@@ -25,7 +25,7 @@ final readonly class SyncTeamPlanFromSubscription
 
     public function execute(Team $team, Subscription $subscription): void
     {
-        $subscriptionPlan = $this->planForPrice($subscription->stripe_price);
+        $subscriptionPlan = Plan::fromStripePrice($subscription->stripe_price);
 
         if (! $subscriptionPlan instanceof Plan) {
             Log::warning('Stripe subscription price is not mapped to a plan', [
@@ -83,24 +83,6 @@ final readonly class SyncTeamPlanFromSubscription
         // plan (e.g. Enterprise) must survive an unrelated subscription ending.
         if ($team->plan === $subscriptionPlan) {
             return Plan::default();
-        }
-
-        return null;
-    }
-
-    private function planForPrice(?string $priceId): ?Plan
-    {
-        if ($priceId === null) {
-            return null;
-        }
-
-        /** @var array<string, string|null> $prices */
-        $prices = config('services.stripe.prices', []);
-
-        foreach ($prices as $key => $mappedPriceId) {
-            if ($mappedPriceId !== null && $mappedPriceId === $priceId) {
-                return Plan::tryFrom(explode('_', $key)[0]);
-            }
         }
 
         return null;

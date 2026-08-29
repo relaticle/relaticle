@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Deploy Relaticle with Docker or manually.
 order: 1
-updated: "2026-08-13"
+updated: "2026-08-14"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -428,10 +428,10 @@ If you prefer not to use Docker, you can deploy Relaticle directly on a server.
 
 ### Requirements
 
-- PHP 8.4+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
+- PHP 8.5+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
 - PostgreSQL 17+
 - Redis 7+
-- Node.js 20+
+- Node.js 22+
 - Composer 2+
 - Nginx or Apache
 - Supervisor (for queue workers)
@@ -449,7 +449,7 @@ cd /var/www/relaticle
 
 ```bash
 composer install --no-dev --optimize-autoloader
-npm ci && npm run build
+pnpm install --frozen-lockfile && pnpm run build
 ```
 
 3. Configure the environment:
@@ -496,7 +496,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.5-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
     }

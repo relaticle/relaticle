@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 use App\Filament\Pages\AccessTokens;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Laravel\Jetstream\Features;
 
 test('rest api integration link points to scribe docs', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $user = User::factory()->withTeam()->create();
+
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
 
     livewire(AccessTokens::class)
         ->assertSee(route('scribe'), escape: false)
