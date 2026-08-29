@@ -181,3 +181,15 @@ test('callback does not flag the signup event when the OAuth user already exists
 
     expect(session()->has('fathom.track_signup'))->toBeFalse();
 });
+
+test('github redirect route is gone', function () {
+    $this->get('/auth/redirect/github')->assertNotFound();
+});
+
+test('github callback route is gone', function () {
+    $this->get('/auth/callback/github?code=x')->assertNotFound();
+});
+
+test('callback rejects unknown providers', function () {
+    $this->get('/auth/callback/bitbucket?code=x')->assertNotFound();
+});

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use Filament\Notifications\Notification;
@@ -22,7 +23,7 @@ final readonly class CallbackController
 {
     public function __invoke(
         Request $request,
-        string $provider,
+        SocialiteProvider $provider,
         CreatesNewSocialUsers $creator
     ): RedirectResponse {
         if (! $request->has('code')) {
@@ -30,8 +31,8 @@ final readonly class CallbackController
         }
 
         try {
-            $socialUser = $this->retrieveSocialUser($provider);
-            $user = $this->resolveUser($provider, $socialUser, $creator);
+            $socialUser = $this->retrieveSocialUser($provider->value);
+            $user = $this->resolveUser($provider->value, $socialUser, $creator);
 
             if ($user->wasRecentlyCreated) {
                 $this->flagSignupForAnalytics();
@@ -45,7 +46,7 @@ final readonly class CallbackController
         } catch (Throwable $e) {
             report($e);
 
-            return $this->handleError($this->parseProviderError($e->getMessage(), $provider));
+            return $this->handleError($this->parseProviderError($e->getMessage(), $provider->value));
         }
     }
 

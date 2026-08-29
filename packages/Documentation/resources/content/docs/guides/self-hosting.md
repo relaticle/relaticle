@@ -116,8 +116,6 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID for social login. |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret. |
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 

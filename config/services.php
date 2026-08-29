@@ -43,12 +43,6 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'github' => [
-        'client_id' => env('GITHUB_CLIENT_ID'),
-        'client_secret' => env('GITHUB_CLIENT_SECRET'),
-        'redirect' => '/auth/callback/github',
-    ],
-
     'fathom' => [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
