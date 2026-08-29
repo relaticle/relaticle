@@ -56,7 +56,9 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_DATABASE" value="relaticle_testing"/>
+        <!-- DB_DATABASE deliberately comes from .env.testing so parallel
+             workspaces can isolate their testing databases; CI pins its own
+             value in phpunit.ci.xml. -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
