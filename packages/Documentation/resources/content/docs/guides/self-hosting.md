@@ -116,6 +116,7 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
+| `GOOGLE_REDIRECT_URI` | Absolute callback URL (`https://your-host/auth/callback/google`), or a relative path (`/auth/callback/google`) to derive the host from the request. |
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
@@ -152,7 +153,7 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
-| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
+| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google social login. Set to `false` to use only email/password authentication. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
 
 ---
