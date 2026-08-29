@@ -218,3 +218,36 @@ it('ignores an initial pending action id belonging to another user', function ()
     Livewire::test(ProposalCard::class, ['context' => 'conversation', 'initialPendingActionId' => $foreignId])
         ->assertSet('pendingActionId', null);
 });
+
+it('never leaks another team conversation in-flight turn on mount', function (): void {
+    $victim = User::factory()->withPersonalTeam()->create();
+    $conversationId = turnPresenceSeedConversation($victim);
+    $pendingId = turnPresenceSeedPendingAction($victim, $conversationId);
+
+    TurnPresence::begin($conversationId, turnId: 'turn-a', message: 'victim secret prompt');
+
+    $component = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->assertSet('turnInFlight', false)
+        ->assertSet('messages', [])
+        ->assertDontSee($pendingId)
+        ->assertDontSee('victim secret prompt');
+
+    expect($component->get('messages'))->toBe([]);
+});
+
+it('never leaks a teammate conversation in-flight turn on mount', function (): void {
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+    $teammate->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $conversationId = turnPresenceSeedConversation($teammate);
+    $pendingId = turnPresenceSeedPendingAction($teammate, $conversationId);
+
+    TurnPresence::begin($conversationId, turnId: 'turn-a', message: 'teammate secret prompt');
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->assertSet('turnInFlight', false)
+        ->assertSet('messages', [])
+        ->assertDontSee($pendingId)
+        ->assertDontSee('teammate secret prompt');
+});

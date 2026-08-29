@@ -113,6 +113,16 @@ final class ChatInterface extends BaseLivewireComponent
      */
     private function appendInFlightTurnState(string $conversationId): void
     {
+        // $conversationId is a route parameter, so it names any conversation the
+        // caller cares to type. Neither source below is scoped on its own: the
+        // marker is keyed by conversation id alone, and the cards query trusted
+        // its previous caller to have verified ownership first. An empty
+        // transcript is not that verification, it is what a foreign id also
+        // returns.
+        if (resolve(FindConversation::class)->execute($this->authUser(), $conversationId) === null) {
+            return;
+        }
+
         $presence = TurnPresence::current($conversationId);
 
         if ($presence !== null && $this->turnAlreadyPersisted($presence['started_at'])) {
@@ -316,16 +326,23 @@ final class ChatInterface extends BaseLivewireComponent
 
     /**
      * Still-pending (and not-yet-expired) proposal cards for this conversation,
-     * shaped exactly as the live `.tool_result` payload the client renders. Used
-     * only for reconciliation, so the conversation ownership is already verified
-     * by latestAssistantMessage()'s scoped query before this runs.
+     * shaped exactly as the live `.tool_result` payload the client renders.
+     *
+     * Scoped to the authed participant in its own right, matching the filter
+     * ListConversationMessages applies to the same rows. Every caller does
+     * verify the conversation, but leaning on that precondition is how a
+     * route-supplied id once reached these payloads.
      *
      * @return list<array<string, mixed>>
      */
     private function pendingActionCards(string $conversationId): array
     {
+        $user = $this->authUser();
+
         $actions = PendingAction::query()
             ->where('conversation_id', $conversationId)
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
             ->oldest()
