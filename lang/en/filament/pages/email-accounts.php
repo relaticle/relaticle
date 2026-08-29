@@ -70,8 +70,9 @@ return [
     ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
-    'importing_count' => 'Importing :count emails',
-    'importing_progress' => 'Importing :imported of :estimated emails',
+    'importing' => 'Importing',
+    'importing_count' => ':count emails',
+    'importing_progress' => ':imported of :estimated emails',
     'capabilities' => [
         'email' => 'Email',
         'calendar' => 'Calendar',
