@@ -95,9 +95,29 @@ final class ProposalCard extends BaseLivewireComponent
     /** @var array<string, mixed> */
     public array $data = [];
 
-    public function mount(string $context = 'conversation'): void
+    /**
+     * $initialPendingActionId lets the dock render its card in the same request
+     * that renders the page, instead of empty-until-set-active: the client's
+     * init dispatch of proposal:set-active still runs and re-anchors moments
+     * later, so a stale or wrong id self-corrects. loadStep() scopes it to the
+     * authed user, so the value can only ever name a proposal of their own.
+     */
+    public function mount(string $context = 'conversation', ?string $initialPendingActionId = null): void
     {
         $this->context = $context;
+
+        if ($initialPendingActionId === null) {
+            return;
+        }
+
+        $pendingAction = $this->loadStep($initialPendingActionId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $this->pendingActionId = (string) $pendingAction->getKey();
+        $this->focusFirstPendingStep($pendingAction);
     }
 
     public function form(Schema $schema): Schema
