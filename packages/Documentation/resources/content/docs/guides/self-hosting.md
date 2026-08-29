@@ -431,7 +431,7 @@ If you prefer not to use Docker, you can deploy Relaticle directly on a server.
 - PHP 8.5+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
 - PostgreSQL 17+
 - Redis 7+
-- Node.js 20+
+- Node.js 22+
 - Composer 2+
 - Nginx or Apache
 - Supervisor (for queue workers)

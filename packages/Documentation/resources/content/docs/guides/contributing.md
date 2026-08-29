@@ -69,7 +69,7 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 
 - **PHP 8.5+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
 - **PostgreSQL 17+**
-- **Node.js 20+** with pnpm
+- **Node.js 22+** with pnpm
 - **Composer 2+**
 
 ### Manual Installation
