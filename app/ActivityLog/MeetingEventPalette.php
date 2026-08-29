@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace App\ActivityLog;
 
-enum MeetingEventPalette: string
+use Filament\Support\Contracts\HasIcon;
+use Filament\Support\Contracts\HasLabel;
+use Filament\Support\Icons\Heroicon;
+
+enum MeetingEventPalette: string implements HasIcon, HasLabel
 {
     case MeetingCreated = 'meeting.created';
     case MeetingCancelled = 'meeting.cancelled';
 
-    public function icon(): string
+    public function getIcon(): Heroicon
     {
         return match ($this) {
-            self::MeetingCreated => 'heroicon-o-calendar',
-            self::MeetingCancelled => 'heroicon-o-calendar-days',
+            self::MeetingCreated => Heroicon::OutlinedCalendar,
+            self::MeetingCancelled => Heroicon::OutlinedCalendarDays,
         };
     }
 
-    public function label(): string
+    public function getLabel(): string
     {
         $events = __('activity-log.events');
         $event = is_array($events) ? ($events[$this->value] ?? null) : null;

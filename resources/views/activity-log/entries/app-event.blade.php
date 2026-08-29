@@ -1,6 +1,6 @@
 @php
     $causerName = $entry->causer?->name ?? null;
-    $fallbackTitle = $palette->label();
+    $fallbackTitle = $palette->getLabel();
     $title = $entry->title ?? $fallbackTitle;
     $description = $entry->description
         ?? ($causerName
@@ -16,7 +16,7 @@
 >
     <div class="flex justify-center pt-0.5">
         <span class="flex h-6 w-6 items-center justify-center rounded-full bg-primary-50 text-primary-600 ring-1 ring-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
-            <x-filament::icon :icon="$palette->icon()" class="h-3.5 w-3.5" />
+            <x-filament::icon :icon="$palette->getIcon()" class="h-3.5 w-3.5" />
         </span>
     </div>
 
