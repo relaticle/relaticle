@@ -178,7 +178,7 @@ it('shows record creation mode descriptions and the recommended badge', function
         ->call('setTab', 'record_creation')
         ->assertSee(__('filament/pages/email-privacy-settings.tabs.record_creation'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.all.description'))
-        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.description'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.selective.description'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.none.description'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.recommended'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
@@ -229,5 +229,5 @@ it('forbids a non-admin member from changing record creation settings', function
         false,
     ))->toThrow(HttpException::class);
 
-    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Bidirectional);
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
 });

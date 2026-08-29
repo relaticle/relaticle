@@ -16,7 +16,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
@@ -63,7 +62,7 @@ final readonly class LinkMeetingAction
                 )
                 ->first();
 
-            if (! $person && $account && $team && $this->shouldCreatePerson($team, $account, $attendee->email_address, $meeting)) {
+            if (! $person && $account && $team && $this->shouldCreatePerson($team)) {
                 $person = $this->autoCreatePerson->execute(
                     $attendee->name ?? '',
                     $attendee->email_address,
@@ -96,22 +95,12 @@ final readonly class LinkMeetingAction
         }
     }
 
-    private function shouldCreatePerson(Team $team, ConnectedAccount $account, string $emailAddress, Meeting $currentMeeting): bool
+    private function shouldCreatePerson(Team $team): bool
     {
         return match ($team->contact_creation_mode) {
-            ContactCreationMode::All => true,
-            ContactCreationMode::Bidirectional => $this->hasPriorMeetingWith($account, $emailAddress, $currentMeeting),
+            ContactCreationMode::All, ContactCreationMode::Selective => true,
             ContactCreationMode::None => false,
         };
-    }
-
-    private function hasPriorMeetingWith(ConnectedAccount $account, string $emailAddress, Meeting $currentMeeting): bool
-    {
-        return Meeting::query()
-            ->where('connected_account_id', $account->getKey())
-            ->where('id', '!=', $currentMeeting->getKey())
-            ->whereHas('attendees', fn (Builder $q) => $q->where('email_address', $emailAddress))
-            ->exists();
     }
 
     /**

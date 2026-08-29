@@ -41,7 +41,7 @@ return [
                 'label' => 'All contacts',
                 'description' => 'Records will be created for all contacts who appear in the emails and calendar events of your workspace members.',
             ],
-            'bidirectional' => [
+            'selective' => [
                 'label' => 'Selective contact creation',
                 'description' => 'Records will only be created for contacts who receive emails from your workspace members, or appear in their calendar events.',
             ],

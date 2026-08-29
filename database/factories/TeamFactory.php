@@ -29,7 +29,7 @@ final class TeamFactory extends Factory
             'user_id' => User::factory(),
             'personal_team' => true,
             'plan' => Plan::default()->value,
-            'contact_creation_mode' => ContactCreationMode::Bidirectional,
+            'contact_creation_mode' => ContactCreationMode::Selective,
             'auto_create_companies' => true,
         ];
     }
