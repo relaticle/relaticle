@@ -39,9 +39,11 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property CreationSource $creation_source
  * @property Carbon|null $last_email_at
  * @property Carbon|null $last_interaction_at
+ * @property Carbon|null $last_meeting_at
  * @property int $email_count
  * @property int $inbound_email_count
  * @property int $outbound_email_count
+ * @property int $meeting_count
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
@@ -88,6 +90,7 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
             'creation_source' => CreationSource::class,
             'last_email_at' => 'datetime',
             'last_interaction_at' => 'datetime',
+            'last_meeting_at' => 'datetime',
         ];
     }
 

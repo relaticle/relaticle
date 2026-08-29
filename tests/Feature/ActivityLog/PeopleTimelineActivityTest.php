@@ -14,6 +14,7 @@ use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 mutates(ActivityLogLivewire::class);
 mutates(ActivityLogSummary::class);
+mutates(People::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create(['name' => 'John']);
