@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
+use Relaticle\Comments\Filament\Actions\CommentsAction;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -28,6 +29,7 @@ final class ViewPeople extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            CommentsAction::make(),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([

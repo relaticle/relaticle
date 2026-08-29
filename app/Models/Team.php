@@ -124,7 +124,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 
         // Infrastructure & framework
         'filament', 'livewire', 'storage', 'imports', 'horizon', 'scalar', 'engagement',
-        'broadcasting',
+        'broadcasting', '__relaticle-comments',
         'system-administrators',
         'up', 'health', 'status', 'metrics',
         'static', 'assets', 'cdn', 'public', 'uploads',

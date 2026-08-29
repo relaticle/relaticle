@@ -24,6 +24,8 @@ use Illuminate\Support\Carbon;
 use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
+use Relaticle\Comments\Concerns\HasComments;
+use Relaticle\Comments\Contracts\Commentable;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -38,9 +40,10 @@ use Spatie\Activitylog\Support\LogOptions;
     'name',
     'creation_source',
 ])]
-final class People extends Model implements HasCustomFields, HasTimeline
+final class People extends Model implements Commentable, HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
+    use HasComments;
     use HasCreator;
 
     /** @use HasFactory<PeopleFactory> */

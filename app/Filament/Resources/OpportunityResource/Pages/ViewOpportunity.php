@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Js;
+use Relaticle\Comments\Filament\Actions\CommentsAction;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
@@ -27,6 +28,7 @@ final class ViewOpportunity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            CommentsAction::make(),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
