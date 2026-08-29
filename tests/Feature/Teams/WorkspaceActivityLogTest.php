@@ -402,7 +402,11 @@ test('filtering on updated covers custom field edits too', function (): void {
     // which is what the page is supposed to do to a create that carried fields.
     app()->forgetScopedInstances();
 
-    seedCustomFieldRow($this, $company, (string) Str::uuid(), 'ICP', 'No', 'Yes');
+    activity()
+        ->performedOn($company)
+        ->causedBy($this->owner)
+        ->event('custom_field_changes')
+        ->log('custom field changed');
 
     livewire(ActivityLog::class)
         ->filterTable('event', 'updated')

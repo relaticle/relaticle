@@ -31,14 +31,14 @@ beforeEach(function () {
 });
 
 test('an invite with only an email defaults to the editor role', function () {
-    livewire(AddTeamMember::class, ['team' => $this->team])
-        ->assertFormSet(['role' => 'editor'])
-        ->fillForm(['email' => 'default-role@example.com'])
-        ->call('addTeamMember', $this->team);
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->assertFormSet(['role' => TeamRole::Editor->value])
+        ->fillForm(['emails' => 'default-role@example.com'])
+        ->call('invitePeople');
 
     $invitation = $this->team->fresh()->teamInvitations->sole();
     expect($invitation->email)->toBe('default-role@example.com')
-        ->and($invitation->role)->toBe('editor');
+        ->and($invitation->role)->toBe(TeamRole::Editor->value);
 });
 
 test('team members can be invited to team', function () {
