@@ -36,8 +36,8 @@ final class EmailAccountsPage extends Page
 
     /**
      * Heading and subheading are rendered inside the content column (see the page
-     * view) so they align with the accounts panel rather than spanning the cluster
-     * navigation — the page header itself stays empty.
+     * view) so they sit with the accounts panel under the cluster tabs — the page
+     * header itself stays empty.
      */
     public function getHeading(): string
     {
@@ -47,17 +47,6 @@ final class EmailAccountsPage extends Page
     public function getSubheading(): ?string
     {
         return null;
-    }
-
-    /**
-     * @return array<int|string, string>
-     */
-    public function getBreadcrumbs(): array
-    {
-        return [
-            EmailSettings::getUrl() => (string) __('filament/clusters/email-settings.breadcrumb'),
-            (string) __('filament/pages/email-accounts.navigation_label'),
-        ];
     }
 
     public static function getNavigationLabel(): string

@@ -7,12 +7,12 @@ namespace Relaticle\EmailIntegration\Filament\Concerns;
 use Filament\Actions\Action;
 
 /**
- * Email settings cluster pages render their own header (breadcrumbs, heading, actions)
+ * Email settings cluster pages render their own header (heading, actions)
  * from `<x-email-integration::cluster-header />` at the top of the page view, so it
- * starts at the content column like the accounts page rather than spanning the cluster
- * navigation. Each page blanks `$heading` so the stock full-width header is not
- * rendered at all — it would drop the breadcrumbs anyway, since the app panel disables
- * them globally (AppPanelProvider::breadcrumbs(false)).
+ * sits with the page content under the cluster tabs. Each page blanks `$heading` so the
+ * stock full-width header is not rendered. The app panel disables breadcrumbs globally
+ * (AppPanelProvider::breadcrumbs(false)); pages that still need a trail opt in via
+ * shouldRenderClusterBreadcrumbs().
  */
 trait HasClusterBreadcrumbs
 {
@@ -35,5 +35,10 @@ trait HasClusterBreadcrumbs
     public function getBreadcrumbs(): array
     {
         return [...parent::getBreadcrumbs(), static::getNavigationLabel()];
+    }
+
+    public function shouldRenderClusterBreadcrumbs(): bool
+    {
+        return true;
     }
 }

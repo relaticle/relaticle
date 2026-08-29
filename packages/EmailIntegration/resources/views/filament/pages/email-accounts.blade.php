@@ -1,7 +1,5 @@
 <x-filament-panels::page>
-    <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" />
-
-    <div class="-mt-2">
+    <div>
         <h2 class="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
             {{ __('filament/pages/email-accounts.title') }}
         </h2>
