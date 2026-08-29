@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -38,7 +35,6 @@ use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateUserEmailPrivacySettingsAction;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
@@ -94,8 +90,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         $this->form->fill([
             'sync_inbox' => $this->account()->sync_inbox,
             'sync_sent' => $this->account()->sync_sent,
-            'contact_creation_mode' => $this->account()->contact_creation_mode->value,
-            'auto_create_companies' => $this->account()->auto_create_companies,
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
             'default_email_sharing_tier' => $user->default_email_sharing_tier->value ?? '',
@@ -179,20 +173,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             Toggle::make('sync_sent')
                 ->label($this->labelWithInfo(__('filament/pages/email-accounts.settings.sync_sent.label'), __('filament/pages/email-accounts.settings.sync_sent.helper_text')))
                 ->inlineLabel(),
-
-            Toggle::make('auto_create_companies')
-                ->label($this->labelWithInfo(__('filament/pages/email-accounts.settings.auto_create_companies.label'), __('filament/pages/email-accounts.settings.auto_create_companies.helper_text')))
-                ->inlineLabel(),
-
-            Select::make('contact_creation_mode')
-                ->label($this->labelWithInfo(
-                    __('filament/pages/email-accounts.settings.contact_creation_mode.label'),
-                    __('filament/pages/email-accounts.settings.contact_creation_mode.helper_text'),
-                ))
-                ->options(ContactCreationMode::class)
-                ->selectablePlaceholder(false)
-                ->inlineLabel()
-                ->required(),
 
             Grid::make(2)
                 ->schema([

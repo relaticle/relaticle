@@ -4,33 +4,48 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Enums;
 
+use Filament\Support\Contracts\HasDescription;
+use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
+use Filament\Support\Icons\Heroicon;
 
-enum ContactCreationMode: string implements HasLabel
+enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
 {
-    /**
-     * Automatically create a Person record for every new email address
-     * encountered during sync, regardless of direction.
-     */
     case All = 'all';
 
-    /**
-     * Only create a Person record when the connected account has exchanged
-     * email in both directions with the address (sent AND received).
-     */
     case Bidirectional = 'bidirectional';
 
-    /**
-     * Never auto-create Person records. Only link emails to existing records.
-     */
     case None = 'none';
 
     public function getLabel(): string
     {
         return match ($this) {
-            self::All => 'All contacts',
-            self::Bidirectional => 'Bidirectional only',
-            self::None => 'Never',
+            self::All => __('filament/pages/email-privacy-settings.record_creation.modes.all.label'),
+            self::Bidirectional => __('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.label'),
+            self::None => __('filament/pages/email-privacy-settings.record_creation.modes.none.label'),
         };
     }
-}
+
+    public function getDescription(): string
+    {
+        return match ($this) {
+            self::All => __('filament/pages/email-privacy-settings.record_creation.modes.all.description'),
+            self::Bidirectional => __('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.description'),
+            self::None => __('filament/pages/email-privacy-settings.record_creation.modes.none.description'),
+        };
+    }
+
+    public function getIcon(): Heroicon
+    {
+        return match ($this) {
+            self::All => Heroicon::OutlinedUserGroup,
+            self::Bidirectional => Heroicon::OutlinedUserPlus,
+            self::None => Heroicon::OutlinedNoSymbol,
+        };
+    }
+
+    public function isRecommended(): bool
+    {
+        return $this === self::Bidirectional;
+    }
+};

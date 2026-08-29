@@ -35,7 +35,8 @@
         @apply ring-2 ring-primary-600/40 dark:ring-primary-500/40;
     }
 
-    &:has(input:checked) {
+    &:has(input:checked),
+    &:has([role='switch'][aria-checked='true']) {
         @apply border-primary-600 bg-primary-50 dark:border-primary-500 dark:bg-primary-500/10;
 
         & .ei-sharing-card-icon {

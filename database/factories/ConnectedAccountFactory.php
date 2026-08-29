@@ -7,7 +7,6 @@ namespace Database\Factories;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -19,6 +18,9 @@ final class ConnectedAccountFactory extends Factory
 {
     protected $model = ConnectedAccount::class;
 
+    /**
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
@@ -31,8 +33,6 @@ final class ConnectedAccountFactory extends Factory
             'access_token' => 'fake-token',
             'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
-            'contact_creation_mode' => ContactCreationMode::None,
-            'auto_create_companies' => false,
         ];
     }
 
@@ -62,20 +62,6 @@ final class ConnectedAccountFactory extends Factory
         return $this->state(fn (): array => [
             'status' => EmailAccountStatus::ERROR,
             'last_error' => 'Token refresh failed',
-        ]);
-    }
-
-    public function withAutoCreateCompanies(): static
-    {
-        return $this->state(fn (): array => [
-            'auto_create_companies' => true,
-        ]);
-    }
-
-    public function withContactCreation(ContactCreationMode $mode = ContactCreationMode::All): static
-    {
-        return $this->state(fn (): array => [
-            'contact_creation_mode' => $mode,
         ]);
     }
 

@@ -238,6 +238,8 @@ it('updates participant contact_id when linked to a person', function (): void {
 });
 
 it('does not auto-create companies when auto_create_companies is false', function (): void {
+    $this->team->update(['auto_create_companies' => false]);
+
     $email = makeLinkEmail();
 
     EmailParticipant::factory()->from()->create([
@@ -253,7 +255,7 @@ it('does not auto-create companies when auto_create_companies is false', functio
 });
 
 it('auto-creates a company when auto_create_companies is true', function (): void {
-    $this->account->update(['auto_create_companies' => true]);
+    $this->team->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
 
@@ -268,7 +270,7 @@ it('auto-creates a company when auto_create_companies is true', function (): voi
 });
 
 it('derives the company name from the registrable domain, not a mail subdomain', function (): void {
-    $this->account->update(['auto_create_companies' => true]);
+    $this->team->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
 
@@ -284,7 +286,7 @@ it('derives the company name from the registrable domain, not a mail subdomain',
 });
 
 it('derives the company name from the registrable label across TLD shapes', function (string $address, string $expected): void {
-    $this->account->update(['auto_create_companies' => true]);
+    $this->team->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
 
@@ -307,7 +309,7 @@ it('derives the company name from the registrable label across TLD shapes', func
 ]);
 
 it('does not auto-create a company for a no-reply / automated sender', function (): void {
-    $this->account->update(['auto_create_companies' => true]);
+    $this->team->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
 
@@ -324,7 +326,7 @@ it('does not auto-create a company for a no-reply / automated sender', function 
 });
 
 it('does not auto-create a person for a no-reply / automated sender', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $email = makeLinkEmail();
 
@@ -342,7 +344,7 @@ it('does not auto-create a person for a no-reply / automated sender', function (
 });
 
 it('seeds an auto-created company with a protocol-less domain and ICP set to false', function (): void {
-    $this->account->update(['auto_create_companies' => true]);
+    $this->team->update(['auto_create_companies' => true]);
 
     $email = makeLinkEmail();
 
@@ -444,6 +446,8 @@ it('creates distinct companies for same-named domains with different TLDs and pr
 });
 
 it('does not auto-create a person when contact_creation_mode is None', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::None]);
+
     $countBefore = People::where('team_id', $this->team->id)->count();
 
     $email = makeLinkEmail();
@@ -459,7 +463,7 @@ it('does not auto-create a person when contact_creation_mode is None', function 
 });
 
 it('auto-creates a person when contact_creation_mode is All', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $email = makeLinkEmail();
 
@@ -475,7 +479,7 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
 });
 
 it('creates distinct people for participants sharing a display name but different emails', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $email = makeLinkEmail();
 
@@ -496,7 +500,7 @@ it('creates distinct people for participants sharing a display name but differen
 });
 
 it('does not duplicate a person when the same address appears on multiple participants', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::All]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $email = makeLinkEmail();
 
@@ -517,7 +521,7 @@ it('does not duplicate a person when the same address appears on multiple partic
 });
 
 it('does not auto-create a person when Bidirectional and only one direction exists', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
 
     // Only inbound email — no outbound yet
     $inboundEmail = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
@@ -543,7 +547,7 @@ it('does not auto-create a person when Bidirectional and only one direction exis
 });
 
 it('auto-creates a person when Bidirectional and both directions exist', function (): void {
-    $this->account->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
 
     $address = 'bidirectional@bidirectional.com';
 

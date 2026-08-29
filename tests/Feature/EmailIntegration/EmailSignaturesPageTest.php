@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
@@ -28,7 +27,6 @@ function foreignAccount(string $accountId, string $email): ConnectedAccount
         'display_name' => 'Other Sender',
         'access_token' => 'fake-token',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 }
 
@@ -47,7 +45,6 @@ beforeEach(function (): void {
         'display_name' => 'Test Sender',
         'access_token' => 'fake-token',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 });
 
@@ -84,7 +81,6 @@ it('preselects the default account, not merely the oldest, when opening the crea
         'is_default' => true,
         'access_token' => 'fake-token-default',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
     livewire(EmailSignaturesPage::class)
@@ -244,7 +240,6 @@ it('does not delete another user\'s signature', function (): void {
         'display_name' => 'Other Sender',
         'access_token' => 'fake-token-2',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
     $otherSignature = EmailSignature::factory()->create([
@@ -282,7 +277,6 @@ it('shows only the authenticated user\'s signatures on mount', function (): void
         'display_name' => 'Other',
         'access_token' => 'fake-token-3',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
     $otherSignature = EmailSignature::factory()->create([
@@ -313,7 +307,6 @@ it('excludes another user\'s signatures even when in the same team', function ()
         'display_name' => 'Teammate',
         'access_token' => 'fake-token-4',
         'status' => EmailAccountStatus::ACTIVE,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
 
     $teammateSignature = EmailSignature::factory()->create([

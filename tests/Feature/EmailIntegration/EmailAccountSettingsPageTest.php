@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
@@ -45,13 +44,17 @@ it('fills the form from the account, the user tier and the existing blocklist', 
     expect($data['blocklist_domains'])->toContain('spammy.com');
 });
 
+it('does not expose workspace record creation controls on a personal account', function (): void {
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.label'))
+        ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
+});
+
 it('saves account settings, the sharing tier and the blocklist together', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
             'sync_inbox' => false,
             'sync_sent' => true,
-            'contact_creation_mode' => ContactCreationMode::All->value,
-            'auto_create_companies' => true,
             'hourly_send_limit' => 25,
             'daily_send_limit' => 100,
             'default_email_sharing_tier' => EmailPrivacyTier::FULL->value,
@@ -64,8 +67,6 @@ it('saves account settings, the sharing tier and the blocklist together', functi
     expect($this->account->fresh())
         ->sync_inbox->toBeFalse()
         ->sync_sent->toBeTrue()
-        ->contact_creation_mode->toBe(ContactCreationMode::All)
-        ->auto_create_companies->toBeTrue()
         ->hourly_send_limit->toBe(25)
         ->daily_send_limit->toBe(100);
 

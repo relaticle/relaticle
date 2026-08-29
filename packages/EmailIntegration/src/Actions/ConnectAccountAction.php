@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class ConnectAccountAction
@@ -24,8 +23,6 @@ final readonly class ConnectAccountAction
                 'token_expires_at' => $data->tokenExpiresAt,
                 'status' => 'active',
                 'last_error' => null,
-                'auto_create_companies' => true,
-                'contact_creation_mode' => ContactCreationMode::Bidirectional,
                 'capabilities' => [
                     'email' => true,
                     'calendar' => $data->hasCalendar,

@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(EmailPrivacySettingsPage::class, UpdateTeamEmailPrivacySettingsAction::class);
+mutates(EmailPrivacySettingsPage::class, UpdateTeamEmailPrivacySettingsAction::class, UpdateTeamContactCreationSettingsAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -169,4 +171,63 @@ it('denies a non-admin member access to the workspace privacy page', function ()
     Filament::setTenant($this->team);
 
     expect(EmailPrivacySettingsPage::canAccess())->toBeFalse();
+});
+
+it('shows record creation mode descriptions and the recommended badge', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->assertSee(__('filament/pages/email-privacy-settings.tabs.record_creation'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.all.description'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.description'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.none.description'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.recommended'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
+});
+
+it('pre-fills record creation settings from the team on mount', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::None,
+        'auto_create_companies' => false,
+    ]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->assertSet('contact_creation_mode', ContactCreationMode::None->value)
+        ->assertSet('auto_create_companies', false);
+});
+
+it('autosaves contact_creation_mode for every mailbox on the team', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->set('contact_creation_mode', ContactCreationMode::All->value);
+
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::All);
+});
+
+it('autosaves auto_create_companies for the workspace', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->set('auto_create_companies', false);
+
+    expect($this->team->fresh()->auto_create_companies)->toBeFalse();
+});
+
+it('renders a switch for automatic company creation', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->assertSeeHtml('role="switch"')
+        ->assertDontSeeHtml('fi-checkbox-input');
+});
+
+it('forbids a non-admin member from changing record creation settings', function (): void {
+    $member = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    expect(fn () => resolve(UpdateTeamContactCreationSettingsAction::class)->execute(
+        $this->team,
+        $member,
+        ContactCreationMode::All,
+        false,
+    ))->toThrow(HttpException::class);
+
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Bidirectional);
 });
