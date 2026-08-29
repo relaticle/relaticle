@@ -51,7 +51,7 @@ all_trivial=1
 while IFS= read -r path; do
     [[ -z "$path" ]] && continue
     case "$path" in
-        *.md|*.txt|*.lock|*.gitignore|composer.lock|package-lock.json|yarn.lock)
+        *.md|*.txt|*.lock|*.gitignore|composer.lock|package-lock.json|pnpm-lock.yaml|yarn.lock)
             ;;
         tests/*)
             ;;

@@ -48,7 +48,7 @@ Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any A
 
 - PHP 8.5+
 - PostgreSQL 17+
-- Composer 2 and Node.js 20+
+- Composer 2 and Node.js 22+
 - Redis for queues (optional for development)
 
 # Installation

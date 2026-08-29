@@ -47,7 +47,7 @@ the report (documented degraded mode, not a silent default).
 
 **ANY step returning malformed/absent/un-read-backable output → the channel is down →
 §5 `blocked`.** Before declaring it down, spend ONE bounded attempt distinguishing a
-fixable env defect: stale build (`npm run build`), config cache (`php artisan
+fixable env defect: stale build (`pnpm run build`), config cache (`php artisan
 config:clear`), wrong websocket host, hung daemon (`agent-browser` restart). A defect
 you can fix in setup is setup; a channel you cannot fix is `blocked`
 (verified: 2026-06-10 — a "degraded channel" on PR 322 turned out to be a stale JS

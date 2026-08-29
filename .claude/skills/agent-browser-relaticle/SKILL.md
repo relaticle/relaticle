@@ -193,7 +193,7 @@ await comp2.call("callMountedAction");
   `REDIS_DB` in `.env`; before queue-dependent testing, dispatch a sentinel job and
   confirm THIS checkout's worker consumed it.
 - **Reverb/websockets**: agent-browser's Chromium may use a wrong websocket host or a
-  stale built bundle — looks like a dead page, is an env defect. `npm run build`, check
+  stale built bundle — looks like a dead page, is an env defect. `pnpm run build`, check
   `agent-browser console` for websocket errors (verified: 2026-06-10).
 - **419 CSRF after idle** → `agent-browser reload` and retry once (verified: 2026-05).
 - **A failed Livewire request leaves a full-screen error overlay in the DOM** (Laravel
