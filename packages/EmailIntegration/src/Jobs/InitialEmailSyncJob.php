@@ -68,7 +68,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $newIds = array_values(array_diff($allIds, $storedIds));
 
         if ($newIds === []) {
-            self::continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
+            $this->continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
 
             return;
         }
@@ -93,7 +93,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
                     return;
                 }
 
-                self::continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
+                $this->continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
             })
             ->dispatch();
     }
@@ -122,7 +122,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         return (int) $days;
     }
 
-    private static function continueOrFinish(
+    private function continueOrFinish(
         ConnectedAccount $account,
         ?string $historyCursor,
         ?string $nextPageToken,
