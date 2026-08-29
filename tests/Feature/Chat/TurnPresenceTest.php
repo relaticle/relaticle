@@ -15,10 +15,11 @@ use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\TurnPresence;
 use Tests\Helpers\ChatDocument;
 
-mutates(TurnPresence::class, ChatInterface::class);
+mutates(TurnPresence::class, ChatInterface::class, TurnContinuationService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -250,4 +251,39 @@ it('never leaks a teammate conversation in-flight turn on mount', function (): v
         ->assertSet('messages', [])
         ->assertDontSee($pendingId)
         ->assertDontSee('teammate secret prompt');
+});
+
+it('marks a continuation turn in flight when the assistant resumes', function (): void {
+    Queue::fake();
+    $conversationId = turnPresenceSeedConversation($this->user);
+
+    $resumed = resolve(TurnContinuationService::class)
+        ->resume($this->user, $conversationId, 'resolved-turn-a');
+
+    expect($resumed)->toBeTrue();
+
+    Queue::assertPushed(ProcessChatMessage::class);
+
+    $presence = TurnPresence::current($conversationId);
+
+    expect($presence)->not->toBeNull()
+        ->and($presence['kind'])->toBe('continuation')
+        ->and($presence['message'])->toBe('');
+});
+
+it('hands the dock the first pending card id at render', function (): void {
+    $conversationId = turnPresenceSeedConversation($this->user);
+    turnPresenceSeedMessage($this->user, $conversationId);
+    $pendingId = turnPresenceSeedPendingAction($this->user, $conversationId);
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->assertViewHas('initialProposalId', $pendingId);
+});
+
+it('hands the dock no card id when nothing is pending', function (): void {
+    $conversationId = turnPresenceSeedConversation($this->user);
+    turnPresenceSeedMessage($this->user, $conversationId);
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->assertViewHas('initialProposalId', null);
 });
