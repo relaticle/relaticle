@@ -105,7 +105,7 @@
     </nav>
 
     <header class="sticky top-0 z-40 border-b border-gray-200/70 bg-white/85 backdrop-blur-md dark:border-white/[0.06] dark:bg-gray-950/85">
-        <div class="flex h-14 items-center gap-3 px-4 sm:px-6">
+        <div class="mx-auto flex h-14 w-full max-w-[90rem] items-center gap-3 px-4 sm:px-6">
             <button type="button"
                     x-on:click="sidebarOpen = true"
                     class="-ml-1.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
