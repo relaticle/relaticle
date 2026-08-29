@@ -75,6 +75,8 @@ use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 use Spatie\Onboard\OnboardingSteps;
 
@@ -154,6 +156,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
+        Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 

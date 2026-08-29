@@ -182,6 +182,25 @@ test('callback does not flag the signup event when the OAuth user already exists
     expect(session()->has('fathom.track_signup'))->toBeFalse();
 });
 
+test('redirect to microsoft provider', function () {
+    Socialite::fake(SocialiteProvider::MICROSOFT->value);
+
+    $this->get(route('auth.socialite.redirect', ['provider' => 'microsoft']))
+        ->assertRedirect();
+});
+
+test('microsoft callback creates a user', function () {
+    Socialite::fake(
+        SocialiteProvider::MICROSOFT->value,
+        makeSocialiteUser('ms-1', 'MS User', 'ms@example.com'),
+    );
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'microsoft', 'code' => 'test-code']));
+
+    $this->assertDatabaseHas('user_social_accounts', ['provider_name' => 'microsoft', 'provider_id' => 'ms-1']);
+    $this->assertAuthenticated();
+});
+
 test('github redirect route is gone', function () {
     $this->get('/auth/redirect/github')->assertNotFound();
 });

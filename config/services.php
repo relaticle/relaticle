@@ -43,6 +43,12 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'microsoft' => [
+        'client_id' => env('MICROSOFT_CLIENT_ID'),
+        'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
+        'redirect' => '/auth/callback/microsoft',
+    ],
+
     'fathom' => [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
