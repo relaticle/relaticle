@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
@@ -32,6 +33,16 @@ it('can render the view page', function (): void {
 
     livewire(ViewCompany::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('registers the meetings relation manager on the company view page', function (): void {
+    $record = Company::factory()->recycle([$this->user, $this->team])->create();
+
+    $managers = livewire(ViewCompany::class, ['record' => $record->getKey()])
+        ->instance()
+        ->getRelationManagers();
+
+    expect($managers)->toContain(MeetingsRelationManager::class);
 });
 
 // Column metadata is checked against a single mounted table rather than one

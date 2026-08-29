@@ -19,7 +19,11 @@ enum MeetingEventPalette: string
 
     public function label(): string
     {
-        return (string) __("activity-log.events.{$this->value}.label");
+        $events = __('activity-log.events');
+        $event = is_array($events) ? ($events[$this->value] ?? null) : null;
+        $label = is_array($event) ? ($event['label'] ?? null) : null;
+
+        return is_string($label) ? $label : $this->value;
     }
 
     public function badge(): null

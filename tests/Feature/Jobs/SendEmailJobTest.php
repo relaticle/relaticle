@@ -45,6 +45,26 @@ it('records exception class and message on the email when the job fails', functi
         ->last_error->toBe('RuntimeException: boom');
 });
 
+it('does not mark a delivered email as failed when a later job step throws', function (): void {
+    $email = Email::create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Outbound',
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::SENT,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'last_error' => null,
+    ]);
+
+    (new SendEmailJob($email->getKey()))->failed(new RuntimeException('link failed'));
+
+    expect($email->fresh())
+        ->status->toBe(EmailStatus::SENT)
+        ->last_error->toBeNull();
+});
+
 it('logs the full exception when the job fails', function (): void {
     $email = Email::create([
         'team_id' => $this->team->id,

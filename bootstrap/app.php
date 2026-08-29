@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\RedirectToPrimaryHost;
@@ -20,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use Laravel\Pennant\Feature;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
@@ -182,29 +184,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('notifications:send-setup-nudge')->hourly()->withoutOverlapping()->onOneServer();
 
-        // TODO::Separate it in different command class
-        $schedule->call(function (): void {
-            ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
-                ->whereNotNull('sync_cursor')
-                ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalEmailSyncJob($account)));
-        })
-            ->everyFiveMinutes()
-            ->name('email:incremental-sync')
-            ->withoutOverlapping();
+        if (Feature::active(EmailIntegration::class)) {
+            // TODO::Separate it in different command class
+            $schedule->call(function (): void {
+                ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
+                    ->whereNotNull('sync_cursor')
+                    ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalEmailSyncJob($account)));
+            })
+                ->everyFiveMinutes()
+                ->name('email:incremental-sync')
+                ->withoutOverlapping();
 
-        $schedule->call(function (): void {
-            ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
-                ->whereJsonContains('capabilities->calendar', true)
-                ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalCalendarSyncJob($account)));
-        })
-            ->everyFiveMinutes()
-            ->name('calendar:incremental-sync')
-            ->withoutOverlapping();
+            $schedule->call(function (): void {
+                ConnectedAccount::query()->where('status', EmailAccountStatus::ACTIVE)
+                    ->whereJsonContains('capabilities->calendar', true)
+                    ->each(fn (ConnectedAccount $account): PendingDispatch => dispatch(new IncrementalCalendarSyncJob($account)));
+            })
+                ->everyFiveMinutes()
+                ->name('calendar:incremental-sync')
+                ->withoutOverlapping();
 
-        $schedule->command('email:dispatch-outbox')
-            ->everyMinute()
-            ->name('email:dispatch-outbox')
-            ->withoutOverlapping();
+            $schedule->command('email:dispatch-outbox')
+                ->everyMinute()
+                ->name('email:dispatch-outbox')
+                ->withoutOverlapping();
+        }
 
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();
