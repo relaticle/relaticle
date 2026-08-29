@@ -123,7 +123,7 @@ return [
         'general' => 'General',
         'members' => 'Members',
         'custom_fields' => 'Custom Fields',
-        'email' => 'Email',
+        'email' => 'Email and Calendar',
         'activity' => 'Activity',
         'billing' => 'Billing',
     ],
