@@ -226,3 +226,14 @@
         transition: none;
     }
 }
+
+/* Login/register brand card: matches the deletion-interstitial's card
+   treatment. Scoped off the onboarding wizard, which strips fi-simple-main
+   down to a transparent, borderless shell for its own split-screen layout. */
+.fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-layout {
+    @apply bg-gray-50 dark:bg-gray-950;
+}
+
+.fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-main {
+    @apply shadow-sm sm:rounded-2xl;
+}

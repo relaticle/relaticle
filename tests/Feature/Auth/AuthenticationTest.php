@@ -55,13 +55,6 @@ test('users cannot authenticate with invalid password', function () {
     $this->assertGuest();
 });
 
-test('login screen renders the Sign in with passkey button via the panel render hook', function (): void {
-    $response = $this->get(url()->getAppUrl('login'));
-
-    $response->assertStatus(200);
-    $response->assertSee('Sign in with a passkey');
-});
-
 test('login email field has autocomplete=username webauthn for conditional mediation', function (): void {
     livewire(Login::class)
         ->assertSeeHtml('autocomplete="username webauthn"');
@@ -354,4 +347,48 @@ test('discovery is rate limited per ip across different emails', function (): vo
         ->fillForm(['email' => $blockedEmail])
         ->call('authenticate')
         ->assertHasFormErrors(['email']);
+});
+
+test('social hint renders after discovering a social-only account', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => 'google',
+        'provider_id' => 'g-'.uniqid(),
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSee(__('auth.login.social_hint', ['provider' => 'Google']));
+});
+
+test('password fallback link renders only for passkey users with a password', function (): void {
+    $user = User::factory()->create();
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Key',
+        'credential_id' => 'fallback-link-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSee(__('auth.login.use_password'));
+});
+
+test('login page renders the google button and no passkey button', function (): void {
+    $response = $this->get(url()->getAppUrl('login'));
+
+    $response->assertSee(__('auth.login.continue_with', ['provider' => 'Google']));
+    $response->assertDontSee('Sign in with a passkey');
+});
+
+test('microsoft button renders only when configured', function (): void {
+    config(['services.microsoft.client_id' => null]);
+    $this->get(url()->getAppUrl('login'))->assertDontSee('Microsoft');
+
+    config(['services.microsoft.client_id' => 'test-client']);
+    $this->get(url()->getAppUrl('login'))->assertSee('Microsoft');
 });

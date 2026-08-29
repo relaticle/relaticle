@@ -17,6 +17,7 @@ use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
@@ -39,6 +40,7 @@ final class Login extends \Filament\Auth\Pages\Login
                 Html::make(fn (): string => $this->getInvitationContentHtml()),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE),
                 $this->getFormContentComponent(),
+                Html::make(fn (): string => $this->getDiscoveryHintHtml()),
                 $this->getMultiFactorChallengeFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
             ]);
@@ -68,6 +70,30 @@ final class Login extends \Filament\Auth\Pages\Login
     public function usePassword(): void
     {
         $this->authMethod = 'password';
+    }
+
+    private function getDiscoveryHintHtml(): string
+    {
+        if ($this->authMethod === 'passkey' && $this->passkeyUserHasPassword) {
+            return Blade::render(<<<'BLADE'
+                <p class="mt-3 text-center text-sm">
+                    <button type="button" wire:click="usePassword" class="text-primary-600 underline-offset-2 hover:underline dark:text-primary-400">
+                        {{ __('auth.login.use_password') }}
+                    </button>
+                </p>
+            BLADE);
+        }
+
+        if (str_starts_with((string) $this->authMethod, 'social:')) {
+            $provider = ucfirst(mb_substr((string) $this->authMethod, 7));
+
+            return Blade::render(
+                '<p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __(\'auth.login.social_hint\', [\'provider\' => $provider]) }}</p>',
+                ['provider' => $provider],
+            );
+        }
+
+        return '';
     }
 
     protected function discover(): void
