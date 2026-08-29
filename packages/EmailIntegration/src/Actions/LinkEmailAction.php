@@ -14,7 +14,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
@@ -85,7 +84,7 @@ final readonly class LinkEmailAction
                 ->first();
 
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $connectedAccount, $participant->email_address)) {
+            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address)) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -130,35 +129,34 @@ final readonly class LinkEmailAction
      * Determine whether a new Person should be created for the given email address,
      * based on the workspace contact_creation_mode setting.
      *
-     * - All:           always create when the address is unknown
-     * - Bidirectional: only create when the connected account has exchanged email in
-     *                  BOTH directions with this address
-     * - None:          never create
+     * - All:        always create when the address is unknown
+     * - Selective:  create when any workspace mailbox has sent to this address
+     * - None:       never create
      */
-    private function shouldCreatePerson(Team $team, ConnectedAccount $account, string $emailAddress): bool
+    private function shouldCreatePerson(Team $team, string $emailAddress): bool
     {
         return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
-            ContactCreationMode::Bidirectional => $this->hasBidirectionalHistory($account, $emailAddress),
+            ContactCreationMode::Selective => $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
         };
     }
 
     /**
-     * Returns true if the account already has at least one stored email in each
-     * direction involving the given address.
+     * True when any connected mailbox on this team has an outbound email involving
+     * the address. The email currently being linked already exists in the table,
+     * so the first send is enough — a reply is not required.
      */
-    private function hasBidirectionalHistory(ConnectedAccount $account, string $emailAddress): bool
+    private function hasTeamOutboundHistory(Team $team, string $emailAddress): bool
     {
-        $directions = Email::query()->where('connected_account_id', $account->getKey())
-            ->whereHas('participants', fn (Builder $participantQuery) => $participantQuery->where('email_address', $emailAddress))
-            ->distinct()
-            ->pluck('direction');
-
-        $values = $directions->map(fn (mixed $direction): mixed => $direction instanceof EmailDirection ? $direction->value : $direction);
-
-        return $values->contains(EmailDirection::INBOUND->value)
-            && $values->contains(EmailDirection::OUTBOUND->value);
+        return Email::query()
+            ->where('team_id', $team->getKey())
+            ->where('direction', EmailDirection::OUTBOUND)
+            ->whereHas(
+                'participants',
+                fn (Builder $participantQuery) => $participantQuery->where('email_address', $emailAddress),
+            )
+            ->exists();
     }
 
     /**

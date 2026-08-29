@@ -127,7 +127,7 @@ it('skips person creation when contact_creation_mode=None', function (): void {
     expect(People::query()->where('team_id', $team->id)->count())->toBe(0);
 });
 
-it('requires prior meeting with the address for Bidirectional mode', function (): void {
+it('auto-creates a person on the first meeting in Selective mode', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
     $team = $user->currentTeam;
@@ -136,22 +136,14 @@ it('requires prior meeting with the address for Bidirectional mode', function ()
         'team_id' => $team->id,
         'user_id' => $user->id,
     ]));
-    $team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
+    $team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
 
-    // First meeting — no existing prior → skipped
-    $m1 = Meeting::factory()->create(['team_id' => $account->team_id, 'connected_account_id' => $account->getKey()]);
+    $meeting = Meeting::factory()->create(['team_id' => $account->team_id, 'connected_account_id' => $account->getKey()]);
     MeetingAttendee::factory()->create([
-        'meeting_id' => $m1->getKey(), 'email_address' => 'bi@acme.com', 'is_self' => false,
+        'meeting_id' => $meeting->getKey(), 'email_address' => 'new-guest@acme.com', 'is_self' => false,
     ]);
-    (app(LinkMeetingAction::class))->execute($m1->fresh());
-    expect(People::query()->where('team_id', $team->id)->count())->toBe(0);
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
 
-    // Second meeting with same address — prior exists → created
-    $m2 = Meeting::factory()->create(['team_id' => $account->team_id, 'connected_account_id' => $account->getKey()]);
-    MeetingAttendee::factory()->create([
-        'meeting_id' => $m2->getKey(), 'email_address' => 'bi@acme.com', 'is_self' => false,
-    ]);
-    (app(LinkMeetingAction::class))->execute($m2->fresh());
     expect(People::query()->where('team_id', $team->id)->count())->toBe(1);
 });
 

@@ -46,7 +46,7 @@ it('fills the form from the account, the user tier and the existing blocklist', 
 
 it('does not expose workspace record creation controls on a personal account', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.label'))
+        ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.modes.selective.label'))
         ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
 });
 

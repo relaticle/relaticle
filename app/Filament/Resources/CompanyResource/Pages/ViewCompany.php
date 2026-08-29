@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
+use App\Features\EmailIntegration;
 use App\Filament\Components\Infolists\AvatarName;
 use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
@@ -21,6 +23,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
+use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 
@@ -35,6 +38,7 @@ final class ViewCompany extends ViewRecord
                 ->label(__('filament/resources/company.pages.view.actions.view_emails.label'))
                 ->icon('heroicon-o-envelope')
                 ->color('gray')
+                ->visible(fn (): bool => Feature::active(EmailIntegration::class))
                 ->url(fn (): string => CompanyResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
@@ -160,6 +164,7 @@ final class ViewCompany extends ViewRecord
             PeopleRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
+            MeetingsRelationManager::class,
             ActivityLogRelationManager::class,
         ];
     }

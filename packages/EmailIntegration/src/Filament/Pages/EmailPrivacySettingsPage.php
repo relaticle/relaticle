@@ -87,7 +87,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     /** @var array<int, string> */
     public array $protected_domains = [];
 
-    public string $contact_creation_mode = 'bidirectional';
+    public string $contact_creation_mode = 'selective';
 
     public bool $auto_create_companies = true;
 
@@ -101,7 +101,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
         $this->default_email_sharing_tier = ($team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY)->value;
 
-        $this->contact_creation_mode = ($team->contact_creation_mode ?? ContactCreationMode::Bidirectional)->value;
+        $this->contact_creation_mode = ($team->contact_creation_mode ?? ContactCreationMode::Selective)->value;
         $this->auto_create_companies = $team->auto_create_companies;
 
         $rows = ProtectedRecipient::query()->where('team_id', $team->getKey())->get();

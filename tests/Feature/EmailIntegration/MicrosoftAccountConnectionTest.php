@@ -52,7 +52,7 @@ it('stores an azure connected account and flips calendar capability when Graph c
 
     expect($account->hasCalendar())->toBeTrue()
         ->and($account->capabilities['email'])->toBeTrue()
-        ->and($user->currentTeam->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Bidirectional);
+        ->and($user->currentTeam->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
 
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });

@@ -520,25 +520,23 @@ it('does not duplicate a person when the same address appears on multiple partic
     expect(People::where('team_id', $this->team->id)->where('name', 'Dup Person')->count())->toBe(1);
 });
 
-it('does not auto-create a person when Bidirectional and only one direction exists', function (): void {
-    $this->team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
+it('does not auto-create a person when Selective and the address has only inbound mail', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
 
-    // Only inbound email — no outbound yet
     $inboundEmail = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
 
     EmailParticipant::factory()->from()->create([
         'email_id' => $inboundEmail->getKey(),
-        'email_address' => 'bidirectional@partner.com',
+        'email_address' => 'inbound-only@partner.com',
     ]);
 
     $countBefore = People::where('team_id', $this->team->id)->count();
 
-    // Store first (no existing bidirectional history), then link the new email
     $newEmail = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
 
     EmailParticipant::factory()->from()->create([
         'email_id' => $newEmail->getKey(),
-        'email_address' => 'bidirectional@partner.com',
+        'email_address' => 'inbound-only@partner.com',
     ]);
 
     app(LinkEmailAction::class)->execute($newEmail);
@@ -546,27 +544,60 @@ it('does not auto-create a person when Bidirectional and only one direction exis
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
-it('auto-creates a person when Bidirectional and both directions exist', function (): void {
-    $this->team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
+it('auto-creates a person and company on the first outbound email in Selective mode', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::Selective,
+        'auto_create_companies' => true,
+    ]);
 
-    $address = 'bidirectional@bidirectional.com';
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
 
-    // Seed one inbound and one outbound email already in the system for this address
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'jane@acme.com',
+        'name' => 'Jane Prospect',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Jane Prospect')->exists())->toBeTrue()
+        ->and(Company::where('team_id', $this->team->id)->where('name', 'Acme')->exists())->toBeTrue();
+});
+
+it('creates a person in Selective mode when a teammate already sent to the address', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
+
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+    ]));
+
+    $address = 'shared@partner.com';
+
+    $teammateOutbound = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'direction' => EmailDirection::OUTBOUND,
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $teammateOutbound->getKey(),
+        'email_address' => $address,
+    ]);
+
     $inbound = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
-    EmailParticipant::factory()->from()->create(['email_id' => $inbound->getKey(), 'email_address' => $address]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $inbound->getKey(),
+        'email_address' => $address,
+        'name' => 'Shared Contact',
+    ]);
 
-    $outbound = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
-    EmailParticipant::factory()->to()->create(['email_id' => $outbound->getKey(), 'email_address' => $address]);
+    app(LinkEmailAction::class)->execute($inbound);
 
-    // Now link a third email — should trigger person creation because both directions exist
-    $newEmail = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
-    EmailParticipant::factory()->from()->create(['email_id' => $newEmail->getKey(), 'email_address' => $address, 'name' => 'Bidirectional Contact']);
-
-    $countBefore = People::where('team_id', $this->team->id)->count();
-
-    app(LinkEmailAction::class)->execute($newEmail);
-
-    expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore + 1);
+    expect(People::where('team_id', $this->team->id)->where('name', 'Shared Contact')->exists())->toBeTrue();
 });
 
 it('increments person email_count when linked', function (): void {

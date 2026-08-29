@@ -13,7 +13,7 @@ enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
 {
     case All = 'all';
 
-    case Bidirectional = 'bidirectional';
+    case Selective = 'selective';
 
     case None = 'none';
 
@@ -21,7 +21,7 @@ enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::All => __('filament/pages/email-privacy-settings.record_creation.modes.all.label'),
-            self::Bidirectional => __('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.label'),
+            self::Selective => __('filament/pages/email-privacy-settings.record_creation.modes.selective.label'),
             self::None => __('filament/pages/email-privacy-settings.record_creation.modes.none.label'),
         };
     }
@@ -30,7 +30,7 @@ enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::All => __('filament/pages/email-privacy-settings.record_creation.modes.all.description'),
-            self::Bidirectional => __('filament/pages/email-privacy-settings.record_creation.modes.bidirectional.description'),
+            self::Selective => __('filament/pages/email-privacy-settings.record_creation.modes.selective.description'),
             self::None => __('filament/pages/email-privacy-settings.record_creation.modes.none.description'),
         };
     }
@@ -39,13 +39,13 @@ enum ContactCreationMode: string implements HasDescription, HasIcon, HasLabel
     {
         return match ($this) {
             self::All => Heroicon::OutlinedUserGroup,
-            self::Bidirectional => Heroicon::OutlinedUserPlus,
+            self::Selective => Heroicon::OutlinedUserPlus,
             self::None => Heroicon::OutlinedNoSymbol,
         };
     }
 
     public function isRecommended(): bool
     {
-        return $this === self::Bidirectional;
+        return $this === self::Selective;
     }
-};
+}

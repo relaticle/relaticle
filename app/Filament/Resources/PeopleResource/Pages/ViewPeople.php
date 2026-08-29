@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
+use App\Features\EmailIntegration;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
@@ -20,6 +21,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
+use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
@@ -33,6 +35,7 @@ final class ViewPeople extends ViewRecord
                 ->label(__('filament/resources/person.pages.view.actions.view_emails.label'))
                 ->icon('heroicon-o-envelope')
                 ->color('gray')
+                ->visible(fn (): bool => Feature::active(EmailIntegration::class))
                 ->url(fn (): string => PeopleResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([

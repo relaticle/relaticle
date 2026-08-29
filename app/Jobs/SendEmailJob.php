@@ -78,7 +78,7 @@ final class SendEmailJob implements ShouldQueue
         /** @var Email|null $email */
         $email = Email::query()->find($this->emailId);
 
-        if ($email === null) {
+        if ($email === null || $email->status === EmailStatus::SENT) {
             return;
         }
 

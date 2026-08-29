@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\ActivityLog;
 
-enum AppEventPalette: string
+use Filament\Support\Contracts\HasIcon;
+use Filament\Support\Contracts\HasLabel;
+
+enum AppEventPalette: string implements HasIcon, HasLabel
 {
     case EmailSent = 'email_sent';
     case EmailReceived = 'email_received';
     case NoteCreated = 'note_created';
     case TaskCreated = 'task_created';
 
-    public function icon(): string
+    public function getIcon(): string
     {
         return match ($this) {
             self::EmailSent, self::EmailReceived => 'ri-mail-line',
@@ -20,7 +23,7 @@ enum AppEventPalette: string
         };
     }
 
-    public function label(): string
+    public function getLabel(): string
     {
         return (string) __("activity-log.events.{$this->value}.label");
     }
