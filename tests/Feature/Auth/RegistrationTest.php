@@ -253,3 +253,18 @@ it('renders each conversion event only for its own flag', function (): void {
     expect($html)->toContain("fathom.trackEvent('signup')")
         ->and($html)->not->toContain("trackEvent('workspace_created')");
 });
+
+it('shows the google button and hides microsoft when unconfigured on the register page', function (): void {
+    config()->set('services.microsoft.client_id', null);
+
+    $this->get(url()->getAppUrl('register'))
+        ->assertSee(__('auth.login.continue_with', ['provider' => 'Google']))
+        ->assertDontSee('Microsoft');
+});
+
+it('shows the microsoft button on the register page when configured', function (): void {
+    config()->set('services.microsoft.client_id', 'test-client');
+
+    $this->get(url()->getAppUrl('register'))
+        ->assertSee(__('auth.login.continue_with', ['provider' => 'Microsoft']));
+});
