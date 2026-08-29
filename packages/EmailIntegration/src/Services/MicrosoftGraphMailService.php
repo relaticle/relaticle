@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Services;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -150,31 +151,43 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         ], $attachments);
     }
 
-    public function initialBackfill(int $daysBack): array
+    public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
     {
         $http = $this->clientFactory->make($this->account);
 
-        $afterIso = now()->subDays($daysBack)->toIso8601String();
+        $nextUrl = $pageToken ?? $this->initialDeltaUrl($daysBack);
+
+        $response = $http->get($nextUrl)->throw()->json();
 
         $messageIds = [];
-        $deltaLink = '';
-        $nextUrl = self::MESSAGES_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
 
-        do {
-            $response = $http->get($nextUrl)->throw()->json();
-
-            foreach ($response['value'] ?? [] as $message) {
-                $messageIds[] = (string) $message['id'];
+        foreach ($response['value'] ?? [] as $message) {
+            if (isset($message['@removed'])) {
+                continue;
             }
 
-            $nextUrl = $response['@odata.nextLink'] ?? null;
-            $deltaLink = (string) ($response['@odata.deltaLink'] ?? $deltaLink);
-        } while ($nextUrl !== null);
+            $messageIds[] = (string) $message['id'];
+        }
 
-        return [
-            'message_ids' => collect($messageIds)->unique()->values(),
-            'cursor' => $deltaLink,
-        ];
+        $nextLink = $response['@odata.nextLink'] ?? null;
+        $deltaLink = $response['@odata.deltaLink'] ?? null;
+
+        return new MailBackfillPage(
+            messageIds: collect($messageIds)->unique()->values(),
+            nextPageToken: is_string($nextLink) && $nextLink !== '' ? $nextLink : null,
+            cursor: is_string($deltaLink) && $deltaLink !== '' ? $deltaLink : null,
+        );
+    }
+
+    private function initialDeltaUrl(?int $daysBack): string
+    {
+        if ($daysBack === null || $daysBack <= 0) {
+            return self::MESSAGES_DELTA;
+        }
+
+        $afterIso = now()->subDays($daysBack)->toIso8601String();
+
+        return self::MESSAGES_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
     }
 
     public function sendMessage(array $data): array

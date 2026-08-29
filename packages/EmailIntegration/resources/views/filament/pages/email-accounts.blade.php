@@ -14,7 +14,12 @@
         :heading="__('filament/pages/email-accounts.sections.connected.heading')"
         :description="new \Illuminate\Support\HtmlString(__('filament/pages/email-accounts.sections.connected.description', ['url' => route('policy.show')]))"
     >
-        <div class="space-y-3">
+        <div
+            class="space-y-3"
+            @if ($this->connectedAccounts->contains(fn ($account): bool => $account->isImportingHistory()))
+                wire:poll.5s="refreshAccounts"
+            @endif
+        >
             @foreach ($this->connectedAccounts as $account)
                 @php
                     $capabilities = collect([
@@ -44,11 +49,22 @@
 
                     <div class="flex shrink-0 items-center gap-2">
                         <x-filament::badge
-                            :color="$account->status->getColor()"
-                            :icon="$account->isActive() ? 'heroicon-m-bolt' : 'heroicon-m-exclamation-triangle'"
+                            :color="$account->isImportingHistory() ? 'warning' : $account->status->getColor()"
+                            :icon="$account->isImportingHistory() ? 'heroicon-m-arrow-path' : ($account->isActive() ? 'heroicon-m-bolt' : 'heroicon-m-exclamation-triangle')"
                             :title="$account->last_synced_at ? __('filament/pages/email-accounts.synced_at', ['time' => $account->last_synced_at->diffForHumans()]) : null"
                         >
-                            {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
+                            @if ($account->isImportingHistory())
+                                @if ($account->initial_sync_estimated)
+                                    {{ __('filament/pages/email-accounts.importing_progress', [
+                                        'imported' => number_format($account->initial_sync_imported),
+                                        'estimated' => number_format($account->initial_sync_estimated),
+                                    ]) }}
+                                @else
+                                    {{ __('filament/pages/email-accounts.importing_count', ['count' => number_format($account->initial_sync_imported)]) }}
+                                @endif
+                            @else
+                                {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
+                            @endif
                         </x-filament::badge>
 
                         {{ $this->accountActions($account->getKey(), $account->status, [$this->editSettingsAction()]) }}

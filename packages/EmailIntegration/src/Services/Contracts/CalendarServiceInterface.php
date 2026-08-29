@@ -9,7 +9,7 @@ use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
 
 interface CalendarServiceInterface
 {
-    public function initialSync(): CalendarSyncResult;
+    public function initialSync(?string $pageToken = null): CalendarSyncResult;
 
     /**
      * @throws CalendarSyncTokenExpired when Google invalidates the syncToken (HTTP 410)

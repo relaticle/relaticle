@@ -11,6 +11,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -29,6 +31,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
+        public readonly ?string $pageToken = null,
     ) {
         $this->onQueue('emails-sync');
     }
@@ -42,25 +45,37 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $service = $serviceFactory->make($account);
-        $result = $service->initialSync();
+        $result = $service->initialSync($this->pageToken);
 
-        foreach ($result->events as $event) {
-            dispatch(new StoreMeetingJob($account, $event));
+        if ($result->events === []) {
+            self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken);
+
+            return;
         }
 
-        $update = [
-            'last_calendar_synced_at' => now(),
-            'status' => EmailAccountStatus::ACTIVE,
-            'last_error' => null,
-        ];
+        $accountId = (int) $account->getKey();
+        $nextPageToken = $result->nextPageToken;
+        $nextSyncToken = $result->nextSyncToken;
 
-        // Never overwrite a good cursor with null: a missing sync token (partial/empty
-        // page) would otherwise force a full re-sync of the whole window on every run.
-        if ($result->nextSyncToken !== null) {
-            $update['calendar_sync_cursor'] = $result->nextSyncToken;
-        }
+        $jobs = array_map(
+            fn (CalendarEventData $event): StoreMeetingJob => new StoreMeetingJob($account, $event),
+            $result->events,
+        );
 
-        $account->update($update);
+        Bus::batch($jobs)
+            ->name("Initial calendar sync: {$account->email_address}")
+            ->onQueue('emails-sync')
+            ->allowFailures()
+            ->then(function () use ($accountId, $nextPageToken, $nextSyncToken): void {
+                $account = ConnectedAccount::query()->whereKey($accountId)->first();
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
+            })
+            ->dispatch();
     }
 
     public function failed(Throwable $exception): void
@@ -73,6 +88,30 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return "initial-calendar-sync-{$this->connectedAccount->getKey()}";
+        return 'initial-calendar-sync-'.$this->connectedAccount->getKey().'-'.hash('xxh3', $this->pageToken ?? 'start');
+    }
+
+    private static function continueOrFinish(
+        ConnectedAccount $account,
+        ?string $nextPageToken,
+        ?string $nextSyncToken,
+    ): void {
+        if ($nextPageToken !== null && $nextPageToken !== '') {
+            dispatch(new self($account, $nextPageToken));
+
+            return;
+        }
+
+        $update = [
+            'last_calendar_synced_at' => now(),
+            'status' => EmailAccountStatus::ACTIVE,
+            'last_error' => null,
+        ];
+
+        if ($nextSyncToken !== null && $nextSyncToken !== '') {
+            $update['calendar_sync_cursor'] = $nextSyncToken;
+        }
+
+        $account->update($update);
     }
 }

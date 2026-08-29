@@ -133,9 +133,14 @@ final class EmailAccountsPage extends Page
             ]));
     }
 
-    protected function afterAccountChanged(): void
+    public function refreshAccounts(): void
     {
         $this->connectedAccounts = $this->getAccounts();
+    }
+
+    protected function afterAccountChanged(): void
+    {
+        $this->refreshAccounts();
     }
 
     public function sendSuccessNotification(): void

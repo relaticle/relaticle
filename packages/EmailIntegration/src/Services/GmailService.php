@@ -10,6 +10,7 @@ use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartHeader;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -133,43 +134,41 @@ final readonly class GmailService implements MailServiceInterface
     }
 
     /**
-     * Get initial cursor and list of message IDs for backfill.
-     *
-     * @return array{message_ids: Collection<int, string>, cursor: string}
+     * Fetch one page of message IDs for the initial backfill.
      */
-    public function initialBackfill(int $daysBack): array
+    public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
     {
-        $after = now()->subDays($daysBack)->timestamp;
+        $cursor = null;
 
-        // Capture the cursor before listing so no message that arrives mid-pagination is missed.
-        $profile = $this->gmail->users->getProfile('me');
+        if ($pageToken === null) {
+            // Capture the cursor before listing so mail that arrives mid-backfill is not missed.
+            $profile = $this->gmail->users->getProfile('me');
+            $cursor = (string) $profile->getHistoryId();
+        }
 
-        $messageIds = collect();
-        $pageToken = null;
-
-        do {
-            $params = [
-                'q' => "after:$after",
-                'maxResults' => 500,
-            ];
-
-            if ($pageToken !== null) {
-                $params['pageToken'] = $pageToken;
-            }
-
-            $response = $this->gmail->users_messages->listUsersMessages('me', $params);
-
-            $messageIds = $messageIds->merge($this->pluckMessageIds($response->getMessages()));
-
-            $pageToken = $response->getNextPageToken();
-        } while ($pageToken !== null && $pageToken !== '');
-
-        $messageIds = $messageIds->unique()->values();
-
-        return [
-            'message_ids' => $messageIds,
-            'cursor' => (string) $profile->getHistoryId(),
+        $params = [
+            'maxResults' => 500,
         ];
+
+        if ($daysBack !== null && $daysBack > 0) {
+            $params['q'] = 'after:'.now()->subDays($daysBack)->timestamp;
+        }
+
+        if ($pageToken !== null && $pageToken !== '') {
+            $params['pageToken'] = $pageToken;
+        }
+
+        $response = $this->gmail->users_messages->listUsersMessages('me', $params);
+        $nextPageToken = $response->getNextPageToken();
+
+        $estimate = $pageToken === null ? $response->getResultSizeEstimate() : null;
+
+        return new MailBackfillPage(
+            messageIds: $this->pluckMessageIds($response->getMessages())->unique()->values(),
+            nextPageToken: ($nextPageToken !== null && $nextPageToken !== '') ? $nextPageToken : null,
+            cursor: $cursor,
+            estimatedTotal: is_numeric($estimate) ? (int) $estimate : null,
+        );
     }
 
     /**
