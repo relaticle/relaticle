@@ -202,11 +202,14 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Set up Node & NPM
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22.x'
-          cache: npm
+          cache: pnpm
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
@@ -217,7 +220,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Prepare Laravel
         run: |
@@ -225,18 +228,18 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      - name: Install NPM dependencies
-        run: npm ci
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build assets
-        run: npm run build
+        run: pnpm run build
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - name: Install Playwright system dependencies
-        run: npx playwright install-deps chromium
+        run: pnpm exec playwright install-deps chromium
         if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       - name: Browser Tests

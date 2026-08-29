@@ -449,7 +449,7 @@ cd /var/www/relaticle
 
 ```bash
 composer install --no-dev --optimize-autoloader
-npm ci && npm run build
+pnpm install --frozen-lockfile && pnpm run build
 ```
 
 3. Configure the environment:

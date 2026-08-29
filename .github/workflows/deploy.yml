@@ -105,10 +105,14 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Set up Node & NPM
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+          cache: pnpm
 
       - name: Setup Problem Matches
         run: |
@@ -118,25 +122,11 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
-      - name: Get NPM cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Cache dependencies
-        id: npm-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build dependencies
-        run: npm run build
+      - name: Build assets
+        run: pnpm run build
 
       - name: Prepare Laravel
         run: |
@@ -191,26 +181,17 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Set up Node & NPM
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22.x'
+          cache: pnpm
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
-
-      - name: Get NPM cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache NPM dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
 
       - name: Prepare Laravel
         run: |
@@ -218,14 +199,14 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      - name: Install NPM dependencies
-        run: npm ci
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build assets
-        run: npm run build
+        run: pnpm run build
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Browser Tests
         run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml
