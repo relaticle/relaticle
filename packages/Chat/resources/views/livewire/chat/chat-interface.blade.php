@@ -350,7 +350,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         this.beforeUnloadHandler = (e) => {
-            if (!this.isStreaming) return;
+            // A streaming turn is reload-safe (TurnPresence restores it), so
+            // only undelivered input warrants the prompt: a send the server
+            // has not accepted yet, or a message queued behind the stream.
+            const undelivered = this.queuedSend
+                || this.messages.some((m) => m.role === 'user' && m.sendState === 'sending');
+            if (!undelivered) return;
             // Browsers show their own generic prompt; custom strings are ignored.
             e.preventDefault();
             e.returnValue = '';
