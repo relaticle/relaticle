@@ -64,7 +64,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
 
         return new Data\CalendarSyncResult(
             events: $events,
-            nextSyncToken: is_string($nextSyncToken) && $nextSyncToken !== '' ? $nextSyncToken : null,
+            nextSyncToken: $nextSyncToken,
             nextPageToken: ($nextPageToken !== null && $nextPageToken !== '') ? $nextPageToken : null,
         );
     }
