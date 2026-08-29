@@ -55,4 +55,13 @@ final readonly class CompetitorFacts
 
         return $facts;
     }
+
+    // Read from the `ai` fact rather than a fresh literal, so no marketing surface
+    // can drift from the tool count the MCP server actually registers.
+    public static function mcpToolCount(): int
+    {
+        preg_match('/^(\d+)/', self::all()['relaticle']['ai'], $matches);
+
+        return (int) ($matches[1] ?? 0);
+    }
 }

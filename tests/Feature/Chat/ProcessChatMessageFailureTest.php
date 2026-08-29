@@ -291,7 +291,7 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
         team: $team,
         message: 'hello',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
         turnId: $turnId,
     );
 
@@ -339,7 +339,7 @@ it('does not fail over for an explicit model pick', function (): void {
         team: $team,
         message: 'hello',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'explicit'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
         turnId: $turnId,
     );
 
@@ -375,7 +375,7 @@ it('does not fail over once the stream has already broadcast an event', function
         team: $team,
         message: 'hello',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
         turnId: $turnId,
     );
 
@@ -413,7 +413,7 @@ it('refunds the reservation when the job dies before it ever runs', function ():
         team: $team,
         message: 'hello',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
         turnId: $turnId,
     );
 
@@ -448,7 +448,7 @@ it('reports a pre-model failure to the exception handler instead of only a bread
         team: $team,
         message: 'hello',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
     );
 

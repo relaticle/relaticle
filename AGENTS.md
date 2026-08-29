@@ -274,15 +274,14 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 ## Running the suite
 
-- `composer test:pest` — the normal local run (parallel, excludes Browser).
-- `composer test:pest:tia` — Pest's **experimental** test-impact-analysis mode.
-  Records a coverage-backed dependency graph once (~3x a normal run), then
-  replays unaffected tests instead of executing them, so a no-op run drops from
-  ~3 minutes to a few seconds. **Local accelerator only — never a merge gate.**
-  It replays a cached *pass* whenever a test's edges are unchanged, so it cannot
-  see time-dependent failures (`travelTo`, expiring tokens), `.env` edits, or
-  dynamic dispatch it did not trace while recording. Always confirm with
-  `composer test:pest` before pushing.
+- `composer test:pest` is the normal local run (parallel, TIA enabled, excludes
+  Browser). Pest records a coverage-backed dependency graph once, then replays
+  unaffected tests instead of executing them.
+- `composer test:pest:full` is the complete non-TIA merge gate.
+- TIA is a local accelerator only. It replays a cached pass whenever a test's
+  edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
+  expiring tokens), `.env` edits, or dynamic dispatch it did not trace while
+  recording. Always confirm with `composer test:pest:full` before pushing.
 - After changing test timings materially, refresh the CI shard balance with
   `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
   file silently drops new test classes out of time-balancing.
@@ -342,6 +341,24 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.
 
+## Issues and milestones
+
+- Milestones are **product themes, never releases**, and never carry a version
+  number. Releases are cut from merged PRs and land continuously, so a milestone
+  can never track a version: naming them `vX.Y` guaranteed drift, and it did.
+  `v3.5.0` shipped the chat rebuild and MCP work while the `v3.5` milestone held
+  one unstarted issue that did not ship.
+- The live themes are `Infrastructure & Data`, `Integration Platform`,
+  `User Experience`, `Billing & Monetization`, and `AI Intelligence`. Each carries
+  its scope in its GitHub description. Put a new issue in the theme it belongs to;
+  do not re-sync milestones with release tags.
+- Milestones carry no due dates. A theme is not time-boxed, and a permanently
+  overdue date trains everyone to ignore the field.
+- Every issue gets a milestone, an issue type (Bug, Feature, or Task), and a
+  Roadmap project status (default Todo). Ask which milestone before choosing one.
+  Issue type is set with the GraphQL `updateIssue` mutation and `issueTypeId`;
+  `gh issue edit` does not support it.
+
 ## External communication
 
 - PR/issue comments, Discord replies, and any other outbound text: show the
@@ -385,7 +402,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `pnpm run build`, `pnpm run dev`, or `composer run dev`. Ask them.
 
 ## Documentation Files
 
@@ -466,8 +483,10 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Test every code change by adding or updating a test.
+- Run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
 
 === laravel/core rules ===
 
@@ -483,7 +502,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `pnpm run build` or ask the user to run `pnpm run dev` or `composer run dev`.
 
 === pint/core rules ===
 

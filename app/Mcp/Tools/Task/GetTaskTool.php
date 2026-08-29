@@ -9,14 +9,10 @@ use App\Mcp\Tools\BaseShowTool;
 use App\Models\Task;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Get Task')]
 #[Description('Get a single task by ID with full details and relationships.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class GetTaskTool extends BaseShowTool
 {
     protected function modelClass(): string

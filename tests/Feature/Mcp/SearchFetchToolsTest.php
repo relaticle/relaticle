@@ -6,9 +6,11 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\SearchTool;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -32,7 +34,7 @@ it('searches across companies and people and returns canonical urls', function (
         ->assertOk()
         ->assertStructuredContent(function (AssertableJson $json) use ($base, $slug, $company): void {
             $json->has('results', 2)
-                ->has('results.0', fn (AssertableJson $row) => $row
+                ->has('results.0', fn (AssertableJson $row): AssertableJson => $row
                     // The workspace slug is what makes the URL openable in a browser;
                     // without it Filament answers 404 even for the record's owner.
                     ->where('url', "{$base}/app/{$slug}/companies/{$company->getKey()}")
@@ -68,7 +70,7 @@ it('fetches every url the search tool publishes', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(FetchTool::class, ['url' => $result['url']])
             ->assertOk()
-            ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
                 ->where('type', $result['type'])
                 ->etc());
     }
@@ -78,7 +80,70 @@ it('returns empty results for no matches', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(SearchTool::class, ['query' => 'ZZZnonexistent999'])
         ->assertOk()
-        ->assertStructuredContent(['results' => [], 'count' => 0]);
+        ->assertStructuredContent([
+            'results' => [],
+            'count' => 0,
+            'truncated' => [
+                'company' => false,
+                'person' => false,
+                'opportunity' => false,
+                'task' => false,
+                'note' => false,
+            ],
+        ]);
+});
+
+it('searches custom fields and treats wildcard characters literally', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Literal Match']);
+    $other = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Wildcard Decoy']);
+
+    $emails = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+
+    $person->saveCustomFieldValue($emails, ['sales_100%@example.com']);
+    $other->saveCustomFieldValue($emails, ['salesX1000@example.com']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'sales_100%'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 1)
+            ->where('results.0.title', 'Literal Match')
+            ->etc());
+});
+
+it('reports per-entity truncation and orders results deterministically', function (): void {
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Beta']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Alpha']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'Match', 'limit' => 1])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('results.0.title', 'Match Alpha')
+            ->where('truncated.person', true)
+            ->etc());
+});
+
+it('applies the current team predicate before limiting and truncating matches', function (): void {
+    $otherTeam = Team::factory()->create();
+
+    People::factory()->for($otherTeam)->create(['name' => 'Match Aardvark']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Zebra']);
+    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Match Zulu']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'Match', 'limit' => 1])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 1)
+            ->where('results.0.title', 'Match Zebra')
+            ->where('truncated.person', true)
+            ->etc());
 });
 
 it('fetches a company record by canonical url and returns the full payload', function (): void {

@@ -113,20 +113,6 @@ parameters:
         -
             identifier: app.architecture.eloquentWriteOutsideAction
             path: app/Livewire/App/Profile/UpdatePassword.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Mcp/Tools/Note/AttachNoteToEntitiesTool.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Mcp/Tools/Note/DetachNoteFromEntitiesTool.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Mcp/Tools/Task/AttachTaskToEntitiesTool.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Mcp/Tools/Task/DetachTaskFromEntitiesTool.php
-
-
     stubFiles:
         - stubs/Mailcoach.stub
 

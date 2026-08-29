@@ -16,6 +16,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class AiCreditTransactionsTable
 {
@@ -81,9 +82,14 @@ final class AiCreditTransactionsTable
                         DatePicker::make('from'),
                         DatePicker::make('until'),
                     ])
+                    /**
+                     * The picked dates are days on the administrator's calendar,
+                     * which is what the table renders too, so they widen to that
+                     * day's UTC bounds rather than being compared with whereDate.
+                     */
                     ->query(fn (Builder $query, array $data): Builder => $query
-                        ->when($data['from'] ?? null, fn (Builder $q, mixed $date): Builder => $q->whereDate('created_at', '>=', $date))
-                        ->when($data['until'] ?? null, fn (Builder $q, mixed $date): Builder => $q->whereDate('created_at', '<=', $date))),
+                        ->when($data['from'] ?? null, fn (Builder $q, mixed $date): Builder => $q->where('created_at', '>=', ViewerTime::startOfDayUtc((string) $date)))
+                        ->when($data['until'] ?? null, fn (Builder $q, mixed $date): Builder => $q->where('created_at', '<=', ViewerTime::endOfDayUtc((string) $date)))),
             ])
             ->recordActions([
                 ViewAction::make(),

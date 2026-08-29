@@ -5,24 +5,22 @@ declare(strict_types=1);
 namespace App\Mcp\Resources\Concerns;
 
 use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Services\ValidationService;
 
 trait ResolvesEntitySchema
 {
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    protected function resolveCustomFields(User $user, string $entityType): array
+    protected function resolveCustomFields(User $user, string $entityType): object
     {
         $teamId = $user->currentTeam->getKey();
-        $cacheKey = "custom_fields_schema_{$teamId}_{$entityType}";
+        $cacheKey = McpSchemaCache::entitySchemaKey($teamId, $entityType);
 
-        return Cache::remember($cacheKey, 60, function () use ($teamId, $entityType): array {
+        return (object) Cache::remember($cacheKey, McpSchemaCache::TTL, function () use ($teamId, $entityType): array {
             $fields = CustomField::query()
                 ->withoutGlobalScopes()
                 ->where('tenant_id', $teamId)
@@ -36,15 +34,12 @@ trait ResolvesEntitySchema
         });
     }
 
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    protected function resolveFilterableFields(User $user, string $entityType): array
+    protected function resolveFilterableFields(User $user, string $entityType): object
     {
-        return (new CustomFieldFilterSchema)->build($user, $entityType);
+        return (object) (new CustomFieldFilterSchema)->build($user, $entityType);
     }
 
-    private const CHOICE_TYPES = ['select', 'radio', 'multi_select', 'checkbox_list', 'tags'];
+    private const CHOICE_TYPES = ['select', 'radio', 'multi-select', 'checkbox-list', 'tags-input', 'toggle-buttons'];
 
     /**
      * @param  Collection<int, CustomField>  $fields
@@ -97,10 +92,11 @@ trait ResolvesEntitySchema
             'link' => ['format' => 'array of URL strings', 'example' => ['https://example.com']],
             'email' => ['format' => 'array of email strings', 'example' => ['user@example.com']],
             'phone' => ['format' => 'array of phone strings', 'example' => ['+1234567890']],
-            'select', 'radio' => ['format' => 'option ID string (see options)', 'example' => 'option-id-here'],
-            'multi_select', 'checkbox_list', 'tags' => ['format' => 'array of option ID strings', 'example' => ['option-id-1', 'option-id-2']],
+            'select', 'radio', 'toggle-buttons' => ['format' => 'option ID string (see options)', 'example' => 'option-id-here'],
+            'multi-select', 'checkbox-list' => ['format' => 'array of option ID strings', 'example' => ['option-id-1', 'option-id-2']],
+            'tags-input' => ['format' => 'array of arbitrary string values', 'example' => ['priority', 'customer']],
             'toggle' => ['format' => 'boolean', 'example' => true],
-            'date_time' => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],
+            'date-time' => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],
             'number' => ['format' => 'numeric value', 'example' => 42],
             'currency' => ['format' => 'numeric value (amount)', 'example' => 15000.00],
             default => null,

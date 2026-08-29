@@ -22,7 +22,7 @@ beforeEach(function (): void {
         'email' => 'founder@relaticle.com',
     ]);
     $this->admin->withAccessToken(new TransientToken);
-    $this->category = Category::create(['name' => 'Engineering']);
+    $this->category = Category::factory()->create(['name' => 'Engineering']);
 });
 
 it('creates a post authored by the matching user account', function (): void {

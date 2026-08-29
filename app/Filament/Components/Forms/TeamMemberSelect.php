@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Components\Forms;
 
+use App\Models\Team;
 use App\Models\User;
 use Closure;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -17,9 +19,10 @@ use Illuminate\Database\Eloquent\Builder;
  * TeamMembersContext and deliberately does not use this component, because the pin
  * lives in the relationship() override and there is no relationship there.
  *
- * Pins the acting user to the top of the list, then falls back to alphabetical.
- * Filament only applies its own alphabetical order when the query carries none
- * (Select.php:1151), so the injected order wins without fighting it.
+ * Restricts the option set to the current workspace, then pins the acting user to
+ * the top of the list and falls back to alphabetical. Filament only applies its own
+ * alphabetical order when the query carries none (Select.php:1151), so the injected
+ * order wins without fighting it.
  */
 final class TeamMemberSelect extends Select
 {
@@ -30,16 +33,48 @@ final class TeamMemberSelect extends Select
     private const string IS_CURRENT_USER_ALIAS = 'team_member_select_is_current_user';
 
     /**
-     * Orders the acting user first, then by name.
+     * Narrows a user query to the current workspace, then orders the acting user first.
      *
-     * auth()->id() is resolved when the query runs, not when the schema is built.
-     * Capturing it at build time would pin one user for every subsequent request.
+     * auth()->id() and the tenant are resolved when the query runs, not when the schema
+     * is built. Capturing either at build time would pin one user, or one workspace,
+     * for every subsequent request.
      *
      * @return Closure(Builder<User>): Builder<User>
      */
-    public static function currentUserFirst(): Closure
+    public static function currentTeamMembers(): Closure
     {
-        return self::orderByCurrentUserFirst(...);
+        return self::scopeToCurrentTeamMembers(...);
+    }
+
+    /**
+     * Both member relationships (Task::assignees() and the account-owner belongsTo)
+     * resolve to an unconstrained User query, so without this every registered user on
+     * the installation is a valid option. That is two defects, not one: the preloaded
+     * picker lists every user's name, and Filament builds its `in` validation rule from
+     * this same query (Select::getInValidationRuleValues()), so a hand-crafted Livewire
+     * payload naming any of them passes validation and is written to the record.
+     *
+     * Fails closed when no tenant is bound: an unscoped fallback here is the bug.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    private static function scopeToCurrentTeamMembers(Builder $query): Builder
+    {
+        $team = Filament::getTenant();
+
+        if (! $team instanceof Team) {
+            return self::orderByCurrentUserFirst($query->whereIn('users.id', []));
+        }
+
+        // The owner is not a `team_user` row, so membership is the pivot plus the owner,
+        // the same two sources App\Support\TenantFkValidator checks on the API side.
+        $query->where(function (Builder $members) use ($team): void {
+            $members->whereKey($team->user_id)
+                ->orWhereHas('teams', fn (Builder $teams): Builder => $teams->whereKey($team->getKey()));
+        });
+
+        return self::orderByCurrentUserFirst($query);
     }
 
     /**
@@ -78,9 +113,10 @@ final class TeamMemberSelect extends Select
     }
 
     /**
-     * currentUserFirst() is applied BEFORE the caller's modifier, so a caller
-     * adding its own orderBy becomes a secondary sort under the pin. A caller
-     * that must override the pin should use a plain Select instead.
+     * The workspace scope and the pin are applied BEFORE the caller's modifier, so a
+     * caller adding its own orderBy becomes a secondary sort under the pin, and a
+     * caller cannot widen the option set past the current workspace. A caller that
+     * must override the pin should use a plain Select instead.
      *
      * The caller's closure is routed through the component's own evaluate(),
      * with the same named `query`/`search` injections Filament itself passes
@@ -99,7 +135,7 @@ final class TeamMemberSelect extends Select
             $name,
             $titleAttribute,
             function (Builder $query, ?string $search) use ($modifyQueryUsing): Builder {
-                $query = self::orderByCurrentUserFirst($query);
+                $query = self::scopeToCurrentTeamMembers($query);
 
                 if (! $modifyQueryUsing instanceof Closure) {
                     return $query;

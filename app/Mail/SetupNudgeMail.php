@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
-use App\Filament\Pages\NotificationPreferences;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +18,6 @@ final class SetupNudgeMail extends Mailable implements ShouldQueue
 
     public function __construct(
         public User $user,
-        public Team $team,
         public string $stepKey,
         public string $conversationUrl,
     ) {}
@@ -39,10 +36,6 @@ final class SetupNudgeMail extends Mailable implements ShouldQueue
                 'stepLabel' => __("filament/pages/dashboard.activation.steps.{$this->stepKey}.label"),
                 'stepDescription' => __("filament/pages/dashboard.activation.steps.{$this->stepKey}.description"),
                 'conversationUrl' => $this->conversationUrl,
-                'manageSettingsUrl' => NotificationPreferences::getUrl(
-                    panel: 'app',
-                    tenant: $this->team,
-                ),
                 'companyName' => (string) config('relaticle.company.name'),
                 'companyAddress' => (string) config('relaticle.company.address'),
             ],

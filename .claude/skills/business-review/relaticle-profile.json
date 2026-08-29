@@ -12,7 +12,7 @@
   "panel_url_note": "Panels are path-routed under APP_URL unless APP_PANEL_DOMAIN/SYSADMIN_DOMAIN are set. Each Conductor workspace serves at its own https://<workspace>.test, so never assume relaticle.test — derive from config('app.url') per references/environment.md. Verified path-routed 2026-08-10 in workspace 'miami' (https://miami.test/app).",
   "commands": {
     "install": "composer install --no-interaction",
-    "build": "npm run build",
+    "build": "pnpm run build",
     "migrate": "php artisan migrate --force",
     "serve": "(herd, always-on)"
   },

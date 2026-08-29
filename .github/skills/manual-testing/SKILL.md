@@ -23,7 +23,7 @@ Skip rules (encoded in the script):
 1. `MANUAL_TESTING_SKIP=1` env var — hard override.
 2. Branch is `main`, `master`, or `release/*`.
 3. Diff is empty.
-4. Every path in the diff matches a trivial pattern: `*.md`, `*.txt`, `*.lock`, `*.gitignore`, `composer.lock`, `package-lock.json`, `yarn.lock`, `tests/**`.
+4. Every path in the diff matches a trivial pattern: `*.md`, `*.txt`, `*.lock`, `*.gitignore`, `composer.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `tests/**`.
 
 Additionally, **the skill itself** (not the script) must check the user's message in the current turn for `[skip-qa]`, `skip qa`, `no test`, or `dont test` BEFORE invoking the script. If found, exit with `SKIP user-request:<phrase>` logged to `.context/testing/reports/skipped.log`. The script handles env-var, branch, empty-diff, and trivial-path cases; the user-message gate is the skill's responsibility because the script has no access to chat context.
 

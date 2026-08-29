@@ -5,15 +5,12 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
-
-uses(LazilyRefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();

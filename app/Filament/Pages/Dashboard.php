@@ -75,6 +75,12 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $firstName = explode(' ', $user->name)[0];
 
+        // The browser reports its timezone only after the first render, so the
+        // local hour is unknown on the very first visit: greet without the clock.
+        if ($user->timezone === null) {
+            return __('Welcome, :name.', ['name' => $firstName]);
+        }
+
         $hour = Date::now($user->effectiveTimezone())->hour;
 
         return match (true) {
@@ -152,13 +158,25 @@ final class Dashboard extends Page
 
     private function configureCreateTaskAction(CreateAction $action): CreateAction
     {
+        /** @var array<int, string> $submittedAssigneeIds */
+        $submittedAssigneeIds = [];
+
         return $action
             ->model(Task::class)
             ->icon('heroicon-o-plus')
             ->slideOver()
             ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-            ->after(function (Task $record): void {
-                resolve(NotifyTaskAssignees::class)->execute($record);
+            ->before(function () use ($action, &$submittedAssigneeIds): void {
+                $submittedAssignees = $action->getRawData()['assignees'] ?? [];
+
+                if (! is_array($submittedAssignees)) {
+                    $submittedAssignees = [];
+                }
+
+                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
+            })
+            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
+                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
             });
     }
 }

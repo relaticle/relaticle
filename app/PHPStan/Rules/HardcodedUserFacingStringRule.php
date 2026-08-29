@@ -58,7 +58,7 @@ final readonly class HardcodedUserFacingStringRule implements Rule
 
         return [
             RuleErrorBuilder::message(sprintf(
-                'Hardcoded user-facing string in ->%s() — wrap in __() and add a key under lang/en/.',
+                'Hardcoded user-facing string in ->%s(): wrap in __() and add a key under lang/en/.',
                 $methodName,
             ))
                 ->identifier('app.i18n.hardcodedUserFacingString')

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,11 +13,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Tool;
 
 abstract class BaseUpdateTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasExplicitToolAnnotations;
+
+    protected function idempotentHint(): bool
+    {
+        return true;
+    }
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -54,7 +62,12 @@ abstract class BaseUpdateTool extends Tool
         );
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return ['data' => $schema->object()->required()];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('update')) instanceof Response) {
             return $denied;
@@ -63,10 +76,19 @@ abstract class BaseUpdateTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
+        // Read before validation runs, so anything but a scalar id is dropped here and
+        // reported by the `id` rule below rather than blowing up on the typed parameter.
+        $entityId = $request->get('id');
+
         $rules = array_merge(
             ['id' => ['required', 'string']],
             $this->entityRules($user),
-            new ValidCustomFields($user->currentTeam->getKey(), $this->entityType(), isUpdate: true)->toRules($request->get('custom_fields')),
+            new ValidCustomFields(
+                $user->currentTeam->getKey(),
+                $this->entityType(),
+                isUpdate: true,
+                ignoreEntityId: is_string($entityId) || is_int($entityId) ? $entityId : null,
+            )->toRules($request->get('custom_fields')),
         );
 
         $validated = $request->validate($rules);
@@ -90,8 +112,11 @@ abstract class BaseUpdateTool extends Tool
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();
 
-        return Response::text(
-            new $resourceClass($model->loadMissing('customFieldValues.customField.options'))->toJson(JSON_PRETTY_PRINT)
+        $payload = (array) json_decode(
+            new $resourceClass($model->loadMissing('customFieldValues.customField.options'))->toJson(),
+            flags: JSON_THROW_ON_ERROR,
         );
+
+        return Response::structured($payload);
     }
 }

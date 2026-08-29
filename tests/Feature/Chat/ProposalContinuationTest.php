@@ -6,7 +6,6 @@ use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -29,8 +28,6 @@ use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Tests\Helpers\AnthropicSse;
-
-uses(LazilyRefreshDatabase::class);
 
 mutates(TurnContinuationService::class);
 
@@ -242,7 +239,7 @@ it('clears the continuation flag when the resumed turn dies before it stores any
         team: $team,
         message: TurnContinuationService::PROMPT,
         conversationId: $this->convId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
         isContinuation: true,
     );
@@ -279,7 +276,7 @@ it('leaves the next job on the worker to store its own question as the user type
             team: $team,
             message: TurnContinuationService::PROMPT,
             conversationId: $this->convId,
-            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+            resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
             turnId: (string) Str::ulid(),
             isContinuation: true,
         ))->handle(resolve(CreditService::class));
@@ -293,7 +290,7 @@ it('leaves the next job on the worker to store its own question as the user type
         team: $team,
         message: 'What did we agree with Acme?',
         conversationId: $this->convId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
     ))->handle(resolve(CreditService::class));
 

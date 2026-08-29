@@ -4,7 +4,7 @@
      $persistSelection: whether picking a model writes chat:model to
      localStorage (the full chat persists, the dashboard does not). --}}
 currentPlan: @js(auth()->user()?->currentTeam?->plan?->value ?? \App\Enums\Plan::default()->value),
-currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->label() ?? \App\Enums\Plan::default()->label()),
+currentPlanLabel: @js(auth()->user()?->currentTeam?->plan?->getLabel() ?? \App\Enums\Plan::default()->getLabel()),
 {{-- Null when billing is off or no tenant is bound (tenant-less pages/tests):
      the locked-model hint then renders without a link. --}}
 upgradeUrl: @js(

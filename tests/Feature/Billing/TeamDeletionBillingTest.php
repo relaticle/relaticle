@@ -42,8 +42,8 @@ it('logs instead of throwing when stripe is unreachable for a live subscription'
         'quantity' => 1,
     ]);
 
-    // No real STRIPE_SECRET in tests → the Cashier cancel call throws → action logs and returns.
+    // Tests have no real STRIPE_SECRET, so the Cashier cancel call throws. The action logs and returns.
     app(CancelTeamSubscription::class)->execute($team);
 
     expect($team->fresh()->subscription()->stripe_status)->toBe('active');
-})->throwsNoExceptions();
+});

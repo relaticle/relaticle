@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Resources;
 
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
+use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use Laravel\Mcp\Request;
@@ -17,7 +18,7 @@ use Laravel\Mcp\Server\Resource;
 #[Description('Schema for opportunities including available custom fields. Read this before creating or updating opportunities.')]
 #[Uri('relaticle://schema/opportunity')]
 #[MimeType('application/json')]
-final class OpportunitySchemaResource extends Resource
+final class OpportunitySchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
 
@@ -39,7 +40,13 @@ final class OpportunitySchemaResource extends Resource
         /** @var User $user */
         $user = $request->user();
 
-        $schema = [
+        return Response::text(json_encode($this->toSchema($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    }
+
+    /** @return array<string, mixed> */
+    public function toSchema(User $user): array
+    {
+        return [
             'entity' => 'opportunity',
             'description' => 'Sales deals or business opportunities.',
             'fields' => [
@@ -49,14 +56,12 @@ final class OpportunitySchemaResource extends Resource
             ],
             'custom_fields' => $this->resolveCustomFields($user, 'opportunity'),
             'filterable_fields' => $this->resolveFilterableFields($user, 'opportunity'),
-            'relationships' => ['creator', 'company', 'contact'],
+            'relationships' => ['creator', 'company', 'contact', 'tasks', 'notes'],
             'aggregate_includes' => [
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
             'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators (eq, gt, gte, lt, lte, contains, in, has_any).',
         ];
-
-        return Response::text(json_encode($schema, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

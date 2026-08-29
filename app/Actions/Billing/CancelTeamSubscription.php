@@ -13,6 +13,12 @@ final readonly class CancelTeamSubscription
 {
     public function execute(Team $team, bool $immediately = false): void
     {
+        // Cashier's subscription() reads the relation off the model. Deletion
+        // paths arrive with a team that was never loaded with its subscriptions
+        // (DeleteUser walks owned teams, the purge command chunks them), which
+        // is both an N+1 and a strict-lazy-loading violation outside production.
+        $team->loadMissing('subscriptions');
+
         $subscription = $team->subscription();
 
         if (! $subscription instanceof Subscription || $subscription->ended()) {

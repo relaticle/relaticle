@@ -11,7 +11,5 @@
 
 <x-slot:subcopy>
 {{ $companyName }}@if($companyAddress !== '') · {{ $companyAddress }}@endif
-
-[Manage notification settings]({{ $manageSettingsUrl }})
 </x-slot:subcopy>
 </x-mail::message>

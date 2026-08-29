@@ -267,7 +267,7 @@ describe('custom field create via MCP', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
+            $section = CustomFieldSection::factory()->create([
                 'tenant_id' => $this->team->id,
                 'entity_type' => $entityType,
                 'name' => "MCP Test Section for {$entityType}",
@@ -277,7 +277,7 @@ describe('custom field create via MCP', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
+            CustomField::factory()->create([
                 'tenant_id' => $this->team->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,
@@ -362,7 +362,7 @@ describe('custom field update via MCP', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
+            $section = CustomFieldSection::factory()->create([
                 'tenant_id' => $this->team->id,
                 'entity_type' => $entityType,
                 'name' => "MCP Update Section for {$entityType}",
@@ -372,7 +372,7 @@ describe('custom field update via MCP', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
+            CustomField::factory()->create([
                 'tenant_id' => $this->team->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,
@@ -447,7 +447,7 @@ describe('custom field update via MCP', function () {
 // ---------------------------------------------------------------------------
 describe('partial custom_fields update preserves omitted fields', function () {
     beforeEach(function () {
-        $section = CustomFieldSection::create([
+        $section = CustomFieldSection::factory()->create([
             'tenant_id' => $this->team->id,
             'entity_type' => 'company',
             'name' => 'Partial Update Section',
@@ -457,7 +457,7 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'active' => true,
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
@@ -469,7 +469,7 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
@@ -481,7 +481,7 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
@@ -493,7 +493,7 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
@@ -615,7 +615,7 @@ describe('partial custom_fields update preserves omitted fields', function () {
 // ---------------------------------------------------------------------------
 describe('unknown custom field key rejection', function () {
     beforeEach(function () {
-        $section = CustomFieldSection::create([
+        $section = CustomFieldSection::factory()->create([
             'tenant_id' => $this->team->id,
             'entity_type' => 'company',
             'name' => 'Unknown Key Test Section',
@@ -625,7 +625,7 @@ describe('unknown custom field key rejection', function () {
             'active' => true,
         ]);
 
-        CustomField::create([
+        CustomField::factory()->create([
             'tenant_id' => $this->team->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
@@ -679,7 +679,7 @@ describe('custom field validation rejection', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
+            $section = CustomFieldSection::factory()->create([
                 'tenant_id' => $this->team->id,
                 'entity_type' => $entityType,
                 'name' => "Number Section for {$entityType}",
@@ -689,7 +689,7 @@ describe('custom field validation rejection', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
+            CustomField::factory()->create([
                 'tenant_id' => $this->team->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,

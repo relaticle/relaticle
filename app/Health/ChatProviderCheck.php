@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Health;
 
+use App\Enums\Plan;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Relaticle\Chat\Support\CatalogEntry;
 use Spatie\Health\Checks\Check;
 use Spatie\Health\Checks\Result;
 
@@ -128,42 +130,27 @@ final class ChatProviderCheck extends Check
      * per provider. Prefer the entry available on every plan — the one most
      * turns actually use — and fall back to the cheapest plan on offer.
      *
+     * `isServable()` is the same question every picker asks, so a model this
+     * check watches is exactly a model a user can land on. Self-hosted models are
+     * never in this catalog (ModelRegistry merges them from env), so there is
+     * nothing to exclude for them here.
+     *
      * @return array<string, string>
      */
     private static function reachableModels(): array
     {
-        /** @var Collection<int, array<string, mixed>> $models */
-        $models = new Collection(config('chat.models', []));
+        /** @var list<array<string, mixed>> $stored */
+        $stored = config('chat.models', []);
 
-        return $models
-            ->filter(static fn (array $entry): bool => self::isReachable($entry))
-            ->sortBy(static fn (array $entry): int => ($entry['min_plan'] ?? null) === 'free' ? 0 : 1)
-            ->groupBy('provider')
-            ->map(static fn (Collection $entries): string => (string) $entries->first()['model'])
+        return new Collection($stored)
+            ->map(static fn (array $entry): ?CatalogEntry => CatalogEntry::fromArray($entry))
+            ->filter(static fn (?CatalogEntry $entry): bool => $entry instanceof CatalogEntry
+                && $entry->isServable()
+                && filled(config("ai.providers.{$entry->provider}.key")))
+            ->sortBy(static fn (CatalogEntry $entry): int => $entry->minPlan === Plan::Free ? 0 : 1)
+            ->groupBy(static fn (CatalogEntry $entry): string => (string) $entry->provider)
+            ->map(static fn (Collection $entries): string => $entries->first()->model)
             ->all();
-    }
-
-    /**
-     * @param  array<string, mixed>  $entry
-     */
-    private static function isReachable(array $entry): bool
-    {
-        $provider = $entry['provider'] ?? null;
-        $model = $entry['model'] ?? null;
-
-        if (! is_string($provider) || ! is_string($model) || $model === '') {
-            return false;
-        }
-
-        if (($entry['self_hosted'] ?? false) === true) {
-            return false;
-        }
-
-        if (($entry['supports_tools'] ?? false) !== true) {
-            return false;
-        }
-
-        return filled(config("ai.providers.{$provider}.key"));
     }
 
     private function target(string $provider, string $model): self

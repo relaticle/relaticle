@@ -89,7 +89,7 @@ test('inviting keeps the admin on the members tab and refreshes the pending list
         ->assertDispatched('teamInvitationSent')
         ->assertSchemaStateSet([
             'email' => null,
-            'role' => null,
+            'role' => 'editor',
         ]);
 
     livewire(PendingTeamInvitations::class, ['team' => $this->team])

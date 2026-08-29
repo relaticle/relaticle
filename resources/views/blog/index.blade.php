@@ -79,7 +79,7 @@
             @else
                 <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
                     @foreach($posts as $post)
-                        <x-ink::post-card :post="$post" />
+                        <x-blog.post-card :post="$post" />
                     @endforeach
                 </div>
 

@@ -12,12 +12,10 @@ use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Update Note')]
 #[Description('Update an existing note in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class UpdateNoteTool extends BaseUpdateTool
 {
     protected function modelClass(): string

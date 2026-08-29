@@ -32,39 +32,30 @@ jobs:
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
       # composer audit has no severity threshold; fail on any reported advisory (>= low).
-      # Medium-and-up gating is applied to the npm side below.
+      # Medium-and-up gating is applied to the pnpm side below.
       - name: Run Composer Audit
         run: composer audit --locked --no-dev --ansi
 
-  npm-audit:
+  pnpm-audit:
     runs-on: ubuntu-latest
-    name: NPM Audit
+    name: pnpm Audit
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up Node & NPM
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22.x'
-
-      - name: Get NPM cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache NPM dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      # moderate == "medium" severity in npm's scale (info/low/moderate/high/critical).
-      - name: Run NPM Audit
-        run: npm audit --audit-level=moderate
+      # moderate == "medium" severity (info/low/moderate/high/critical).
+      - name: Run pnpm Audit
+        run: pnpm audit --audit-level=moderate

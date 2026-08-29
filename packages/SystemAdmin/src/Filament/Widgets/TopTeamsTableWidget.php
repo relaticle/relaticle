@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Enums\Plan;
+use App\Enums\BillingStatus;
 use App\Models\Team;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -18,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 /**
  * Ranks teams by the distinct records they worked on in the selected period,
@@ -39,6 +39,8 @@ final class TopTeamsTableWidget extends BaseWidget
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
+            ->description(ViewerTime::freshnessCaption())
+            ->poll('60s')
             ->columns([
                 TextColumn::make('name')
                     ->label('Team')
@@ -54,16 +56,11 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->color('primary')
                     ->url(fn (Team $record): ?string => $record->owner ? UserResource::getUrl('view', ['record' => $record->owner]) : null),
 
-                TextColumn::make('plan')
-                    ->label('Plan')
-                    ->badge()
-                    ->formatStateUsing(fn (Plan $state): string => $state->label())
-                    ->color(fn (Plan $state): string => match ($state) {
-                        Plan::Free => 'gray',
-                        Plan::Pro => 'success',
-                        Plan::Enterprise => 'primary',
-                    })
-                    ->sortable(),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                    ->badge(),
 
                 TextColumn::make('members_count')
                     ->label('Members')
@@ -104,9 +101,15 @@ final class TopTeamsTableWidget extends BaseWidget
                     ->since()
                     ->sortable(),
 
+                /**
+                 * A date-only column resolves its zone to config('app.timezone'),
+                 * not FilamentTimezone, so it has to name the viewer's zone to
+                 * agree with the relative column above it.
+                 */
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->date('M j, Y')
+                    ->timezone(fn (): string => ViewerTime::timezone())
                     ->sortable(),
             ])
             ->recordActions([
@@ -129,24 +132,34 @@ final class TopTeamsTableWidget extends BaseWidget
     private function buildQuery(): Builder
     {
         $days = (int) ($this->pageFilters['period'] ?? 30);
-        $end = CarbonImmutable::now();
-        $start = $end->subDays($days);
+        [$start, $end] = ViewerTime::periodUtc($days);
 
         $userMorphAlias = (new User)->getMorphClass();
 
+        /**
+         * `created_at` is a UTC-bearing `timestamp without time zone`, so it is
+         * relabelled as UTC before being shifted into the viewer's zone. Without
+         * that, two events either side of the viewer's midnight count as two
+         * active days for anyone who is not on UTC.
+         *
+         * Binding order follows the placeholders in the select list: the zone
+         * comes before the causer alias.
+         */
         $activity = DB::table('activity_log')
             ->selectRaw(<<<'SQL'
                 team_id,
                 COUNT(DISTINCT (subject_type, subject_id)) AS records_touched,
-                COUNT(DISTINCT created_at::date) AS active_days,
+                COUNT(DISTINCT (created_at AT TIME ZONE 'UTC' AT TIME ZONE ?)::date) AS active_days,
                 COUNT(DISTINCT causer_id) FILTER (WHERE causer_type = ?) AS active_members,
                 MAX(created_at) AS last_activity
-            SQL, [$userMorphAlias])
+            SQL, [ViewerTime::timezone(), $userMorphAlias])
             ->whereNotNull('team_id')
             ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
             ->groupBy('team_id');
 
         return Team::query()
+            // billingStatus() reads the subscriptions relation per row.
+            ->with('subscriptions')
             ->select([
                 'teams.*',
                 'activity.records_touched',

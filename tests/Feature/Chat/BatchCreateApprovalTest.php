@@ -7,7 +7,6 @@ use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +18,6 @@ use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
-
-uses(LazilyRefreshDatabase::class);
 
 mutates(PendingActionService::class);
 

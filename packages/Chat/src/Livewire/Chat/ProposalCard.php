@@ -95,9 +95,29 @@ final class ProposalCard extends BaseLivewireComponent
     /** @var array<string, mixed> */
     public array $data = [];
 
-    public function mount(string $context = 'conversation'): void
+    /**
+     * $initialPendingActionId lets the dock render its card in the same request
+     * that renders the page, instead of empty-until-set-active: the client's
+     * init dispatch of proposal:set-active still runs and re-anchors moments
+     * later, so a stale or wrong id self-corrects. loadStep() scopes it to the
+     * authed user, so the value can only ever name a proposal of their own.
+     */
+    public function mount(string $context = 'conversation', ?string $initialPendingActionId = null): void
     {
         $this->context = $context;
+
+        if ($initialPendingActionId === null) {
+            return;
+        }
+
+        $pendingAction = $this->loadStep($initialPendingActionId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $this->pendingActionId = (string) $pendingAction->getKey();
+        $this->focusFirstPendingStep($pendingAction);
     }
 
     public function form(Schema $schema): Schema
@@ -1606,7 +1626,7 @@ final class ProposalCard extends BaseLivewireComponent
      * from the record's clean action_data so each owned/editable row carries a
      * `code`. Carried-forward relationship rows stay code-less (read-only). The
      * rebuild is byte-for-byte the stored display because applyEdit re-renders
-     * with the same builder — see ProposalCardComponentTest's no-divergence test.
+     * with the same builder. See ProposalCardEditingTest's no-divergence test.
      *
      * @return list<array<string, mixed>>
      */

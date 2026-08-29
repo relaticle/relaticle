@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Resources;
 
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
+use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use Laravel\Mcp\Request;
@@ -17,7 +18,7 @@ use Laravel\Mcp\Server\Resource;
 #[Description('Schema for notes including available custom fields. Read this before creating or updating notes.')]
 #[Uri('relaticle://schema/note')]
 #[MimeType('application/json')]
-final class NoteSchemaResource extends Resource
+final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
 
@@ -39,7 +40,13 @@ final class NoteSchemaResource extends Resource
         /** @var User $user */
         $user = $request->user();
 
-        $schema = [
+        return Response::text(json_encode($this->toSchema($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    }
+
+    /** @return array<string, mixed> */
+    public function toSchema(User $user): array
+    {
+        return [
             'entity' => 'note',
             'description' => 'Free-form notes attached to CRM records.',
             'fields' => [
@@ -70,7 +77,5 @@ final class NoteSchemaResource extends Resource
             ],
             'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys.',
         ];
-
-        return Response::text(json_encode($schema, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

@@ -3,15 +3,21 @@
 declare(strict_types=1);
 
 use App\Actions\Task\CompleteTask;
+use App\Actions\Task\NotifyTaskAssignees;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
+use App\Mail\TaskAssignedMail;
+use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Models\CustomFieldValue;
+
+mutates(CompleteTask::class, Dashboard::class, NotifyTaskAssignees::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -65,6 +71,54 @@ it('mounts the createTask action on the page', function (): void {
 
     livewire(Dashboard::class)
         ->assertActionExists('createTask');
+});
+
+it('notifies only the assignees submitted through the dashboard create action', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $intendedAssignee = User::factory()->create([
+        'notification_preferences' => ['task_assigned' => ['email' => true]],
+    ]);
+    $concurrentAssignee = User::factory()->create([
+        'notification_preferences' => ['task_assigned' => ['email' => true]],
+    ]);
+    $team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    $concurrentAssignmentAdded = false;
+    DB::listen(function (QueryExecuted $query) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {
+        if ($concurrentAssignmentAdded || ! str_contains($query->sql, 'insert into "task_user"')) {
+            return;
+        }
+
+        $taskId = DB::table('tasks')->where('title', 'Dashboard notification race')->value('id');
+
+        if (! is_string($taskId)) {
+            return;
+        }
+
+        $concurrentAssignmentAdded = true;
+        DB::table('task_user')->insert([
+            'task_id' => $taskId,
+            'user_id' => $concurrentAssignee->id,
+        ]);
+    });
+
+    livewire(Dashboard::class)
+        ->callAction('createTask', data: [
+            'title' => 'Dashboard notification race',
+            'assignees' => [$intendedAssignee->id],
+        ])
+        ->assertHasNoActionErrors();
+
+    defer()->invoke();
+
+    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($intendedAssignee->email));
+    Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
 });
 
 it('completes a task from the dashboard and drops it from the list', function (): void {

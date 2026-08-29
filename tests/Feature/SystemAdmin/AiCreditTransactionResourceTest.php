@@ -14,7 +14,8 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 mutates(AiCreditTransactionResource::class);
 
 beforeEach(function (): void {
-    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    $this->admin = SystemAdministrator::factory()->create();
+    $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 });
 
@@ -66,4 +67,19 @@ it('renders a reservation-type transaction without crashing (regression: unhandl
 
     livewire(ViewAiCreditTransaction::class, ['record' => $reservation->getKey()])
         ->assertSuccessful();
+});
+
+it('filters transactions by the date range on the administrator calendar, not the server one', function (): void {
+    $this->admin->forceFill(['timezone' => 'Asia/Yerevan'])->save();
+    $this->actingAs($this->admin->refresh(), 'sysadmin');
+
+    // 01:30 on Jun 10 in Yerevan, still Jun 9 on the server.
+    $justInside = AiCreditTransaction::factory()->create(['created_at' => '2026-06-09 21:30:00']);
+    // 01:30 on Jun 21 in Yerevan, still Jun 20 on the server.
+    $justOutside = AiCreditTransaction::factory()->create(['created_at' => '2026-06-20 21:30:00']);
+
+    livewire(ListAiCreditTransactions::class)
+        ->filterTable('date_range', ['from' => '2026-06-10', 'until' => '2026-06-20'])
+        ->assertCanSeeTableRecords([$justInside])
+        ->assertCanNotSeeTableRecords([$justOutside]);
 });

@@ -54,7 +54,7 @@ test('pending invitations are cancelled when team deletion is scheduled', functi
 
     resolve(ScheduleTeamDeletion::class)->schedule($user, $team);
 
-    expect($team->refresh()->teamInvitations)->toHaveCount(0);
+    expect($team->refresh()->teamInvitations)->toBeEmpty();
 });
 
 test('personal team cannot be directly scheduled for deletion', function () {

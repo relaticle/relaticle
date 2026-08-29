@@ -7,17 +7,14 @@ namespace App\Mcp\Tools\Task;
 use App\Actions\Task\ListTasks;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseListTool;
+use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('List Tasks')]
 #[Description('List tasks in the CRM with optional search and pagination.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class ListTasksTool extends BaseListTool
 {
     protected function actionClass(): string
@@ -54,6 +51,18 @@ final class ListTasksTool extends BaseListTool
             'company_id' => $request->get('company_id'),
             'people_id' => $request->get('people_id'),
             'opportunity_id' => $request->get('opportunity_id'),
+        ];
+    }
+
+    protected function additionalValidationRules(User $user): array
+    {
+        return [
+            'assigned_to_me' => ['sometimes', 'boolean'],
+            'assignee_ids' => ['sometimes', 'array', 'list', 'max:100'],
+            'assignee_ids.*' => ['string', 'ulid', 'distinct'],
+            'company_id' => ['sometimes', 'string', 'ulid'],
+            'people_id' => ['sometimes', 'string', 'ulid'],
+            'opportunity_id' => ['sometimes', 'string', 'ulid'],
         ];
     }
 }

@@ -199,8 +199,8 @@ it('truncates a label or prompt the model wrote too long for the strip', functio
 
     $steps = persistedNextSteps($messageId);
 
-    expect(mb_strlen($steps[0]['label']))->toBe(48)
-        ->and(mb_strlen($steps[0]['prompt']))->toBe(160);
+    expect($steps[0]['label'])->toHaveLength(48)
+        ->and($steps[0]['prompt'])->toHaveLength(160);
 });
 
 it('writes nothing when the model offers no steps', function (): void {
@@ -307,7 +307,7 @@ it('dispatches the suggester at the end of a turn with what the turn produced', 
         team: $this->team,
         message: 'how is acme doing',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     ))->handle(resolve(CreditService::class));
 
     Queue::assertPushed(
@@ -337,7 +337,7 @@ it('offers no steps on a turn that ends waiting for a decision', function (): vo
         team: $this->team,
         message: 'create a task to call acme',
         conversationId: $this->conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     ))->handle(resolve(CreditService::class));
 
     expect(PendingAction::query()->where('conversation_id', $this->conversationId)

@@ -29,6 +29,17 @@ beforeEach(function () {
     Filament::setTenant($this->team);
 });
 
+test('an invite with only an email defaults to the editor role', function () {
+    livewire(AddTeamMember::class, ['team' => $this->team])
+        ->assertFormSet(['role' => 'editor'])
+        ->fillForm(['email' => 'default-role@example.com'])
+        ->call('addTeamMember', $this->team);
+
+    $invitation = $this->team->fresh()->teamInvitations->sole();
+    expect($invitation->email)->toBe('default-role@example.com')
+        ->and($invitation->role)->toBe('editor');
+});
+
 test('team members can be invited to team', function () {
     livewire(AddTeamMember::class, ['team' => $this->team])
         ->fillForm([
@@ -75,7 +86,7 @@ test('team member invitations can be revoked', function () {
     livewire(PendingTeamInvitations::class, ['team' => $this->team])
         ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation));
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 test('team members cannot be invited with a disposable email address', function () {
@@ -87,7 +98,7 @@ test('team members cannot be invited with a disposable email address', function 
         ->call('addTeamMember', $this->team)
         ->assertNotified(__('validation.indisposable'));
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 test('invite returns the created invitation', function () {
@@ -130,7 +141,7 @@ test('the chat adapter action rejects an invitation for an existing team member'
         ['email' => $member->email, 'role' => TeamRole::Editor->value],
     ))->toThrow(ValidationException::class);
 
-    expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
+    expect($this->team->fresh()->teamInvitations)->toBeEmpty();
 });
 
 /**
