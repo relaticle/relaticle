@@ -6,7 +6,6 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
-use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
 use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
@@ -30,7 +29,6 @@ it('renders the cluster breadcrumb trail on every email settings page', function
 })->with([
     [EmailSignaturesPage::class, 'Signatures'],
     [ManageEmailTemplates::class, 'Templates'],
-    [EmailPrivacySettingsPage::class, 'Workspace Privacy'],
     [UserEmailPrivacyPage::class, 'My Email Privacy'],
     [EmailAccessRequestsPage::class, 'Access Requests'],
 ]);

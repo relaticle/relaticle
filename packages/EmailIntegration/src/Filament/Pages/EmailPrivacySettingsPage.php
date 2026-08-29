@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 
 use App\Enums\TeamRole;
 use App\Features\EmailIntegration;
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -21,13 +22,11 @@ use Filament\Schemas\Schema;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
-    use HasClusterBreadcrumbs;
+    use HasWorkspaceSettingsNavigation;
     use InteractsWithSchemas;
 
     /**
@@ -56,32 +55,25 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
             && ($user->ownsTeam($team) || $user->hasTeamRole($team, TeamRole::Admin->value));
     }
 
-    protected string $view = 'email-integration::filament.pages.email-privacy-settings';
+    protected string $view = 'email-integration::filament.pages.workspace-email-settings';
 
-    protected static ?string $cluster = EmailSettings::class;
-
-    protected static ?string $slug = 'privacy';
+    protected static ?string $slug = 'team/email';
 
     protected static ?string $title = null;
 
-    protected static ?int $navigationSort = 4;
-
-    /**
-     * Blank so the stock full-width header is not rendered: the page view carries its
-     * own `<x-email-integration::cluster-header />` inside the content column.
-     */
-    protected ?string $heading = '';
-
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public function getTitle(): string
     {
-        return __('filament/pages/email-privacy-settings.title');
+        return __('teams.tabs.email');
     }
 
-    public static function getNavigationLabel(): string
+    public static function getLabel(): string
     {
-        return __('filament/pages/email-privacy-settings.navigation_label');
+        return __('teams.tabs.email');
     }
 
     public string $default_email_sharing_tier = 'metadata_only';

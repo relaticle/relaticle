@@ -35,9 +35,11 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property CreationSource $creation_source
  * @property Carbon|null $last_email_at
  * @property Carbon|null $last_interaction_at
+ * @property Carbon|null $last_meeting_at
  * @property int $email_count
  * @property int $inbound_email_count
  * @property int $outbound_email_count
+ * @property int $meeting_count
  */
 #[ObservedBy(PeopleObserver::class)]
 #[Fillable([
@@ -80,6 +82,7 @@ final class People extends Model implements HasCustomFields, HasTimeline
             'creation_source' => CreationSource::class,
             'last_email_at' => 'datetime',
             'last_interaction_at' => 'datetime',
+            'last_meeting_at' => 'datetime',
         ];
     }
 
@@ -114,7 +117,7 @@ final class People extends Model implements HasCustomFields, HasTimeline
                 'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
                 'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
-                'outbound_email_count', 'meeting_count', 'last_meeting_at',
+                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'company_id',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
