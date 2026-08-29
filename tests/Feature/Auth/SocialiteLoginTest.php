@@ -183,10 +183,9 @@ test('callback does not flag the signup event when the OAuth user already exists
 });
 
 test('redirect to microsoft provider', function () {
-    Socialite::fake(SocialiteProvider::MICROSOFT->value);
-
-    $this->get(route('auth.socialite.redirect', ['provider' => 'microsoft']))
-        ->assertRedirect();
+    $this->get(route('auth.socialite.redirect', ['provider' => SocialiteProvider::MICROSOFT->value]))
+        ->assertRedirectContains('login.microsoftonline.com/common/oauth2/v2.0/authorize')
+        ->assertRedirectContains('redirect_uri='.urlencode(url('/auth/callback/microsoft')));
 });
 
 test('microsoft callback creates a user', function () {
