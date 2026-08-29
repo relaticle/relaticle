@@ -7,6 +7,7 @@
                 <pattern id="dots-top" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#6B7280"/></pattern>
                 <rect width="100%" height="100%" fill="url(#dots-top)"/>
             </svg>
+            <x-marketing.interactive-dot-grid-glow/>
             <div class="absolute inset-0 bg-gradient-to-b from-transparent to-white dark:to-gray-950"></div>
         </div>
         @foreach([['left', 'br'], ['right', 'bl']] as [$side, $dir])
@@ -15,6 +16,7 @@
                     <pattern id="dots-{{ $side }}" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#6B7280"/></pattern>
                     <rect width="100%" height="100%" fill="url(#dots-{{ $side }})"/>
                 </svg>
+                <x-marketing.interactive-dot-grid-glow/>
                 <div class="absolute inset-0 bg-gradient-to-{{ $dir }} from-transparent via-white/50 to-white dark:via-gray-950/50 dark:to-gray-950"></div>
             </div>
         @endforeach
