@@ -39,11 +39,18 @@ final readonly class DocsJsonLd
 
     private function articleNode(DocPage $page, string $url): Article
     {
+        $publisher = Schema::organization()
+            ->name((string) config('app.name'))
+            ->url(url('/'))
+            ->logo(asset('web-app-manifest-512x512.png'));
+
         $article = Schema::article()
             ->headline($page->title)
             ->description($page->description)
             ->mainEntityOfPage($url)
-            ->url($url);
+            ->url($url)
+            ->author($publisher)
+            ->publisher($publisher);
 
         return $page->updated instanceof CarbonImmutable
             ? $article->dateModified($page->updated)
