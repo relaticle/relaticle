@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 
 /**
  * @extends Factory<Team>
@@ -28,6 +29,8 @@ final class TeamFactory extends Factory
             'user_id' => User::factory(),
             'personal_team' => true,
             'plan' => Plan::default()->value,
+            'contact_creation_mode' => ContactCreationMode::Bidirectional,
+            'auto_create_companies' => true,
         ];
     }
 

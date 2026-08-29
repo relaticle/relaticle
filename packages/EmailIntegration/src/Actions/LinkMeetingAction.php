@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -43,7 +44,7 @@ final readonly class LinkMeetingAction
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
-                if (! $company && $account?->auto_create_companies) {
+                if (! $company && $team?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -62,7 +63,7 @@ final readonly class LinkMeetingAction
                 )
                 ->first();
 
-            if (! $person && $account && $this->shouldCreatePerson($account, $attendee->email_address, $meeting)) {
+            if (! $person && $account && $team && $this->shouldCreatePerson($team, $account, $attendee->email_address, $meeting)) {
                 $person = $this->autoCreatePerson->execute(
                     $attendee->name ?? '',
                     $attendee->email_address,
@@ -95,9 +96,9 @@ final readonly class LinkMeetingAction
         }
     }
 
-    private function shouldCreatePerson(ConnectedAccount $account, string $emailAddress, Meeting $currentMeeting): bool
+    private function shouldCreatePerson(Team $team, ConnectedAccount $account, string $emailAddress, Meeting $currentMeeting): bool
     {
-        return match ($account->contact_creation_mode) {
+        return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
             ContactCreationMode::Bidirectional => $this->hasPriorMeetingWith($account, $emailAddress, $currentMeeting),
             ContactCreationMode::None => false,

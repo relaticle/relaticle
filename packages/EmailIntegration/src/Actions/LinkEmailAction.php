@@ -60,7 +60,7 @@ final readonly class LinkEmailAction
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
                 // 2. Auto-create Company when no existing record found.
-                if (! $company && ! $isAutomatedSender && $connectedAccount?->auto_create_companies) {
+                if (! $company && ! $isAutomatedSender && $team?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -85,7 +85,7 @@ final readonly class LinkEmailAction
                 ->first();
 
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && $connectedAccount && $this->shouldCreatePerson($connectedAccount, $participant->email_address)) {
+            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $connectedAccount, $participant->email_address)) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -128,16 +128,16 @@ final readonly class LinkEmailAction
 
     /**
      * Determine whether a new Person should be created for the given email address,
-     * based on the account's contact_creation_mode setting.
+     * based on the workspace contact_creation_mode setting.
      *
      * - All:           always create when the address is unknown
      * - Bidirectional: only create when the connected account has exchanged email in
      *                  BOTH directions with this address
-     * - None:          never create (default)
+     * - None:          never create
      */
-    private function shouldCreatePerson(ConnectedAccount $account, string $emailAddress): bool
+    private function shouldCreatePerson(Team $team, ConnectedAccount $account, string $emailAddress): bool
     {
-        return match ($account->contact_creation_mode) {
+        return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
             ContactCreationMode::Bidirectional => $this->hasBidirectionalHistory($account, $emailAddress),
             ContactCreationMode::None => false,

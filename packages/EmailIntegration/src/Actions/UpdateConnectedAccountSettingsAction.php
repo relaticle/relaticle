@@ -16,8 +16,6 @@ final readonly class UpdateConnectedAccountSettingsAction
         $account->update([
             'sync_inbox' => $data['sync_inbox'],
             'sync_sent' => $data['sync_sent'],
-            'contact_creation_mode' => $data['contact_creation_mode'],
-            'auto_create_companies' => $data['auto_create_companies'],
             'hourly_send_limit' => filled($data['hourly_send_limit'] ?? null) ? (int) $data['hourly_send_limit'] : null,
             'daily_send_limit' => filled($data['daily_send_limit'] ?? null) ? (int) $data['daily_send_limit'] : null,
         ]);

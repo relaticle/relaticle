@@ -39,8 +39,8 @@ it('matches an existing person by email custom-field value', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
+    $team->update(['contact_creation_mode' => ContactCreationMode::None]);
 
     $person = People::factory()->for($team)->create();
     savePersonEmail($person, 'guest@acme.com');
@@ -82,8 +82,8 @@ it('auto-creates a person when contact_creation_mode=All', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
-        'contact_creation_mode' => ContactCreationMode::All,
     ]));
+    $team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
@@ -109,8 +109,8 @@ it('skips person creation when contact_creation_mode=None', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
-        'contact_creation_mode' => ContactCreationMode::None,
     ]));
+    $team->update(['contact_creation_mode' => ContactCreationMode::None]);
 
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
@@ -135,8 +135,8 @@ it('requires prior meeting with the address for Bidirectional mode', function ()
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
-        'contact_creation_mode' => ContactCreationMode::Bidirectional,
     ]));
+    $team->update(['contact_creation_mode' => ContactCreationMode::Bidirectional]);
 
     // First meeting — no existing prior → skipped
     $m1 = Meeting::factory()->create(['team_id' => $account->team_id, 'connected_account_id' => $account->getKey()]);
@@ -164,9 +164,11 @@ it('increments meeting_count metrics on matched records', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
+    ]));
+    $team->update([
         'contact_creation_mode' => ContactCreationMode::All,
         'auto_create_companies' => true,
-    ]));
+    ]);
 
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
@@ -194,9 +196,11 @@ it('does not double-count metrics when a meeting is re-linked on re-sync', funct
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
+    ]));
+    $team->update([
         'contact_creation_mode' => ContactCreationMode::All,
         'auto_create_companies' => true,
-    ]));
+    ]);
 
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
@@ -225,9 +229,11 @@ it('never regresses last_meeting_at when an older meeting is linked after a newe
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
+    ]));
+    $team->update([
         'contact_creation_mode' => ContactCreationMode::All,
         'auto_create_companies' => true,
-    ]));
+    ]);
 
     $recent = Meeting::factory()->create([
         'team_id' => $account->team_id,

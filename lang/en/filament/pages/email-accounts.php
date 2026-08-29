@@ -34,14 +34,6 @@ return [
             'label' => 'Sync sent',
             'helper_text' => 'Sync emails you send from this account.',
         ],
-        'contact_creation_mode' => [
-            'label' => 'Auto-create contacts',
-            'helper_text' => 'When to create Person records from participants.',
-        ],
-        'auto_create_companies' => [
-            'label' => 'Auto-create companies',
-            'helper_text' => 'Creates companies from business domains only.',
-        ],
         'hourly_send_limit' => [
             'label' => 'Hourly send limit',
             'placeholder' => 'Default: :default',

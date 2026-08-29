@@ -16,7 +16,7 @@ use Relaticle\EmailIntegration\Models\MeetingAttendee;
 mutates(LinkMeetingAction::class);
 
 it('auto-links a meeting to a company by attendee email domain', function (): void {
-    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create(['auto_create_companies' => true]));
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
         'connected_account_id' => $account->getKey(),
@@ -36,7 +36,7 @@ it('auto-links a meeting to a company by attendee email domain', function (): vo
 });
 
 it('skips company creation for public domains', function (): void {
-    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create(['auto_create_companies' => true]));
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
         'connected_account_id' => $account->getKey(),
@@ -61,8 +61,8 @@ it('does not downgrade an existing manual company link to auto', function (): vo
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $team->id,
         'user_id' => $user->id,
-        'auto_create_companies' => false,
     ]));
+    $team->update(['auto_create_companies' => false]);
 
     $domainsField = CustomField::query()
         ->where('tenant_id', $account->team_id)

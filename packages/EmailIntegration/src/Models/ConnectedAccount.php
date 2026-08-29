@@ -19,7 +19,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
@@ -39,8 +38,6 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property string $access_token
  * @property string|null $refresh_token
  * @property Carbon|null $token_expires_at
- * @property ContactCreationMode $contact_creation_mode
- * @property bool $auto_create_companies
  * @property int|null $hourly_send_limit
  * @property int|null $daily_send_limit
  */
@@ -77,8 +74,6 @@ final class ConnectedAccount extends Model
         'last_error',
         'sync_inbox',
         'sync_sent',
-        'contact_creation_mode',
-        'auto_create_companies',
         'daily_send_limit',
         'hourly_send_limit',
     ];
@@ -92,8 +87,6 @@ final class ConnectedAccount extends Model
         'is_default' => 'boolean',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
-        'contact_creation_mode' => ContactCreationMode::class,
-        'auto_create_companies' => 'boolean',
         'capabilities' => 'array',
         'access_token' => 'encrypted',
         'refresh_token' => 'encrypted',
