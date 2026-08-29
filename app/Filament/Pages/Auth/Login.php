@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Concerns\DetectsTeamInvitation;
+use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -19,13 +20,16 @@ use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\Locked;
 
 final class Login extends \Filament\Auth\Pages\Login
 {
     use DetectsTeamInvitation;
 
+    #[Locked]
     public ?string $authMethod = null;
 
+    #[Locked]
     public bool $passkeyUserHasPassword = false;
 
     public function content(Schema $schema): Schema
@@ -70,17 +74,26 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         $email = mb_strtolower(trim((string) ($this->form->getState()['email'] ?? '')));
 
-        $key = 'login-discover:'.$email.'|'.request()->ip();
+        $ipKey = 'login-discover-ip:'.request()->ip();
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
+        if (RateLimiter::tooManyAttempts($ipKey, 20)) {
             throw ValidationException::withMessages([
-                'data.email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($key)]),
+                'data.email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($ipKey)]),
             ]);
         }
 
-        RateLimiter::hit($key, 60);
+        $emailKey = 'login-discover:'.$email.'|'.request()->ip();
 
-        $user = User::query()->where('email', $email)->first();
+        if (RateLimiter::tooManyAttempts($emailKey, 5)) {
+            throw ValidationException::withMessages([
+                'data.email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($emailKey)]),
+            ]);
+        }
+
+        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($emailKey, 60);
+
+        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
 
         if ($user?->hasPasskey()) {
             $this->authMethod = 'passkey';
@@ -102,8 +115,32 @@ final class Login extends \Filament\Auth\Pages\Login
             return;
         }
 
-        $provider = $user->socialAccounts()->value('provider_name');
-        $this->authMethod = 'social:'.$provider;
+        $provider = $this->resolveOfferedProvider($user);
+
+        $this->authMethod = $provider === null
+            ? 'password'
+            : 'social:'.$provider;
+    }
+
+    protected function resolveOfferedProvider(User $user): ?string
+    {
+        return $user->socialAccounts()
+            ->pluck('provider_name')
+            ->first(fn (?string $providerName): bool => $this->isProviderOffered($providerName));
+    }
+
+    protected function isProviderOffered(?string $providerName): bool
+    {
+        $provider = SocialiteProvider::tryFrom((string) $providerName);
+
+        if ($provider === null) {
+            return false;
+        }
+
+        return match ($provider) {
+            SocialiteProvider::GOOGLE => true,
+            SocialiteProvider::MICROSOFT => filled(config('services.microsoft.client_id')),
+        };
     }
 
     protected function getAuthenticateFormAction(): Action

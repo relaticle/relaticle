@@ -13,9 +13,14 @@ use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContr
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 
 mutates(Login::class);
 mutates(PasskeyLoginResponse::class);
+
+beforeEach(function (): void {
+    RateLimiter::clear('login-discover-ip:127.0.0.1');
+});
 
 test('login screen can be rendered', function () {
     $response = $this->get(url()->getAppUrl('login'));
@@ -246,6 +251,107 @@ test('discovery is rate limited per email and ip', function (): void {
 
     livewire(Login::class)
         ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email']);
+});
+
+test('a client cannot preset the auth method by writing the locked property directly', function (): void {
+    expect(fn () => livewire(Login::class)->set('authMethod', 'junk'))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+});
+
+test('discovery matches a stored email case-insensitively for passkey users', function (): void {
+    $user = User::factory()->create(['email' => 'MixedCase@Example.com']);
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Key',
+        'credential_id' => 'mixedcase-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'mixedcase@example.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'passkey');
+});
+
+test('a legacy github-only account falls back to the password field', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => 'github',
+        'provider_id' => 'gh-'.uniqid(),
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'password');
+});
+
+test('a social-only account with no linked social row falls back to the password field', function (): void {
+    $user = User::factory()->socialOnly()->create();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'password');
+});
+
+test('a microsoft-only account falls back to the password field when microsoft is not configured', function (): void {
+    config(['services.microsoft.client_id' => null]);
+
+    $user = User::factory()->socialOnly()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => 'microsoft',
+        'provider_id' => 'ms-'.uniqid(),
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'password');
+});
+
+test('a microsoft-only account hints the provider when microsoft is configured', function (): void {
+    config(['services.microsoft.client_id' => 'configured-client-id']);
+
+    $user = User::factory()->socialOnly()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => 'microsoft',
+        'provider_id' => 'ms-'.uniqid(),
+    ]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'social:microsoft');
+});
+
+test('discovery is rate limited per ip across different emails', function (): void {
+    $ipKey = 'login-discover-ip:127.0.0.1';
+    RateLimiter::clear($ipKey);
+
+    $emails = [];
+
+    for ($i = 0; $i < 20; $i++) {
+        $email = 'sweep-'.$i.'-'.uniqid().'@example.com';
+        $emails[] = $email;
+        RateLimiter::clear('login-discover:'.mb_strtolower($email).'|127.0.0.1');
+
+        livewire(Login::class)
+            ->fillForm(['email' => $email])
+            ->call('authenticate')
+            ->assertSet('authMethod', 'password');
+    }
+
+    $blockedEmail = 'sweep-blocked-'.uniqid().'@example.com';
+    RateLimiter::clear('login-discover:'.mb_strtolower($blockedEmail).'|127.0.0.1');
+
+    livewire(Login::class)
+        ->fillForm(['email' => $blockedEmail])
         ->call('authenticate')
         ->assertHasFormErrors(['email']);
 });
