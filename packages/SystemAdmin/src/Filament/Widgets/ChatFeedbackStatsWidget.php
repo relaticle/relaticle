@@ -6,8 +6,8 @@ namespace Relaticle\SystemAdmin\Filament\Widgets;
 
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Models\ChatMessageFeedback;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
 final class ChatFeedbackStatsWidget extends StatsOverviewWidget
 {
@@ -17,7 +17,12 @@ final class ChatFeedbackStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $since = Date::now()->subDays(30);
+        /**
+         * This widget sits on the feedback list page, which carries no period
+         * filter, so the 30 days are fixed. Only the anchor moves: they are the
+         * viewer's last 30 calendar days, matching the dashboards.
+         */
+        [$since] = ViewerTime::periodUtc(30);
 
         $total = ChatMessageFeedback::query()->where('created_at', '>=', $since)->count();
         $down = ChatMessageFeedback::query()

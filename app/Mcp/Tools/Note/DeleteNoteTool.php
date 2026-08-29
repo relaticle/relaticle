@@ -8,12 +8,10 @@ use App\Actions\Note\DeleteNote;
 use App\Mcp\Tools\BaseDeleteTool;
 use App\Models\Note;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Delete Note')]
 #[Description('Delete a note from the CRM (soft delete).')]
-#[IsDestructive]
-#[IsOpenWorld(false)]
 final class DeleteNoteTool extends BaseDeleteTool
 {
     protected function modelClass(): string

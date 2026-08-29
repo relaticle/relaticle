@@ -59,8 +59,8 @@ test('sending the first chat message dispatches the has-ai-usage tag job', funct
 
     storeChatUserMessage($user, $conversationId, 'hello');
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->subscriberUuid === 'sub-uuid-1'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
+        return invade($job)->userId === (string) $user->id
             && invade($job)->tags === [SubscriberTagEnum::HasAiUsage->value];
     });
 });

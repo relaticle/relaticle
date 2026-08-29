@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing as BillingFeature;
+use Laravel\Pennant\Feature;
+
 it('renders the Rela page with verified capability claims', function (): void {
     $html = $this->get('/ai')->assertOk()->getContent();
 
@@ -16,6 +19,26 @@ it('does not claim hosted models ship with self-hosted installs', function (): v
     $html = $this->get('/ai')->assertOk()->getContent();
 
     expect($html)->toContain(__('bring your own API key'));
+});
+
+it('describes the Cloud Pro trial when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Is Rela included with Relaticle Cloud?'))
+        ->and($html)->toContain('14-day Cloud Pro trial')
+        ->and($html)->toContain('2,000-credit monthly allowance')
+        ->and($html)->not->toContain('every workspace, free or paid');
+});
+
+it('describes the free Cloud plan when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Is Rela included in the free plan?'))
+        ->and($html)->toContain('300-credit monthly allowance');
 });
 
 it('describes batch approval as per record, matching how the service resolves batches', function (): void {

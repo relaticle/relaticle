@@ -23,7 +23,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 });
 
-function nextPeopleActivityRequest(): void
+function nextTimelineActivityRequest(): void
 {
     app()->forgetInstance(RequestActivityBatch::class);
 }
@@ -33,7 +33,7 @@ it('loads causer eagerly when resolving activity_log entries so strict lazy-load
         'name' => 'Alpha',
         'team_id' => $this->team->getKey(),
     ]);
-    nextPeopleActivityRequest();
+    nextTimelineActivityRequest();
     $person->update(['name' => 'Bravo']);
 
     $entries = TimelineBuilder::make($person)
@@ -48,7 +48,7 @@ it('renders activity_log entries in the ActivityLogLivewire UI when fromActivity
         'name' => 'Alpha',
         'team_id' => $this->team->getKey(),
     ]);
-    nextPeopleActivityRequest();
+    nextTimelineActivityRequest();
     $person->update(['name' => 'Bravo']);
 
     livewire(ActivityLogLivewire::class, [
@@ -66,16 +66,16 @@ it('groups entries by ISO week with relative labels', function (): void {
         'team_id' => $this->team->getKey(),
     ]);
 
+    nextTimelineActivityRequest();
     $this->travelTo(CarbonImmutable::parse('2026-04-15 09:00:00'));
-    nextPeopleActivityRequest();
     $person->update(['name' => 'Bravo']);
 
+    nextTimelineActivityRequest();
     $this->travelTo(CarbonImmutable::parse('2026-04-08 09:00:00'));
-    nextPeopleActivityRequest();
     $person->update(['name' => 'Charlie']);
 
+    nextTimelineActivityRequest();
     $this->travelTo(CarbonImmutable::parse('2026-03-25 09:00:00'));
-    nextPeopleActivityRequest();
     $person->update(['name' => 'Delta']);
 
     $this->travelTo(CarbonImmutable::parse('2026-04-19 12:00:00'));
@@ -96,7 +96,7 @@ it('renders a concise summary sentence with changed field labels', function (): 
         'name' => 'Alpha',
         'team_id' => $this->team->getKey(),
     ]);
-    nextPeopleActivityRequest();
+    nextTimelineActivityRequest();
     $person->update(['name' => 'Bravo']);
 
     livewire(ActivityLogLivewire::class, [
@@ -113,7 +113,7 @@ it('renders old and new values inside the collapsed diff panel markup', function
         'name' => 'Alpha',
         'team_id' => $this->team->getKey(),
     ]);
-    nextPeopleActivityRequest();
+    nextTimelineActivityRequest();
     $person->update(['name' => 'Bravo']);
 
     livewire(ActivityLogLivewire::class, [

@@ -16,9 +16,12 @@ final readonly class AiModelResolver
     /**
      * Resolve the provider and model for a chat request. An available,
      * plan-allowed explicit choice (or stored user preference) is honored;
-     * anything else falls to the configured `auto_chain`: first available +
-     * plan-allowed, then first available regardless of plan (self-hosted
-     * infrastructure is not plan-gated), then a safe cloud default.
+     * anything else falls to the Auto chain: first available + plan-allowed, then
+     * first available regardless of plan (self-hosted infrastructure is not
+     * plan-gated), then the head of the chain even though nothing can serve it,
+     * so the caller gets a named model to report rather than an exception. No
+     * model id is hardcoded here: the catalog is editable without a deploy, so a
+     * literal one would be a code change on the next vendor retirement.
      *
      * `source` records whether the resolution was the user's explicit pick or
      * the auto chain: ProcessChatMessage only fails over to the next chain
@@ -88,10 +91,9 @@ final readonly class AiModelResolver
             }
         }
 
-        return $this->registry->find('claude-sonnet')
-            ?? $chain[0]
+        return $chain[0]
             ?? $this->registry->all()[0]
-            ?? throw new RuntimeException('No chat model is configured; set at least one provider in config/chat.php.');
+            ?? throw new RuntimeException('No chat model is configured; add one at /sysadmin/ai-models or seed one in config/chat.php.');
     }
 
     /**

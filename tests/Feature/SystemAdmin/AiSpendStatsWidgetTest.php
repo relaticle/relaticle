@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\SystemAdmin\Filament\Widgets\AiSpendStatsWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\ChatCatalog;
 
 mutates(AiSpendStatsWidget::class);
 
@@ -102,7 +105,8 @@ it('respects the dashboard period filter', function (): void {
 
 it('reports period ai cost in dollars from token usage', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -118,7 +122,8 @@ it('reports period ai cost in dollars from token usage', function (): void {
 });
 
 it('surfaces models with no configured rate as unpriced instead of silently treating them as free', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -135,7 +140,8 @@ it('surfaces models with no configured rate as unpriced instead of silently trea
 });
 
 it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -162,7 +168,8 @@ it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', 
 });
 
 it('treats a malformed rate entry as unpriced instead of coercing it to zero cost', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => null])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
@@ -179,7 +186,8 @@ it('treats a malformed rate entry as unpriced instead of coercing it to zero cos
 });
 
 it('ignores zero-token settlement rows instead of listing them as unpriced models', function (): void {
-    config()->set('chat.model_costs', ['claude-sonnet-4-6' => ['input_per_mtok' => 3.00, 'output_per_mtok' => 15.00]]);
+    config()->set('chat.models', [ChatCatalog::entry(['model' => 'claude-sonnet-4-6', 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00])]);
+    app()->forgetInstance(ModelRegistry::class);
 
     // settleReservedMinimum() books cancelled and timed-out turns under this
     // synthetic model with zero tokens — they cost nothing to serve.
@@ -197,18 +205,49 @@ it('ignores zero-token settlement rows instead of listing them as unpriced model
         ->assertDontSee('Unpriced models');
 });
 
-it('has a configured cost rate for every hosted model the app can select', function (): void {
-    /** @var array<string, mixed> $rates */
-    $rates = config('chat.model_costs');
+it('has a cost rate on every catalog entry the app can select', function (): void {
+    $registry = resolve(ModelRegistry::class);
 
     $hostedModels = collect(config('chat.models'))
-        ->reject(fn (array $model): bool => (bool) ($model['self_hosted'] ?? false))
+        ->filter(fn (array $entry): bool => ($entry['enabled'] ?? true) === true)
         ->pluck('model')
         ->all();
 
     expect($hostedModels)->not->toBeEmpty();
 
     foreach ($hostedModels as $model) {
-        expect($rates)->toHaveKey($model);
+        expect($registry->ratesFor((string) $model))->not->toBeNull("{$model} has no rate");
     }
+});
+
+function actAsAiSpendAdminInZone(string $timezone): void
+{
+    test()->actingAs(SystemAdministrator::factory()->create(['timezone' => $timezone]), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+}
+
+it('ends the comparison window at the same elapsed point as today, on the administrator calendar', function (): void {
+    $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
+    actAsAiSpendAdminInZone('Asia/Yerevan');
+
+    /**
+     * For a 7 day period the comparison window runs from midnight on Aug 14 in
+     * Yerevan (2026-08-13 20:00 UTC) to 14:31 on Aug 20 there (2026-08-20 10:31
+     * UTC), which is the same elapsed time the current window covers.
+     */
+    $spend = fn (string $utc, int $credits): AiCreditTransaction => AiCreditTransaction::factory()->create([
+        'type' => AiCreditType::Chat,
+        'model' => 'claude-sonnet-4-6',
+        'credits_charged' => $credits,
+        'created_at' => Date::parse($utc, 'UTC'),
+    ]);
+
+    $spend('2026-08-13 19:00:00', 7);   // Aug 13 23:00 in Yerevan, before the window opens
+    $spend('2026-08-13 21:00:00', 50);  // Aug 14 01:00 in Yerevan, inside
+    $spend('2026-08-20 11:00:00', 9);   // Aug 20 15:00 in Yerevan, past the elapsed point
+
+    $component = livewire(AiSpendStatsWidget::class, ['pageFilters' => ['period' => '7']])->assertOk();
+    $stats = invade($component->instance())->getStats();
+
+    expect($stats[1]->getDescription())->toBe('Previous period: 50');
 });

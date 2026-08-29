@@ -172,7 +172,7 @@ final class TasksBoard extends BoardResourcePage
             ->filters([
                 SelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
-                    ->relationship('assignees', 'name', TeamMemberSelect::currentUserFirst())
+                    ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
                     ->searchable()
                     ->preload()
                     ->multiple(),

@@ -111,6 +111,10 @@ return [
     */
 
     'mcp_domain' => env('MCP_DOMAIN'),
+    'mcp_allowed_origins' => array_values(array_filter(
+        array_map(trim(...), explode(',', (string) env('MCP_ALLOWED_ORIGINS', ''))),
+        static fn (string $origin): bool => $origin !== '',
+    )),
 
     /*
     |--------------------------------------------------------------------------

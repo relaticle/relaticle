@@ -38,7 +38,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
@@ -66,7 +66,7 @@ it('refunds the reservation when the job fails without ever streaming', function
         team: $team,
         message: 'hello',
         conversationId: 'conv-123',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
     );
 
     $job->failed(new RuntimeException('boom'));
@@ -114,7 +114,7 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
         team: $team,
         message: 'hello',
         conversationId: 'conv-paused',
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet', 'source' => 'auto'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: 'turn-paused',
     );
 

@@ -8,12 +8,10 @@ use App\Actions\Company\DeleteCompany;
 use App\Mcp\Tools\BaseDeleteTool;
 use App\Models\Company;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Delete Company')]
 #[Description('Delete a company from the CRM (soft delete).')]
-#[IsDestructive]
-#[IsOpenWorld(false)]
 final class DeleteCompanyTool extends BaseDeleteTool
 {
     protected function modelClass(): string

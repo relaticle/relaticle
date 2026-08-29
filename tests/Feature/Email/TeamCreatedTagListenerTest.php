@@ -31,8 +31,8 @@ test('dispatches use-case and referral tags when owner has uuid', function (): v
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->subscriberUuid === 'mc-uuid-owner'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($owner): bool {
+        return invade($job)->userId === (string) $owner->id
             && invade($job)->tags === ['use-case:sales', 'referral:google']
             && invade($job)->action === TagAction::Add;
     });
@@ -56,7 +56,7 @@ test('dispatches only use-case tag when referral is null', function (): void {
     });
 });
 
-test('does not dispatch tag job until owner has mailcoach uuid', function (): void {
+test('dispatches the tag job even when the owner has no mailcoach uuid yet', function (): void {
     $owner = User::factory()->withTeam()->create([
         'mailcoach_subscriber_uuid' => null,
     ]);
@@ -68,28 +68,7 @@ test('does not dispatch tag job until owner has mailcoach uuid', function (): vo
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
-});
-
-test('dispatches tag job once uuid becomes available on retry', function (): void {
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => null,
-    ]);
-
-    $team = $owner->currentTeam;
-    $team->update([
-        'onboarding_use_case' => OnboardingUseCase::Sales,
-    ]);
-
-    $listener = new TeamCreatedTagListener;
-    $listener->handle(new TeamCreated($team->fresh()));
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
-
-    $owner->forceFill(['mailcoach_subscriber_uuid' => 'mc-uuid-late'])->save();
-
-    $listener->handle(new TeamCreated($team->fresh()));
-
-    Queue::assertPushed(ModifySubscriberTagsJob::class, fn (ModifySubscriberTagsJob $job): bool => invade($job)->subscriberUuid === 'mc-uuid-late'
+    Queue::assertPushed(ModifySubscriberTagsJob::class, fn (ModifySubscriberTagsJob $job): bool => invade($job)->userId === (string) $owner->id
         && invade($job)->tags === ['use-case:sales']);
 });
 

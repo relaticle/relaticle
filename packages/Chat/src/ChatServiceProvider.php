@@ -34,6 +34,7 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Chat\Settings\ChatSettings;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AgentRunTelemetry;
 
@@ -56,6 +57,7 @@ final class ChatServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->applyStoredSettings();
         $this->registerCommands();
         $this->registerChannels();
         $this->registerViews();
@@ -64,6 +66,20 @@ final class ChatServiceProvider extends ServiceProvider
         $this->registerRenderHooks();
         $this->registerInsightsCacheInvalidation();
         $this->registerRunTelemetry();
+    }
+
+    /**
+     * Push the runtime-editable model catalog over the config seed defaults.
+     *
+     * Guarded because the settings table does not exist on a fresh install's
+     * first `migrate`, nor while the app boots to run that migration; until then
+     * the config values in chat.php simply stay in force. Runs before
+     * ModelRegistry can be resolved (it is a singleton that reads config once in
+     * its constructor), which is why this is the first line of boot().
+     */
+    private function applyStoredSettings(): void
+    {
+        rescue(fn () => config(resolve(ChatSettings::class)->toConfig()), report: false);
     }
 
     /**

@@ -2,7 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Actions\Note\AttachNoteRelationships;
+use App\Actions\Note\DetachNoteRelationships;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseAttachTool;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseDetachTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\Note\AttachNoteToEntitiesTool;
 use App\Mcp\Tools\Note\CreateNoteTool;
 use App\Mcp\Tools\Note\DeleteNoteTool;
@@ -17,6 +27,26 @@ use App\Models\Scopes\TeamScope;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+
+mutates(
+    AttachNoteRelationships::class,
+    AttachNoteToEntitiesTool::class,
+    BaseAttachTool::class,
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseDetachTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreateNoteTool::class,
+    DeleteNoteTool::class,
+    DetachNoteRelationships::class,
+    DetachNoteFromEntitiesTool::class,
+    GetNoteTool::class,
+    ListNotesTool::class,
+    SerializesRelatedModels::class,
+    UpdateNoteTool::class,
+);
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -184,6 +214,59 @@ it('attach does not remove existing links', function (): void {
         ->assertOk();
 
     expect($note->refresh()->companies)->toHaveCount(2);
+});
+
+it('locks the note while attaching relationships', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AttachNoteToEntitiesTool::class, [
+            'id' => $note->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertOk();
+
+    expect(collect(DB::getQueryLog())->contains(
+        fn (array $query): bool => str_contains($query['query'], 'from "notes"')
+            && str_contains($query['query'], 'for update'),
+    ))->toBeTrue();
+});
+
+it('cannot attach relationships to a note outside the current team', function (): void {
+    $otherTeam = Team::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedTeams');
+    $otherNote = Note::withoutEvents(fn () => Note::factory()->for($otherTeam)->create());
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AttachNoteToEntitiesTool::class, [
+            'id' => $otherNote->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertHasErrors();
+
+    expect($otherNote->companies()->whereKey($company->id)->exists())->toBeFalse();
+});
+
+it('cannot detach relationships from a note outside the current team', function (): void {
+    $otherTeam = Team::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedTeams');
+    $otherNote = Note::withoutEvents(fn () => Note::factory()->for($otherTeam)->create());
+    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $otherNote->companies()->attach($company);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(DetachNoteFromEntitiesTool::class, [
+            'id' => $otherNote->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertHasErrors();
+
+    expect($otherNote->companies()->whereKey($company->id)->exists())->toBeTrue();
 });
 
 describe('team scoping', function () {

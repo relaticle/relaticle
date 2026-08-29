@@ -42,8 +42,10 @@ final readonly class CreateTask
 
         $attributes = Arr::only($data, ['title', 'custom_fields']);
         $attributes['creation_source'] = $source;
+        /** @var array<int, string> $newAssigneeIds */
+        $newAssigneeIds = [];
 
-        $task = DB::transaction(function () use ($attributes, $companyIds, $peopleIds, $opportunityIds, $assigneeIds): Task {
+        $task = DB::transaction(function () use ($attributes, $companyIds, $peopleIds, $opportunityIds, $assigneeIds, &$newAssigneeIds): Task {
             $task = Task::query()->create($attributes);
 
             if ($companyIds !== null) {
@@ -56,13 +58,14 @@ final readonly class CreateTask
                 $task->opportunities()->sync($opportunityIds);
             }
             if ($assigneeIds !== null) {
-                $task->assignees()->sync($assigneeIds);
+                $changes = $task->assignees()->sync($assigneeIds);
+                $newAssigneeIds = $changes['attached'];
             }
 
             return $task;
         });
 
-        $this->notifyAssignees->execute($task);
+        $this->notifyAssignees->execute($task, $newAssigneeIds);
 
         return $task->load('customFieldValues.customField.options');
     }

@@ -44,7 +44,7 @@ final readonly class ListOpportunities
                 AllowedFilter::partial('name'),
                 AllowedFilter::exact('company_id'),
                 AllowedFilter::exact('contact_id'),
-                AllowedFilter::custom('custom_fields', new CustomFieldFilter('opportunity')),
+                CustomFieldFilter::allowedFilter('opportunity'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '<=', $value)),
                 AllowedFilter::callback('stale_days', function (Builder $query, string $value) use ($user): void {

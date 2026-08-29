@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Effective date:** March 20, 2026
+**Effective date:** August 26, 2026
 
 This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.
 
@@ -18,7 +18,7 @@ This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, a
 
 ### Self-Hosted Users
 
-We do not collect any data from self-hosted installations. Your data stays entirely on your servers.
+Data from a self-hosted installation stays on your servers unless you configure an external integration. That integration may send authorized data to its provider.
 
 ### Website Visitors (relaticle.com)
 
@@ -50,7 +50,7 @@ The Cloud service uses the following third-party providers:
 - **Email delivery:** For transactional emails (password resets, invitations)
 - **Error monitoring:** For detecting and fixing bugs (anonymized error reports)
 
-We do not share your CRM data with any third party.
+Relaticle does not sell CRM data. Relaticle does not use CRM data for advertising. Relaticle does not train AI models on CRM data.
 
 ## 4. Data Security
 
@@ -97,11 +97,27 @@ Our services are not directed to children under 16. We do not knowingly collect 
 
 ## 9. AI Connectors / MCP Server
 
-When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protocol (MCP) client, the connector accesses the same CRM data you can already see in your account.
+You can authorize an MCP client or AI provider to access your CRM data. The provider receives only data requested through authorized tools. The provider processes that data under its own terms and privacy policy. Disconnecting the provider or revoking its token stops future access.
 
-**What the connector can read.** Companies, people, opportunities, tasks, notes, custom-field values, and team-member metadata for the team you authorize. The connector cannot read other teams' data or any user files outside the CRM.
+Relaticle enforces workspace and token scope on every tool request.
 
-**What the connector can write.** Create, update, delete, and link/unlink companies, people, opportunities, tasks, and notes — the same actions you can perform in the Relaticle UI. Writes are scoped to the team you authorize.
+**Data tool responses can include:**
+
+- User names, email addresses, and identifiers.
+- Team names and identifiers.
+- Team-member names, emails, and identifiers.
+- Token ability names.
+- Companies, people, opportunities, tasks, and notes.
+- Record identifiers and canonical record URLs.
+- Contact details.
+- Custom-field definitions, options, and values.
+- Relationships between records.
+- Opportunity stages and amounts.
+- Activity actors, field changes, and timestamps.
+- Record creation and update timestamps.
+- Pagination and count metadata.
+
+**What the connector can write.** MCP write tools can change CRM records. They can create, update, delete, and link or unlink companies, people, opportunities, tasks, and notes. Task assignment operations can send transactional notifications.
 
 **OAuth tokens.** When you connect via OAuth (Claude Connectors Directory, ChatGPT App Directory), Relaticle stores an access token and refresh token in the `oauth_access_tokens` and `oauth_refresh_tokens` tables. Access tokens expire after 30 days and refresh tokens after 90 days. You can revoke any connector at any time from **Settings → Access Tokens → AI Connectors**; revocation immediately invalidates both the access and refresh token.
 
@@ -109,7 +125,15 @@ When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protoc
 
 **Conversation data.** The MCP server does not log, store, or process the conversation context of your AI assistant. It only sees the specific tool arguments your assistant sends and the records it requests.
 
-**Telemetry.** Relaticle does not include telemetry, request IDs, internal timestamps, or session identifiers in MCP tool responses. Tool outputs are limited to fields documented in the public MCP guide.
+**Response metadata.** Tool responses can include record identifiers, timestamps, pagination metadata, and count metadata.
+
+Tool responses exclude:
+
+- Access tokens.
+- Refresh tokens.
+- Passwords.
+- API keys.
+- Authentication secrets.
 
 ## 10. Changes to This Policy
 

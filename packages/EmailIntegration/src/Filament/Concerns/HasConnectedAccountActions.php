@@ -12,8 +12,6 @@ use Filament\Notifications\Notification;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use LogicException;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -44,18 +42,16 @@ trait HasConnectedAccountActions
      *
      * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
      */
-    public function accountActions(Model $account, array $extraActions = []): ActionGroup
+    public function accountActions(string $accountId, EmailAccountStatus $status, array $extraActions = []): ActionGroup
     {
-        throw_unless($account instanceof ConnectedAccount, LogicException::class, 'Account actions require a connected account.');
-
-        $arguments = ['account_id' => $account->getKey()];
+        $arguments = ['account_id' => $accountId];
 
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
             ($this->setDefaultAction())($arguments),
             ($this->reAuthAction())($arguments)
-                ->visible(in_array($account->status, [
+                ->visible(in_array($status, [
                     EmailAccountStatus::REAUTH_REQUIRED,
                     EmailAccountStatus::ERROR,
                 ], true)),

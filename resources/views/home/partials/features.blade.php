@@ -2,6 +2,7 @@
     $cardBase = 'group feat-card rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm';
     $cardTitle = 'font-display text-lg font-medium text-gray-900 dark:text-white mb-2';
     $cardDesc = 'text-[13px] leading-relaxed text-gray-500 dark:text-gray-400';
+    $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
 @endphp
 
 <section id="features" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
@@ -28,7 +29,7 @@
                     Connect Any External Agent
                 </h3>
                 <p class="{{ $cardDesc }} max-w-md">
-                    Bring your own agent through the MCP server with 32 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                    Bring your own agent through the MCP server with 37 tools, or build custom integrations with the REST API. Full CRUD, custom fields, activity history, and pipeline analysis are built in.
                 </p>
 
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
@@ -54,7 +55,7 @@
                         <div class="fn w-full bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
                             <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
                             <div class="flex gap-4 text-[11px]">
-                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">32</span> tools</span>
+                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">{{ $mcpToolCount }}</span> tools</span>
                                 <span class="text-gray-500 dark:text-gray-400">REST API <span class="font-mono font-medium text-gray-800 dark:text-gray-200">v1</span></span>
                                 <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-700 dark:text-emerald-400">auto</span></span>
                             </div>
@@ -98,7 +99,7 @@
                                 <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
                                     <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">Connected</div>
                                     <div class="space-y-1.5">
-                                        @foreach([['Tools', '32', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
+                                        @foreach([['Tools', (string) $mcpToolCount, ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
                                             <div class="flex items-center justify-between text-[11px]">
                                                 <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
                                                 <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>

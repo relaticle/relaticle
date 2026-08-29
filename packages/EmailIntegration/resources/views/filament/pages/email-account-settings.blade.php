@@ -31,7 +31,7 @@
         </x-slot>
 
         <x-slot name="afterHeader">
-            {{ $this->accountActions($account) }}
+            {{ $this->accountActions($account->getKey(), $account->status) }}
         </x-slot>
 
         {{ $this->form }}

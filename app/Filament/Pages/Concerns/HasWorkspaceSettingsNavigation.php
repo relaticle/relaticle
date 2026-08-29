@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Concerns;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\EditTeam;
+use App\Filament\Pages\Team\ActivityLog;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\Team;
@@ -68,6 +69,13 @@ trait HasWorkspaceSettingsNavigation
                 ->url(fn (): string => EmailPrivacySettingsPage::getUrl())
                 ->isActiveWhen(fn (): bool => request()->routeIs(EmailPrivacySettingsPage::getRouteName()))
                 ->visible(fn (): bool => EmailPrivacySettingsPage::canAccess()),
+
+            NavigationItem::make()
+                ->label(__('teams.tabs.activity'))
+                ->icon(Heroicon::OutlinedClock)
+                ->url(fn (): string => ActivityLog::getUrl())
+                ->isActiveWhen(fn (): bool => request()->routeIs(ActivityLog::getRouteName()))
+                ->visible(fn (): bool => ActivityLog::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.billing'))

@@ -19,18 +19,21 @@ function chatProviderCatalogueEntry(
     string $model,
     string $minPlan = 'free',
     bool $supportsTools = true,
-    bool $selfHosted = false,
+    bool $enabled = true,
 ): array {
     return [
-        'id' => $model,
+        'key' => $model,
         'label' => $model,
         'provider' => $provider,
         'model' => $model,
         'min_plan' => $minPlan,
         'credit_multiplier' => 1.0,
-        'supports_tools' => $supportsTools,
-        'write_guard' => 'api',
-        'self_hosted' => $selfHosted,
+        'input_per_mtok' => 1.0,
+        'output_per_mtok' => 1.0,
+        'auto' => true,
+        'enabled' => $enabled,
+        'capabilities' => ['supports_tools' => $supportsTools, 'write_guard' => 'api'],
+        'verified_at' => null,
     ];
 }
 
@@ -200,10 +203,10 @@ it('registers one check per provider that has a key configured', function (): vo
 it('skips models chat can never select', function (): void {
     config()->set('chat.models', [
         chatProviderCatalogueEntry('gemini', 'gemini-3-flash', supportsTools: false),
-        chatProviderCatalogueEntry('ollama', 'llama', selfHosted: true),
+        chatProviderCatalogueEntry('mistral', 'retired-model', enabled: false),
     ]);
     config()->set('ai.providers.gemini.key', 'test-key');
-    config()->set('ai.providers.ollama.key', 'test-key');
+    config()->set('ai.providers.mistral.key', 'test-key');
 
     expect(ChatProviderCheck::forConfiguredProviders())->toBeEmpty();
 });

@@ -85,6 +85,12 @@ final class PreviewStep extends Component implements HasActions, HasForms
     }
 
     #[Computed]
+    public function hasUnresolvedMatches(): bool
+    {
+        return $this->store()->query()->whereNull('match_action')->exists();
+    }
+
+    #[Computed]
     public function isImporting(): bool
     {
         if ($this->isCompleted) {
@@ -283,11 +289,24 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function startImportAction(): Action
     {
+        $resolvingMatches = $this->matchResolutionBatchId !== null;
+        $matchesIncomplete = ! $resolvingMatches && $this->hasUnresolvedMatches();
+        $label = match (true) {
+            $resolvingMatches => __('Resolving matches...'),
+            $matchesIncomplete => __('Match resolution failed'),
+            default => __('Start Import'),
+        };
+        $icon = match (true) {
+            $resolvingMatches => Heroicon::OutlinedArrowPath,
+            $matchesIncomplete => Heroicon::OutlinedExclamationTriangle,
+            default => Heroicon::OutlinedPlay,
+        };
+
         return Action::make('startImport')
-            ->label($this->matchResolutionBatchId !== null ? 'Resolving matches...' : 'Start Import')
+            ->label($label)
             ->color('primary')
-            ->icon($this->matchResolutionBatchId !== null ? Heroicon::OutlinedArrowPath : Heroicon::OutlinedPlay)
-            ->disabled(fn (): bool => $this->matchResolutionBatchId !== null)
+            ->icon($icon)
+            ->disabled(fn (): bool => $resolvingMatches || $matchesIncomplete)
             ->requiresConfirmation()
             ->modalHeading('Start import')
             ->modalDescription('Are you sure that you want to start running this import?')
@@ -348,7 +367,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
 
     public function startImport(): void
     {
-        if ($this->matchResolutionBatchId !== null || $this->batchId !== null || $this->isCompleted) {
+        if ($this->matchResolutionBatchId !== null || $this->hasUnresolvedMatches() || $this->batchId !== null || $this->isCompleted) {
             return;
         }
 

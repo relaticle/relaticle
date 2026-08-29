@@ -5,32 +5,41 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[Title('Get Account Context')]
 #[Description('Get information about the authenticated user, current team, team members, and token abilities.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class WhoAmiTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
 
     public function schema(JsonSchema $schema): array
     {
         return [];
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'user' => $schema->object()->required(),
+            'team' => $schema->object()->required(),
+            'team_members' => $schema->array()->items($schema->object())->required(),
+            'token_abilities' => $schema->array()->items($schema->string())->required(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
             return $denied;
@@ -69,6 +78,6 @@ final class WhoAmiTool extends Tool
             'token_abilities' => $tokenAbilities,
         ];
 
-        return Response::text(json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        return Response::structured($result);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Task;
 
+use App\Actions\Task\DetachTaskRelationships;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseDetachTool;
 use App\Models\Task;
@@ -11,15 +12,11 @@ use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Detach Task Relationships')]
 #[Description('Detach a task from companies, people, opportunities, or unassign users. Removes specified links.')]
-#[IsDestructive]
-#[IsOpenWorld(false)]
 final class DetachTaskFromEntitiesTool extends BaseDetachTool
 {
     protected function modelClass(): string
@@ -35,6 +32,11 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
     protected function resourceClass(): string
     {
         return TaskResource::class;
+    }
+
+    protected function actionClass(): string
+    {
+        return DetachTaskRelationships::class;
     }
 
     /** @return array<int, string> */
@@ -58,7 +60,6 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
         /** @var Team $team */
         $team = $user->currentTeam;
         $teamId = $team->getKey();
-        $teamMemberIds = $team->allUsers()->pluck('id')->all();
 
         return [
             'company_ids' => ['sometimes', 'array'],
@@ -68,27 +69,7 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
             'opportunity_ids' => ['sometimes', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
             'assignee_ids' => ['sometimes', 'array'],
-            'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
+            'assignee_ids.*' => ['string'],
         ];
-    }
-
-    public function detachRelationships(Model $model, array $data): void
-    {
-        /** @var Task $model */
-        if (isset($data['company_ids'])) {
-            $model->companies()->detach($data['company_ids']);
-        }
-
-        if (isset($data['people_ids'])) {
-            $model->people()->detach($data['people_ids']);
-        }
-
-        if (isset($data['opportunity_ids'])) {
-            $model->opportunities()->detach($data['opportunity_ids']);
-        }
-
-        if (isset($data['assignee_ids'])) {
-            $model->assignees()->detach($data['assignee_ids']);
-        }
     }
 }

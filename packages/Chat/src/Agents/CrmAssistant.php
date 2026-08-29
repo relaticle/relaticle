@@ -8,7 +8,6 @@ use App\Models\Team;
 use App\Services\WorkspaceActivationFacts;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
-use Laravel\Ai\Attributes\Temperature;
 use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
@@ -63,12 +62,14 @@ use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
 // over: to get failover, stream() has to receive the array.
 #[Provider(Lab::Anthropic)]
 #[MaxSteps(15)]
-#[Temperature(0.3)]
 #[Timeout(120)]
 final class CrmAssistant implements Agent, Conversational, HasProviderOptions, HasTools
 {
     use Promptable;
     use RemembersConversations;
+
+    /** @var list<string> */
+    private const array ANTHROPIC_EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
     /**
      * Per-turn mention context injected into the system prompt.
@@ -640,6 +641,7 @@ PROMPT;
                     'type' => 'auto',
                     'disable_parallel_tool_use' => true,
                 ],
+                ...$this->anthropicEffort(),
                 ...$this->anthropicCachedSystemBlocks(),
             ],
             Lab::OpenAI->value => [
@@ -651,6 +653,38 @@ PROMPT;
             // sequential-write guard would be unenforceable.
             default => [],
         };
+    }
+
+    /**
+     * Anthropic removed `temperature` and `top_p` on Opus 4.7 and every model
+     * after it, rejecting a request that carries either with a flat 400. A
+     * #[Temperature] attribute on this class is therefore enough to break every
+     * turn on those models, which is exactly how Opus 4.7 went down in
+     * production. `output_config.effort` is the replacement dial, and it matters
+     * more than temperature ever did: from Opus 5 onward thinking is on by
+     * default, so a turn spends output tokens before it writes a word.
+     *
+     * An unrecognised configured value sends nothing at all rather than passing
+     * the typo to the provider, so a bad env degrades to Anthropic's own default
+     * instead of failing every turn. That failure mode is the whole reason this
+     * method exists.
+     *
+     * Lands at the request top level, next to (not inside) the `output_config`
+     * the gateway writes for structured output. This agent declares no schema,
+     * so the two cannot collide today; giving it one would need this merged
+     * rather than set.
+     *
+     * @return array{output_config?: array{effort: string}}
+     */
+    private function anthropicEffort(): array
+    {
+        $effort = config('chat.anthropic_effort');
+
+        if (! is_string($effort) || ! in_array($effort, self::ANTHROPIC_EFFORT_LEVELS, true)) {
+            return [];
+        }
+
+        return ['output_config' => ['effort' => $effort]];
     }
 
     /**

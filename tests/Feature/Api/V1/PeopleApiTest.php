@@ -8,6 +8,7 @@ use App\Actions\People\ListPeople;
 use App\Actions\People\UpdatePeople;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\PeopleController;
+use App\Http\Resources\V1\PeopleResource;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\Team;
@@ -22,6 +23,7 @@ mutates(
     UpdatePeople::class,
     DeletePeople::class,
     ListPeople::class,
+    PeopleResource::class,
 );
 
 beforeEach(function () {
@@ -103,6 +105,17 @@ it('can show a person', function (): void {
                 ->etc()
             )
         );
+});
+
+it('does not expose MCP-only task relationships through the public API', function (): void {
+    Sanctum::actingAs($this->user);
+
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+
+    $this->getJson("/api/v1/people/{$person->id}?include=tasks")
+        ->assertOk()
+        ->assertJsonMissingPath('data.relationships.tasks')
+        ->assertJsonMissingPath('included');
 });
 
 it('can update a person', function (): void {

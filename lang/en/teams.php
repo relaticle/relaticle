@@ -124,7 +124,47 @@ return [
         'members' => 'Members',
         'custom_fields' => 'Custom Fields',
         'email' => 'Email',
+        'activity' => 'Activity',
         'billing' => 'Billing',
+    ],
+
+    'activity' => [
+        'description' => 'Every change your members make to records, including deletions.',
+        'system' => 'System',
+        'yes' => 'Yes',
+        'no' => 'No',
+        'columns' => [
+            'created_at' => 'When',
+            'causer' => 'Who',
+            'event' => 'Action',
+            'subject_type' => 'Type',
+            'record' => 'Record',
+            'changes' => 'Changes',
+        ],
+        'filters' => [
+            'event' => 'Action',
+            'subject_type' => 'Type',
+            'causer' => 'Who',
+            'from' => 'From',
+            'until' => 'Until',
+        ],
+        'events' => [
+            'created' => 'Created',
+            'updated' => 'Updated',
+            'deleted' => 'Deleted',
+            'restored' => 'Restored',
+        ],
+        'types' => [
+            'company' => 'Company',
+            'people' => 'Person',
+            'opportunity' => 'Opportunity',
+            'task' => 'Task',
+            'note' => 'Note',
+        ],
+        'empty' => [
+            'heading' => 'No activity yet',
+            'description' => 'Changes your members make to records will show up here.',
+        ],
     ],
 
     'roles' => [
