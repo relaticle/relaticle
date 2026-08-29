@@ -125,11 +125,7 @@ final class ChatInterface extends BaseLivewireComponent
 
         $presence = TurnPresence::current($conversationId);
 
-        if ($presence !== null && $this->turnAlreadyPersisted($presence['started_at'])) {
-            $presence = null;
-        }
-
-        if ($presence !== null) {
+        if ($presence !== null && ! $this->turnAlreadyPersisted($presence['started_at'])) {
             $this->turnInFlight = true;
 
             if ($presence['kind'] === 'message') {

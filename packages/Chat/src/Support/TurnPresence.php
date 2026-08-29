@@ -20,8 +20,8 @@ use Illuminate\Support\Facades\Cache;
  * Written where the turn is dispatched (ChatController::send,
  * TurnContinuationService::resume) and cleared on every terminal path of
  * ProcessChatMessage. Retries, releases and the failover re-dispatch keep it:
- * the turn is still alive. The TTL is only the dead-worker backstop — a job
- * killed hard enough to skip failed() — sized past the job's worst case
+ * the turn is still alive. The TTL is only the dead-worker backstop (a job
+ * killed hard enough to skip failed()), sized past the job's worst case
  * (retryUntil + timeout), after which the client watchdog's timeout error has
  * long since told the user the turn is gone.
  */
