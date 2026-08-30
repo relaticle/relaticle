@@ -98,7 +98,7 @@
             <x-marketing.button variant="secondary" href="{{ route('login') }}">
                 Sign In
             </x-marketing.button>
-            <x-marketing.button href="{{ route('register') }}">
+            <x-marketing.button href="{{ route('login') }}">
                 Start for free
             </x-marketing.button>
         </div>

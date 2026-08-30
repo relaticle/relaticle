@@ -122,7 +122,7 @@
                             Sign In
                         </x-marketing.button>
 
-                        <x-marketing.button size="sm" href="{{ route('register') }}">
+                        <x-marketing.button size="sm" href="{{ route('login') }}">
                             Start for free
                         </x-marketing.button>
                     </div>

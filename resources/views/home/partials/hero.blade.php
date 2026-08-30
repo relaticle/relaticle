@@ -33,7 +33,7 @@
 
             {{-- ── CTA Buttons ── --}}
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
-                <x-marketing.button href="{{ route('register') }}" class="group">
+                <x-marketing.button href="{{ route('login') }}" class="group">
                     Start for free
                 </x-marketing.button>
 

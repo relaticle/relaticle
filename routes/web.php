@@ -46,7 +46,7 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 
-    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('register')))->name('register');
+    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
 
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
