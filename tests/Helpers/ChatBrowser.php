@@ -39,11 +39,7 @@ final class ChatBrowser
      */
     public static function logIn(User $user, string $slug, ?string $conversationId = null): AwaitableWebpage
     {
-        $page = test()->visit('/app/login')
-            ->type('[id="form.email"]', $user->email)
-            ->type('[id="form.password"]', 'password')
-            ->click('button.fi-btn')
-            ->assertPathIs("/app/{$slug}");
+        $page = loginViaBrowser($user)->assertPathIs("/app/{$slug}");
 
         return $conversationId === null
             ? $page
