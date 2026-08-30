@@ -7,6 +7,7 @@ use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
 use App\Notifications\UserDeletionScheduledNotification;
 use App\Support\Auth\IdentityConfirmation;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
@@ -148,7 +149,28 @@ test('delete account component renders correctly', function (): void {
 
     Livewire::test(DeleteAccount::class)
         ->assertSuccessful()
-        ->assertSee('Delete Account');
+        ->assertSee('Delete Account')
+        ->assertSee('Permanently delete your account after a 30-day grace period.')
+        ->assertSee('Records in shared workspaces will remain without your profile.')
+        ->assertDontSee('all your data');
+});
+
+test('the confirmation modal explains what deletion keeps and removes', function () {
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
+
+    Livewire::test(DeleteAccount::class)
+        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
+        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
+        ->assertMountedActionModalSee('Shared workspace records will remain.');
+});
+
+test('a social-only account sees the same deletion scope copy', function () {
+    $this->actingAs(User::factory()->withPersonalTeam()->socialOnly()->create());
+
+    Livewire::test(DeleteAccount::class)
+        ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
+        ->assertMountedActionModalSee('Your profile and sign-in account will be deleted after 30 days.')
+        ->assertMountedActionModalSee('Shared workspace records will remain.');
 });
 
 test('the delete modal copy does not instruct users to enter a password', function (): void {

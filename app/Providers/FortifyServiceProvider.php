@@ -10,7 +10,9 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Http\Responses\PasskeyLoginResponse;
+use Filament\Facades\Filament;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -31,6 +33,14 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
+        // Jetstream registers the Blade-based `auth.verify-email` prompt view for
+        // Fortify's `/email/verify` route, but this app renders all auth UI through
+        // Filament and never publishes that view. Send unverified users hitting the
+        // Fortify verification-notice route to Filament's real prompt instead.
+        Fortify::verifyEmailView(fn (): RedirectResponse => to_route(
+            Filament::getPanel('app')->getEmailVerificationPromptRouteName(),
+        ));
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());

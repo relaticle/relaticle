@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Data\NotificationPreferences;
+use App\Enums\Notifications\NotificationChannel;
+use App\Enums\Notifications\NotificationType;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
 use Exception;
 use Filament\Models\Contracts\FilamentUser;
@@ -13,6 +17,10 @@ use Filament\Models\Contracts\HasDefaultTenant;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Attributes\Appends;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -20,6 +28,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -28,24 +37,50 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
+use Laravel\Jetstream\Jetstream;
+use Laravel\Passport\Client;
+use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
  * @property string $name
  * @property string $email
+ * @property string|null $timezone
  * @property string|null $password
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
- * @property string|null $subscriber_recency_bucket
+ * @property string|null $subscriber_profile_hash
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property array<string, mixed>|null $ai_preferences
+ * @property array<string, mixed>|null $notification_preferences
  * @property-read Team|null $currentTeam
  */
+#[Appends([
+    'profile_photo_url',
+])]
+#[Fillable([
+    'name',
+    'email',
+    'timezone',
+    'password',
+    'ai_preferences',
+    'notification_preferences',
+])]
+#[Hidden([
+    'password',
+    'remember_token',
+    'two_factor_recovery_codes',
+    'two_factor_secret',
+    'mailcoach_subscriber_uuid',
+    'subscriber_profile_hash',
+])]
+#[ObservedBy(UserObserver::class)]
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
@@ -61,40 +96,6 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use TwoFactorAuthenticatable;
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'name',
-        'email',
-        'password',
-    ];
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-    protected $hidden = [
-        'password',
-        'remember_token',
-        'two_factor_recovery_codes',
-        'two_factor_secret',
-        'mailcoach_subscriber_uuid',
-        'subscriber_recency_bucket',
-    ];
-
-    /**
-     * The accessors to append to the model's array form.
-     *
-     * @var list<string>
-     */
-    protected $appends = [
-        'profile_photo_url',
-    ];
-
-    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -105,8 +106,31 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'ai_preferences' => 'array',
+            'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
         ];
+    }
+
+    public function notificationPreferences(): NotificationPreferences
+    {
+        return new NotificationPreferences($this->notification_preferences ?? []);
+    }
+
+    public function wantsNotification(NotificationType $type, NotificationChannel $channel): bool
+    {
+        return $this->notificationPreferences()->wants($type, $channel);
+    }
+
+    /**
+     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * who never chose one and whose browser was never detected falls back to the app
+     * default, so every caller that turns a stored UTC value into a wall clock reads
+     * it from here rather than repeating the fallback.
+     */
+    public function effectiveTimezone(): string
+    {
+        return $this->timezone ?? (string) config('app.timezone');
     }
 
     /**
@@ -207,5 +231,103 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->belongsToTeam($tenant);
+    }
+
+    /**
+     * @return MorphMany<Client, $this>
+     */
+    public function oauthApps(): MorphMany
+    {
+        return $this->morphMany(Passport::clientModel(), 'owner');
+    }
+
+    public function getProviderName(): string
+    {
+        return 'users';
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return HasMany<Team, $this>
+     */
+    public function ownedTeams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    /**
+     * Typed override of the Jetstream relation, which resolves its model from
+     * runtime config and so returns an untyped collection.
+     *
+     * @return BelongsToMany<Team, $this, Membership, 'membership'>
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, Membership::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->as('membership');
+    }
+
+    /**
+     * The ids of every team the user can reach, owned or joined.
+     *
+     * Authorization runs once per table row, so resolving a record's `team`
+     * relation inside a policy costs a query per row — and throws once a query
+     * hydrates more than one row, because that is when Eloquent arms its strict
+     * lazy-loading guard. Matching the record's foreign key against this set
+     * keeps authorization off the record's relations entirely.
+     *
+     * Both relations are the ones Jetstream already defines and that
+     * `allTeams()` loads for the panel's tenant switcher, so inside a panel
+     * request this set costs nothing beyond what is already in memory.
+     *
+     * @return list<string>
+     */
+    public function accessibleTeamIds(): array
+    {
+        $this->loadMissing(['ownedTeams', 'teams']);
+
+        return array_map(
+            strval(...),
+            [...$this->ownedTeams->modelKeys(), ...$this->teams->modelKeys()],
+        );
+    }
+
+    public function belongsToTeamId(?string $teamId): bool
+    {
+        return $teamId !== null && in_array($teamId, $this->accessibleTeamIds(), true);
+    }
+
+    /**
+     * Determine whether the user holds the given role on the team owning the
+     * given foreign key.
+     */
+    public function hasTeamRoleForTeamId(?string $teamId, string $role): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return true;
+        }
+
+        $this->loadMissing('teams');
+
+        $membershipRole = $this->teams
+            ->first(fn (Team $team): bool => $team->getKey() === $teamId)
+            ?->membership
+            ?->role;
+
+        if ($membershipRole === null) {
+            return false;
+        }
+
+        return Jetstream::findRole($membershipRole)?->key === $role;
     }
 }

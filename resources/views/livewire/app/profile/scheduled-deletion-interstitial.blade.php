@@ -22,7 +22,7 @@
                     </div>
 
                     <h1 class="text-lg font-semibold text-gray-950 dark:text-white">
-                        Your account is being deleted
+                        {{ __('profile.scheduled_deletion_interstitial.heading') }}
                     </h1>
                 </div>
 
@@ -33,9 +33,6 @@
                             <span class="text-4xl font-bold tabular-nums leading-none text-danger-600 dark:text-danger-400">{{ $daysRemaining }}</span>
                             <span class="text-sm font-medium text-danger-700 dark:text-danger-300">{{ Str::plural('day', $daysRemaining) }} remaining</span>
                         </div>
-                        <p class="mt-2 text-xs text-danger-700/80 dark:text-danger-300/80">
-                            Permanent deletion on {{ $deletionDate->format('F j, Y') }}
-                        </p>
                     @elseif ($daysRemaining === 0)
                         <p class="text-sm font-semibold text-danger-700 dark:text-danger-300">
                             Deletion is scheduled for today
@@ -48,11 +45,21 @@
                 </div>
 
                 {{-- Details --}}
-                <p class="mt-5 px-8 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                    This permanently removes
-                    <strong class="font-medium text-gray-700 dark:text-gray-300">{{ $teamCount }} {{ Str::plural('workspace', $teamCount) }}</strong>
-                    along with every contact, company, opportunity, and note.
-                </p>
+                <div class="mt-5 space-y-2 px-8 text-center text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                    <p>
+                        {{ __('profile.scheduled_deletion_interstitial.details.account') }}
+                    </p>
+                    <p>
+                        {{ __('profile.scheduled_deletion_interstitial.details.deletion_date') }}
+                        <strong class="text-gray-950 dark:text-white">{{ $deletionDate->format('F j, Y') }}</strong>
+                    </p>
+                    <p>
+                        {{ trans_choice('profile.scheduled_deletion_interstitial.details.workspaces', $teamCount, ['count' => $teamCount]) }}
+                    </p>
+                    <p>
+                        {{ __('profile.scheduled_deletion_interstitial.details.shared_records') }}
+                    </p>
+                </div>
 
                 {{-- Actions --}}
                 <div class="mt-7 space-y-3 border-t border-gray-100 px-8 py-6 dark:border-white/5">
@@ -66,7 +73,7 @@
 
             {{-- Help text --}}
             <p class="mt-5 text-center text-xs text-gray-400 dark:text-gray-500">
-                Changed your mind? Keep your account above and everything is restored instantly.
+                {{ __('profile.scheduled_deletion_interstitial.help') }}
             </p>
         </div>
     </div>
