@@ -9,12 +9,12 @@
             }, { once: true });
 
             $wire.on('passkey-register', async () => {
-                this.startProcessing('{{ __('profile.sections.passkeys.registering') }}');
+                this.startProcessing(@js(__('profile.sections.passkeys.registering')));
 
                 try {
                     await window.Passkeys.register({ name: this.deviceLabel() });
 
-                    this.startProcessing('{{ __('profile.sections.passkeys.confirmed') }}');
+                    this.startProcessing(@js(__('profile.sections.passkeys.confirmed')));
                     await new Promise((resolve) => setTimeout(resolve, 600));
 
                     $wire.loadPasskeys();
@@ -22,7 +22,7 @@
                 } catch (e) {
                     this.stopProcessing();
 
-                    if (e?.constructor?.name === 'UserCancelledError') {
+                    if (e?.name === 'UserCancelledError') {
                         return;
                     }
 

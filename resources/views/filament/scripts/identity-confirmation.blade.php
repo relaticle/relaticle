@@ -39,7 +39,7 @@
             } catch (e) {
                 stopProcessing();
 
-                if (e?.constructor?.name === 'UserCancelledError') {
+                if (e?.name === 'UserCancelledError') {
                     return;
                 }
 
