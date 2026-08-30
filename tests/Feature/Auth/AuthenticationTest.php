@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Dashboard;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -469,13 +471,33 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
         ->call('authenticate')
         ->assertHasNoErrors();
 
-    $user = User::where('email', mb_strtolower($email))->first();
+    $user = User::where('email', $email)->first();
 
     expect($user)->not->toBeNull()
         ->and($user->hasVerifiedEmail())->toBeTrue();
 
     Notification::assertNotSentTo($user, VerifyEmail::class);
     Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->get($acceptUrl)->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
+});
+
+test('a fresh teamless signup lands on tenant registration, not the login page', function (): void {
+    $email = 'fresh-signup-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors()
+        ->assertRedirect(url()->getAppUrl());
+
+    $this->get(url()->getAppUrl())
+        ->assertRedirect(url()->getAppUrl('new'));
 });
 
 test('signup rejects a submission caught by the honeypot', function (): void {
@@ -535,6 +557,64 @@ test('signup rejects a duplicate email at submission', function (): void {
         ->assertHasFormErrors(['email']);
 
     expect(User::where('email', $email)->count())->toBe(1);
+});
+
+test('swapping the email after discovery via a wholesale data set does not create a user and still consumes a throttle hit', function (): void {
+    $discoveredEmail = 'discover-swap-source-'.uniqid().'@gmail.com';
+    $swappedEmail = 'discover-swap-target-'.uniqid().'@gmail.com';
+
+    $swappedKey = 'login-discover:'.mb_strtolower($swappedEmail).'|127.0.0.1';
+    RateLimiter::clear($swappedKey);
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $discoveredEmail])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->assertSet('discoveredEmail', mb_strtolower($discoveredEmail));
+
+    expect(RateLimiter::attempts($swappedKey))->toBe(0);
+
+    $component
+        ->set('data', ['email' => $swappedEmail, 'password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->assertSet('discoveredEmail', mb_strtolower($swappedEmail));
+
+    expect(RateLimiter::attempts($swappedKey))->toBe(1)
+        ->and(User::where('email', $swappedEmail)->exists())->toBeFalse()
+        ->and(User::where('email', $discoveredEmail)->exists())->toBeFalse();
+
+    $this->assertGuest();
+});
+
+test('a mixed-case signup can log back in using the same typed casing', function (): void {
+    $email = 'MixedCase-'.uniqid().'@Gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue()
+        ->and(User::where('email', mb_strtolower($email))->exists())->toBeFalse();
+
+    $this->assertAuthenticated();
+
+    auth()->guard('web')->logout();
+    $this->app['session']->flush();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'password')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $this->assertAuthenticated();
 });
 
 test('signup rejects a password shorter than 8 characters', function (): void {

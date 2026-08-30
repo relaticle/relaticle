@@ -23,6 +23,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -45,6 +46,9 @@ final class Login extends \Filament\Auth\Pages\Login
 
     #[Locked]
     public bool $passkeyUserHasPassword = false;
+
+    #[Locked]
+    public ?string $discoveredEmail = null;
 
     public HoneypotData $extraFields;
 
@@ -99,19 +103,36 @@ final class Login extends \Filament\Auth\Pages\Login
         $this->authMethod = 'password';
     }
 
-    protected function handleSignup(): LoginResponse
+    protected function handleSignup(): ?LoginResponse
     {
+        $submittedEmail = mb_strtolower(trim((string) ($this->data['email'] ?? '')));
+
+        if ($submittedEmail !== $this->discoveredEmail) {
+            $this->authMethod = null;
+            $this->passkeyUserHasPassword = false;
+            $this->discoveredEmail = null;
+            $this->discover();
+
+            return null;
+        }
+
         $this->protectAgainstSpam();
 
         $data = $this->form->getState();
 
-        $email = mb_strtolower(trim((string) $data['email']));
+        $email = trim((string) $data['email']);
 
-        $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
+        try {
+            $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'data.email' => __('validation.unique', ['attribute' => __('filament-panels::auth/pages/login.form.email.label')]),
+            ]);
+        }
 
         $invitation = $this->getTeamInvitationFromSession();
 
-        if ($invitation && mb_strtolower((string) $invitation->email) === $email && $user->markEmailAsVerified()) {
+        if ($invitation && $invitation->email === $email && $user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
@@ -195,6 +216,8 @@ final class Login extends \Filament\Auth\Pages\Login
 
         RateLimiter::hit($ipKey, 60);
         RateLimiter::hit($emailKey, 60);
+
+        $this->discoveredEmail = $email;
 
         $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
 
@@ -280,6 +303,7 @@ final class Login extends \Filament\Auth\Pages\Login
             ->afterStateUpdated(function (): void {
                 $this->authMethod = null;
                 $this->passkeyUserHasPassword = false;
+                $this->discoveredEmail = null;
             });
     }
 
