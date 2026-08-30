@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\PeopleField;
 use App\Jobs\SendEmailJob;
+use App\Models\CustomField;
+use App\Models\People;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
@@ -218,4 +221,158 @@ it('completes the batch when a later step fails after the provider already accep
         ->sent_count->toBe(1)
         ->failed_count->toBe(0)
         ->status->toBe(EmailBatchStatus::Completed);
+});
+
+it('retries linking after a post-send crash without double-counting the batch or CRM metrics', function (): void {
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->first();
+
+    if (! $emailsField) {
+        $this->markTestSkipped('No emails custom field seeded for this team.');
+    }
+
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Retry Link Person',
+        'creator_id' => $this->user->id,
+        'email_count' => 0,
+        'outbound_email_count' => 0,
+    ]);
+    $person->saveCustomFieldValue($emailsField, ['recipient@partner.com'], $this->team);
+
+    $batch = EmailBatch::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'total_recipients' => 1,
+        'sent_count' => 0,
+        'failed_count' => 0,
+        'status' => EmailBatchStatus::Sending,
+    ]);
+
+    $email = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'batch_id' => $batch->getKey(),
+        'status' => EmailStatus::SENDING,
+        'sent_at' => null,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'rfc_message_id' => '<send-job-link@example.com>',
+        'provider_message_id' => null,
+        'thread_id' => null,
+        'attempts' => 0,
+    ]);
+
+    $email->body()->create(['body_text' => 'hi', 'body_html' => '<p>hi</p>']);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'recipient@partner.com',
+    ]);
+
+    $mail = new class implements MailServiceInterface
+    {
+        public int $sendCount = 0;
+
+        public function fetchDelta(string $cursor): MailDeltaResult
+        {
+            throw new LogicException('unused');
+        }
+
+        public function fetchMessage(string $providerMessageId): FetchedEmailData
+        {
+            throw new LogicException('unused');
+        }
+
+        public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
+        {
+            throw new LogicException('unused');
+        }
+
+        public function sendMessage(array $data): array
+        {
+            $this->sendCount++;
+
+            return [
+                'provider_message_id' => 'sent-link-123',
+                'thread_id' => 'thread-link-123',
+                'rfc_message_id' => $data['rfc_message_id'] ?? '<derived-link@example.com>',
+            ];
+        }
+
+        public function findSentMessage(string $rfcMessageId): ?array
+        {
+            return null;
+        }
+
+        public function downloadAttachment(string $providerMessageId, string $providerAttachmentId): string
+        {
+            return '';
+        }
+    };
+
+    app()->bind(MailServiceFactoryInterface::class, fn (): MailServiceFactoryInterface => new class($mail) implements MailServiceFactoryInterface
+    {
+        public function __construct(private readonly MailServiceInterface $service) {}
+
+        public function make(ConnectedAccount $account): MailServiceInterface
+        {
+            return $this->service;
+        }
+    });
+
+    $throwOnLink = false;
+    Email::updated(function (Email $updated) use (&$throwOnLink): void {
+        if ($updated->status === EmailStatus::SENT) {
+            $throwOnLink = true;
+        }
+    });
+    EmailParticipant::retrieved(function () use (&$throwOnLink): void {
+        if (! $throwOnLink) {
+            return;
+        }
+
+        $throwOnLink = false;
+
+        throw new RuntimeException('link failed');
+    });
+
+    $job = new SendEmailJob($email->getKey());
+    $sendingService = app(EmailSendingService::class);
+    $linkEmailAction = app(LinkEmailAction::class);
+
+    expect(fn () => $job->handle($sendingService, $linkEmailAction))
+        ->toThrow(RuntimeException::class);
+
+    expect($email->fresh()->status)->toBe(EmailStatus::SENT)
+        ->and($email->people()->whereKey($person->getKey())->exists())->toBeFalse()
+        ->and($mail->sendCount)->toBe(1);
+
+    $job->handle($sendingService, $linkEmailAction);
+
+    expect($email->fresh()->status)->toBe(EmailStatus::SENT)
+        ->and($email->people()->whereKey($person->getKey())->exists())->toBeTrue()
+        ->and($person->fresh()->email_count)->toBe(1)
+        ->and($person->fresh()->outbound_email_count)->toBe(1)
+        ->and($mail->sendCount)->toBe(1)
+        ->and($batch->fresh())
+        ->sent_count->toBe(1)
+        ->failed_count->toBe(0)
+        ->status->toBe(EmailBatchStatus::Completed);
+
+    $job->handle($sendingService, $linkEmailAction);
+    $job->failed(new RuntimeException('link failed'));
+
+    expect($person->fresh()->email_count)->toBe(1)
+        ->and($batch->fresh())
+        ->sent_count->toBe(1)
+        ->failed_count->toBe(0)
+        ->status->toBe(EmailBatchStatus::Completed)
+        ->and($mail->sendCount)->toBe(1);
 });

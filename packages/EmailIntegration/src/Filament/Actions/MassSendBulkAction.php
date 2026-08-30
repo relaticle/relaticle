@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\Actions;
 
 use App\Enums\CustomFields\PeopleField;
+use App\Features\EmailIntegration;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Team;
@@ -18,6 +19,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
@@ -40,7 +42,9 @@ final class MassSendBulkAction extends BulkAction
                 /** @var Team|null $team */
                 $team = filament()->getTenant();
 
-                return $user instanceof User && ConnectedAccount::hasActiveFor($user, $team);
+                return Feature::active(EmailIntegration::class)
+                    && $user instanceof User
+                    && ConnectedAccount::hasActiveFor($user, $team);
             })
             ->schema([
                 Select::make('connected_account_id')

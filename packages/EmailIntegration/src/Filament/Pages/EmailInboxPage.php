@@ -509,6 +509,29 @@ final class EmailInboxPage extends Page
         Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
     }
 
+    /**
+     * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
+     * reader out of their participant line: repeating your own address on every row
+     * says nothing, and it is the widest thing on the row.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function ownEmailAddresses(): array
+    {
+        $user = $this->authUser();
+
+        /** @var list<string> */
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->pluck('email_address')
+            ->map(fn (mixed $address): string => mb_strtolower((string) $address))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function approveAccessRequestAction(): Action
     {
         return Action::make('approveAccessRequest')

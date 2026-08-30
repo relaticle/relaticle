@@ -19,6 +19,8 @@ use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
+use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
+use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
@@ -103,6 +105,8 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             $this->commands([
                 BackfillEmailThreadsCommand::class,
                 DispatchOutboxCommand::class,
+                IncrementalCalendarSyncCommand::class,
+                IncrementalEmailSyncCommand::class,
             ]);
         }
     }
