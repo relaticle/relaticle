@@ -48,7 +48,24 @@
                 @php($navItems = app(\App\Support\MarketingNavigation::class)->header())
 
                 <nav aria-label="{{ __('Main') }}" class="hidden md:flex items-center gap-1"
-                     x-data="{ openDropdown: null }"
+                     x-data="{
+                         openDropdown: null,
+                         closeTimer: null,
+                         openOnHover(slug) {
+                             clearTimeout(this.closeTimer)
+                             // Switching between triggers while one is already open is instant —
+                             // only the very first open of a hover session gets the settle delay,
+                             // so a fast pass across the bar doesn't flicker every panel it crosses.
+                             if (this.openDropdown) { this.openDropdown = slug; return }
+                             this.hoverTimer = setTimeout(() => { this.openDropdown = slug }, 90)
+                         },
+                         cancelHoverOpen() { clearTimeout(this.hoverTimer) },
+                         closeOnHoverLeave(slug) {
+                             this.closeTimer = setTimeout(() => {
+                                 if (this.openDropdown === slug) { this.openDropdown = null }
+                             }, 200)
+                         },
+                     }"
                      @keydown.escape.window="openDropdown = null"
                      @click.outside="openDropdown = null">
                     @foreach($navItems as $item)
@@ -56,14 +73,16 @@
                             @php($slug = \Illuminate\Support\Str::slug($item->label))
                             @php($isTwoColumn = collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0))
                             <div class="relative" x-data="{ slug: '{{ $slug }}' }"
-                                 @keydown.escape="if (openDropdown === slug) { openDropdown = null; $refs.trigger.focus(); }">
+                                 @keydown.escape="if (openDropdown === slug) { openDropdown = null; $refs.trigger.focus(); }"
+                                 @mouseenter="openOnHover(slug)"
+                                 @mouseleave="cancelHoverOpen(); closeOnHoverLeave(slug)">
                                 <button type="button" x-ref="trigger"
                                         @click="openDropdown = openDropdown === slug ? null : slug"
                                         aria-haspopup="true"
                                         :aria-expanded="openDropdown === slug"
                                         aria-controls="menu-{{ $slug }}"
-                                        class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                                        :class="openDropdown === slug && 'text-gray-900 dark:text-white'">
+                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                                        :class="openDropdown === slug && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
                                     <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-150"
                                                              ::class="openDropdown === slug && 'rotate-180'"/>
