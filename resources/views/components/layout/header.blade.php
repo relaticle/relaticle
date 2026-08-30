@@ -62,6 +62,7 @@
                          outgoingDropdown: null,
                          direction: 1,
                          closeTimer: null,
+                         lastPanelStyle: '',
                          swapTimer: null,
                          order: {{ Illuminate\Support\Js::from($dropdownSlugs) }},
                          twoColumn: {{ Illuminate\Support\Js::from($twoColumnBySlug) }},
@@ -85,10 +86,22 @@
                          // no incoming layer to slide past.
                          closeAll() {
                              clearTimeout(this.swapTimer)
-                             const wasOpen = this.openDropdown
+                             // outgoingDropdown is set BEFORE openDropdown clears, so
+                             // `openDropdown ?? outgoingDropdown` is never null-null on the same
+                             // tick — a gap there sends panelStyle() an unresolvable slug, which
+                             // drops the inline width/height and collapses the card to a stray dot.
+                             this.outgoingDropdown = this.openDropdown
                              this.openDropdown = null
-                             this.outgoingDropdown = wasOpen
-                             this.swapTimer = setTimeout(() => { this.outgoingDropdown = null }, 220)
+                             // Alpine's own x-show leave transition on the card (driven purely by
+                             // openDropdown, not outgoingDropdown) already runs and finishes on
+                             // its own. Writing to outgoingDropdown again afterwards was enough to
+                             // make Alpine re-run that transition's bookkeeping and re-show the
+                             // card at a collapsed size — so only clear it if a NEW open hasn't
+                             // already claimed it (swapTo re-purposes the same field).
+                             const closingSlug = this.outgoingDropdown
+                             this.swapTimer = setTimeout(() => {
+                                 if (this.outgoingDropdown === closingSlug) { this.outgoingDropdown = null }
+                             }, 220)
                          },
                          // Sets the sweep direction before switching content, so both layers
                          // that are about to render already know which way to move.
@@ -111,14 +124,19 @@
                              this.swapTo(slug)
                          },
                          panelStyle(slug, isTwoColumn) {
+                             // Falls back to the last resolved position instead of an empty
+                             // string: an empty style drops the inline width, and with no
+                             // content driving height either (mid-close, mid-swap), the card
+                             // collapses to a stray dot for a frame instead of holding still.
                              const trigger = this.$refs['trigger-' + slug]
-                             if (!trigger) { return '' }
+                             if (!trigger) { return this.lastPanelStyle }
                              const nav = trigger.closest('nav').getBoundingClientRect()
                              const rect = trigger.getBoundingClientRect()
                              const width = isTwoColumn ? Math.min(640, window.innerWidth - 32) : 384
                              let left = (rect.left - nav.left) + rect.width / 2 - width / 2
                              left = Math.max(0, Math.min(left, nav.width - width))
-                             return `left:${left}px;width:${width}px`
+                             this.lastPanelStyle = `left:${left}px;width:${width}px`
+                             return this.lastPanelStyle
                          },
                      }"
                      @keydown.escape.window="closeAll()"
@@ -171,10 +189,16 @@
                          x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                          x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.97]"
                          x-cloak
-                         x-bind:style="panelStyle(openDropdown ?? outgoingDropdown, twoColumn[openDropdown ?? outgoingDropdown])"
+                         {{-- Only recomputes while a dropdown is genuinely open. Once
+                              openDropdown clears, this stops re-evaluating — leaving it wired to
+                              outgoingDropdown too meant the later `outgoingDropdown = null` write
+                              (well after the close transition finished) re-ran this binding and
+                              overwrote Alpine's own `display:none` with a bare left/width string,
+                              silently re-showing the card at a collapsed size. --}}
+                         x-bind:style="openDropdown ? panelStyle(openDropdown, twoColumn[openDropdown]) : lastPanelStyle"
                          @mouseenter="cancelHoverOpen(); clearTimeout(closeTimer)"
                          @mouseleave="closeOnHoverLeave(openDropdown)"
-                         class="absolute top-full mt-2 origin-top rounded-2xl border border-gray-200/70 dark:border-white/[0.08] bg-white dark:bg-gray-900 shadow-xl shadow-gray-950/[0.08] dark:shadow-black/50 overflow-hidden transition-[left,width] duration-200 ease-[var(--ease-out-expo)]">
+                         class="absolute top-full mt-2 origin-top rounded-2xl border border-gray-200/70 dark:border-white/[0.08] bg-white dark:bg-gray-900 shadow-xl shadow-gray-950/[0.08] dark:shadow-black/50 overflow-hidden">
                         <div class="relative">
                             @foreach($dropdownItems as $item)
                                 @php($slug = $dropdownSlugs[$loop->index])
