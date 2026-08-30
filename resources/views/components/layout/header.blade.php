@@ -156,7 +156,7 @@
                          x-transition:enter="transition-[translate,scale,opacity] duration-250 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
                          x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.97]"
                          x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                         x-transition:leave="transition-[translate,scale,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
+                         x-transition:leave="transition-[translate,scale,opacity] duration-150 ease-out motion-reduce:transition-none"
                          x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                          x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.97]"
                          x-cloak
