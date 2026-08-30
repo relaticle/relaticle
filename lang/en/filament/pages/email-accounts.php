@@ -24,6 +24,11 @@ return [
             'fallback_provider' => 'the provider',
         ],
         'sync_calendar_now' => 'Sync now',
+        'reimport_history' => [
+            'label' => 'Re-import history',
+            'heading' => 'Re-import mailbox history?',
+            'description' => 'Already synced mail and events stay in Relaticle. We will create missing people and companies using the current workspace record-creation setting, and import any messages not stored yet. This can take a while on a large mailbox.',
+        ],
     ],
     'settings' => [
         'sync_inbox' => [
@@ -59,6 +64,10 @@ return [
         'default_set' => [
             'title' => 'Default account updated.',
             'body' => ':email is now your default sending account.',
+        ],
+        'reimport_queued' => [
+            'title' => 'History import queued.',
+            'body' => 'People and companies will appear as the import runs. You can keep using Relaticle.',
         ],
     ],
     'default_badge' => 'Default',

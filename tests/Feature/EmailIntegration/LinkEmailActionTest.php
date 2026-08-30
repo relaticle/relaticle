@@ -635,6 +635,42 @@ it('increments person email_count when linked', function (): void {
         ->and($person->fresh()->outbound_email_count)->toBe(0);
 });
 
+it('does not increment person email_count when the same email is linked again', function (): void {
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if (! $emailField) {
+        $this->markTestSkipped('No emails custom field seeded for this team.');
+    }
+
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Metric Person',
+        'creator_id' => $this->user->id,
+        'email_count' => 0,
+    ]);
+
+    $person->saveCustomFieldValue($emailField, ['metric@company.com'], $this->team);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'metric@company.com',
+    ]);
+
+    $action = app(LinkEmailAction::class);
+    $action->execute($email);
+    $action->execute($email);
+
+    expect($person->fresh()->email_count)->toBe(1)
+        ->and($person->fresh()->inbound_email_count)->toBe(1);
+});
+
 it('also links email to opportunity via person relationship', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()

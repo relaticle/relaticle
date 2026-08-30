@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -65,9 +66,8 @@ final readonly class LinkEmailAction
 
                 if ($company instanceof Company) {
                     $participant->update(['company_id' => $company->getKey()]);
-                    $email->companies()->syncWithoutDetaching([$company->getKey()]);
 
-                    if (! isset($countedCompanies[$company->getKey()])) {
+                    if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
                         $countedCompanies[$company->getKey()] = true;
                         $this->incrementEmailMetrics($company, $email);
                     }
@@ -96,27 +96,22 @@ final readonly class LinkEmailAction
 
             if ($person) {
                 $participant->update(['contact_id' => $person->getKey()]);
-                $email->people()->syncWithoutDetaching([$person->getKey()]);
 
-                if (! isset($countedPeople[$person->getKey()])) {
+                if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
                     $this->incrementEmailMetrics($person, $email);
                 }
 
-                // Link to person's company if set.
                 if ($person->company_id) {
-                    $email->companies()->syncWithoutDetaching([$person->company_id]);
+                    $this->autoAttach($email->companies(), $person->company_id);
                 }
 
-                // Link to person's opportunities.
                 $opportunities = Opportunity::query()->where('team_id', $teamId)
                     ->where('contact_id', $person->getKey())
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    $email->opportunities()->syncWithoutDetaching([$opportunity->getKey()]);
-
-                    if (! isset($countedOpportunities[$opportunity->getKey()])) {
+                    if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
                         $this->incrementEmailMetrics($opportunity, $email);
                     }
@@ -181,6 +176,26 @@ final readonly class LinkEmailAction
         $parts = explode('@', $email);
 
         return count($parts) === 2 ? strtolower($parts[1]) : null;
+    }
+
+    /**
+     * Attaches a record to the email via the given morph relation if not already linked.
+     * Returns true only when a new pivot row was created, so metric increments stay
+     * one-shot across history re-import of the same message.
+     *
+     * @template TRelated of Model
+     *
+     * @param  MorphToMany<TRelated, Email>  $relation
+     */
+    private function autoAttach(MorphToMany $relation, string $relatedId): bool
+    {
+        if ($relation->whereKey($relatedId)->exists()) {
+            return false;
+        }
+
+        $relation->attach($relatedId, ['link_source' => 'auto']);
+
+        return true;
     }
 
     /**

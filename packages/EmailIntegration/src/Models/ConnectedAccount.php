@@ -8,7 +8,6 @@ use App\Models\Concerns\HasTeam;
 use App\Models\Team;
 use App\Models\User;
 use Database\Factories\ConnectedAccountFactory;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -22,7 +21,6 @@ use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
-use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
 
 /**
  * @property string $id
@@ -47,7 +45,6 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property string|null $calendar_sync_cursor
  * @property Carbon|null $last_calendar_synced_at
  */
-#[ObservedBy(ConnectedAccountObserver::class)]
 final class ConnectedAccount extends Model
 {
     /**

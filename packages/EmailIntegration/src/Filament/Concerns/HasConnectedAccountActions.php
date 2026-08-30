@@ -14,6 +14,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
+use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -56,6 +57,7 @@ trait HasConnectedAccountActions
                     EmailAccountStatus::ERROR,
                 ], true)),
             ($this->syncCalendarNowAction())($arguments),
+            ($this->reimportHistoryAction())($arguments),
             ($this->syncCalendarAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
             ($this->disconnectAction())($arguments),
@@ -130,6 +132,29 @@ trait HasConnectedAccountActions
                     ->success()
                     ->title(__('filament/pages/email-accounts.notifications.calendar_sync_queued.title'))
                     ->body(__('filament/pages/email-accounts.notifications.calendar_sync_queued.body'))
+                    ->send();
+            });
+    }
+
+    public function reimportHistoryAction(): Action
+    {
+        return Action::make('reimportHistory')
+            ->label(__('filament/pages/email-accounts.actions.reimport_history.label'))
+            ->icon('heroicon-o-arrow-path')
+            ->color('gray')
+            ->size(Size::Small)
+            ->requiresConfirmation()
+            ->modalHeading(__('filament/pages/email-accounts.actions.reimport_history.heading'))
+            ->modalDescription(__('filament/pages/email-accounts.actions.reimport_history.description'))
+            ->action(function (array $arguments): void {
+                $account = $this->findOwnedAccountOrFail($arguments);
+
+                resolve(StartMailboxHistoryImportAction::class)->execute($account);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-accounts.notifications.reimport_queued.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.reimport_queued.body'))
                     ->send();
             });
     }

@@ -10,9 +10,13 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class ConnectAccountAction
 {
+    public function __construct(
+        private StartMailboxHistoryImportAction $startMailboxHistoryImport,
+    ) {}
+
     public function execute(ConnectAccountData $data): ConnectedAccount
     {
-        return DB::transaction(function () use ($data): ConnectedAccount {
+        $account = DB::transaction(function () use ($data): ConnectedAccount {
             // Match against trashed rows too: the unique index spans soft-deleted
             // records, so a previously disconnected account must be reused and
             // restored rather than inserted again.
@@ -67,5 +71,9 @@ final readonly class ConnectAccountAction
 
             return $account;
         });
+
+        $this->startMailboxHistoryImport->execute($account);
+
+        return $account;
     }
 }
