@@ -226,3 +226,19 @@
         transition: none;
     }
 }
+
+/* Open-canvas auth surface: no card chrome, just the page wash behind a
+   centered column. Scoped off the onboarding wizard, which strips
+   fi-simple-main down to a transparent, borderless shell for its own
+   split-screen layout. */
+.fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-layout {
+    @apply flex-col bg-gray-50 dark:bg-gray-950;
+}
+
+.fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-main-ctn {
+    @apply flex-1;
+}
+
+.fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-main {
+    @apply bg-transparent shadow-none ring-0 dark:bg-transparent dark:ring-0;
+}

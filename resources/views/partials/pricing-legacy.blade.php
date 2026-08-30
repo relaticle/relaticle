@@ -69,7 +69,7 @@
             </div>
         </div>
 
-        <x-marketing.button href="{{ route('register') }}">
+        <x-marketing.button href="{{ route('login') }}">
             Start for free
         </x-marketing.button>
         </div>

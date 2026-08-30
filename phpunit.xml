@@ -55,6 +55,7 @@
         <env name="OPENAI_API_KEY" value="fake-openai-key"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="AUTH_TIMEBOX_DURATION" value="1000"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <!-- DB_DATABASE deliberately comes from .env.testing so parallel
              workspaces can isolate their testing databases; CI pins its own

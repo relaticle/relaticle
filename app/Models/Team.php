@@ -88,7 +88,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         'login', 'logout', 'register', 'signin', 'signout', 'signup',
         'auth', 'oauth', 'sso', 'callback', '.well-known',
         'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
-        'confirm-password', 'two-factor-challenge',
+        'confirm-password', 'two-factor-challenge', 'passkeys',
 
         // Administration
         'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',

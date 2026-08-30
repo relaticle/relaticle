@@ -47,10 +47,7 @@ it('opens a picker when @ is typed and inserts a chip on selection', function ()
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -91,10 +88,7 @@ it('does not open the picker for queries shorter than 2 chars', function (): voi
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -116,10 +110,7 @@ it('closes the picker when Escape is pressed', function (): void {
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'EscapeCo']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -146,10 +137,7 @@ it('closes the picker when the query drops below the 2-char minimum', function (
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -178,10 +166,7 @@ it('searches across a multi-word company name', function (): void {
     Company::factory()->for($team)->create(['name' => 'Acme Corp']);
     Company::factory()->for($team)->create(['name' => 'Globex']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -200,10 +185,7 @@ it('removes a selected mention chip with backspace', function (): void {
     $team = $user->ownedTeams()->first();
     Company::factory()->for($team)->create(['name' => 'AcmeQA']);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');

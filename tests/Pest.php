@@ -19,6 +19,7 @@ use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
@@ -93,4 +94,17 @@ function userChannelAuth(User $user, string $id): bool
     }
 
     return (bool) $callback($user, $id);
+}
+
+/**
+ * Log in through the real two-step login form: type the email and submit to
+ * reveal the password field, then type the password and submit again.
+ */
+function loginViaBrowser(User $user): AwaitableWebpage
+{
+    return test()->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
+        ->type('[id="form.password"]', 'password')
+        ->click('button[type="submit"]');
 }

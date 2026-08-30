@@ -2,41 +2,23 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 
-mutates(Register::class);
+mutates(Login::class);
 
-it('registers a new user without creating a team', function (): void {
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-test@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+it('flags the session for signup analytics tracking on signup', function (): void {
+    $email = 'jane-track-'.uniqid().'@gmail.com';
 
-    $user = User::where('email', 'jane-test@gmail.com')->first();
-
-    expect($user)->not->toBeNull()
-        ->and($user->ownedTeams)->toBeEmpty()
-        ->and($user->personalTeam())->toBeNull();
-});
-
-it('flags the session for signup analytics tracking on registration', function (): void {
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-track@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
         ->assertHasNoFormErrors();
 
     expect(session()->get('fathom.track_signup'))->toBeTrue();
@@ -68,43 +50,41 @@ it('keeps panel auth pages out of tenant-slug normalization', function (): void 
         ->and($html)->toContain("'/email-verification'");
 });
 
-it('rejects registration from a disposable email domain', function (): void {
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Burner User',
-            'email' => 'burner@mailinator.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
+it('rejects a signup from a disposable email domain', function (): void {
+    $email = 'burner-'.uniqid().'@mailinator.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
         ->assertHasFormErrors(['email']);
 
-    expect(User::where('email', 'burner@mailinator.com')->exists())->toBeFalse();
+    expect(User::where('email', $email)->exists())->toBeFalse();
 });
 
 it('rejects a disposable email in the active locale', function (): void {
     app()->setLocale('fr');
 
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Burner User',
-            'email' => 'burner-fr@mailinator.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
+    $email = 'burner-fr-'.uniqid().'@mailinator.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
         ->assertHasFormErrors(['email' => 'Les adresses e-mail jetables ne sont pas autorisées.']);
 });
 
-it('rejects registration from a subdomain of a disposable email domain', function (string $email): void {
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Burner User',
-            'email' => $email,
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
+it('rejects a signup from a subdomain of a disposable email domain', function (string $email): void {
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
         ->assertHasFormErrors(['email' => 'indisposable']);
 
     expect(User::where('email', $email)->exists())->toBeFalse();
@@ -128,14 +108,12 @@ it('never treats a whitelisted domain as disposable, even when the upstream list
     DisposableDomains::clearResolvedInstance('disposable_email.domains');
 
     try {
-        livewire(Register::class)
-            ->fillForm([
-                'name' => 'Jane Doe',
-                'email' => $email,
-                'password' => 'Password123!',
-                'passwordConfirmation' => 'Password123!',
-            ])
-            ->call('register')
+        livewire(Login::class)
+            ->fillForm(['email' => $email])
+            ->call('authenticate')
+            ->assertSet('authMethod', 'signup')
+            ->fillForm(['password' => 'Password123!'])
+            ->call('authenticate')
             ->assertHasNoFormErrors();
     } finally {
         File::delete($storagePath);
@@ -147,68 +125,25 @@ it('never treats a whitelisted domain as disposable, even when the upstream list
     'jane-whitelisted@relaticle.com',
 ]);
 
-it('rejects registration when the honeypot field is filled', function (): void {
-    config(['honeypot.enabled' => true]);
-
-    $component = livewire(Register::class)
-        ->fillForm([
-            'name' => 'Bot User',
-            'email' => 'bot-honeypot@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ]);
-
-    $this->travel(2)->seconds();
-
-    $component
-        ->set('extraFields.my_name', 'I fill every field I see')
-        ->call('register')
-        ->assertForbidden();
-
-    expect(User::where('email', 'bot-honeypot@gmail.com')->exists())->toBeFalse();
-});
-
-it('rejects a registration submitted faster than a human could', function (): void {
+it('rejects a signup submitted faster than a human could type', function (): void {
     config(['honeypot.enabled' => true]);
     $this->freezeTime();
 
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Fast Bot',
-            'email' => 'bot-instant@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ])
-        ->call('register')
-        ->assertForbidden();
+    $email = 'bot-instant-'.uniqid().'@gmail.com';
 
-    expect(User::where('email', 'bot-instant@gmail.com')->exists())->toBeFalse();
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertForbidden()
+        ->assertSet('authMethod', null);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
 });
 
-it('registers normally when the honeypot stays empty and enough time has passed', function (): void {
+it('renders the honeypot fields on the login page', function (): void {
     config(['honeypot.enabled' => true]);
 
-    $component = livewire(Register::class)
-        ->fillForm([
-            'name' => 'Jane Doe',
-            'email' => 'jane-honeypot-ok@gmail.com',
-            'password' => 'Password123!',
-            'passwordConfirmation' => 'Password123!',
-        ]);
-
-    $this->travel(2)->seconds();
-
-    $component
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    expect(User::where('email', 'jane-honeypot-ok@gmail.com')->exists())->toBeTrue();
-});
-
-it('renders the honeypot fields inside the registration page', function (): void {
-    config(['honeypot.enabled' => true]);
-
-    livewire(Register::class)
+    livewire(Login::class)
         ->assertSee('name="my_name', escape: false)
         ->assertSee('name="valid_from"', escape: false);
 });
@@ -224,8 +159,12 @@ it('does not expose a fortify registration endpoint', function (): void {
     expect(User::where('email', 'burner-fortify@mailinator.com')->exists())->toBeFalse();
 });
 
-it('redirects the bare register path to the panel register page', function (): void {
-    $this->get('/register')->assertRedirect(url()->getAppUrl('register'));
+it('redirects the bare register path to the login page', function (): void {
+    $this->get('/register')->assertRedirect(url()->getAppUrl('login'));
+});
+
+it('redirects the old panel register url to the login page', function (): void {
+    $this->get(url()->getAppUrl('register'))->assertRedirect(url()->getAppUrl('login'));
 });
 
 it('renders the workspace created event once and clears the flag', function (): void {

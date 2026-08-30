@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Profile;
 
+use App\Actions\Profile\DestroyOtherBrowserSessions;
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
-use Filament\Actions\Action;
-use Filament\Forms;
+use App\Support\Auth\IdentityConfirmation;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -15,82 +17,60 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Session;
 use Laravel\Jetstream\Agent;
 
 final class LogoutOtherBrowserSessions extends BaseLivewireComponent
 {
     public function form(Schema $schema): Schema
     {
-        $hasPassword = $this->authUser()->hasPassword();
-
         return $schema
             ->schema([
                 Section::make(__('profile.sections.browser_sessions.title'))
                     ->description(__('profile.sections.browser_sessions.description'))
                     ->aside()
                     ->schema([
-                        Forms\Components\ViewField::make('browserSessions')
+                        ViewField::make('browserSessions')
                             ->hiddenLabel()
                             ->view('components.browser-sessions')
                             ->viewData(['sessions' => $this->browserSessions()]),
                         Actions::make([
-                            Action::make('deleteBrowserSessions')
-                                ->label(__('profile.actions.log_out_other_browsers'))
-                                ->requiresConfirmation()
-                                ->modalHeading(__('profile.modals.log_out_other_browsers.title'))
-                                ->modalDescription($hasPassword ? __('profile.modals.log_out_other_browsers.description') : __('profile.modals.log_out_other_browsers.description_no_password'))
-                                ->modalSubmitActionLabel(__('profile.actions.log_out_other_browsers'))
-                                ->modalCancelAction(false)
-                                ->schema($hasPassword ? [
-                                    Forms\Components\TextInput::make('password')
-                                        ->password()
-                                        ->revealable()
-                                        ->label(__('profile.form.password.label'))
-                                        ->required()
-                                        ->currentPassword(),
-                                ] : [])
-                                ->action(
-                                    fn (array $data) => $this->logoutOtherBrowserSessions($data['password'] ?? null)
-                                ),
+                            $this->deleteBrowserSessionsAction(),
                         ]),
                     ]),
             ]);
     }
 
-    /**
-     * @throws ValidationException
-     */
-    public function logoutOtherBrowserSessions(?string $password): void
+    public function deleteBrowserSessionsAction(): ConfirmIdentityAction
+    {
+        return ConfirmIdentityAction::make('deleteBrowserSessions')
+            ->label(__('profile.actions.log_out_other_browsers'))
+            ->modalHeading(__('profile.modals.log_out_other_browsers.title'))
+            ->modalDescription(__('profile.modals.log_out_other_browsers.description'))
+            ->modalSubmitActionLabel(__('profile.actions.log_out_other_browsers'))
+            ->modalCancelAction(false)
+            ->confirmedUsing(fn () => $this->logoutOtherBrowserSessions());
+    }
+
+    public function logoutOtherBrowserSessions(): void
     {
         $user = $this->authUser();
 
-        if ($user->hasPassword() && ! Hash::check((string) $password, $user->password ?? '')) {
-            throw ValidationException::withMessages([
-                'password' => __('auth.password'),
-            ]);
+        if (! IdentityConfirmation::satisfied($user)) {
+            $this->notifyIdentityConfirmationFailed();
+
+            return;
         }
 
         if (config('session.driver') !== 'database') {
             return;
         }
 
-        if ($password !== null) {
-            auth(filament()->getAuthGuard())->logoutOtherDevices($password);
-        }
+        resolve(DestroyOtherBrowserSessions::class)->execute($user, Session::getId());
 
-        DB::connection(config('session.connection'))
-            ->table(config('session.table', 'sessions'))
-            ->where('user_id', filament()->auth()->user()->getAuthIdentifier())
-            ->where('id', '!=', request()->session()->getId())
-            ->delete();
-
-        request()
-            ->session()
-            ->put([
-                'password_hash_'.Auth::getDefaultDriver() => filament()->auth()->user()->getAuthPassword(),
-            ]);
+        Session::put([
+            'password_hash_'.Auth::getDefaultDriver() => $user->getAuthPassword(),
+        ]);
 
         $this->sendNotification(__('profile.notifications.logged_out_other_sessions.success'));
     }
@@ -118,7 +98,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
                 return (object) [
                     'agent' => $agent,
                     'ip_address' => $session->ip_address,
-                    'is_current_device' => $session->id === request()->session()->getId(),
+                    'is_current_device' => $session->id === Session::getId(),
                     'last_active' => Date::createFromTimestamp($session->last_activity)->diffForHumans(),
                 ];
             });

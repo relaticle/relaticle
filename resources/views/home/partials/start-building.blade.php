@@ -30,7 +30,7 @@
             </p>
 
             <div class="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     Start for free
                 </x-marketing.button>
 

@@ -38,6 +38,10 @@ return [
             'invite_subheading' => 'Invite your team to collaborate',
         ],
         'form' => [
+            'your_name' => [
+                'label' => 'Your name',
+                'placeholder' => 'Jane Doe',
+            ],
             'workspace_name' => [
                 'label' => 'Workspace name',
                 'placeholder' => 'Acme Corp',

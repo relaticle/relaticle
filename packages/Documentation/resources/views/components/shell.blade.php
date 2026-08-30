@@ -148,7 +148,7 @@
                    class="hidden rounded-lg px-2 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:text-gray-900 sm:block dark:text-gray-400 dark:hover:text-white">
                     {{ __('Sign in') }}
                 </a>
-                <x-marketing.button size="sm" href="{{ route('register') }}" class="whitespace-nowrap">
+                <x-marketing.button size="sm" href="{{ route('login') }}" class="whitespace-nowrap">
                     {{ __('Start for free') }}
                 </x-marketing.button>
             </div>

@@ -57,7 +57,7 @@
                 </ul>
             </div>
 
-            <x-marketing.button href="{{ route('register') }}">
+            <x-marketing.button href="{{ route('login') }}">
                 Start your 14-day trial — no card
             </x-marketing.button>
             <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500" x-text="yearly ? '$228 billed yearly · save $60' : 'Billed monthly · cancel anytime'">

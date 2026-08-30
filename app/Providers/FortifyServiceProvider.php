@@ -9,6 +9,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Http\Responses\PasskeyLoginResponse;
 use Filament\Facades\Filament;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\RedirectResponse;
@@ -17,20 +18,16 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
         $this->app->singleton(CreatesNewSocialUsers::class, CreateNewSocialUser::class);
+        $this->app->singleton(PasskeyLoginResponseContract::class, PasskeyLoginResponse::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
@@ -52,5 +49,14 @@ final class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+
+        /**
+         * Every passkey ceremony costs two requests (options, then assertion), so this
+         * allows far more than a person can perform while still capping scripted
+         * assertion verification. Keyed per user where the route is authenticated, so
+         * shared egress IPs only aggregate on the guest login endpoint.
+         */
+        RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(30)
+            ->by($request->user()?->getAuthIdentifier() ?? (string) $request->ip()));
     }
 }

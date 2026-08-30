@@ -71,14 +71,17 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('keeps the socialite redirect on the requesting host so the oauth redirect_uri does not change', function (): void {
-        config(['services.github.client_id' => 'test-client-id']);
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => '/auth/callback/google',
+        ]);
 
-        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/github')
+        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/google')
             ->assertStatus(302)
             ->headers->get('Location');
 
-        expect($location)->toStartWith('https://github.com/login/oauth/authorize');
-        expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/github');
+        expect($location)->toStartWith('https://accounts.google.com/o/oauth2/auth');
+        expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/google');
     });
 
     it('leaves filament export downloads untouched', function (): void {

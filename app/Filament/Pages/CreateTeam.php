@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Actions\Jetstream\InviteTeamMember;
+use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\TeamRole;
@@ -440,12 +441,24 @@ final class CreateTeam extends RegisterTenant
         $appHost = parse_url(url()->getAppUrl(), PHP_URL_HOST);
 
         return [
+            TextInput::make('user_name')
+                ->label(__('filament/pages/teams.create_team.form.your_name.label'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('filament/pages/teams.create_team.form.your_name.placeholder'))
+                ->autofocus()
+                ->default(function (): string {
+                    /** @var User $user */
+                    $user = auth('web')->user();
+
+                    return $user->name;
+                }),
+
             TextInput::make('name')
                 ->label(__('filament/pages/teams.create_team.form.workspace_name.label'))
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/teams.create_team.form.workspace_name.placeholder'))
-                ->autofocus()
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
@@ -551,6 +564,8 @@ final class CreateTeam extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
+        $this->updateUserNameIfChanged($user, $data);
+
         // The tenant may already be set if the user clicked "Copy invite link" earlier
         // in the wizard, which pre-creates the team so the invite URL can exist.
         // Reconcile name/slug here so later edits don't silently disappear — a regression
@@ -578,6 +593,20 @@ final class CreateTeam extends RegisterTenant
         $this->sendOnboardingInvites($user, $team, $data);
 
         return $team;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function updateUserNameIfChanged(User $user, array $data): void
+    {
+        $name = $data['user_name'] ?? null;
+
+        if (! is_string($name) || $name === $user->name) {
+            return;
+        }
+
+        resolve(UpdateUserName::class)->execute($user, $name);
     }
 
     /**

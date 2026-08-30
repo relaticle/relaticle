@@ -228,7 +228,7 @@ describe('Authentication redirects', function () {
     it('redirects register to app panel', function () {
         $response = $this->get('/register');
 
-        $response->assertRedirect(url()->getAppUrl('register'));
+        $response->assertRedirect(url()->getAppUrl('login'));
     });
 
     it('redirects forgot password to app panel', function () {
@@ -267,10 +267,10 @@ describe('Social authentication routes', function () {
         $response->assertStatus(429); // Too Many Requests
     });
 
-    it('accepts github as a provider for redirect', function () {
+    it('rejects github as a provider for redirect', function () {
         $response = $this->get('/auth/redirect/github');
 
-        $response->assertStatus(302); // Redirect to GitHub
+        $response->assertNotFound();
     });
 
     it('accepts google as a provider for redirect', function () {

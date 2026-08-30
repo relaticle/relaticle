@@ -180,7 +180,7 @@
                     {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan — both run the same open-source codebase.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <x-marketing.button href="{{ route('register') }}">
+                    <x-marketing.button href="{{ route('login') }}">
                         {{ __('Start for free') }}
                     </x-marketing.button>
                     <x-marketing.button variant="secondary" href="{{ route('contact') }}">

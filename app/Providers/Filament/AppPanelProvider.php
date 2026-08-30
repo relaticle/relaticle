@@ -6,12 +6,13 @@ namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
-use App\Features\SocialAuth;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
+use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
-use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
@@ -60,11 +61,11 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -213,11 +214,10 @@ final class AppPanelProvider extends PanelProvider
                 : view('filament.app.logo'))
             ->brandLogoHeight('2.6rem')
             ->login(Login::class)
-            ->registration(Register::class)
             ->authGuard('web')
             ->authPasswordBroker('users')
-            ->passwordReset()
-            ->emailVerification(isRequired: config('app.require_email_verification'))
+            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->emailVerification(EmailVerificationPrompt::class, isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
             /**
@@ -260,6 +260,8 @@ final class AppPanelProvider extends PanelProvider
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
             ->routes(function (): void {
+                Route::get('/register', fn (): RedirectResponse => redirect()->to(Filament::getLoginUrl()))
+                    ->name('auth.register');
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
@@ -312,20 +314,32 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
+                fn (): View|Factory => view('filament.auth.developer_login'),
+            )
+            ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                fn (): View|Factory => view('filament.auth.login_options'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_START,
+                fn (): View|Factory => view('filament.auth.header'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_END,
+                fn (): View|Factory => view('filament.auth.footer'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
             );
-
-        if (Feature::active(SocialAuth::class)) {
-            $panel
-                ->renderHook(
-                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                )
-                ->renderHook(
-                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                );
-        }
 
         $panel
             ->renderHook(
@@ -359,6 +373,10 @@ final class AppPanelProvider extends PanelProvider
 
                     return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory => view('filament.scripts.identity-confirmation'),
             );
 
         // Hidden without a bound tenant: the old panel-root fallback sent these

@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Deploy Relaticle with Docker or manually.
 order: 1
-updated: "2026-08-14"
+updated: "2026-08-30"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -83,7 +83,8 @@ These must be set or the containers will refuse to start.
 | `APP_URL` | `http://localhost` | Full URL where Relaticle is accessible. Include the scheme. |
 | `APP_PORT` | `80` | Host port the app container binds to. |
 | `APP_PANEL_DOMAIN` | (empty) | Set for subdomain routing (e.g., `app.example.com`). Leave empty for path mode (`/app`). |
-| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email — useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach `/app/register` can create a working account. |
+| `PASSKEYS_USER_HANDLE_SECRET` | `APP_KEY` | Derives the opaque WebAuthn user handle stored on each authenticator. Set it to its own random value (`openssl rand -base64 32`) before anyone registers a passkey, so rotating `APP_KEY` later does not change every user's handle. |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email — useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach the sign-in page can create a working account. |
 | `LOG_CHANNEL` | `stderr` | Where logs go. `stderr` is recommended for Docker. |
 | `LOG_LEVEL` | `warning` | Minimum log level. Use `debug` for troubleshooting. |
 
@@ -116,8 +117,9 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID for social login. |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret. |
+| `GOOGLE_REDIRECT_URI` | Absolute callback URL (`https://your-host/auth/callback/google`), or a relative path (`/auth/callback/google`) to derive the host from the request. |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra ID client id. The Microsoft button appears only when this is set; register `https://your-host/auth/callback/microsoft` as the redirect URI. |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra ID client secret. |
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
@@ -154,7 +156,7 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
-| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
+| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
 
 ---
@@ -210,6 +212,8 @@ docker compose exec app php artisan sysadmin:create
 ## Reverse Proxy and SSL
 
 The app container serves HTTP on port 8080 internally. Place a reverse proxy in front to handle SSL termination and route traffic to the container.
+
+SSL is not optional if you want passkeys: browsers run WebAuthn over HTTPS only, and a passkey is bound to the host it was registered on. That host is `APP_PANEL_DOMAIN` when subdomain routing is on, and the `APP_URL` host otherwise, so serve the panel from one hostname and keep it stable.
 
 ### Nginx
 

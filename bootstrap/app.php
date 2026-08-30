@@ -8,8 +8,6 @@ use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ValidateSignature;
-use App\Models\TeamInvitation;
-use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -127,23 +125,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request): string {
-            if ($request->routeIs('team-invitations.accept')) {
-                $invitation = TeamInvitation::query()
-                    ->whereKey($request->route('invitation'))
-                    ->first();
-
-                if ($invitation && User::query()->where('email', $invitation->email)->exists()) {
-                    return Filament::getLoginUrl();
-                }
-
-                return Filament::getRegistrationUrl();
-            }
-
-            // A shared join link carries no email, so we cannot tell whether the
-            // visitor has an account. Most people opening one do not, and the
-            // register page links back to sign-in for the rest.
-            if ($request->routeIs('teams.join')) {
-                return Filament::getRegistrationUrl();
+            // The login page's signup branch handles both an invited email that
+            // already has an account and one that does not, from the same URL.
+            if ($request->routeIs('team-invitations.accept', 'teams.join')) {
+                return Filament::getLoginUrl();
             }
 
             return route('login');

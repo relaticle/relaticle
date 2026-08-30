@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation as TeamInvitationModel;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
+use App\Support\EmailAddress;
 use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -31,6 +32,8 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
     public function invite(User $user, Team $team, string $email, ?string $role = null): TeamInvitationModel
     {
         Gate::forUser($user)->authorize('addTeamMember', $team);
+
+        $email = EmailAddress::canonicalize($email);
 
         $this->validate($team, $email, $role);
 

@@ -26,12 +26,10 @@ use Symfony\Component\HttpFoundation\Response;
  * signed routes are exempt because signatures are computed over the absolute
  * URL — rewriting the host would 403 every invitation link.
  *
- * Socialite routes are exempt by name: the GitHub redirect URI is configured
- * as a relative path, so Socialite derives its host from the current request —
- * bouncing /auth/redirect/github to the primary host would change the
- * redirect_uri sent to the provider and break the OAuth app's registered
- * callback. Filament's export/import downloads are exempt by name too: their
- * auth + relative-signature checks live inside the controller behind the
+ * Socialite routes are exempt by name: redirect_uri must match the host the
+ * user started on (Google's is GOOGLE_REDIRECT_URI or a relative path).
+ * Filament's export/import downloads are exempt by name too: their auth +
+ * relative-signature checks live inside the controller behind the
  * `filament.actions` group alias, which this middleware cannot see through.
  */
 final readonly class RedirectToPrimaryHost
