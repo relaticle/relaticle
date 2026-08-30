@@ -65,11 +65,13 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         return $schema
             ->components([
-                Html::make(fn (): string => $this->getInvitationContentHtml()),
+                Html::make(fn (): string => $this->getInvitationContentHtml())
+                    ->visible(fn (): bool => $this->getInvitationContentHtml() !== ''),
                 Html::make(fn (): string => Blade::render('<x-honeypot livewire-model="extraFields" />')),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE),
                 $this->getFormContentComponent(),
-                Html::make(fn (): string => $this->getDiscoveryHintHtml()),
+                Html::make(fn (): string => $this->getDiscoveryHintHtml())
+                    ->visible(fn (): bool => $this->getDiscoveryHintHtml() !== ''),
                 Html::make(fn (): string => $this->getTermsFooterHtml()),
                 $this->getMultiFactorChallengeFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
