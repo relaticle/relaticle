@@ -72,6 +72,36 @@ test('PasskeyLoginResponse contract resolves to our admin-panel response', funct
     expect(app(PasskeyLoginResponseContract::class))->toBeInstanceOf(PasskeyLoginResponse::class);
 });
 
+test('the passkey login endpoint is rate limited', function (): void {
+    $lastStatus = 200;
+
+    foreach (range(1, 40) as $ignored) {
+        $lastStatus = $this->postJson('/passkeys/login', [])->getStatusCode();
+
+        if ($lastStatus === 429) {
+            break;
+        }
+    }
+
+    expect($lastStatus)->toBe(429);
+});
+
+test('the passkey confirmation endpoint is rate limited', function (): void {
+    $this->actingAs(User::factory()->create());
+
+    $lastStatus = 200;
+
+    foreach (range(1, 40) as $ignored) {
+        $lastStatus = $this->postJson('/passkeys/confirm', [])->getStatusCode();
+
+        if ($lastStatus === 429) {
+            break;
+        }
+    }
+
+    expect($lastStatus)->toBe(429);
+});
+
 test('passkey login is allowed for active users', function (): void {
     $user = User::factory()->create();
     $passkey = Passkey::create([

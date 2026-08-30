@@ -49,5 +49,14 @@ final class FortifyServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+
+        /**
+         * Every passkey ceremony costs two requests (options, then assertion), so this
+         * allows far more than a person can perform while still capping scripted
+         * assertion verification. Keyed per user where the route is authenticated, so
+         * shared egress IPs only aggregate on the guest login endpoint.
+         */
+        RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(30)
+            ->by($request->user()?->getAuthIdentifier() ?? (string) $request->ip()));
     }
 }
