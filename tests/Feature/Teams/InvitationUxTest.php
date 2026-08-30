@@ -52,7 +52,7 @@ test('guest with a well-formed token for a since-deleted invitation is sent to l
     $acceptUrl = route('team-invitations.token.accept', ['token' => Str::random(40)]);
 
     $this->get($acceptUrl)
-        ->assertRedirect(route('login'));
+        ->assertRedirect(Filament::getLoginUrl());
 });
 
 test('guest clicking invitation link sees the team name banner on the login page', function () {

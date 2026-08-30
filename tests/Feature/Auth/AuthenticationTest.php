@@ -16,7 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\URL;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -491,7 +490,10 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
         'email' => $email,
     ]);
 
-    session(['url.intended' => "/team-invitations/{$invitation->id}/accept"]);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    session(['url.intended' => route('team-invitations.token.accept', ['token' => $rawToken])]);
 
     livewire(Login::class)
         ->fillForm(['email' => $email])
@@ -509,9 +511,12 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
     Notification::assertNotSentTo($user, VerifyEmail::class);
     Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
 
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+    // Accepting is a confirmed two-step flow: the link renders a page, the
+    // POST is what joins.
+    $this->get(route('team-invitations.token.accept', ['token' => $rawToken]))->assertOk();
 
-    $this->get($acceptUrl)->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
+    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 });
 
 test('a fresh teamless signup lands on tenant registration, not the login page', function (): void {
