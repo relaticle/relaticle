@@ -23,6 +23,7 @@ final readonly class FirstChatUsageTagger
 {
     public static function tagIfFirstMessage(string $currentMessageId): void
     {
+        // Guarded here too so the request path skips the exists-probe below.
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
@@ -43,6 +44,6 @@ final readonly class FirstChatUsageTagger
             return;
         }
 
-        dispatch(new SyncSubscriberJob((string) $user->id))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }

@@ -7,6 +7,7 @@ namespace App\Enums;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 enum SubscriberTagEnum: string
 {
@@ -44,13 +45,7 @@ enum SubscriberTagEnum: string
      */
     public static function isOwned(string $tag): bool
     {
-        foreach (self::OWNED_PREFIXES as $prefix) {
-            if (str_starts_with($tag, $prefix)) {
-                return true;
-            }
-        }
-
-        return self::tryFrom($tag) instanceof self;
+        return Str::startsWith($tag, self::OWNED_PREFIXES) || self::tryFrom($tag) instanceof self;
     }
 
     /**
@@ -82,14 +77,14 @@ enum SubscriberTagEnum: string
      * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
-    public static function applyRecencyWindow(Builder $query, ?string $bucket, string $column = 'last_login_at'): Builder
+    public static function applyRecencyWindow(Builder $query, ?string $bucket): Builder
     {
         return match ($bucket) {
-            self::Active7d->value => $query->where($column, '>=', now()->subDays(self::ACTIVE_7D_DAYS)),
+            self::Active7d->value => $query->where('last_login_at', '>=', now()->subDays(self::ACTIVE_7D_DAYS)),
             self::Active30d->value => $query
-                ->where($column, '<', now()->subDays(self::ACTIVE_7D_DAYS))
-                ->where($column, '>=', now()->subDays(self::ACTIVE_30D_DAYS)),
-            self::Dormant->value => $query->where($column, '<', now()->subDays(self::DORMANT_DAYS)),
+                ->where('last_login_at', '<', now()->subDays(self::ACTIVE_7D_DAYS))
+                ->where('last_login_at', '>=', now()->subDays(self::ACTIVE_30D_DAYS)),
+            self::Dormant->value => $query->where('last_login_at', '<', now()->subDays(self::DORMANT_DAYS)),
             default => $query,
         };
     }

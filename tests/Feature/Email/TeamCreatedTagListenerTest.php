@@ -13,6 +13,7 @@ use Laravel\Jetstream\Events\TeamCreated;
 mutates(TeamCreatedTagListener::class);
 
 beforeEach(function (): void {
+    config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
     Queue::fake([SyncSubscriberJob::class]);
 });
 

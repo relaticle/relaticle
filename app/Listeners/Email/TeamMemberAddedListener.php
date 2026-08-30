@@ -23,7 +23,7 @@ final class TeamMemberAddedListener
         /** @var User $member */
         $member = $event->user;
 
-        dispatch(new SyncSubscriberJob((string) $team->user_id))->afterCommit();
-        dispatch(new SyncSubscriberJob((string) $member->id))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $team->user_id);
+        SyncSubscriberJob::dispatchFor((string) $member->id);
     }
 }

@@ -15,6 +15,6 @@ final class NewSubscriberListener
         /** @var User $user */
         $user = $event->user;
 
-        dispatch(new SyncSubscriberJob((string) $user->id))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }

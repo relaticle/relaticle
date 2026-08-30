@@ -59,7 +59,7 @@ final class ReconcileSubscribersCommand extends Command
                         continue;
                     }
 
-                    dispatch(new SyncSubscriberJob((string) $user->id));
+                    SyncSubscriberJob::dispatchFor((string) $user->id);
                 }
 
                 return true;

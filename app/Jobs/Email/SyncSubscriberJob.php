@@ -44,13 +44,26 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(private readonly string $userId) {}
 
+    /**
+     * The single entry point for trigger paths: owns the feature-flag gate and
+     * defers the push until the surrounding transaction commits.
+     */
+    public static function dispatchFor(string $userId): void
+    {
+        if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
+            return;
+        }
+
+        dispatch(new self($userId))->afterCommit();
+    }
+
     public function handle(SubscriberProfileDeriver $deriver): void
     {
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
 
-        $user = User::query()->find($this->userId);
+        $user = User::query()->with(['ownedTeams', 'teams'])->find($this->userId);
 
         if (! $user || $user->email_verified_at === null) {
             return;
@@ -92,6 +105,7 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
                 return Mailcoach::subscriber($user->mailcoach_subscriber_uuid);
             } catch (\Throwable $exception) {
                 // Only a deleted subscriber falls through to the email lookup.
+                // A typed catch reads as dead to PHPStan (the SDK lacks @throws).
                 throw_unless($exception instanceof ResourceNotFound, $exception);
             }
         }
@@ -145,10 +159,7 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
             fn (string $tag): bool => ! SubscriberTagEnum::isOwned($tag),
         );
 
-        $tags = array_values(array_unique([...$foreignTags, ...$desiredTags]));
-        sort($tags);
-
-        return $tags;
+        return array_values(array_unique([...$foreignTags, ...$desiredTags]));
     }
 
     private function listId(): string

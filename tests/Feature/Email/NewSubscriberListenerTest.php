@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Queue;
 mutates(NewSubscriberListener::class);
 
 beforeEach(function (): void {
+    config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
     Queue::fake([SyncSubscriberJob::class]);
 });
 

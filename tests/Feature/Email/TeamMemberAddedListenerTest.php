@@ -11,6 +11,7 @@ use Laravel\Jetstream\Events\TeamMemberAdded;
 mutates(TeamMemberAddedListener::class);
 
 beforeEach(function (): void {
+    config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
     Queue::fake([SyncSubscriberJob::class]);
 });
 

@@ -15,10 +15,12 @@ final class TeamCreatedTagListener
         /** @var Team $team */
         $team = $event->team;
 
+        // Every registration creates a bare personal team; the Verified
+        // listener owns that initial sync, so only onboarding answers matter.
         if ($team->onboardingSubscriberTags() === []) {
             return;
         }
 
-        dispatch(new SyncSubscriberJob((string) $team->user_id))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $team->user_id);
     }
 }

@@ -22,6 +22,7 @@ trait TagsFirstCrmData
 {
     protected function tagFirstCrmDataIfNeeded(Model $createdModel): void
     {
+        // Guarded here too so the request path skips the exists-probes below.
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
@@ -37,6 +38,6 @@ trait TagsFirstCrmData
             return;
         }
 
-        dispatch(new SyncSubscriberJob((string) $user->id))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }
