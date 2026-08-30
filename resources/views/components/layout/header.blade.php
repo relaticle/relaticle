@@ -55,11 +55,14 @@
                 <nav aria-label="{{ __('Main') }}" class="relative hidden md:flex items-center gap-1"
                      x-data="{
                          openDropdown: null,
+                         // The dropdown a swap is animating away from. Kept mounted (and shown)
+                         // alongside `openDropdown` for one transition window so the outgoing
+                         // content can slide out while the incoming one slides in — a real
+                         // two-layer swipe, not a single element re-skinning itself.
+                         outgoingDropdown: null,
                          direction: 1,
-                         // True only when this open replaces an already-open dropdown — a fresh
-                         // open (nothing was showing) fades the content in, no horizontal sweep.
-                         isSwap: false,
                          closeTimer: null,
+                         swapTimer: null,
                          order: {{ Illuminate\Support\Js::from($dropdownSlugs) }},
                          twoColumn: {{ Illuminate\Support\Js::from($twoColumnBySlug) }},
                          openOnHover(slug) {
@@ -73,18 +76,27 @@
                          cancelHoverOpen() { clearTimeout(this.hoverTimer) },
                          closeOnHoverLeave(slug) {
                              this.closeTimer = setTimeout(() => {
-                                 if (this.openDropdown === slug) { this.openDropdown = null }
+                                 if (this.openDropdown === slug) { this.openDropdown = null; this.outgoingDropdown = null }
                              }, 200)
                          },
-                         // Sets the sweep direction before switching content, so the panel that
-                         // is about to render already knows which way to slide in from.
+                         // Sets the sweep direction before switching content, so both layers
+                         // that are about to render already know which way to move.
                          swapTo(slug) {
-                             this.isSwap = this.openDropdown !== null
-                             this.direction = this.order.indexOf(slug) >= this.order.indexOf(this.openDropdown) ? 1 : -1
+                             if (slug === this.openDropdown) { return }
+                             clearTimeout(this.swapTimer)
+                             const wasOpen = this.openDropdown
+                             this.direction = this.order.indexOf(slug) >= this.order.indexOf(wasOpen ?? slug) ? 1 : -1
+                             this.outgoingDropdown = wasOpen
                              this.openDropdown = slug
+                             // The outgoing layer only needs to stay mounted for the swap
+                             // animation itself — once it's done sliding out, drop it so it
+                             // stops occupying space/receiving events.
+                             if (wasOpen) {
+                                 this.swapTimer = setTimeout(() => { this.outgoingDropdown = null }, 220)
+                             }
                          },
                          toggle(slug) {
-                             if (this.openDropdown === slug) { this.openDropdown = null; return }
+                             if (this.openDropdown === slug) { this.openDropdown = null; this.outgoingDropdown = null; return }
                              this.swapTo(slug)
                          },
                          panelStyle(slug, isTwoColumn) {
@@ -98,8 +110,8 @@
                              return `left:${left}px;width:${width}px`
                          },
                      }"
-                     @keydown.escape.window="openDropdown = null"
-                     @click.outside="openDropdown = null">
+                     @keydown.escape.window="openDropdown = null; outgoingDropdown = null"
+                     @click.outside="openDropdown = null; outgoingDropdown = null">
                     @foreach($navItems as $item)
                         @if($item->url === null && count($item->children) > 0)
                             @php($slug = \Illuminate\Support\Str::slug($item->label))
@@ -135,68 +147,68 @@
                     @endforeach
 
                     {{-- One shared floating card: it repositions/resizes under whichever
-                         trigger is active (panelStyle), while its inner content sweeps left
-                         or right depending on the swap direction. A single element for the
-                         card itself (rather than one absolute panel per trigger, each with its
-                         own enter/leave) is what makes Product→Resources read as one panel
-                         moving, not two panels overlapping mid-swap. --}}
-                    <div x-show="openDropdown !== null"
-                         x-transition:enter="transition duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
-                         x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                         trigger is active (panelStyle), while its content swipes left or right
+                         on a swap. During a swap BOTH the outgoing and incoming item's content
+                         are mounted at once (stacked with absolute inset-0), each carrying its
+                         own slide-out/slide-in — a real two-layer swipe, not one element
+                         re-skinning itself. --}}
+                    <div x-show="openDropdown !== null || outgoingDropdown !== null"
+                         x-transition:enter="transition-[translate,scale,opacity] duration-250 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
+                         x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.97]"
                          x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                         x-transition:leave="transition duration-100 ease-in motion-reduce:transition-none"
-                         x-transition:leave-start="opacity-100 scale-100"
-                         x-transition:leave-end="opacity-0 scale-[0.98]"
+                         x-transition:leave="transition-[translate,scale,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
+                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.97]"
                          x-cloak
-                         x-bind:style="openDropdown ? panelStyle(openDropdown, twoColumn[openDropdown]) : ''"
+                         x-bind:style="panelStyle(openDropdown ?? outgoingDropdown, twoColumn[openDropdown ?? outgoingDropdown])"
                          @mouseenter="cancelHoverOpen(); clearTimeout(closeTimer)"
                          @mouseleave="closeOnHoverLeave(openDropdown)"
                          class="absolute top-full mt-2 origin-top rounded-2xl border border-gray-200/70 dark:border-white/[0.08] bg-white dark:bg-gray-900 shadow-xl shadow-gray-950/[0.08] dark:shadow-black/50 overflow-hidden transition-[left,width] duration-200 ease-[var(--ease-out-expo)]">
-                        @foreach($dropdownItems as $item)
-                            @php($slug = $dropdownSlugs[$loop->index])
-                            @php($isTwoColumn = collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0))
-                            <div x-show="openDropdown === '{{ $slug }}'" id="menu-{{ $slug }}">
-                                {{-- The slide lives on this inner wrapper, separate from the
-                                     x-show element above: x-show drives its own display/enter
-                                     sequencing, and layering a second manual transition on the
-                                     same node raced Alpine's own — the slide never got a chance
-                                     to paint its off-position frame before snapping back. --}}
-                                <div x-data="{ settled: false }"
-                                     x-effect="if (openDropdown === '{{ $slug }}') {
-                                         settled = false
-                                         // This element's x-show sibling may be flipping
-                                         // display:none → block in the same tick (first open,
-                                         // or coming back from a fully-closed state), so the
-                                         // 'off' position and the transition to 'settled' would
-                                         // otherwise land in the same paint and never animate.
-                                         // Reading offsetHeight forces the browser to commit the
-                                         // 'off' layout before the class changes again.
-                                         void $el.offsetHeight
-                                         setTimeout(() => { settled = true }, 20)
-                                     }"
-                                     class="p-2 transition-[translate,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none @if($isTwoColumn) grid grid-cols-[1.35fr_1fr] divide-x divide-gray-100 dark:divide-white/[0.06] @endif"
-                                     :class="settled
-                                         ? 'translate-x-0 opacity-100'
-                                         : (isSwap ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0')">
-                                    @foreach($item->children as $child)
-                                        @if($child->url === null && count($child->children) > 0)
-                                            <div class="px-2 first:pl-0 last:pr-0">
-                                                <p class="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                                    {{ $child->label }}
-                                                </p>
-                                                <div class="space-y-0.5">
-                                                    @foreach($child->children as $grandchild)
-                                                        <x-layout.mega-menu-link :item="$grandchild"/>
-                                                    @endforeach
+                        <div class="relative">
+                            @foreach($dropdownItems as $item)
+                                @php($slug = $dropdownSlugs[$loop->index])
+                                @php($isTwoColumn = collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0))
+                                {{-- `current` renders in normal flow so the card measures its
+                                     height; `leaving` (the outgoing layer during a swap) is
+                                     absolutely stacked on top of it so both are visible and
+                                     sliding past each other at once. --}}
+                                <template x-if="openDropdown === '{{ $slug }}' || outgoingDropdown === '{{ $slug }}'">
+                                    <div x-data="{
+                                             get isCurrent() { return openDropdown === '{{ $slug }}' },
+                                             get isLeaving() { return outgoingDropdown === '{{ $slug }}' && openDropdown !== '{{ $slug }}' },
+                                             settled: false,
+                                         }"
+                                         x-effect="if (isCurrent) {
+                                             settled = false
+                                             // Forces the browser to commit the off-position layout
+                                             // before the class flips back, otherwise both changes
+                                             // land in the same paint and never animate.
+                                             void $el.offsetHeight
+                                             setTimeout(() => { settled = true }, 20)
+                                         }"
+                                         id="menu-{{ $slug }}"
+                                         class="p-2 transition-[translate,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none @if($isTwoColumn) grid grid-cols-[1.35fr_1fr] divide-x divide-gray-100 dark:divide-white/[0.06] @endif"
+                                         :class="isLeaving ? 'absolute inset-0 bg-white dark:bg-gray-900 ' + (direction > 0 ? '-translate-x-3 opacity-0' : 'translate-x-3 opacity-0') : (settled ? 'translate-x-0 opacity-100' : (isCurrent && outgoingDropdown ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0'))">
+                                        @foreach($item->children as $child)
+                                            @if($child->url === null && count($child->children) > 0)
+                                                <div class="px-2 first:pl-0 last:pr-0">
+                                                    <p class="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                                        {{ $child->label }}
+                                                    </p>
+                                                    <div class="space-y-0.5">
+                                                        @foreach($child->children as $grandchild)
+                                                            <x-layout.mega-menu-link :item="$grandchild"/>
+                                                        @endforeach
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        @else
-                                            <x-layout.mega-menu-link :item="$child"/>
-                                        @endif
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
+                                            @else
+                                                <x-layout.mega-menu-link :item="$child"/>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </template>
+                            @endforeach
+                        </div>
                     </div>
                 </nav>
 
