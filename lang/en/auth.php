@@ -20,8 +20,12 @@ return [
         'password_helper' => 'At least 8 characters long.',
         'email_placeholder' => 'Enter your email address',
         'password_placeholder' => 'Password',
-        'terms_notice' => 'By continuing you agree to our :terms and :privacy.',
+    ],
+    'footer' => [
+        'terms_notice' => 'By proceeding you acknowledge that you have read, understood and agree to our :terms.',
         'terms_of_service' => 'Terms of Service',
+        'copyright' => '© :year Relaticle',
         'privacy_policy' => 'Privacy Policy',
+        'support' => 'Support',
     ],
 ];

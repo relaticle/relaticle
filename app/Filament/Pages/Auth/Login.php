@@ -72,7 +72,6 @@ final class Login extends \Filament\Auth\Pages\Login
                 $this->getFormContentComponent(),
                 Html::make(fn (): string => $this->getDiscoveryHintHtml())
                     ->visible(fn (): bool => $this->getDiscoveryHintHtml() !== ''),
-                Html::make(fn (): string => $this->getTermsFooterHtml()),
                 $this->getMultiFactorChallengeFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
             ]);
@@ -80,7 +79,12 @@ final class Login extends \Filament\Auth\Pages\Login
 
     public function getMaxWidth(): Width
     {
-        return Width::Small;
+        return Width::Medium;
+    }
+
+    public function hasLogo(): bool
+    {
+        return false;
     }
 
     public function getHeading(): string
@@ -212,16 +216,6 @@ final class Login extends \Filament\Auth\Pages\Login
         }
 
         return '';
-    }
-
-    private function getTermsFooterHtml(): string
-    {
-        $termsLink = '<a href="'.e(url('/terms-of-service')).'" class="underline hover:text-gray-700 dark:hover:text-gray-300">'.e(__('auth.login.terms_of_service')).'</a>';
-        $privacyLink = '<a href="'.e(url('/privacy-policy')).'" class="underline hover:text-gray-700 dark:hover:text-gray-300">'.e(__('auth.login.privacy_policy')).'</a>';
-
-        return '<p class="mt-8 text-center text-xs text-gray-500 dark:text-gray-400">'
-            .__('auth.login.terms_notice', ['terms' => $termsLink, 'privacy' => $privacyLink])
-            .'</p>';
     }
 
     protected function discover(): void

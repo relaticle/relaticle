@@ -9,7 +9,10 @@ use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
+use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
@@ -213,8 +216,8 @@ final class AppPanelProvider extends PanelProvider
             ->login(Login::class)
             ->authGuard('web')
             ->authPasswordBroker('users')
-            ->passwordReset()
-            ->emailVerification(isRequired: config('app.require_email_verification'))
+            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->emailVerification(EmailVerificationPrompt::class, isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
             /**
@@ -316,6 +319,26 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
                 fn (): View|Factory => view('filament.auth.login_options'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_START,
+                fn (): View|Factory => view('filament.auth.header'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_END,
+                fn (): View|Factory => view('filament.auth.footer'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
             );
 
         $panel
