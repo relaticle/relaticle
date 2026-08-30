@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Listeners\Email\TeamCreatedTagListener;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -14,14 +13,12 @@ use Laravel\Jetstream\Events\TeamCreated;
 mutates(TeamCreatedTagListener::class);
 
 beforeEach(function (): void {
-    Queue::fake([ModifySubscriberTagsJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
+    Queue::fake([SyncSubscriberJob::class]);
 });
 
-test('dispatches use-case and referral tags when owner has uuid', function (): void {
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-owner',
-    ]);
+test('dispatches a profile sync for the owner when the team has onboarding answers', function (): void {
+    $owner = User::factory()->withTeam()->create();
 
     $team = $owner->currentTeam;
     $team->update([
@@ -31,17 +28,11 @@ test('dispatches use-case and referral tags when owner has uuid', function (): v
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($owner): bool {
-        return invade($job)->userId === (string) $owner->id
-            && invade($job)->tags === ['use-case:sales', 'referral:google']
-            && invade($job)->action === TagAction::Add;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $owner->id);
 });
 
-test('dispatches only use-case tag when referral is null', function (): void {
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-owner',
-    ]);
+test('dispatches when only the use case is set', function (): void {
+    $owner = User::factory()->withTeam()->create();
 
     $team = $owner->currentTeam;
     $team->update([
@@ -51,12 +42,10 @@ test('dispatches only use-case tag when referral is null', function (): void {
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->tags === ['use-case:marketing'];
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $owner->id);
 });
 
-test('dispatches the tag job even when the owner has no mailcoach uuid yet', function (): void {
+test('dispatches even when the owner has no mailcoach uuid yet', function (): void {
     $owner = User::factory()->withTeam()->create([
         'mailcoach_subscriber_uuid' => null,
     ]);
@@ -68,14 +57,11 @@ test('dispatches the tag job even when the owner has no mailcoach uuid yet', fun
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, fn (ModifySubscriberTagsJob $job): bool => invade($job)->userId === (string) $owner->id
-        && invade($job)->tags === ['use-case:sales']);
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $owner->id);
 });
 
-test('skips dispatch when there are no tags to apply (regardless of uuid state)', function (): void {
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => null,
-    ]);
+test('skips dispatch when the team has no onboarding answers', function (): void {
+    $owner = User::factory()->withTeam()->create();
 
     $team = $owner->currentTeam;
     $team->update([
@@ -85,30 +71,11 @@ test('skips dispatch when there are no tags to apply (regardless of uuid state)'
 
     (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('skips when sync is disabled', function (): void {
-    config()->set('mailcoach-sdk.enabled_subscribers_sync', false);
-
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-owner',
-    ]);
-
-    $team = $owner->currentTeam;
-    $team->update([
-        'onboarding_use_case' => OnboardingUseCase::Sales,
-    ]);
-
-    (new TeamCreatedTagListener)->handle(new TeamCreated($team->fresh()));
-
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
-});
-
-test('tags second team with different use case', function (): void {
-    $owner = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-owner',
-    ]);
+test('dispatches for a second team with onboarding answers', function (): void {
+    $owner = User::factory()->withTeam()->create();
 
     $secondTeam = $owner->ownedTeams()->create([
         'name' => 'Second Team',
@@ -118,10 +85,9 @@ test('tags second team with different use case', function (): void {
         'onboarding_referral_source' => OnboardingReferralSource::LinkedIn,
     ]);
 
+    Queue::fake([SyncSubscriberJob::class]);
+
     (new TeamCreatedTagListener)->handle(new TeamCreated($secondTeam));
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job): bool {
-        return invade($job)->tags === ['use-case:recruiting', 'referral:linkedin']
-            && invade($job)->action === TagAction::Add;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $owner->id);
 });
