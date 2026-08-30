@@ -55,7 +55,7 @@
             <div class="hero-agent-title min-w-0 flex-1">
                 <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">Overdue tasks this week</h2>
             </div>
-            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
+            <img src="{{ resolve(\App\Services\AvatarService::class)->generateAuto('Marcus Reid', 64) }}" alt="" class="h-6 w-6 shrink-0 rounded-full">
         </div>
 
         {{-- Messages --}}

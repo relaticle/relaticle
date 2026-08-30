@@ -8,6 +8,9 @@
      is not a dependency of this project. --}}
 <header x-data="{
             mobileMenu: false,
+            {{-- One accordion open at a time; reset on every open so the menu
+                 always starts collapsed rather than remembering the last visit. --}}
+            mobileExpanded: null,
             bodyLock() { document.body.style.overflow = this.mobileMenu ? 'hidden' : '' },
             focusables() {
                 return [...$refs.overlay.querySelectorAll('a[href], button:not([disabled])')]
@@ -31,7 +34,7 @@
             },
         }"
         x-effect="bodyLock()"
-        x-init="$watch('mobileMenu', (open) => open || $refs.hamburger.focus())"
+        x-init="$watch('mobileMenu', (open) => { if (open) { mobileExpanded = null } else { $refs.hamburger.focus() } })"
         @resize.window="if (window.innerWidth >= 768) mobileMenu = false">
     <div
         id="main-header"
@@ -40,7 +43,7 @@
             <div class="flex items-center justify-between h-16">
 
                 <div class="flex flex-1 items-center">
-                    <a href="{{ url('/') }}" class="transition-opacity" aria-label="Relaticle Home">
+                    <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
                         <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                     </a>
                 </div>
@@ -86,6 +89,8 @@
                          // no incoming layer to slide past.
                          closeAll() {
                              clearTimeout(this.swapTimer)
+                             clearTimeout(this.heightTimer)
+                             if (this.$refs.panel) { this.$refs.panel.style.height = '' }
                              // outgoingDropdown is set BEFORE openDropdown clears, so
                              // `openDropdown ?? outgoingDropdown` is never null-null on the same
                              // tick — a gap there sends panelStyle() an unresolvable slug, which
@@ -109,6 +114,9 @@
                              if (slug === this.openDropdown) { return }
                              clearTimeout(this.swapTimer)
                              const wasOpen = this.openDropdown
+                             // Alpine flushes DOM changes async, so this still reads the
+                             // pre-swap height even after the assignments below.
+                             const priorHeight = wasOpen ? this.$refs.panel.offsetHeight : 0
                              this.direction = this.order.indexOf(slug) >= this.order.indexOf(wasOpen ?? slug) ? 1 : -1
                              this.outgoingDropdown = wasOpen
                              this.openDropdown = slug
@@ -116,14 +124,34 @@
                              // animation itself — once it's done sliding out, drop it so it
                              // stops occupying space/receiving events.
                              if (wasOpen) {
+                                 this.morphHeight(priorHeight)
                                  this.swapTimer = setTimeout(() => { this.outgoingDropdown = null }, 220)
                              }
+                         },
+                         // Left/width morph via the transition class; height is auto (content
+                         // driven) and CSS cannot animate to auto, so it gets a FLIP: pin the
+                         // old height, force a layout, pin the new one, release when done.
+                         morphHeight(priorHeight) {
+                             this.$nextTick(() => {
+                                 const panel = this.$refs.panel
+                                 panel.style.height = ''
+                                 const target = panel.offsetHeight
+                                 if (target === priorHeight) { return }
+                                 panel.style.height = priorHeight + 'px'
+                                 void panel.offsetHeight
+                                 panel.style.height = target + 'px'
+                                 clearTimeout(this.heightTimer)
+                                 this.heightTimer = setTimeout(() => { panel.style.height = '' }, 210)
+                             })
                          },
                          toggle(slug) {
                              if (this.openDropdown === slug) { this.closeAll(); return }
                              this.swapTo(slug)
                          },
-                         panelStyle(slug, isTwoColumn) {
+                         panelWidth(slug) {
+                             return this.twoColumn[slug] ? Math.min(640, window.innerWidth - 32) : 384
+                         },
+                         panelStyle(slug) {
                              // Falls back to the last resolved position instead of an empty
                              // string: an empty style drops the inline width, and with no
                              // content driving height either (mid-close, mid-swap), the card
@@ -132,7 +160,7 @@
                              if (!trigger) { return this.lastPanelStyle }
                              const nav = trigger.closest('nav').getBoundingClientRect()
                              const rect = trigger.getBoundingClientRect()
-                             const width = isTwoColumn ? Math.min(640, window.innerWidth - 32) : 384
+                             const width = this.panelWidth(slug)
                              let left = (rect.left - nav.left) + rect.width / 2 - width / 2
                              left = Math.max(0, Math.min(left, nav.width - width))
                              this.lastPanelStyle = `left:${left}px;width:${width}px`
@@ -152,10 +180,10 @@
                                         aria-haspopup="true"
                                         :aria-expanded="openDropdown === '{{ $slug }}'"
                                         aria-controls="menu-{{ $slug }}"
-                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                                        class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 flex items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                                         :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
-                                    <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-150"
+                                    <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-200"
                                                              ::class="openDropdown === '{{ $slug }}' && 'rotate-180'"/>
                                 </button>
                             </div>
@@ -163,11 +191,11 @@
                             <a href="{{ $item->url }}"
                                @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                                @if(url()->current() === $item->url) aria-current="page" @endif
-                               class="px-4 py-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-[13px] font-medium transition-colors @if($item->external) flex items-center gap-1.5 @endif">
+                               class="group px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @if($item->external) flex items-center gap-1.5 @endif">
                                 @if($item->external)
                                     <x-ri-discord-fill class="w-4 h-4"/>
                                     <span>{{ $item->label }}</span>
-                                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-600"/>
+                                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500 transition-colors duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300"/>
                                 @else
                                     {{ $item->label }}
                                 @endif
@@ -195,7 +223,12 @@
                               (well after the close transition finished) re-ran this binding and
                               overwrote Alpine's own `display:none` with a bare left/width string,
                               silently re-showing the card at a collapsed size. --}}
-                         x-bind:style="openDropdown ? panelStyle(openDropdown, twoColumn[openDropdown]) : lastPanelStyle"
+                         x-bind:style="openDropdown ? panelStyle(openDropdown) : lastPanelStyle"
+                         {{-- The card morphs (left/width) only while a swap is in flight — both
+                              slugs set. On a first open or a close this class is absent, so the
+                              morph never fights Alpine's own enter/leave transition classes. --}}
+                         x-bind:class="openDropdown && outgoingDropdown ? 'transition-[left,width,height] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none' : ''"
+                         x-ref="panel"
                          @mouseenter="cancelHoverOpen(); clearTimeout(closeTimer)"
                          @mouseleave="closeOnHoverLeave(openDropdown)"
                          class="absolute top-full mt-2 origin-top rounded-2xl border border-gray-200/70 dark:border-white/[0.08] bg-white dark:bg-gray-900 shadow-xl shadow-gray-950/[0.08] dark:shadow-black/50 overflow-hidden">
@@ -204,9 +237,13 @@
                                 @php($slug = $dropdownSlugs[$loop->index])
                                 @php($isTwoColumn = collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0))
                                 {{-- `current` renders in normal flow so the card measures its
-                                     height; `leaving` (the outgoing layer during a swap) is
-                                     absolutely stacked on top of it so both are visible and
-                                     sliding past each other at once. --}}
+                                     height. During a SWAP the outgoing layer is absolutely
+                                     stacked on top of it so both slide past each other at once.
+                                     During a full CLOSE the outgoing layer must stay in normal
+                                     flow untouched: pulling it absolute collapses the card to a
+                                     border-only sliver mid-fade (a visible "line" under the nav),
+                                     and fading it separately just double-fades what the card's
+                                     own leave transition already fades. --}}
                                 <template x-if="openDropdown === '{{ $slug }}' || outgoingDropdown === '{{ $slug }}'">
                                     <div x-data="{
                                              get isCurrent() { return openDropdown === '{{ $slug }}' },
@@ -214,18 +251,29 @@
                                              settled: false,
                                          }"
                                          x-effect="if (isCurrent) {
-                                             settled = false
-                                             // Forces the browser to commit the off-position layout
-                                             // before the class flips back, otherwise both changes
-                                             // land in the same paint and never animate.
-                                             void $el.offsetHeight
-                                             setTimeout(() => { settled = true }, 20)
+                                             if (!outgoingDropdown) {
+                                                 // Fresh open (nothing to swipe past): show at once
+                                                 // and let the card's enter transition do the work.
+                                                 settled = true
+                                             } else if (!settled) {
+                                                 // Forces the browser to commit the off-position
+                                                 // layout before the class flips back, otherwise
+                                                 // both changes land in one paint and never animate.
+                                                 void $el.offsetHeight
+                                                 setTimeout(() => { settled = true }, 20)
+                                             }
                                          }"
                                          id="menu-{{ $slug }}"
+                                         {{-- Each layer is pinned to ITS panel's natural width, so
+                                              the card's left/width morph only ever clips it — the
+                                              content never re-wraps mid-swap, and the card's auto
+                                              height reads the incoming layer's final height from
+                                              the first frame. --}}
+                                         x-bind:style="`width:${panelWidth('{{ $slug }}')}px`"
                                          class="p-2 transition-[translate,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none @if($isTwoColumn) grid grid-cols-[1.35fr_1fr] divide-x divide-gray-100 dark:divide-white/[0.06] @endif"
                                          :class="isLeaving
-                                             ? 'absolute inset-0 bg-white dark:bg-gray-900 ' + (openDropdown ? (direction > 0 ? '-translate-x-3 opacity-0' : 'translate-x-3 opacity-0') : 'opacity-0')
-                                             : (settled ? 'translate-x-0 opacity-100' : (isCurrent && outgoingDropdown ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0'))">
+                                             ? (openDropdown ? 'absolute top-0 left-0 bg-white dark:bg-gray-900 ' + (direction > 0 ? '-translate-x-3 opacity-0' : 'translate-x-3 opacity-0') : '')
+                                             : (settled ? 'translate-x-0 opacity-100' : (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0'))">
                                         @foreach($item->children as $child)
                                             @if($child->url === null && count($child->children) > 0)
                                                 <div class="px-2 first:pl-0 last:pr-0">
@@ -264,15 +312,24 @@
                          keyboard user back on the control they opened it with. Driven by
                          the watcher in x-init, not a second escape listener: the overlay
                          already has one on `window`, and two handlers on one event race. --}}
+                    {{-- The overlay's close button renders this same three-line
+                         construct in its end state at the same screen position, so
+                         the overlay fading in over the mid-morph lines reads as one
+                         continuous hamburger-to-cross motion, not two different
+                         icons crossfading. --}}
                     <button @click="mobileMenu = !mobileMenu"
                             x-ref="hamburger"
-                            class="md:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
+                            class="md:hidden p-2.5 -mr-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             :aria-expanded="mobileMenu"
                             :aria-label="mobileMenu ? 'Close menu' : 'Open menu'">
-                        <svg class="w-5 h-5 transition-transform duration-200" :class="mobileMenu && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path x-show="!mobileMenu" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-                            <path x-show="mobileMenu" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
+                        <span class="relative block h-5 w-5" aria-hidden="true">
+                            <span class="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-current transition-[translate,rotate] duration-300 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
+                                  :class="mobileMenu && 'translate-y-[6px] rotate-45'"></span>
+                            <span class="absolute left-0 top-[9px] h-[2px] w-5 rounded-full bg-current transition-[opacity,scale] duration-200 motion-reduce:transition-none"
+                                  :class="mobileMenu && 'opacity-0 scale-x-50'"></span>
+                            <span class="absolute left-0 top-[15px] h-[2px] w-5 rounded-full bg-current transition-[translate,rotate] duration-300 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
+                                  :class="mobileMenu && '-translate-y-[6px] -rotate-45'"></span>
+                        </span>
                     </button>
                 </div>
             </div>

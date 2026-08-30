@@ -17,16 +17,11 @@
             <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">Northwind</div>
         </div>
         <x-heroicon-o-chevron-down class="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500"/>
-
-        {{-- Sidebar collapse toggle — chat-sidebar-toggle-hook.blade.php renders
-             it into this row from lg: up. Remix Icon here, unlike the Heroicons
-             around it, because the hook uses one too. --}}
-        <x-ri-side-bar-line class="hidden lg:block w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
     </div>
 
     {{-- Global search + notifications row — mirrors the real sidebar's
          fi-sidebar-search-ctn (GlobalSearch pill + inbox trigger). --}}
-    <div class="flex items-center gap-1.5 px-2 pb-1.5">
+    <div class="flex items-center gap-1.5 px-2 pt-2.5 pb-1.5">
         <div class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-gray-100 px-2.5 dark:bg-white/[0.06]">
             <x-heroicon-o-magnifying-glass class="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span class="min-w-0 flex-1 truncate text-xs text-gray-400 dark:text-zinc-500">Search</span>

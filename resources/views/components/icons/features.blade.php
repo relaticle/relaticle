@@ -1,8 +1,8 @@
 @props([])
 
-{{-- Features nav icon. Isometric line art (isocons.app), viewBox preserved
-     from source (0 0 95 124) since the geometry doesn't map cleanly to a square
-     24x24 grid. Color via currentColor, size via {{ $attributes }}. --}}
+{{-- Features nav icon. Isometric line art, viewBox preserved from source
+     (0 0 95 124) since the geometry doesn't map cleanly to a square 24x24 grid.
+     Color via currentColor, size via {{ $attributes }}. --}}
 
 <svg viewBox="0 0 95 124" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" {{ $attributes }}>
     <path d="M72.5601 77.25V69.15L65.5 65.08V48.89L55.51 43.12L51.9801 41.08L32.5801 29.88L22 23.77L2 12.22V85.09L65.5 121.76V105.57L72.5601 109.64V101.54L65.5 97.47V89.37L72.5601 93.45V85.35L65.5 81.27V73.1799L72.5601 77.25ZM31.9801 90.26L12.5801 79.0599V62.87L22 68.3099L27.61 71.5499L31.9801 74.0699V90.26ZM31.9801 70.02L31.37 69.6699L22 64.26L12.5801 58.8199V30.48L22 35.9199L31.9801 41.6799V70.02ZM54.92 103.5L35.51 92.2999V63.96L51.9801 73.46L54.92 75.16V103.5ZM54.92 71.11L51.9801 69.41L35.51 59.91V43.72L50.54 52.39L51.9801 53.22L54.92 54.9199V71.11Z" stroke="currentColor" stroke-linejoin="round"/>

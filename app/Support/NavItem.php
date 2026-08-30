@@ -7,18 +7,8 @@ namespace App\Support;
 final readonly class NavItem
 {
     /**
-     * Icon names resolved through their own `icons.*` component (isocons.app
-     * set). Anything else falls back to the legacy name-keyed `x-brand.nav-icon`.
-     *
-     * @var list<string>
-     */
-    public const array ICON_COMPONENTS = ['rela', 'features', 'self-hosted', 'api', 'help', 'developers'];
-
-    /**
      * @param  list<NavItem>  $children
-     * @param  string|null  $icon  Icon name resolved by the mega menu: either an `icons.*`
-     *                             component (isocons.app set) or, as a fallback, a name
-     *                             from `x-brand.nav-icon`.
+     * @param  string|null  $icon  Name of the `icons.*` component the mega menu renders.
      * @param  string|null  $description  One line shown under the label in the mega menu.
      */
     public function __construct(

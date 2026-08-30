@@ -134,12 +134,12 @@
     </div>
 
     {{-- Decided proposal, collapsed to one line: the dock's identity folded flat
-         (operation-tinted entity tile, bold record label, muted card title),
-         then the record link, the outcome chip and the Details disclosure. No
-         record pill here -- chips are reserved for inline clickable references. --}}
+         (operation-tinted entity tile, bold record label), then the record link
+         and the Details disclosure. No record pill here -- chips are reserved
+         for inline clickable references. --}}
     <div class="mcp-el mcp-audit-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
-        <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
-            <span class="relative flex min-w-0 flex-1 items-center gap-2">
+        <div class="group relative flex items-center gap-3 px-4 py-3.5">
+            <span class="relative flex min-w-0 flex-1 items-center gap-3">
                 <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip data-record-type="task">
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
@@ -148,14 +148,9 @@
                     </span>
                     <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">Schedule demo with Kovra Systems</span>
                 </span>
-                <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Update Task</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
-            </span>
-
-            <span class="relative inline-flex shrink-0 items-center rounded-full bg-green-50 px-2 py-0.5 text-micro font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                Approved
             </span>
 
             <span class="relative inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-gray-400">
@@ -199,8 +194,8 @@
 
     {{-- Decided create, same one-line shape as exchange 2 with the create tone. --}}
     <div class="mcp-el mcp-create-card my-3 w-full overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]" aria-hidden="true">
-        <div class="group relative flex items-center gap-2.5 px-4 py-2.5">
-            <span class="relative flex min-w-0 flex-1 items-center gap-2">
+        <div class="group relative flex items-center gap-3 px-4 py-3.5">
+            <span class="relative flex min-w-0 flex-1 items-center gap-3">
                 <span class="flex min-w-0 items-center gap-2.5" data-proposal-record-chip data-record-type="people">
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-600 text-white" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
@@ -209,14 +204,9 @@
                     </span>
                     <span class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">Sarah Chen</span>
                 </span>
-                <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Create Person</span>
                 <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5"/>
                 </span>
-            </span>
-
-            <span class="relative inline-flex shrink-0 items-center rounded-full bg-green-50 px-2 py-0.5 text-micro font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
-                Approved
             </span>
 
             <span class="relative inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium text-gray-400">

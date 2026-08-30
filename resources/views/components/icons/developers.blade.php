@@ -1,8 +1,8 @@
 @props([])
 
-{{-- Developers nav icon. Isometric line art (isocons.app), viewBox preserved
-     from source (0 0 96 121) since the geometry doesn't map cleanly to a square
-     24x24 grid. Color via currentColor, size via {{ $attributes }}. --}}
+{{-- Developers nav icon. Isometric line art, viewBox preserved from source
+     (0 0 96 121) since the geometry doesn't map cleanly to a square 24x24 grid.
+     Color via currentColor, size via {{ $attributes }}. --}}
 
 <svg viewBox="0 0 96 121" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" {{ $attributes }}>
     <path d="M22.5 56.4698V65.0298L26.21 62.8698L22.5 56.4698ZM22.5 40.3398V43.9198L25.82 42.2598L22.5 40.3398Z" stroke="currentColor" stroke-linejoin="round"/>

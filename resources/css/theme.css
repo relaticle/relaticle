@@ -216,9 +216,32 @@
                 width var(--duration-base) var(--ease-out-expo);
 }
 
+/* Mobile menu entrance — smaller slide than the hero's, tuned for a list of
+   rows. Re-runs on every open because the overlay toggles display. Kept short
+   and steep on purpose: a long expo tail drags text through sub-pixel
+   translation for hundreds of ms, which renders soft and "snaps" sharp at the
+   end. */
+@keyframes mobile-nav-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mobile-nav-enter {
+    opacity: 0;
+    animation: mobile-nav-fade-up 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(40ms + var(--stagger, 0) * 30ms);
+}
+
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-    .hero-enter {
+    .hero-enter,
+    .mobile-nav-enter {
         opacity: 1;
         animation: none;
     }

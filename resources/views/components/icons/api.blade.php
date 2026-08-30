@@ -1,8 +1,8 @@
 @props([])
 
-{{-- MCP and API nav icon. Isometric line art (isocons.app), viewBox preserved
-     from source (0 0 87 113) since the geometry doesn't map cleanly to a square
-     24x24 grid. Color via currentColor, size via {{ $attributes }}. --}}
+{{-- MCP and API nav icon. Isometric line art, viewBox preserved from source
+     (0 0 87 113) since the geometry doesn't map cleanly to a square 24x24 grid.
+     Color via currentColor, size via {{ $attributes }}. --}}
 
 <svg viewBox="0 0 87 113" fill="none" xmlns="http://www.w3.org/2000/svg" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" {{ $attributes }}>
     <path d="M64.2002 102.28C64.2002 105.85 63.0901 108.27 60.8801 109.53C58.6601 110.79 56.0001 110.53 52.8901 108.73C49.7801 106.93 47.1202 104.13 44.9102 100.31C42.6902 96.4901 41.5801 92.7901 41.5801 89.2201C41.5801 85.6501 42.6902 83.2401 44.9102 81.9801L45.3801 81.7501C47.4901 80.7501 50.0001 81.1001 52.8901 82.7801C56.0001 84.5701 58.6601 87.3801 60.8801 91.2001C63.0901 95.0201 64.2002 98.7101 64.2002 102.28Z" stroke="currentColor" stroke-linejoin="round"/>
