@@ -163,13 +163,24 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
+     * Members of a workspace: the `team_user` pivot plus the owner, who has no
+     * pivot row — the same two sources App\Support\TenantFkValidator checks.
+     *
+     * Deliberately not `current_team_id`: that column is only a user's *active*
+     * workspace, so a member who is currently working in another one would drop
+     * out of member pickers and be rejected as a share target.
+     *
      * @param  Builder<User>  $query
      * @return Builder<User>
      */
     #[Scope]
     protected function inTeam(Builder $query, string $teamId): Builder
     {
-        return $query->where('current_team_id', $teamId);
+        return $query->where(function (Builder $members) use ($teamId): void {
+            $members
+                ->whereHas('teams', fn (Builder $teams): Builder => $teams->whereKey($teamId))
+                ->orWhereHas('ownedTeams', fn (Builder $ownedTeams): Builder => $ownedTeams->whereKey($teamId));
+        });
     }
 
     /**

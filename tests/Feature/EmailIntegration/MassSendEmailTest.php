@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\PeopleField;
+use App\Features\EmailIntegration;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
@@ -49,6 +51,18 @@ function setPersonEmail(People $person, string $emailAddress): void
 
     $person->saveCustomFieldValue($emailsField, [$emailAddress], $person->team);
 }
+
+it('hides mass send when email integration is disabled', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    livewire(ListPeople::class)
+        ->assertTableBulkActionHidden('massSend');
+});
+
+it('shows mass send when email integration is enabled and an account is connected', function (): void {
+    livewire(ListPeople::class)
+        ->assertTableBulkActionVisible('massSend');
+});
 
 it('creates an EmailBatch and persists one Email row per recipient', function (): void {
     $people = collect(range(1, 3))->map(fn (int $i): People => People::create([

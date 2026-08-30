@@ -795,8 +795,8 @@ final class EmailInboxPage extends Page
         $user = $this->authUser();
 
         return User::query()
-            ->where('current_team_id', $user->current_team_id)
-            ->where('id', '!=', $user->getKey())
+            ->inTeam($user->current_team_id)
+            ->whereKeyNot($user->getKey())
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();

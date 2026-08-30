@@ -7,12 +7,14 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(EmailSharingService::class);
 
@@ -189,4 +191,41 @@ it('returns 0 when no emails are linked to the record', function (): void {
     $updated = $this->service->setTierForAllOnRecord($person, $this->owner, EmailPrivacyTier::FULL);
 
     expect($updated)->toBe(0);
+});
+
+it('shares with a workspace member who is currently working in another workspace', function (): void {
+    $member = User::factory()->withTeam()->create();
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    $email = makeSharingEmail();
+
+    app(UpdateEmailSharingAction::class)->execute(
+        $email,
+        $this->owner,
+        EmailPrivacyTier::METADATA_ONLY,
+        [['shared_with' => $member->getKey(), 'tier' => EmailPrivacyTier::FULL->value]],
+    );
+
+    $this->assertDatabaseHas('email_shares', [
+        'email_id' => $email->getKey(),
+        'shared_with' => $member->getKey(),
+        'tier' => EmailPrivacyTier::FULL->value,
+    ]);
+});
+
+it('rejects a share target who is not a member of the workspace', function (): void {
+    $outsider = User::factory()->withTeam()->create();
+    $email = makeSharingEmail();
+
+    expect(fn () => app(UpdateEmailSharingAction::class)->execute(
+        $email,
+        $this->owner,
+        EmailPrivacyTier::METADATA_ONLY,
+        [['shared_with' => $outsider->getKey(), 'tier' => EmailPrivacyTier::FULL->value]],
+    ))->toThrow(HttpException::class);
+
+    $this->assertDatabaseMissing('email_shares', [
+        'email_id' => $email->getKey(),
+        'shared_with' => $outsider->getKey(),
+    ]);
 });

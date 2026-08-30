@@ -28,7 +28,37 @@ final readonly class LinkEmailAction
         private AutomatedSenderMatcher $automatedSender,
     ) {}
 
+    /**
+     * Link an email to its CRM records exactly once.
+     *
+     * incrementEmailMetrics() is not idempotent, so a second pass over an email
+     * would inflate email_count on every record it touches. The `linked_at` claim
+     * and the linking itself share one transaction, taken under a row lock on the
+     * email: a crash mid-link rolls the claim back so a retry re-links from
+     * scratch, and a retry after a completed link is a no-op. Concurrent workers
+     * on the same email serialise on the lock, and the second one finds the claim.
+     */
     public function execute(Email $email): void
+    {
+        DB::transaction(function () use ($email): void {
+            /** @var Email|null $locked */
+            $locked = Email::query()
+                ->withoutGlobalScopes()
+                ->whereKey($email->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if ($locked === null || $locked->linked_at !== null) {
+                return;
+            }
+
+            $this->link($email);
+
+            $locked->updateQuietly(['linked_at' => now()]);
+        });
+    }
+
+    private function link(Email $email): void
     {
         $participants = $email->participants()->with('contact', 'company')->get();
         $teamId = $email->team_id;
