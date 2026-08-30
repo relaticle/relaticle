@@ -6,7 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversationMessage;
 
 /**
  * Syncs the authenticated user's Mailcoach profile the first time they send a
@@ -34,11 +34,9 @@ final readonly class FirstChatUsageTagger
             return;
         }
 
-        $alreadyUsedChat = DB::table('agent_conversation_messages')
-            ->where('participant_type', $user->getMorphClass())
-            ->where('participant_id', (string) $user->getKey())
-            ->where('role', 'user')
-            ->where('id', '!=', $currentMessageId)
+        $alreadyUsedChat = AgentConversationMessage::query()
+            ->sentBy($user)
+            ->whereKeyNot($currentMessageId)
             ->exists();
 
         if ($alreadyUsedChat) {

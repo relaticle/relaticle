@@ -133,7 +133,7 @@ final class UserResource extends Resource
                         ->placeholder('Never'),
                     TextEntry::make('engagement')
                         ->label('Engagement')
-                        ->state(fn (User $record): ?string => SubscriberTagEnum::recencyBucketFor($record->last_login_at)?->value)
+                        ->state(self::engagementBadge(...))
                         ->badge()
                         ->placeholder('—'),
                     TextEntry::make('created_at')
@@ -175,7 +175,7 @@ final class UserResource extends Resource
                     ->placeholder('Never'),
                 TextColumn::make('engagement')
                     ->label('Engagement')
-                    ->state(fn (User $record): ?string => SubscriberTagEnum::recencyBucketFor($record->last_login_at)?->value)
+                    ->state(self::engagementBadge(...))
                     ->badge()
                     ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('last_login_at', $direction))
                     ->toggleable()
@@ -198,14 +198,10 @@ final class UserResource extends Resource
                         SubscriberTagEnum::Active30d->value => 'Active (30d)',
                         SubscriberTagEnum::Dormant->value => 'Dormant',
                     ])
-                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
-                        SubscriberTagEnum::Active7d->value => $query->where('last_login_at', '>=', now()->subDays(7)),
-                        SubscriberTagEnum::Active30d->value => $query
-                            ->where('last_login_at', '<', now()->subDays(7))
-                            ->where('last_login_at', '>=', now()->subDays(30)),
-                        SubscriberTagEnum::Dormant->value => $query->where('last_login_at', '<', now()->subDays(60)),
-                        default => $query,
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => SubscriberTagEnum::applyRecencyWindow(
+                        $query,
+                        $data['value'] ?? null,
+                    )),
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -218,6 +214,11 @@ final class UserResource extends Resource
                     }),
                 ]),
             ]);
+    }
+
+    public static function engagementBadge(User $record): ?string
+    {
+        return SubscriberTagEnum::recencyBucketFor($record->last_login_at)?->value;
     }
 
     /**

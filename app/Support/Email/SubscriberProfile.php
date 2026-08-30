@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Email;
 
+use App\Models\User;
+
 final readonly class SubscriberProfile
 {
     /**
@@ -15,6 +17,17 @@ final readonly class SubscriberProfile
         public string $lastName,
         public array $tags,
     ) {}
+
+    /**
+     * Whether the user already carries this exact profile in Mailcoach. The
+     * uuid half matters: a matching hash with no uuid means the subscriber was
+     * never created, so the sync still has work to do.
+     */
+    public function matchesStored(User $user): bool
+    {
+        return $user->mailcoach_subscriber_uuid !== null
+            && $user->subscriber_profile_hash === $this->hash();
+    }
 
     public function hash(): string
     {

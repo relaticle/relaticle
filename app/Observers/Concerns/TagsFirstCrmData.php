@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Observers\Concerns;
 
 use App\Jobs\Email\SyncSubscriberJob;
-use App\Models\Company;
-use App\Models\Opportunity;
-use App\Models\People;
 use App\Models\User;
+use App\Support\Email\SubscriberProfileDeriver;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -35,19 +33,7 @@ trait TagsFirstCrmData
             return;
         }
 
-        $teamIds = $user->allTeams()->pluck('id');
-
-        $hasCrmData = Company::query()->whereIn('team_id', $teamIds)
-            ->when($createdModel instanceof Company, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-            ->exists()
-            || People::query()->whereIn('team_id', $teamIds)
-                ->when($createdModel instanceof People, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-                ->exists()
-            || Opportunity::query()->whereIn('team_id', $teamIds)
-                ->when($createdModel instanceof Opportunity, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-                ->exists();
-
-        if ($hasCrmData) {
+        if (resolve(SubscriberProfileDeriver::class)->hasCrmData($user, $createdModel)) {
             return;
         }
 

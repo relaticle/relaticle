@@ -47,7 +47,7 @@ final class ReconcileSubscribersCommand extends Command
 
                     $profile = $deriver->derive($user);
 
-                    if ($user->mailcoach_subscriber_uuid && $user->subscriber_profile_hash === $profile->hash()) {
+                    if ($profile->matchesStored($user)) {
                         continue;
                     }
 

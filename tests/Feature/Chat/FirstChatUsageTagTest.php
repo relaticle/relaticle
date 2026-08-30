@@ -10,10 +10,11 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\FirstChatUsageTagger;
 
-mutates(FirstChatUsageTagger::class, SupersededAwareConversationStore::class);
+mutates(FirstChatUsageTagger::class, SupersededAwareConversationStore::class, AgentConversationMessage::class);
 
 function storeChatUserMessage(User $user, string $conversationId, string $text): string
 {
@@ -96,4 +97,34 @@ test('sending a chat message when subscriber sync is disabled does not dispatch'
     storeChatUserMessage($user, seedChatConversation($user), 'hello');
 
     Queue::assertNotPushed(SyncSubscriberJob::class);
+});
+
+test('an assistant reply is not counted as the user having used chat', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+
+    $conversationId = seedChatConversation($user);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'agent' => 'crm-assistant',
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => (string) $user->getKey(),
+        'role' => 'assistant',
+        'content' => 'hi there',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    expect(AgentConversationMessage::query()->sentBy($user)->exists())->toBeFalse();
+
+    storeChatUserMessage($user, $conversationId, 'hello');
+
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });

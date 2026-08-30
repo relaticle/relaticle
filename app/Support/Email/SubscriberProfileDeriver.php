@@ -10,7 +10,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Relaticle\Chat\Models\AgentConversationMessage;
 
 /**
  * Derives the complete Mailcoach subscriber profile for a user from the
@@ -80,22 +81,33 @@ final readonly class SubscriberProfileDeriver
             : SubscriberTagEnum::SignupSourceOrganic->value;
     }
 
-    private function hasCrmData(User $user): bool
+    /**
+     * The single definition of "this account has CRM data". Trigger paths pass
+     * the record they just created as $excluding so they can ask whether any
+     * OTHER one already existed.
+     */
+    public function hasCrmData(User $user, ?Model $excluding = null): bool
     {
         $teamIds = $user->allTeams()->pluck('id');
 
-        return Company::query()->whereIn('team_id', $teamIds)->exists()
-            || People::query()->whereIn('team_id', $teamIds)->exists()
-            || Opportunity::query()->whereIn('team_id', $teamIds)->exists();
+        foreach ([Company::class, People::class, Opportunity::class] as $entity) {
+            $query = $entity::query()->whereIn('team_id', $teamIds);
+
+            if ($excluding instanceof $entity) {
+                $query->whereKeyNot($excluding->getKey());
+            }
+
+            if ($query->exists()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasChatUsage(User $user): bool
     {
-        return DB::table('agent_conversation_messages')
-            ->where('participant_type', $user->getMorphClass())
-            ->where('participant_id', (string) $user->getKey())
-            ->where('role', 'user')
-            ->exists();
+        return AgentConversationMessage::query()->sentBy($user)->exists();
     }
 
     /**

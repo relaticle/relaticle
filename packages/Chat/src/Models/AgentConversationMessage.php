@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Models;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -51,6 +53,15 @@ final class AgentConversationMessage extends Model
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(AgentConversation::class, 'conversation_id');
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function sentBy(Builder $query, User $user): void
+    {
+        $query->where('participant_type', $user->getMorphClass())
+            ->where('participant_id', (string) $user->getKey())
+            ->where('role', 'user');
     }
 
     /**
