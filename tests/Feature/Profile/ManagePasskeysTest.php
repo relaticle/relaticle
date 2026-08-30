@@ -76,7 +76,7 @@ it('reports passkey ownership via hasPasskey', function (): void {
 
 it('confirms with a password and triggers the register ceremony for a password user', function (): void {
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'password'])
+        ->callAction('registerPasskey', ['password' => 'password'])
         ->assertHasNoActionErrors()
         ->assertActionHalted()
         ->assertDispatched('passkey-register')
@@ -87,7 +87,7 @@ it('confirms with a password and triggers the register ceremony for a password u
 
 it('rejects registration when the password is wrong', function (): void {
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook', 'password' => 'wrong-password'])
+        ->callAction('registerPasskey', ['password' => 'wrong-password'])
         ->assertHasActionErrors(['password'])
         ->assertNotDispatched('passkey-register');
 
@@ -96,7 +96,7 @@ it('rejects registration when the password is wrong', function (): void {
 
 it('requires a password for a password user registering their first passkey', function (): void {
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'First Key'])
+        ->callAction('registerPasskey')
         ->assertHasActionErrors(['password'])
         ->assertNotDispatched('confirm-identity-ceremony')
         ->assertNotDispatched('passkey-register');
@@ -108,7 +108,7 @@ it('confirms registration without a password for passwordless users', function (
     $this->actingAs(User::factory()->create(['password' => null]));
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'My MacBook'])
+        ->callAction('registerPasskey')
         ->assertHasNoActionErrors()
         ->assertActionHalted()
         ->assertDispatched('passkey-register');
@@ -120,7 +120,7 @@ it('runs the confirmation ceremony when a password user with a passkey adds anot
     createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'New MacBook'])
+        ->callAction('registerPasskey')
         ->assertHasNoActionErrors()
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony')
@@ -133,7 +133,7 @@ it('registers via the password fallback when the user opts into password confirm
     createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'password'])
+        ->callAction('registerPasskey', ['use_password' => true, 'password' => 'password'])
         ->assertHasNoActionErrors()
         ->assertActionHalted()
         ->assertDispatched('passkey-register')
@@ -146,7 +146,7 @@ it('rejects the registration password fallback when the password is wrong', func
     createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'New MacBook', 'use_password' => true, 'password' => 'wrong-password'])
+        ->callAction('registerPasskey', ['use_password' => true, 'password' => 'wrong-password'])
         ->assertHasActionErrors(['password'])
         ->assertNotDispatched('passkey-register')
         ->assertNotDispatched('confirm-identity-ceremony');
@@ -229,7 +229,7 @@ it('re-confirms when adding a passkey even inside the freshness window', functio
     createPasskey($this->user, 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', ['name' => 'New Key'])
+        ->callAction('registerPasskey')
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony')
         ->assertNotDispatched('passkey-register');
@@ -245,4 +245,52 @@ it('re-confirms when removing a passkey even inside the freshness window', funct
         ->assertDispatched('confirm-identity-ceremony');
 
     expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+// --- Naming ---------------------------------------------------------------
+
+it('registers without asking for a name', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey')
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register');
+});
+
+it('renames a passkey', function (): void {
+    $passkey = createPasskey($this->user, 'Chrome on macOS');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('renamePasskey', data: ['name' => 'Work laptop'], arguments: ['passkeyId' => $passkey->id])
+        ->assertHasNoActionErrors();
+
+    expect($passkey->refresh()->name)->toBe('Work laptop');
+});
+
+it('prefills the rename form with the current name', function (): void {
+    $passkey = createPasskey($this->user, 'Chrome on macOS');
+
+    livewire(ManagePasskeys::class)
+        ->mountAction('renamePasskey', arguments: ['passkeyId' => $passkey->id])
+        ->assertSet('mountedActions.0.data.name', 'Chrome on macOS');
+});
+
+it('requires a name when renaming', function (): void {
+    $passkey = createPasskey($this->user, 'Chrome on macOS');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('renamePasskey', data: ['name' => ''], arguments: ['passkeyId' => $passkey->id])
+        ->assertHasActionErrors(['name']);
+
+    expect($passkey->refresh()->name)->toBe('Chrome on macOS');
+});
+
+it('does not rename a passkey belonging to another user', function (): void {
+    $passkey = createPasskey(User::factory()->create(), 'Not Mine');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('renamePasskey', data: ['name' => 'Hijacked'], arguments: ['passkeyId' => $passkey->id]);
+
+    expect($passkey->refresh()->name)->toBe('Not Mine');
 });

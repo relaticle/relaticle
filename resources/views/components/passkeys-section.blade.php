@@ -8,11 +8,11 @@
                 this.supported = Boolean(window.Passkeys?.isSupported?.());
             }, { once: true });
 
-            $wire.on('passkey-register', async ({ name }) => {
+            $wire.on('passkey-register', async () => {
                 this.startProcessing('{{ __('profile.sections.passkeys.registering') }}');
 
                 try {
-                    await window.Passkeys.register({ name });
+                    await window.Passkeys.register({ name: this.deviceLabel() });
 
                     this.startProcessing('{{ __('profile.sections.passkeys.confirmed') }}');
                     await new Promise((resolve) => setTimeout(resolve, 600));
@@ -30,6 +30,30 @@
                     $wire.call('unmountAction');
                 }
             });
+        },
+
+        deviceLabel() {
+            const ua = navigator.userAgent;
+
+            const browser = /Edg\//.test(ua) ? 'Edge'
+                : /OPR\//.test(ua) ? 'Opera'
+                : /Firefox\//.test(ua) ? 'Firefox'
+                : /Chrome\//.test(ua) ? 'Chrome'
+                : /Safari\//.test(ua) ? 'Safari'
+                : null;
+
+            const platform = /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+                : /Android/.test(ua) ? 'Android'
+                : /Mac OS X/.test(ua) ? 'macOS'
+                : /Windows/.test(ua) ? 'Windows'
+                : /Linux/.test(ua) ? 'Linux'
+                : null;
+
+            if (browser && platform) {
+                return `${browser} on ${platform}`;
+            }
+
+            return browser ?? platform ?? @js(__('profile.sections.passkeys.default_name'));
         },
 
         startProcessing(message) {
@@ -67,7 +91,10 @@
                     </p>
                 </div>
 
-                {{ ($this->deletePasskeyAction)(['passkeyId' => $passkey['id']]) }}
+                <div class="flex shrink-0 items-center gap-3">
+                    {{ ($this->renamePasskeyAction)(['passkeyId' => $passkey['id']]) }}
+                    {{ ($this->deletePasskeyAction)(['passkeyId' => $passkey['id']]) }}
+                </div>
             </div>
         @empty
             <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">

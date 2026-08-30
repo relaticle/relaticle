@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Profile;
 
+use App\Actions\Passkeys\RenamePasskey;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\IdentityConfirmation;
@@ -12,6 +13,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Laravel\Passkeys\Actions\DeletePasskey;
@@ -63,11 +65,16 @@ final class ManagePasskeys extends BaseLivewireComponent
     }
 
     /**
-     * Collect a passkey name, confirm the user's identity (passkey ceremony, password
-     * fallback, or session alone for passwordless accounts), then run the browser
-     * registration ceremony. markConfirmed() is always called before dispatching so the
-     * subsequent register POST satisfies the vendor RequirePassword middleware — even for
-     * passwordless accounts the identity gate would otherwise short-circuit.
+     * Confirm the user's identity (passkey ceremony, password fallback, or session alone
+     * for passwordless accounts), then run the browser registration ceremony.
+     * markConfirmed() is always called before dispatching so the subsequent register POST
+     * satisfies the vendor RequirePassword middleware — even for passwordless accounts the
+     * identity gate would otherwise short-circuit.
+     *
+     * No name is collected here. The AAGUID that identifies the authenticator only exists
+     * once the ceremony has completed, so a name asked for up front is a guess at
+     * something we are about to be told; the browser sends a device-derived fallback and
+     * the list prefers the resolved authenticator label over it.
      */
     public function registerPasskeyAction(): ConfirmIdentityAction
     {
@@ -78,19 +85,50 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
-            ->prependSchema([
+            ->confirmedUsing(function (Action $action): void {
+                IdentityConfirmation::markConfirmed();
+
+                $this->dispatch('passkey-register');
+
+                $action->halt();
+            });
+    }
+
+    public function renamePasskeyAction(): Action
+    {
+        return Action::make('renamePasskey')
+            ->label(__('profile.sections.passkeys.rename'))
+            ->link()
+            ->size(Size::Small)
+            ->modalHeading(__('profile.sections.passkeys.rename'))
+            ->modalWidth(Width::Medium)
+            ->modalSubmitActionLabel(__('profile.sections.passkeys.save'))
+            ->fillForm(fn (array $arguments): array => [
+                'name' => $this->authUser()->passkeys()
+                    ->whereKey((int) ($arguments['passkeyId'] ?? 0))
+                    ->value('name') ?? '',
+            ])
+            ->schema([
                 TextInput::make('name')
                     ->label(__('profile.sections.passkeys.name_label'))
                     ->placeholder(__('profile.sections.passkeys.name_placeholder'))
                     ->required()
                     ->maxLength(255),
             ])
-            ->confirmedUsing(function (array $data, Action $action): void {
-                IdentityConfirmation::markConfirmed();
+            ->action(function (array $arguments, array $data, RenamePasskey $renamePasskey): void {
+                $passkey = $this->authUser()->passkeys()
+                    ->whereKey((int) ($arguments['passkeyId'] ?? 0))
+                    ->first();
 
-                $this->dispatch('passkey-register', name: $data['name']);
+                if (! $passkey instanceof Passkey) {
+                    return;
+                }
 
-                $action->halt();
+                $renamePasskey->execute($this->authUser(), $passkey, $data['name']);
+
+                $this->loadPasskeys();
+
+                $this->sendNotification(__('profile.notifications.passkey_renamed.success'));
             });
     }
 

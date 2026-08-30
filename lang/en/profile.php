@@ -74,6 +74,9 @@ return [
             'add_description' => 'Register a new passkey for this device to sign in without a password.',
             'name_label' => 'Passkey name',
             'name_placeholder' => 'e.g., MacBook Pro, iPhone',
+            'default_name' => 'Passkey',
+            'rename' => 'Rename',
+            'save' => 'Save',
             'password_help' => 'For your security, confirm your account password before adding a passkey.',
             'use_password' => 'Use your password instead',
             'method_hint' => "You'll confirm with Face ID, Touch ID, or your passkey.",
@@ -110,6 +113,9 @@ return [
         ],
         'passkey_removed' => [
             'success' => 'Passkey removed.',
+        ],
+        'passkey_renamed' => [
+            'success' => 'Passkey renamed.',
         ],
         'passkey_registration_failed' => [
             'title' => 'Could not add passkey. Please try again.',
