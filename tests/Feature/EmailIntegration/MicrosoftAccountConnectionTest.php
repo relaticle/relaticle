@@ -104,6 +104,14 @@ it('dispatches history import when a disconnected account is reconnected', funct
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->trashed()->create([
+        'user_id' => $user->getKey(),
+        'team_id' => $user->current_team_id,
+        'email_address' => 'again@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-reconnect-import',
+    ]));
+
     $social = new SocialiteUser;
     $social->id = 'gmail-reconnect-import';
     $social->email = 'again@example.com';
@@ -119,13 +127,7 @@ it('dispatches history import when a disconnected account is reconnected', funct
     Socialite::fake('gmail', $social);
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
 
-    $account = ConnectedAccount::query()->where('email_address', 'again@example.com')->firstOrFail();
-    $account->delete();
-
-    Bus::fake();
-
-    Socialite::fake('gmail', $social);
-    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+    expect($account->refresh()->trashed())->toBeFalse();
 
     Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
     Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
