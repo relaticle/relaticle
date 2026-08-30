@@ -115,6 +115,32 @@ test('deletes other sessions and sends success notification', function (): void 
     )->toBe(0);
 });
 
+test('keeps the current session while deleting the others', function (): void {
+    config(['session.driver' => 'database']);
+    session()->put('auth.password_confirmed_at', time());
+
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $currentSessionId = Session::getId();
+
+    foreach ([$currentSessionId, 'other-session-1'] as $id) {
+        DB::table(config('session.table', 'sessions'))->insert([
+            'id' => $id,
+            'user_id' => $user->getAuthIdentifier(),
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Mozilla/5.0',
+            'payload' => base64_encode('test'),
+            'last_activity' => time(),
+        ]);
+    }
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->call('logoutOtherBrowserSessions');
+
+    expect(DB::table(config('session.table', 'sessions'))->where('id', $currentSessionId)->exists())->toBeTrue()
+        ->and(DB::table(config('session.table', 'sessions'))->where('id', 'other-session-1')->exists())->toBeFalse();
+});
+
 test('browser sessions component renders correctly', function (): void {
     $this->actingAs(User::factory()->withTeam()->create());
 

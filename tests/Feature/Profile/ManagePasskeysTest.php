@@ -247,6 +247,18 @@ it('re-confirms when removing a passkey even inside the freshness window', funct
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
+it('completes the deletion when the ceremony refreshed the proof after the attempt began', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+    $passkey = createPasskey(auth()->user(), 'Existing Key');
+    session()->put('auth.password_confirmed_at', time());
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', data: ['confirm_started_at' => (string) (time() - 10)], arguments: ['passkeyId' => $passkey->id])
+        ->assertNotDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->toBeNull();
+});
+
 it('ignores a client-supplied attempt marker when adding a passkey', function (): void {
     $this->actingAs(User::factory()->create(['password' => null]));
     createPasskey(auth()->user(), 'Existing Key');
