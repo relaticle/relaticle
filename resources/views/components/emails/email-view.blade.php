@@ -67,15 +67,18 @@
 
     {{-- Subject, with the record-level actions kept out of the reading path --}}
     <div class="flex shrink-0 items-start gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 pr-12 sm:px-6 sm:pr-14">
-        {{-- Back to the list on narrow viewports, where the two panes alternate --}}
-        <button
-            wire:click="$set('selectedEmailId', null)"
-            type="button"
-            aria-label="{{ __('filament/pages/email-inbox.back_to_list') }}"
-            class="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:hidden"
-        >
-            <x-heroicon-o-arrow-left class="h-5 w-5" />
-        </button>
+        {{-- Back to the list on narrow viewports, where the two panes alternate.
+             The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
+        @if (property_exists($this, 'selectedEmailId'))
+            <button
+                wire:click="$set('selectedEmailId', null)"
+                type="button"
+                aria-label="{{ __('filament/pages/email-inbox.back_to_list') }}"
+                class="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:hidden"
+            >
+                <x-heroicon-o-arrow-left class="h-5 w-5" />
+            </button>
+        @endif
 
         @if ($canViewSubject)
             {{-- A subject is the one thing worth reading in full: it wraps rather than
