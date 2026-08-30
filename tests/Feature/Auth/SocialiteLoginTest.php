@@ -98,6 +98,23 @@ test('callback from socialite provider links social account to existing user whe
     $this->assertAuthenticatedAs($user);
 });
 
+test('callback links to the existing account when the provider returns a mixed-case email', function () {
+    $user = User::factory()->withTeam()->create(['email' => 'case-link-'.uniqid().'@example.com']);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('987654321', 'Existing User', mb_strtoupper($user->email)),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    $response->assertRedirect();
+
+    $this->assertAuthenticatedAs($user);
+    expect(User::where('email', 'ilike', $user->email)->count())->toBe(1)
+        ->and($user->socialAccounts()->where('provider_name', 'google')->exists())->toBeTrue();
+});
+
 test('callback from socialite provider handles error gracefully', function () {
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,

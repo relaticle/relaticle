@@ -81,6 +81,33 @@ test('signing up with a different email than the invitation does not get auto-ve
     expect($user->hasVerifiedEmail())->toBeFalse();
 });
 
+test('a mixed-case invitation still auto-verifies the signup for that mailbox', function (): void {
+    $team = Team::factory()->create();
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'Invited-Case@Gmail.com',
+    ]);
+
+    expect($invitation->refresh()->email)->toBe('invited-case@gmail.com');
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->get($acceptUrl);
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'INVITED-CASE@GMAIL.COM'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', 'invited-case@gmail.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->hasVerifiedEmail())->toBeTrue();
+});
+
 test('signing up via an invitation link gets a mailcoach subscriber synced', function (): void {
     Queue::fake([SyncSubscriberJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);

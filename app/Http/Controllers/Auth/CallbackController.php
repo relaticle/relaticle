@@ -8,6 +8,7 @@ use App\Contracts\User\CreatesNewSocialUsers;
 use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\EmailAddress;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,7 +77,9 @@ final readonly class CallbackController
             }
 
             $email = $socialUser->getEmail();
-            $user = $email ? User::query()->where('email', $email)->first() : null;
+            $user = $email
+                ? User::query()->where('email', EmailAddress::canonicalize($email))->first()
+                : null;
 
             if (! $user) {
                 $user = $this->createUser($socialUser, $creator, $provider);
@@ -137,8 +140,9 @@ final readonly class CallbackController
 
     private function extractEmail(SocialiteUser $socialUser, string $provider): string
     {
-        return $socialUser->getEmail()
-            ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId());
+        return EmailAddress::canonicalize(
+            $socialUser->getEmail() ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId()),
+        );
     }
 
     private function parseProviderError(string $exceptionMessage, string $provider): string

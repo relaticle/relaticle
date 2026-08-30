@@ -156,7 +156,7 @@ test('a passkey user can fall back to their password', function (): void {
     $this->assertAuthenticated();
 });
 
-test('continue with a social-only account hints the provider', function (): void {
+test('continue with a social-only account switches to the social method', function (): void {
     $user = User::factory()->socialOnly()->create();
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -167,7 +167,7 @@ test('continue with a social-only account hints the provider', function (): void
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
-        ->assertSet('authMethod', 'social:google');
+        ->assertSet('authMethod', 'social');
 });
 
 test('two step password login still authenticates', function (): void {
@@ -315,7 +315,7 @@ test('a microsoft-only account falls back to the password field when microsoft i
         ->assertSet('authMethod', 'password');
 });
 
-test('a microsoft-only account hints the provider when microsoft is configured', function (): void {
+test('a microsoft-only account switches to the social method when microsoft is configured', function (): void {
     config(['services.microsoft.client_id' => 'configured-client-id']);
 
     $user = User::factory()->socialOnly()->create();
@@ -328,7 +328,7 @@ test('a microsoft-only account hints the provider when microsoft is configured',
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
-        ->assertSet('authMethod', 'social:microsoft');
+        ->assertSet('authMethod', 'social');
 });
 
 test('discovery is rate limited per ip across different emails', function (): void {
@@ -368,7 +368,7 @@ test('social hint renders after discovering a social-only account', function ():
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
-        ->assertSee(__('auth.login.social_hint', ['provider' => 'Google']));
+        ->assertSee(__('auth.login.social_hint'));
 });
 
 test('password fallback link renders only for passkey users with a password', function (): void {
@@ -471,7 +471,7 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
         ->call('authenticate')
         ->assertHasNoErrors();
 
-    $user = User::where('email', $email)->first();
+    $user = User::where('email', mb_strtolower($email))->first();
 
     expect($user)->not->toBeNull()
         ->and($user->hasVerifiedEmail())->toBeTrue();
@@ -505,12 +505,14 @@ test('signup rejects a submission caught by the honeypot', function (): void {
 
     $email = 'bot-signup-'.uniqid().'@gmail.com';
 
-    $component = livewire(Login::class)
+    $component = livewire(Login::class);
+
+    $this->travel(2)->seconds();
+
+    $component
         ->fillForm(['email' => $email])
         ->call('authenticate')
         ->assertSet('authMethod', 'signup');
-
-    $this->travel(2)->seconds();
 
     $component
         ->set('extraFields.my_name', 'I fill every field I see')
@@ -526,12 +528,14 @@ test('signup registers normally when the honeypot stays empty and enough time ha
 
     $email = 'human-signup-'.uniqid().'@gmail.com';
 
-    $component = livewire(Login::class)
+    $component = livewire(Login::class);
+
+    $this->travel(2)->seconds();
+
+    $component
         ->fillForm(['email' => $email])
         ->call('authenticate')
         ->assertSet('authMethod', 'signup');
-
-    $this->travel(2)->seconds();
 
     $component
         ->fillForm(['password' => 'Password123!'])
@@ -539,6 +543,40 @@ test('signup registers normally when the honeypot stays empty and enough time ha
         ->assertHasNoErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+test('discovery rejects a submission caught by the honeypot', function (): void {
+    config(['honeypot.enabled' => true]);
+
+    $component = livewire(Login::class);
+
+    $this->travel(2)->seconds();
+
+    $component
+        ->set('extraFields.my_name', 'I fill every field I see')
+        ->fillForm(['email' => 'bot-discover-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertForbidden();
+
+    expect($component->get('authMethod'))->toBeNull();
+});
+
+test('discovery is capped per ip per day independently of the minute window', function (): void {
+    $ip = '127.0.0.1';
+    RateLimiter::clear('login-discover-ip:'.$ip);
+
+    $dayKey = 'login-discover-ip-day:'.$ip;
+    RateLimiter::clear($dayKey);
+
+    for ($i = 0; $i < 300; $i++) {
+        RateLimiter::hit($dayKey, 86400);
+    }
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'day-capped-'.uniqid().'@example.com'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email'])
+        ->assertSet('authMethod', null);
 });
 
 test('signup rejects a duplicate email at submission', function (): void {
@@ -587,8 +625,10 @@ test('swapping the email after discovery via a wholesale data set does not creat
     $this->assertGuest();
 });
 
-test('a mixed-case signup can log back in using the same typed casing', function (): void {
-    $email = 'MixedCase-'.uniqid().'@Gmail.com';
+test('a mixed-case signup is stored lowercase and can log back in with any casing', function (): void {
+    $local = 'MixedCase-'.uniqid();
+    $email = $local.'@Gmail.com';
+    $canonical = mb_strtolower($email);
 
     livewire(Login::class)
         ->fillForm(['email' => $email])
@@ -598,8 +638,8 @@ test('a mixed-case signup can log back in using the same typed casing', function
         ->call('authenticate')
         ->assertHasNoErrors();
 
-    expect(User::where('email', $email)->exists())->toBeTrue()
-        ->and(User::where('email', mb_strtolower($email))->exists())->toBeFalse();
+    expect(User::where('email', $canonical)->exists())->toBeTrue()
+        ->and(User::where('email', $email)->exists())->toBeFalse();
 
     $this->assertAuthenticated();
 
@@ -607,10 +647,24 @@ test('a mixed-case signup can log back in using the same typed casing', function
     $this->app['session']->flush();
 
     livewire(Login::class)
-        ->fillForm(['email' => $email])
+        ->fillForm(['email' => mb_strtoupper($local).'@GMAIL.COM'])
         ->call('authenticate')
         ->assertSet('authMethod', 'password')
         ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $this->assertAuthenticated();
+});
+
+test('a legacy mixed-case account can log in with a lowercase-typed email after normalization', function (): void {
+    User::factory()->withTeam()->create(['email' => 'Legacy-Mixed@Example.com', 'password' => 'password']);
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'legacy-mixed@example.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'password')
+        ->fillForm(['password' => 'password'])
         ->call('authenticate')
         ->assertHasNoErrors();
 

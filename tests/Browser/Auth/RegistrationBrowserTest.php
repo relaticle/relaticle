@@ -13,8 +13,11 @@ it('completes a signup from the unified login page', function (): void {
     $email = 'jane-spa-signup-'.uniqid().'@gmail.com';
 
     $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $email)
-        ->click('button[type="submit"]')
+        ->type('[id="form.email"]', $email);
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
         ->assertVisible('[id="form.password"]')
         ->type('[id="form.password"]', 'Password123!');
 

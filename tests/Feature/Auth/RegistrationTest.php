@@ -134,10 +134,8 @@ it('rejects a signup submitted faster than a human could type', function (): voi
     livewire(Login::class)
         ->fillForm(['email' => $email])
         ->call('authenticate')
-        ->assertSet('authMethod', 'signup')
-        ->fillForm(['password' => 'Password123!'])
-        ->call('authenticate')
-        ->assertForbidden();
+        ->assertForbidden()
+        ->assertSet('authMethod', null);
 
     expect(User::where('email', $email)->exists())->toBeFalse();
 });

@@ -10,6 +10,7 @@ use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
+use App\Support\EmailAddress;
 use Filament\Actions\Action;
 use Filament\Auth\Events\Registered;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Timebox;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
@@ -105,7 +107,7 @@ final class Login extends \Filament\Auth\Pages\Login
             return null;
         }
 
-        if (str_starts_with((string) $this->authMethod, 'social:')) {
+        if ($this->authMethod === 'social') {
             return null;
         }
 
@@ -129,7 +131,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
     protected function handleSignup(): ?LoginResponse
     {
-        $submittedEmail = mb_strtolower(trim((string) ($this->data['email'] ?? '')));
+        $submittedEmail = EmailAddress::canonicalize((string) ($this->data['email'] ?? ''));
 
         if ($submittedEmail !== $this->discoveredEmail) {
             $this->authMethod = null;
@@ -144,7 +146,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $data = $this->form->getState();
 
-        $email = trim((string) $data['email']);
+        $email = EmailAddress::canonicalize((string) $data['email']);
 
         try {
             $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
@@ -206,12 +208,9 @@ final class Login extends \Filament\Auth\Pages\Login
             BLADE);
         }
 
-        if (str_starts_with((string) $this->authMethod, 'social:')) {
-            $provider = ucfirst(mb_substr((string) $this->authMethod, 7));
-
+        if ($this->authMethod === 'social') {
             return Blade::render(
-                '<p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __(\'auth.login.social_hint\', [\'provider\' => $provider]) }}</p>',
-                ['provider' => $provider],
+                '<p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __(\'auth.login.social_hint\') }}</p>',
             );
         }
 
@@ -220,17 +219,78 @@ final class Login extends \Filament\Auth\Pages\Login
 
     protected function discover(): void
     {
-        $email = mb_strtolower(trim((string) ($this->form->getState()['email'] ?? '')));
+        $this->protectAgainstSpam();
 
-        $ipKey = 'login-discover-ip:'.request()->ip();
+        $email = EmailAddress::canonicalize((string) ($this->form->getState()['email'] ?? ''));
 
-        if (RateLimiter::tooManyAttempts($ipKey, 20)) {
+        $this->assertDiscoveryIsNotRateLimited($email);
+
+        $this->discoveredEmail = $email;
+
+        /**
+         * The Timebox pads every branch to the same duration so the response
+         * body stays the only existence oracle, not the response time.
+         */
+        resolve(Timebox::class)->call(function () use ($email): void {
+            $user = User::query()->where('email', $email)->first();
+
+            if ($user?->hasPasskey()) {
+                $this->authMethod = 'passkey';
+                $this->passkeyUserHasPassword = $user->hasPassword();
+                $this->dispatch('passkey-login');
+
+                return;
+            }
+
+            if ($user === null) {
+                $this->authMethod = 'signup';
+
+                return;
+            }
+
+            if ($user->hasPassword()) {
+                $this->authMethod = 'password';
+
+                return;
+            }
+
+            if (! Feature::active(SocialAuth::class)) {
+                $this->authMethod = 'password';
+
+                return;
+            }
+
+            $this->authMethod = $this->resolveOfferedProvider($user) === null
+                ? 'password'
+                : 'social';
+        }, (int) config('auth.timebox_duration', 200_000));
+    }
+
+    private function assertDiscoveryIsNotRateLimited(string $email): void
+    {
+        $ip = request()->ip();
+
+        $minuteKey = 'login-discover-ip:'.$ip;
+
+        if (RateLimiter::tooManyAttempts($minuteKey, 20)) {
             throw ValidationException::withMessages([
-                'data.email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($ipKey)]),
+                'data.email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($minuteKey)]),
             ]);
         }
 
-        $emailKey = 'login-discover:'.$email.'|'.request()->ip();
+        /**
+         * The daily cap makes list enumeration expensive; a global per-email
+         * limiter is omitted on purpose, it would let anyone lock a victim out.
+         */
+        $dayKey = 'login-discover-ip-day:'.$ip;
+
+        if (RateLimiter::tooManyAttempts($dayKey, 300)) {
+            throw ValidationException::withMessages([
+                'data.email' => __('auth.throttle_long'),
+            ]);
+        }
+
+        $emailKey = 'login-discover:'.$email.'|'.$ip;
 
         if (RateLimiter::tooManyAttempts($emailKey, 5)) {
             throw ValidationException::withMessages([
@@ -238,44 +298,9 @@ final class Login extends \Filament\Auth\Pages\Login
             ]);
         }
 
-        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($minuteKey, 60);
+        RateLimiter::hit($dayKey, 86400);
         RateLimiter::hit($emailKey, 60);
-
-        $this->discoveredEmail = $email;
-
-        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
-
-        if ($user?->hasPasskey()) {
-            $this->authMethod = 'passkey';
-            $this->passkeyUserHasPassword = $user->hasPassword();
-            $this->dispatch('passkey-login');
-
-            return;
-        }
-
-        if ($user === null) {
-            $this->authMethod = 'signup';
-
-            return;
-        }
-
-        if ($user->hasPassword()) {
-            $this->authMethod = 'password';
-
-            return;
-        }
-
-        if (! Feature::active(SocialAuth::class)) {
-            $this->authMethod = 'password';
-
-            return;
-        }
-
-        $provider = $this->resolveOfferedProvider($user);
-
-        $this->authMethod = $provider === null
-            ? 'password'
-            : 'social:'.$provider;
     }
 
     protected function resolveOfferedProvider(User $user): ?string
@@ -322,6 +347,7 @@ final class Login extends \Filament\Auth\Pages\Login
             ->maxLength(255)
             ->autocomplete('username webauthn')
             ->autofocus()
+            ->dehydrateStateUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
             ->default(fn (): ?string => $this->getTeamInvitationFromSession()?->email)
             ->rules(RegistrableEmail::rules(), condition: fn (): bool => $this->authMethod === 'signup')
             ->unique(table: fn (): ?string => $this->authMethod === 'signup' ? 'users' : null)
