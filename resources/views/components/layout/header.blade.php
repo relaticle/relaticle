@@ -56,6 +56,9 @@
                      x-data="{
                          openDropdown: null,
                          direction: 1,
+                         // True only when this open replaces an already-open dropdown — a fresh
+                         // open (nothing was showing) fades the content in, no horizontal sweep.
+                         isSwap: false,
                          closeTimer: null,
                          order: {{ Illuminate\Support\Js::from($dropdownSlugs) }},
                          twoColumn: {{ Illuminate\Support\Js::from($twoColumnBySlug) }},
@@ -76,6 +79,7 @@
                          // Sets the sweep direction before switching content, so the panel that
                          // is about to render already knows which way to slide in from.
                          swapTo(slug) {
+                             this.isSwap = this.openDropdown !== null
                              this.direction = this.order.indexOf(slug) >= this.order.indexOf(this.openDropdown) ? 1 : -1
                              this.openDropdown = slug
                          },
@@ -171,7 +175,9 @@
                                          setTimeout(() => { settled = true }, 20)
                                      }"
                                      class="p-2 transition-[translate,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none @if($isTwoColumn) grid grid-cols-[1.35fr_1fr] divide-x divide-gray-100 dark:divide-white/[0.06] @endif"
-                                     :class="settled ? 'translate-x-0 opacity-100' : (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0')">
+                                     :class="settled
+                                         ? 'translate-x-0 opacity-100'
+                                         : (isSwap ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0')">
                                     @foreach($item->children as $child)
                                         @if($child->url === null && count($child->children) > 0)
                                             <div class="px-2 first:pl-0 last:pr-0">
