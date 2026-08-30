@@ -146,6 +146,8 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalHeading(__('profile.sections.passkeys.remove_confirm_title'))
             ->modalDescription(__('profile.sections.passkeys.remove_confirm'))
             ->modalSubmitActionLabel(__('profile.sections.passkeys.remove'))
+            ->link()
+            ->size(Size::Small)
             ->color('danger')
             ->alwaysConfirm()
             ->confirmedUsing(function (array $arguments, DeletePasskey $deletePasskey): void {
