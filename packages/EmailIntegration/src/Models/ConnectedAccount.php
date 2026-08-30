@@ -40,6 +40,12 @@ use Relaticle\EmailIntegration\Observers\ConnectedAccountObserver;
  * @property Carbon|null $token_expires_at
  * @property int|null $hourly_send_limit
  * @property int|null $daily_send_limit
+ * @property string|null $sync_cursor
+ * @property Carbon|null $last_synced_at
+ * @property int $initial_sync_imported
+ * @property int|null $initial_sync_estimated
+ * @property string|null $calendar_sync_cursor
+ * @property Carbon|null $last_calendar_synced_at
  */
 #[ObservedBy(ConnectedAccountObserver::class)]
 final class ConnectedAccount extends Model
@@ -68,6 +74,8 @@ final class ConnectedAccount extends Model
         'capabilities',
         'sync_cursor',
         'last_synced_at',
+        'initial_sync_imported',
+        'initial_sync_estimated',
         'calendar_sync_cursor',
         'last_calendar_synced_at',
         'status',
@@ -84,6 +92,8 @@ final class ConnectedAccount extends Model
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'last_calendar_synced_at' => 'datetime',
+        'initial_sync_imported' => 'integer',
+        'initial_sync_estimated' => 'integer',
         'is_default' => 'boolean',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
@@ -210,6 +220,22 @@ final class ConnectedAccount extends Model
     public function isActive(): bool
     {
         return $this->status === EmailAccountStatus::ACTIVE;
+    }
+
+    /**
+     * True while the first mailbox or calendar backfill has not yet written a cursor.
+     */
+    public function isImportingHistory(): bool
+    {
+        if ($this->status !== EmailAccountStatus::ACTIVE) {
+            return false;
+        }
+
+        if ($this->hasEmail() && $this->sync_cursor === null) {
+            return true;
+        }
+
+        return $this->hasCalendar() && $this->calendar_sync_cursor === null;
     }
 
     /**

@@ -14,39 +14,51 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotification;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Throwable;
 
 #[DeleteWhenMissingModels]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
 
+    public int $tries = 3;
+
+    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
+    public array $backoff = [60, 300, 900];
+
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
+        public readonly ?string $pageToken = null,
+        public readonly ?string $historyCursor = null,
     ) {
         $this->onQueue('emails-sync');
     }
 
     /**
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function handle(MailServiceFactoryInterface $mailFactory): void
     {
         $account = $this->connectedAccount;
-
-        $daysBack = Config::integer('email-integration.sync.initial_days', 90);
-
         $service = $mailFactory->make($account);
+        $page = $service->initialBackfill($this->initialDaysCap(), $this->pageToken);
 
-        $data = $service->initialBackfill($daysBack);
+        $historyCursor = $this->historyCursor ?? $page->cursor;
 
-        $allIds = $data['message_ids']->all();
+        if ($this->pageToken === null && $page->estimatedTotal !== null) {
+            $account->update(['initial_sync_estimated' => $page->estimatedTotal]);
+        }
 
-        // Bulk dedup: exclude IDs that are already stored for this account
+        $allIds = $page->messageIds->all();
+
         $storedIds = Email::query()
             ->where('connected_account_id', $account->getKey())
             ->whereIn('provider_message_id', $allIds)
@@ -55,17 +67,15 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
         $newIds = array_values(array_diff($allIds, $storedIds));
 
-        // Persist the cursor only after the backfill batch has fully stored. Setting it
-        // up front means a StoreEmailJob that exhausts its retries is skipped forever:
-        // incremental sync starts from a cursor already past the unstored message.
         if ($newIds === []) {
-            $account->update(['sync_cursor' => $data['cursor']]);
+            $this->continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
 
             return;
         }
 
         $accountId = (int) $account->getKey();
-        $cursor = $data['cursor'];
+        $nextPageToken = $page->nextPageToken;
+        $pageCursor = $page->cursor;
 
         $jobs = collect($newIds)
             ->chunk(Config::integer('email-integration.sync.batch_size', 50))
@@ -76,18 +86,70 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            // then() runs only when every job succeeded; with a failure the batch still
-            // completes (allowFailures) but the cursor stays null, so the backfill is
-            // re-attempted next sync (dedup makes the re-fetch cheap) instead of dropping
-            // the unstored message.
-            ->then(function () use ($accountId, $cursor): void {
-                ConnectedAccount::query()->whereKey($accountId)->first()?->update(['sync_cursor' => $cursor]);
+            ->then(function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
+                $account = ConnectedAccount::query()->whereKey($accountId)->first();
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                $this->continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
             })
             ->dispatch();
     }
 
+    public function failed(Throwable $exception): void
+    {
+        $this->connectedAccount->update([
+            'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
+            'last_error' => $exception->getMessage(),
+        ]);
+    }
+
     public function uniqueId(): string
     {
-        return "initial-sync-{$this->connectedAccount->getKey()}";
+        return 'initial-sync-'.$this->connectedAccount->getKey().'-'.hash('xxh3', $this->pageToken ?? 'start');
+    }
+
+    private function initialDaysCap(): ?int
+    {
+        $days = Config::get('email-integration.sync.initial_days');
+
+        if (! is_numeric($days) || (int) $days <= 0) {
+            return null;
+        }
+
+        return (int) $days;
+    }
+
+    private function continueOrFinish(
+        ConnectedAccount $account,
+        ?string $historyCursor,
+        ?string $nextPageToken,
+        ?string $pageCursor,
+    ): void {
+        $imported = Email::query()
+            ->where('connected_account_id', $account->getKey())
+            ->count();
+
+        $account->update(['initial_sync_imported' => $imported]);
+
+        if ($nextPageToken !== null && $nextPageToken !== '') {
+            dispatch(new self($account, $nextPageToken, $historyCursor));
+
+            return;
+        }
+
+        $cursor = $historyCursor ?? $pageCursor;
+
+        $account->update([
+            'sync_cursor' => $cursor,
+            'last_synced_at' => now(),
+            'initial_sync_imported' => $imported,
+            'status' => EmailAccountStatus::ACTIVE,
+            'last_error' => null,
+        ]);
+
+        $account->user?->notify(new MailboxHistoryImportCompletedNotification($account->fresh() ?? $account));
     }
 }

@@ -16,10 +16,17 @@ use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 
 final class EmailBatch extends Model
 {
-    /** @use HasFactory<EmailBatchFactory> */
+    /**
+     * @use HasFactory<EmailBatchFactory>
+     */
     use HasFactory;
 
     use HasTeam, HasUlids;
+
+    protected static function newFactory(): EmailBatchFactory
+    {
+        return EmailBatchFactory::new();
+    }
 
     protected $fillable = [
         'team_id',

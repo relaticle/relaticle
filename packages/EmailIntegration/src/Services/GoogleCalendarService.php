@@ -39,36 +39,34 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         return $this->client;
     }
 
-    public function initialSync(): Data\CalendarSyncResult
+    public function initialSync(?string $pageToken = null): Data\CalendarSyncResult
     {
+        $params = [
+            'singleEvents' => true,
+            'showDeleted' => false,
+            'maxResults' => 250,
+        ];
+
+        if ($pageToken !== null && $pageToken !== '') {
+            $params['pageToken'] = $pageToken;
+        }
+
+        $response = $this->client->events->listEvents('primary', $params);
+
         $events = [];
-        $pageToken = null;
-        $nextSyncToken = null;
 
-        do {
-            $params = [
-                'timeMin' => now()->subDays(90)->toRfc3339String(),
-                'singleEvents' => true,
-                'showDeleted' => false,
-                'orderBy' => 'startTime',
-                'maxResults' => 250,
-            ];
+        foreach ($response->getItems() as $event) {
+            $events[] = $this->normalizeGoogleEvent($event);
+        }
 
-            if ($pageToken !== null) {
-                $params['pageToken'] = $pageToken;
-            }
+        $nextPageToken = $response->getNextPageToken();
+        $nextSyncToken = $response->getNextSyncToken() ?: null;
 
-            $response = $this->client->events->listEvents('primary', $params);
-
-            foreach ($response->getItems() as $event) {
-                $events[] = $this->normalizeGoogleEvent($event);
-            }
-
-            $pageToken = $response->getNextPageToken();
-            $nextSyncToken = $response->getNextSyncToken() ?: $nextSyncToken;
-        } while ($pageToken !== null);
-
-        return new Data\CalendarSyncResult(events: $events, nextSyncToken: $nextSyncToken);
+        return new Data\CalendarSyncResult(
+            events: $events,
+            nextSyncToken: $nextSyncToken,
+            nextPageToken: ($nextPageToken !== null && $nextPageToken !== '') ? $nextPageToken : null,
+        );
     }
 
     /**

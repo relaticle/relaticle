@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -39,7 +40,7 @@ final class FakeMailService implements MailServiceInterface
         throw new LogicException('unused');
     }
 
-    public function initialBackfill(int $daysBack): array
+    public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
     {
         throw new LogicException('unused');
     }

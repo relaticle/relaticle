@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Timeline\Sources\RelatedModelSource;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 trait HasActivityTimeline
@@ -24,12 +26,25 @@ trait HasActivityTimeline
             ->fromActivityLog(mergedRenderer: 'merged-activity')
             ->fromRelation('emails', function (RelatedModelSource $source) use ($viewer): void {
                 $source
-                    ->event('sent_at', 'email_sent')
-                    ->event('created_at', 'email_received', when: fn ($email): bool => $email->sent_at === null)
+                    ->event(
+                        'sent_at',
+                        'email_sent',
+                        when: fn (Email $email): bool => $email->direction === EmailDirection::OUTBOUND,
+                    )
+                    ->event(
+                        'sent_at',
+                        'email_received',
+                        when: fn (Email $email): bool => $email->direction === EmailDirection::INBOUND,
+                    )
+                    ->event(
+                        'created_at',
+                        'email_received',
+                        when: fn (Email $email): bool => $email->direction === EmailDirection::INBOUND && $email->sent_at === null,
+                    )
                     ->with(['from', 'labels', 'participants'])
-                    ->title(fn ($email): string => $email->subject ?? 'Email')
-                    ->description(fn ($email): ?string => $email->from->first()?->email_address)
-                    ->causer(fn ($email) => $email->from->first());
+                    ->title(fn (Email $email): string => $email->subject ?? 'Email')
+                    ->description(fn (Email $email): ?string => $email->from->first()?->email_address)
+                    ->causer(fn (Email $email) => $email->from->first());
 
                 if ($viewer instanceof User) {
                     $source->using(fn (Builder|Relation $query) => $query->withGlobalScope(

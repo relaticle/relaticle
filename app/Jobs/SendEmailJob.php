@@ -55,17 +55,17 @@ final class SendEmailJob implements ShouldQueue
         });
 
         if ($email === null) {
+            $existing = Email::query()->find($this->emailId);
+            $this->syncBatchCounters($existing?->batch_id);
+
             return;
         }
 
         $sent = $sendingService->send($email);
 
-        $linkEmailAction->execute($sent);
+        $this->syncBatchCounters($sent->batch_id);
 
-        if ($sent->batch_id !== null) {
-            EmailBatch::query()->where('id', $sent->batch_id)->increment('sent_count');
-            $this->updateBatchStatus((string) $sent->batch_id);
-        }
+        $linkEmailAction->execute($sent);
     }
 
     public function failed(Throwable $exception): void
@@ -78,37 +78,61 @@ final class SendEmailJob implements ShouldQueue
         /** @var Email|null $email */
         $email = Email::query()->find($this->emailId);
 
-        if ($email === null || $email->status === EmailStatus::SENT) {
+        if ($email === null) {
             return;
         }
 
-        $email->update([
-            'status' => EmailStatus::FAILED,
-            'last_error' => $exception::class.': '.$exception->getMessage(),
-        ]);
-
-        if ($email->batch_id !== null) {
-            EmailBatch::query()->where('id', $email->batch_id)->increment('failed_count');
-            $this->updateBatchStatus((string) $email->batch_id);
+        if ($email->status !== EmailStatus::SENT) {
+            $email->update([
+                'status' => EmailStatus::FAILED,
+                'last_error' => $exception::class.': '.$exception->getMessage(),
+            ]);
         }
+
+        $this->syncBatchCounters($email->batch_id);
     }
 
-    private function updateBatchStatus(string $batchId): void
+    /**
+     * Recount sent/failed from email statuses so a crash after delivery cannot
+     * leave the batch hanging, and a retry cannot double-count.
+     */
+    private function syncBatchCounters(?string $batchId): void
     {
-        $batch = EmailBatch::query()->find($batchId);
-
-        if ($batch === null) {
+        if ($batchId === null) {
             return;
         }
 
-        $processed = $batch->sent_count + $batch->failed_count;
+        DB::transaction(function () use ($batchId): void {
+            $batch = EmailBatch::query()->lockForUpdate()->find($batchId);
 
-        if ($processed >= $batch->total_recipients) {
-            $status = $batch->failed_count > 0
-                ? EmailBatchStatus::PartialFailure
-                : EmailBatchStatus::Completed;
+            if ($batch === null) {
+                return;
+            }
 
-            $batch->update(['status' => $status]);
-        }
+            $sentCount = Email::query()
+                ->where('batch_id', $batchId)
+                ->where('status', EmailStatus::SENT)
+                ->count();
+
+            $failedCount = Email::query()
+                ->where('batch_id', $batchId)
+                ->where('status', EmailStatus::FAILED)
+                ->count();
+
+            $processed = $sentCount + $failedCount;
+            $status = $batch->status;
+
+            if ($processed >= $batch->total_recipients) {
+                $status = $failedCount > 0
+                    ? EmailBatchStatus::PartialFailure
+                    : EmailBatchStatus::Completed;
+            }
+
+            $batch->update([
+                'sent_count' => $sentCount,
+                'failed_count' => $failedCount,
+                'status' => $status,
+            ]);
+        });
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -102,11 +101,8 @@ final readonly class StoreMeetingAction
         if ($payload->status === CalendarEventStatus::CANCELLED) {
             return true;
         }
-        if ($payload->selfResponseStatus === AttendeeResponseStatus::DECLINED) {
-            return true;
-        }
 
-        return $payload->startsAt->lt(Date::now()->subDays(90));
+        return $payload->selfResponseStatus === AttendeeResponseStatus::DECLINED;
     }
 
     private function softDeleteExisting(ConnectedAccount $account, string $providerEventId): void

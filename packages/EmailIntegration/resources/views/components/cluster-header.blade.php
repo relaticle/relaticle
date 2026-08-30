@@ -1,9 +1,9 @@
-{{-- Breadcrumbs and heading are spaced like the accounts page: the page content gap
-     separates them, pulled in slightly so the pair reads as one block. --}}
-<x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" />
+@if ($this->shouldRenderClusterBreadcrumbs())
+    <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" />
+@endif
 
 <x-filament-panels::header
-    class="-mt-2"
+    @class(['-mt-2' => $this->shouldRenderClusterBreadcrumbs()])
     :actions="$this->clusterHeaderActions()"
     :heading="$this->getTitle()"
 />

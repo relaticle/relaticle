@@ -6,6 +6,7 @@ use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
@@ -60,10 +61,11 @@ it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue',
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
 
     $service = Mockery::mock(MailServiceInterface::class);
-    $service->shouldReceive('initialBackfill')->andReturn([
-        'cursor' => 'cursor-1',
-        'message_ids' => collect(['M1', 'M2']),
-    ]);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1', 'M2']),
+        nextPageToken: null,
+        cursor: 'cursor-1',
+    ));
 
     $factory = Mockery::mock(MailServiceFactoryInterface::class);
     $factory->shouldReceive('make')->andReturn($service);
