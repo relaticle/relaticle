@@ -99,20 +99,19 @@
                     @foreach($navItems as $item)
                         @if($item->url === null && count($item->children) > 0)
                             @php($slug = \Illuminate\Support\Str::slug($item->label))
-                            <div x-data="{ slug: '{{ $slug }}' }"
-                                 @keydown.escape="if (openDropdown === slug) { openDropdown = null; $refs['trigger-' + slug].focus(); }"
-                                 @mouseenter="openOnHover(slug)"
-                                 @mouseleave="cancelHoverOpen(); closeOnHoverLeave(slug)">
+                            <div @keydown.escape="if (openDropdown === '{{ $slug }}') { openDropdown = null; $refs['trigger-{{ $slug }}'].focus(); }"
+                                 @mouseenter="openOnHover('{{ $slug }}')"
+                                 @mouseleave="cancelHoverOpen(); closeOnHoverLeave('{{ $slug }}')">
                                 <button type="button" x-ref="trigger-{{ $slug }}"
-                                        @click="toggle(slug)"
+                                        @click="toggle('{{ $slug }}')"
                                         aria-haspopup="true"
-                                        :aria-expanded="openDropdown === slug"
+                                        :aria-expanded="openDropdown === '{{ $slug }}'"
                                         aria-controls="menu-{{ $slug }}"
                                         class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                                        :class="openDropdown === slug && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
+                                        :class="openDropdown === '{{ $slug }}' && 'text-gray-900 bg-gray-100 dark:text-white dark:bg-white/[0.08]'">
                                     {{ $item->label }}
                                     <x-ri-arrow-down-s-line class="w-3.5 h-3.5 transition-transform duration-150"
-                                                             ::class="openDropdown === slug && 'rotate-180'"/>
+                                                             ::class="openDropdown === '{{ $slug }}' && 'rotate-180'"/>
                                 </button>
                             </div>
                         @else

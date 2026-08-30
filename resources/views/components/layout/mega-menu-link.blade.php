@@ -34,7 +34,7 @@
         </span>
 
         @if($item->description)
-            <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            <span class="mt-0.5 block truncate text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                 {{ $item->description }}
             </span>
         @endif
