@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -18,7 +19,7 @@ use Relaticle\EmailIntegration\Services\Factories\NormalizedMeetingPayloadFactor
 #[DeleteWhenMissingModels]
 final class StoreMeetingJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
 
@@ -33,6 +34,10 @@ final class StoreMeetingJob implements ShouldQueue
         StoreMeetingAction $store,
         NormalizedMeetingPayloadFactory $factory,
     ): void {
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
         $payload = $factory->fromCalendarEvent($this->event, $this->connectedAccount->email_address);
 
         $store->execute($payload, $this->connectedAccount);

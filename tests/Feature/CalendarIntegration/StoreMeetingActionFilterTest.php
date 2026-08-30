@@ -56,14 +56,14 @@ it('skips events declined by self', function (): void {
     expect(Meeting::query()->count())->toBe(0);
 });
 
-it('skips events older than 90 days', function (): void {
+it('stores events older than 90 days', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     (app(StoreMeetingAction::class))->execute(payload([
         'startsAt' => Carbon::now()->subDays(100),
         'endsAt' => Carbon::now()->subDays(100)->addHour(),
     ]), $account);
 
-    expect(Meeting::query()->count())->toBe(0);
+    expect(Meeting::query()->count())->toBe(1);
 });
 
 it('soft-deletes existing meeting when it becomes private', function (): void {

@@ -8,7 +8,6 @@ use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
-use Override;
 use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 
@@ -27,18 +26,9 @@ final class ManageEmailTemplates extends ManageRecords
      */
     protected ?string $heading = '';
 
-    /**
-     * The resource's own crumb is empty on the index page — name it after the cluster item.
-     *
-     * @return array<string, string>
-     */
-    #[Override]
-    public function getBreadcrumbs(): array
+    public function shouldRenderClusterBreadcrumbs(): bool
     {
-        return [
-            ...array_filter(parent::getBreadcrumbs()),
-            self::getResource()::getNavigationLabel(),
-        ];
+        return false;
     }
 
     /**

@@ -63,7 +63,11 @@ return [
      * Sync settings — override via .env
      */
     'sync' => [
-        'initial_days' => (int) env('EMAIL_SYNC_INITIAL_DAYS', 90),
+        // Unset by default so the first import covers the whole mailbox. Set
+        // EMAIL_SYNC_INITIAL_DAYS to cap history for self-hosted deployments.
+        'initial_days' => ($days = env('EMAIL_SYNC_INITIAL_DAYS')) === null || $days === ''
+            ? null
+            : (int) $days,
         'batch_size' => (int) env('EMAIL_SYNC_BATCH_SIZE', 50),
     ],
 

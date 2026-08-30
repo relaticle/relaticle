@@ -53,14 +53,54 @@ it('backfills from the all-folder /me/messages/delta stream and returns the Grap
 
     $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
 
-    $result = $service->initialBackfill(90);
+    $result = $service->initialBackfill();
 
-    expect($result['cursor'])->toContain('$deltatoken=TKN')
-        ->and($result['message_ids']->all())->toEqual(['AAA1', 'AAA2']);
+    expect($result->cursor)->toContain('$deltatoken=TKN')
+        ->and($result->messageIds->all())->toEqual(['AAA1', 'AAA2'])
+        ->and($result->nextPageToken)->toBeNull();
 
     // Must hit the all-folder endpoint, not the Inbox-only one, so Sent mail syncs.
     Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/messages/delta')
-        && ! str_contains((string) $r->url(), 'mailFolders'));
+        && ! str_contains((string) $r->url(), 'mailFolders')
+        && ! str_contains((string) $r->url(), 'receivedDateTime'));
+});
+
+it('returns one backfill page and does not follow @odata.nextLink', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/delta' => Http::response([
+            'value' => [
+                ['id' => 'AAA1'],
+            ],
+            '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/messages/delta?$skiptoken=NEXT',
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/delta?$skiptoken=NEXT' => Http::response([
+            'value' => [
+                ['id' => 'AAA2'],
+            ],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken=TKN',
+        ]),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->initialBackfill();
+
+    expect($result->messageIds->all())->toEqual(['AAA1'])
+        ->and($result->nextPageToken)->toContain('$skiptoken=NEXT')
+        ->and($result->cursor)->toBeNull();
+
+    Http::assertSentCount(1);
+});
+
+it('applies the optional initial_days cap as a receivedDateTime filter', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/delta*' => Http::response([
+            'value' => [],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/messages/delta?$deltatoken=TKN',
+        ]),
+    ]);
+
+    resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->initialBackfill(90);
+
+    Http::assertSent(fn (Request $r): bool => str_contains(urldecode((string) $r->url()), 'receivedDateTime ge'));
 });
 
 it('paginates delta with @odata.nextLink and surfaces new + read ids + new cursor', function (): void {

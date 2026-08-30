@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Concerns\HasActivityTimeline;
 use App\Models\People;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -11,9 +12,14 @@ use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\ActivityLog\Support\ActivityLogSummary;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 
 mutates(ActivityLogLivewire::class);
 mutates(ActivityLogSummary::class);
+mutates(HasActivityTimeline::class);
 mutates(People::class);
 
 beforeEach(function (): void {
@@ -142,6 +148,51 @@ it('does not render a chevron for created entries', function (): void {
 
     $tail = substr($html, (int) $createdBlockStart, 2000);
     expect($tail)->not->toContain('remix-arrow-down-s-line');
+});
+
+it('labels inbound mailbox mail as received and outbound mail as sent', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    $person = People::factory()->create([
+        'name' => 'Jordan Hale',
+        'team_id' => $this->team->getKey(),
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $inbound = Email::factory()->inbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Re: Pricing for Q3',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    $outbound = Email::factory()->outbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Pricing for Q3',
+        'sent_at' => now()->subMinutes(30),
+        'direction' => EmailDirection::OUTBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    $person->emails()->attach([$inbound->getKey(), $outbound->getKey()]);
+
+    $emailEvents = $person->timeline()
+        ->get()
+        ->where('type', 'related_model')
+        ->filter(fn (TimelineEntry $entry): bool => in_array($entry->event, ['email_sent', 'email_received'], true))
+        ->keyBy(fn (TimelineEntry $entry): string => (string) $entry->relatedModel?->getKey());
+
+    expect($emailEvents)->toHaveCount(2)
+        ->and($emailEvents[$inbound->getKey()]->event)->toBe('email_received')
+        ->and($emailEvents[$outbound->getKey()]->event)->toBe('email_sent');
 });
 
 describe('ActivityLogSummary::from()', function (): void {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
@@ -126,6 +127,59 @@ it('maps Graph "personal" sensitivity to private so the event is treated as priv
         ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
 
     expect($result->events[0]->visibility)->toBe('private');
+});
+
+it('starts the initial calendar delta at 1990 rather than 90 days ago', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => Http::response([
+            'value' => [],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=NEW',
+        ]),
+    ]);
+
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->initialSync();
+
+    Http::assertSent(function (Request $request): bool {
+        $url = urldecode((string) $request->url());
+
+        return str_contains($url, '/me/calendarView/delta')
+            && str_contains($url, 'startDateTime=1990-01-01')
+            && ! str_contains($url, now()->subDays(90)->toIso8601String());
+    });
+});
+
+it('returns one initial calendar page and does not follow nextLink', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => Http::sequence()
+            ->push([
+                'value' => [
+                    [
+                        'id' => 'evt-1',
+                        'subject' => 'One',
+                        'start' => ['dateTime' => '2026-06-01T09:00:00', 'timeZone' => 'UTC'],
+                        'end' => ['dateTime' => '2026-06-01T09:30:00', 'timeZone' => 'UTC'],
+                        'isCancelled' => false,
+                        'organizer' => ['emailAddress' => ['address' => 'org@example.com']],
+                        'attendees' => [],
+                    ],
+                ],
+                '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=NEXT',
+            ])
+            ->push([
+                'value' => [],
+                '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=NEW',
+            ]),
+    ]);
+
+    $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->initialSync();
+
+    expect($result->events)->toHaveCount(1)
+        ->and($result->nextPageToken)->toContain('$skiptoken=NEXT')
+        ->and($result->nextSyncToken)->toBeNull();
+
+    Http::assertSentCount(1);
 });
 
 it('throws CalendarSyncTokenExpired on Graph 410', function (): void {

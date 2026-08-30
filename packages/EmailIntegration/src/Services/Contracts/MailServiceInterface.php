@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services\Contracts;
 
-use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 
 interface MailServiceInterface
@@ -15,11 +15,11 @@ interface MailServiceInterface
     public function fetchMessage(string $providerMessageId): FetchedEmailData;
 
     /**
-     * Run the first-time backfill and return the cursor to store on the account.
-     *
-     * @return array{message_ids: Collection<int, string>, cursor: string}
+     * Fetch one page of the first-time backfill. Pass $pageToken from the previous
+     * page's nextPageToken to continue; omit it to start. The history cursor is
+     * captured on the first page (Gmail) or the last page (Graph deltaLink).
      */
-    public function initialBackfill(int $daysBack): array;
+    public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage;
 
     /**
      * @param array{
