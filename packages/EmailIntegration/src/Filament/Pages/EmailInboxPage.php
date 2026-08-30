@@ -9,8 +9,6 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -22,7 +20,6 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
-use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
@@ -33,9 +30,7 @@ use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
-use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
-use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -43,22 +38,21 @@ use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
-use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class EmailInboxPage extends Page
 {
     use HasEmailFeatureFlag;
+    use HasEmailReaderActions;
     use WithPagination;
 
     protected string $view = 'filament.pages.email-inbox';
@@ -515,309 +509,6 @@ final class EmailInboxPage extends Page
         Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
     }
 
-    protected function manageSharingAction(): Action
-    {
-        return Action::make('manageSharing')
-            ->label(__('filament/pages/email-inbox.sharing.label'))
-            ->icon('ri-share-line')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.sharing.label'))
-            ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
-            ->modalWidth(Width::FiveExtraLarge)
-            ->modalSubmitActionLabel('Save')
-            ->schema([
-                // Two halves of one decision, side by side: what the workspace at large
-                // gets, and who is named individually. Stacked, the second half reads as
-                // an afterthought below the fold.
-                Grid::make(['default' => 1, 'md' => 12])
-                    ->schema([
-                        // Cards rather than a select: each tier is a decision about who
-                        // sees what, which a dropdown of four nouns hides. Same cards as
-                        // the account settings page.
-                        Section::make(__('filament/pages/email-inbox.sharing.fields.privacy_tier.label'))
-                            ->icon('heroicon-o-globe-alt')
-                            ->compact()
-                            ->columnSpan(['default' => 1, 'md' => 5])
-                            ->schema([
-                                Radio::make('privacy_tier')
-                                    ->hiddenLabel()
-                                    ->options(EmailPrivacyTier::class)
-                                    ->view('email-integration::forms.sharing-tier-cards')
-                                    ->viewData(['ariaLabel' => __('filament/pages/email-inbox.sharing.fields.privacy_tier.label')])
-                                    ->required(),
-                            ]),
-
-                        Section::make(__('filament/pages/email-inbox.sharing.fields.shares.label'))
-                            ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
-                            ->icon('heroicon-o-user-group')
-                            ->compact()
-                            ->columnSpan(['default' => 1, 'md' => 7])
-                            ->schema([
-                                Repeater::make('shares')
-                                    ->hiddenLabel()
-                                    ->defaultItems(0)
-                                    // Who was added first says nothing about access, so
-                                    // the drag handle is just noise in the row header.
-                                    ->reorderable(false)
-                                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
-                                    // Not ->table(): that layout quietly stacks once its
-                                    // container is this narrow, which is what put the
-                                    // delete button on a line of its own. Naming the row
-                                    // instead gives each entry a header that carries the
-                                    // delete inline, and the two fields sit side by side.
-                                    ->itemLabel(fn (array $state): string => $this->shareRowLabel($state))
-                                    ->columns(2)
-                                    ->schema([
-                                        Select::make('tier')
-                                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
-                                            ->hiddenLabel()
-                                            ->options(EmailPrivacyTier::class)
-                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->required(),
-
-                                        Select::make('shared_with')
-                                            ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
-                                            ->hiddenLabel()
-                                            ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
-                                            ->options(fn (): array => $this->teammateOptions())
-                                            ->multiple()
-                                            ->searchable()
-                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->required(),
-                                    ]),
-                            ]),
-                    ]),
-            ])
-            ->fillForm(function (array $arguments): array {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
-
-                if (! $email instanceof Email) {
-                    return [];
-                }
-
-                return [
-                    'privacy_tier' => $email->privacy_tier->value,
-                    'shares' => $this->shareFormRows($email),
-                ];
-            })
-            ->action(function (array $data, array $arguments): void {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
-
-                abort_if(! $email instanceof Email, 403);
-
-                resolve(UpdateEmailSharingAction::class)->execute(
-                    $email,
-                    $this->authUser(),
-                    $data['privacy_tier'] instanceof EmailPrivacyTier
-                        ? $data['privacy_tier']
-                        : EmailPrivacyTier::from($data['privacy_tier']),
-                    $data['shares'] ?? [],
-                );
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.sharing.notifications.saved.title'))
-                    ->send();
-            });
-    }
-
-    /**
-     * @return array<int, array{tier: string, shared_with: array<int, int|string>}>
-     */
-    private function shareFormRows(Email $email): array
-    {
-        return $email->shares()
-            ->get()
-            ->groupBy(fn (EmailShare $share): string => $this->tierValue($share->tier))
-            ->map(fn (Collection $shares, string $tier): array => [
-                'tier' => $tier,
-                'shared_with' => $shares->pluck('shared_with')->all(),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @param  array{tier?: mixed}  $state
-     */
-    private function shareRowLabel(array $state): string
-    {
-        $tier = $state['tier'] ?? null;
-
-        if ($tier instanceof EmailPrivacyTier) {
-            return $tier->getLabel();
-        }
-
-        if (is_string($tier) || is_int($tier)) {
-            return EmailPrivacyTier::tryFrom((string) $tier)?->getLabel()
-                ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item');
-        }
-
-        return __('filament/pages/email-inbox.sharing.fields.shares.new_item');
-    }
-
-    private function tierValue(mixed $tier): string
-    {
-        if ($tier instanceof EmailPrivacyTier) {
-            return $tier->value;
-        }
-
-        if (is_string($tier) || is_int($tier)) {
-            return (string) $tier;
-        }
-
-        return '';
-    }
-
-    private function resolveTeamEmail(?string $emailId, string $ability): ?Email
-    {
-        if ($emailId === null) {
-            return null;
-        }
-
-        $user = $this->authUser();
-
-        $email = Email::query()
-            ->forTeam($user->current_team_id)
-            ->whereKey($emailId)
-            ->first();
-
-        if ($email === null) {
-            return null;
-        }
-
-        if (! $user->can($ability, $email)) {
-            return null;
-        }
-
-        return $email;
-    }
-
-    private function requesterNameForOwnedRequest(?string $requestId): string
-    {
-        if ($requestId === null) {
-            return 'this user';
-        }
-
-        return EmailAccessRequest::query()
-            ->whereKey($requestId)
-            ->where('owner_id', $this->authUser()->getKey())
-            ->first()?->requester->name ?? 'this user';
-    }
-
-    /**
-     * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
-     * reader out of their participant line: repeating your own address on every row
-     * says nothing, and it is the widest thing on the row.
-     *
-     * @return list<string>
-     */
-    #[Computed]
-    public function ownEmailAddresses(): array
-    {
-        $user = $this->authUser();
-
-        /** @var list<string> */
-        return ConnectedAccount::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', $user->current_team_id)
-            ->pluck('email_address')
-            ->map(fn (mixed $address): string => mb_strtolower((string) $address))
-            ->filter()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Teammates who can be given access to an email: everyone else on the team.
-     *
-     * @return array<string, string>
-     */
-    private function teammateOptions(): array
-    {
-        $user = $this->authUser();
-
-        return User::query()
-            ->where('current_team_id', $user->current_team_id)
-            ->where('id', '!=', $user->getKey())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all();
-    }
-
-    protected function summarizeThreadAction(): Action
-    {
-        return Action::make('summarizeThread')
-            ->label(__('filament/pages/email-inbox.summarize_thread.label'))
-            ->icon('heroicon-o-sparkles')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.summarize_thread.label'))
-            ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
-            ->modalIcon('heroicon-o-sparkles')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close')
-            ->modalContent(function (array $arguments): View {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'viewBody');
-
-                if (! $email instanceof Email) {
-                    return view('filament.actions.ai-summary', ['summary' => null]);
-                }
-
-                return $this->buildThreadSummaryView($email);
-            });
-    }
-
-    protected function requestAccessAction(): Action
-    {
-        return Action::make('requestAccess')
-            ->label(__('filament/pages/email-inbox.request_access.label'))
-            ->icon('heroicon-o-key')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.request_access.label'))
-            ->schema([
-                Select::make('tier_requested')
-                    ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))
-                    ->options([
-                        EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
-                        EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
-                    ])
-                    ->required(),
-            ])
-            ->action(function (array $data, array $arguments): void {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'requestAccess');
-
-                abort_if(! $email instanceof Email, 403);
-
-                $request = resolve(RequestEmailAccessAction::class)->execute(
-                    $email,
-                    $this->authUser(),
-                    $data['tier_requested'] instanceof EmailPrivacyTier
-                        ? $data['tier_requested']
-                        : EmailPrivacyTier::from($data['tier_requested']),
-                );
-
-                if (! $request instanceof EmailAccessRequest) {
-                    Notification::make()
-                        ->warning()
-                        ->title(__('filament/pages/email-inbox.request_access.notifications.pending.title'))
-                        ->send();
-
-                    return;
-                }
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.request_access.notifications.sent.title'))
-                    ->send();
-            });
-    }
-
     protected function approveAccessRequestAction(): Action
     {
         return Action::make('approveAccessRequest')
@@ -1134,23 +825,6 @@ final class EmailInboxPage extends Page
     public function showAccountSwitcher(): bool
     {
         return $this->userActiveAccounts()->count() > 1;
-    }
-
-    private function buildThreadSummaryView(Email $email): View
-    {
-        $thread = EmailThread::query()
-            ->where('thread_id', $email->thread_id)
-            ->where('connected_account_id', $email->connected_account_id)
-            ->first();
-
-        if ($thread === null) {
-            return view('filament.actions.ai-summary', ['summary' => null]);
-        }
-
-        $summary = resolve(EmailThreadSummaryService::class)
-            ->getSummary($thread, $this->authUser());
-
-        return view('filament.actions.ai-summary', ['summary' => $summary]);
     }
 
     private function authUser(): User

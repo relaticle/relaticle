@@ -58,9 +58,8 @@ function makeEmailWithBody(string $html): Email
 }
 
 /**
- * Render the email-view partial through its real entry point: the
- * EmailsRelationManager's ViewAction modal, where the partial is bound to the
- * Livewire component that exposes the reply/forward action it calls.
+ * Render the inbox/record-page email reader through its relation-manager
+ * ViewAction modal — the same <x-emails.email-view> used on company/people emails.
  */
 function mountEmailView(Email $email): Testable
 {
@@ -198,16 +197,16 @@ it('splits inline attachments and sanitizes body html from the email model', fun
         ->not->toContain('cid:logo@example.test');
 });
 
-it('renders the email view iframe without a same-origin sandbox', function (): void {
+it('renders the email view iframe without scripts and with same-origin height measurement', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
     mountEmailView($email)
         ->assertMountedActionModalSeeHtml('<iframe')
-        ->assertMountedActionModalSeeHtml('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->assertMountedActionModalSeeHtml('sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"')
         ->assertMountedActionModalSeeHtml('referrerpolicy="no-referrer"')
-        ->assertMountedActionModalSeeHtml('dark:bg-neutral-900 dark:[color-scheme:dark]')
+        ->assertMountedActionModalSeeHtml('dark:bg-neutral-950 dark:[color-scheme:dark]')
         ->assertMountedActionModalSeeHtml('dark:bg-gray-950')
-        ->assertMountedActionModalDontSeeHtml('allow-same-origin');
+        ->assertMountedActionModalDontSeeHtml('allow-scripts');
 });
 
 it('strips dangerous markup in the threaded email view', function (): void {
