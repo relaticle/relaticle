@@ -4,28 +4,41 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Auth;
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsTeamInvitation;
 use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
 use App\Models\User;
+use App\Rules\RegistrableEmail;
 use Filament\Actions\Action;
+use Filament\Auth\Events\Registered;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Filament\Auth\Notifications\VerifyEmail;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\HtmlString;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
+use SensitiveParameter;
+use Spatie\Honeypot\Http\Livewire\Concerns\HoneypotData;
+use Spatie\Honeypot\Http\Livewire\Concerns\UsesSpamProtection;
 
 final class Login extends \Filament\Auth\Pages\Login
 {
     use DetectsTeamInvitation;
+    use UsesSpamProtection;
 
     #[Locked]
     public ?string $authMethod = null;
@@ -33,11 +46,21 @@ final class Login extends \Filament\Auth\Pages\Login
     #[Locked]
     public bool $passkeyUserHasPassword = false;
 
+    public HoneypotData $extraFields;
+
+    public function mount(): void
+    {
+        $this->extraFields = new HoneypotData;
+
+        parent::mount();
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Html::make(fn (): string => $this->getInvitationContentHtml()),
+                Html::make(fn (): string => Blade::render('<x-honeypot livewire-model="extraFields" />')),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE),
                 $this->getFormContentComponent(),
                 Html::make(fn (): string => $this->getDiscoveryHintHtml()),
@@ -58,6 +81,10 @@ final class Login extends \Filament\Auth\Pages\Login
             return null;
         }
 
+        if ($this->authMethod === 'signup') {
+            return $this->handleSignup();
+        }
+
         if ($this->authMethod === null) {
             $this->discover();
 
@@ -70,6 +97,56 @@ final class Login extends \Filament\Auth\Pages\Login
     public function usePassword(): void
     {
         $this->authMethod = 'password';
+    }
+
+    protected function handleSignup(): LoginResponse
+    {
+        $this->protectAgainstSpam();
+
+        $data = $this->form->getState();
+
+        $email = mb_strtolower(trim((string) $data['email']));
+
+        $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
+
+        $invitation = $this->getTeamInvitationFromSession();
+
+        if ($invitation && mb_strtolower((string) $invitation->email) === $email && $user->markEmailAsVerified()) {
+            event(new Verified($user));
+        }
+
+        session()->put('fathom.track_signup', true);
+
+        event(new Registered($user));
+
+        $this->sendEmailVerificationNotification($user);
+
+        Filament::auth()->login($user, remember: true);
+
+        session()->regenerate();
+
+        return resolve(LoginResponse::class);
+    }
+
+    private function sendEmailVerificationNotification(User $user): void
+    {
+        if ($user->hasVerifiedEmail()) {
+            return;
+        }
+
+        $notification = resolve(VerifyEmail::class);
+        $notification->url = Filament::getVerifyEmailUrl($user);
+
+        $user->notify($notification);
+    }
+
+    private function getPasswordHelperText(): ?string
+    {
+        if ($this->authMethod !== 'signup') {
+            return null;
+        }
+
+        return __('auth.login.password_helper');
     }
 
     private function getDiscoveryHintHtml(): string
@@ -129,7 +206,13 @@ final class Login extends \Filament\Auth\Pages\Login
             return;
         }
 
-        if ($user === null || $user->hasPassword()) {
+        if ($user === null) {
+            $this->authMethod = 'signup';
+
+            return;
+        }
+
+        if ($user->hasPassword()) {
             $this->authMethod = 'password';
 
             return;
@@ -173,9 +256,11 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         return Action::make('authenticate')
             ->size(Size::Medium)
-            ->label(fn (): string => $this->authMethod === 'password'
-                ? __('filament-panels::auth/pages/login.form.actions.authenticate.label')
-                : __('auth.login.continue'))
+            ->label(fn (): string => match ($this->authMethod) {
+                'password' => __('filament-panels::auth/pages/login.form.actions.authenticate.label'),
+                'signup' => __('auth.login.sign_up'),
+                default => __('auth.login.continue'),
+            })
             ->submit('authenticate');
     }
 
@@ -185,8 +270,12 @@ final class Login extends \Filament\Auth\Pages\Login
             ->label(__('filament-panels::auth/pages/login.form.email.label'))
             ->email()
             ->required()
+            ->maxLength(255)
             ->autocomplete('username webauthn')
             ->autofocus()
+            ->default(fn (): ?string => $this->getTeamInvitationFromSession()?->email)
+            ->rules(RegistrableEmail::rules(), condition: fn (): bool => $this->authMethod === 'signup')
+            ->unique(table: fn (): ?string => $this->authMethod === 'signup' ? 'users' : null)
             ->live(onBlur: true)
             ->afterStateUpdated(function (): void {
                 $this->authMethod = null;
@@ -194,15 +283,27 @@ final class Login extends \Filament\Auth\Pages\Login
             });
     }
 
-    protected function getPasswordFormComponent(): Component
+    protected function getPasswordFormComponent(): TextInput
     {
-        return parent::getPasswordFormComponent()
-            ->visible(fn (): bool => $this->authMethod === 'password');
+        return TextInput::make('password')
+            ->label(__('filament-panels::auth/pages/login.form.password.label'))
+            ->hint(fn (): ?HtmlString => ($this->authMethod === 'password' && filament()->hasPasswordReset())
+                ? new HtmlString(Blade::render('<x-filament::link :href="filament()->getRequestPasswordResetUrl()" tabindex="-1"> {{ __(\'filament-panels::auth/pages/login.actions.request_password_reset.label\') }}</x-filament::link>'))
+                : null)
+            ->helperText(fn (): ?string => $this->getPasswordHelperText())
+            ->password()
+            ->revealable(filament()->arePasswordsRevealable())
+            ->autocomplete(fn (): string => $this->authMethod === 'signup' ? 'new-password' : 'current-password')
+            ->required()
+            ->rule(Password::default(), condition: fn (): bool => $this->authMethod === 'signup')
+            ->showAllValidationMessages()
+            ->dehydrateStateUsing(fn (#[SensitiveParameter] string $state): string => $this->authMethod === 'signup' ? Hash::make($state) : $state)
+            ->visible(fn (): bool => in_array($this->authMethod, ['password', 'signup'], true));
     }
 
-    protected function getRememberFormComponent(): Component
+    protected function getRememberFormComponent(): Hidden
     {
-        return parent::getRememberFormComponent()
-            ->visible(fn (): bool => $this->authMethod === 'password');
+        return Hidden::make('remember')
+            ->default(true);
     }
 }

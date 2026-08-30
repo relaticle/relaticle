@@ -15,5 +15,7 @@ return [
         'continue_with' => 'Continue with :provider',
         'passkey_retry' => 'Try the passkey again',
         'unsupported' => 'Passkeys are not supported in this browser.',
+        'sign_up' => 'Sign up',
+        'password_helper' => 'At least 8 characters long.',
     ],
 ];

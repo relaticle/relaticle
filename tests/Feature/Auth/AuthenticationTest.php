@@ -5,9 +5,15 @@ declare(strict_types=1);
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
 use App\Http\Responses\PasskeyLoginResponse;
+use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use Filament\Auth\Notifications\VerifyEmail;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
@@ -102,11 +108,11 @@ test('continue with a password account reveals the password field', function ():
         ->assertSet('authMethod', 'password');
 });
 
-test('continue with an unknown email behaves like a password account', function (): void {
+test('continue with an unknown email offers to sign up', function (): void {
     livewire(Login::class)
         ->fillForm(['email' => 'nobody-'.uniqid().'@example.com'])
         ->call('authenticate')
-        ->assertSet('authMethod', 'password');
+        ->assertSet('authMethod', 'signup');
 });
 
 test('continue with a passkey account dispatches the passkey challenge', function (): void {
@@ -239,7 +245,7 @@ test('discovery is rate limited per email and ip', function (): void {
         livewire(Login::class)
             ->fillForm(['email' => $email])
             ->call('authenticate')
-            ->assertSet('authMethod', 'password');
+            ->assertSet('authMethod', 'signup');
     }
 
     livewire(Login::class)
@@ -337,7 +343,7 @@ test('discovery is rate limited per ip across different emails', function (): vo
         livewire(Login::class)
             ->fillForm(['email' => $email])
             ->call('authenticate')
-            ->assertSet('authMethod', 'password');
+            ->assertSet('authMethod', 'signup');
     }
 
     $blockedEmail = 'sweep-blocked-'.uniqid().'@example.com';
@@ -391,4 +397,175 @@ test('microsoft button renders only when configured', function (): void {
 
     config(['services.microsoft.client_id' => 'test-client']);
     $this->get(url()->getAppUrl('login'))->assertSee('Microsoft');
+});
+
+test('signup mode reveals a single password field with a helper text and a sign up label', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'reveal-signup-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->assertSee(__('auth.login.password_helper'))
+        ->assertSee(__('auth.login.sign_up'));
+});
+
+test('signup guesses a title-cased name from the email local part', function (): void {
+    $email = 'jane.doe_smith@gmail.com';
+    RateLimiter::clear('login-discover:'.$email.'|127.0.0.1');
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    expect(User::where('email', $email)->value('name'))->toBe('Jane Doe Smith');
+});
+
+test('signup creates a user and sends a verification email', function (): void {
+    Notification::fake();
+
+    $email = 'signup-verify-user@gmail.com';
+    RateLimiter::clear('login-discover:'.$email.'|127.0.0.1');
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', $email)->first();
+
+    expect($user)->not->toBeNull()
+        ->and($user->hasVerifiedEmail())->toBeFalse();
+
+    Notification::assertSentTo($user, VerifyEmail::class);
+
+    $this->assertAuthenticated();
+    expect($user->fresh()->remember_token)->not->toBeNull();
+});
+
+test('signup with a matching invitation auto-verifies the email and fires Verified', function (): void {
+    Event::fake([Verified::class]);
+    Notification::fake();
+
+    $team = Team::factory()->create();
+    $email = 'Invited-Signup-'.uniqid().'@Gmail.com';
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => $email,
+    ]);
+
+    session(['url.intended' => "/team-invitations/{$invitation->id}/accept"]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', mb_strtolower($email))->first();
+
+    expect($user)->not->toBeNull()
+        ->and($user->hasVerifiedEmail())->toBeTrue();
+
+    Notification::assertNotSentTo($user, VerifyEmail::class);
+    Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
+});
+
+test('signup rejects a submission caught by the honeypot', function (): void {
+    config(['honeypot.enabled' => true]);
+
+    $email = 'bot-signup-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    $this->travel(2)->seconds();
+
+    $component
+        ->set('extraFields.my_name', 'I fill every field I see')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertForbidden();
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+test('signup registers normally when the honeypot stays empty and enough time has passed', function (): void {
+    config(['honeypot.enabled' => true]);
+
+    $email = 'human-signup-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    $this->travel(2)->seconds();
+
+    $component
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+test('signup rejects a duplicate email at submission', function (): void {
+    $email = 'dup-signup-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    User::factory()->create(['email' => $email]);
+
+    $component
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email']);
+
+    expect(User::where('email', $email)->count())->toBe(1);
+});
+
+test('signup rejects a password shorter than 8 characters', function (): void {
+    $email = 'short-pass-signup-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['password']);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+test('the remember me checkbox no longer renders on the login page', function (): void {
+    $this->get(url()->getAppUrl('login'))
+        ->assertDontSee(__('filament-panels::auth/pages/login.form.remember.label'));
+});
+
+test('password login always remembers the session even without a checkbox', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $this->assertAuthenticated();
+    expect($user->fresh()->remember_token)->not->toBeNull();
 });
