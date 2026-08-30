@@ -100,9 +100,9 @@ function userChannelAuth(User $user, string $id): bool
  * Log in through the real two-step login form: type the email and submit to
  * reveal the password field, then type the password and submit again.
  */
-function loginViaBrowser(User $user, string $path = '/app/login'): AwaitableWebpage
+function loginViaBrowser(User $user): AwaitableWebpage
 {
-    return test()->visit($path)
+    return test()->visit('/app/login')
         ->type('[id="form.email"]', $user->email)
         ->click('button[type="submit"]')
         ->type('[id="form.password"]', 'password')

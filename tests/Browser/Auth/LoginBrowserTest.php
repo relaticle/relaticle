@@ -22,5 +22,5 @@ it('reveals the password field only after continue', function (): void {
         ->assertMissing('[id="form.password"]')
         ->type('[id="form.email"]', $user->email)
         ->click('button[type="submit"]')
-        ->assertPresent('[id="form.password"]');
+        ->assertVisible('[id="form.password"]');
 });
