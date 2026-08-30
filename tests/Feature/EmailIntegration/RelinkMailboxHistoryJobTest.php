@@ -8,7 +8,6 @@ use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -33,11 +32,10 @@ beforeEach(function (): void {
 it('creates a person from stored outbound mail after the workspace switches to Selective', function (): void {
     $this->team->update(['contact_creation_mode' => ContactCreationMode::None]);
 
-    $email = Email::factory()->create([
+    $email = Email::factory()->outbound()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
         'connected_account_id' => $this->account->getKey(),
-        'direction' => EmailDirection::OUTBOUND,
     ]);
 
     EmailParticipant::factory()->to()->create([
@@ -93,11 +91,10 @@ it('does not relink mail stored on another connected account', function (): void
         'user_id' => $this->user->id,
     ]));
 
-    $email = Email::factory()->create([
+    $email = Email::factory()->outbound()->create([
         'team_id' => $this->team->id,
         'user_id' => $this->user->id,
         'connected_account_id' => $otherAccount->getKey(),
-        'direction' => EmailDirection::OUTBOUND,
     ]);
 
     EmailParticipant::factory()->to()->create([

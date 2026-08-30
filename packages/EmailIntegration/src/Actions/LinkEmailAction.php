@@ -84,7 +84,7 @@ final readonly class LinkEmailAction
                 ->first();
 
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address)) {
+            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address, $email)) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -128,11 +128,14 @@ final readonly class LinkEmailAction
      * - Selective:  create when any workspace mailbox has sent to this address
      * - None:       never create
      */
-    private function shouldCreatePerson(Team $team, string $emailAddress): bool
+    private function shouldCreatePerson(Team $team, string $emailAddress, Email $email): bool
     {
         return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
-            ContactCreationMode::Selective => $this->hasTeamOutboundHistory($team, $emailAddress),
+            // The outbound message being linked is itself history: do not depend on a
+            // second query that ActiveAccountScope can hide during mailbox re-import.
+            ContactCreationMode::Selective => $email->direction === EmailDirection::OUTBOUND
+                || $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
         };
     }
