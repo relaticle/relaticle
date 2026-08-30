@@ -109,13 +109,14 @@ it('draws a distinct icon for every name the navigation declares', function (): 
         ->unique()
         ->values();
 
-    // An unknown name falls back to the `features` glyph rather than blowing up,
-    // so a rename would silently draw the wrong figure. Distinct output is what
-    // proves each declared name still has its own drawing.
-    $drawings = $icons->map(fn (string $name): string => Blade::render(
-        '<x-brand.nav-icon :name="$name"/>',
-        ['name' => $name],
-    ));
+    // Names migrated to the isocons.app set resolve through their own
+    // `icons.*` component; anything else falls back to the legacy
+    // `x-brand.nav-icon` name-keyed set, which draws `blog` for an unknown
+    // name rather than blowing up. Distinct output is what proves each
+    // declared name still has its own drawing either way.
+    $drawings = $icons->map(fn (string $name): string => in_array($name, NavItem::ICON_COMPONENTS, true)
+        ? Blade::render('<x-dynamic-component :component="$component"/>', ['component' => 'icons.'.$name])
+        : Blade::render('<x-brand.nav-icon :name="$name"/>', ['name' => $name]));
 
     expect($icons)->not->toBeEmpty()
         ->and($drawings->unique())->toHaveCount($icons->count());
