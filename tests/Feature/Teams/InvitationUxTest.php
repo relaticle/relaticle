@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\SubscriberTagEnum;
 use App\Filament\Pages\Auth\Register;
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Team;
@@ -191,14 +190,7 @@ test('user registering via invitation link gets mailcoach subscriber synced', fu
     expect($user)->not->toBeNull();
     expect($user->hasVerifiedEmail())->toBeTrue();
 
-    Queue::assertPushed(SyncSubscriberJob::class, function (SyncSubscriberJob $job) use ($user): bool {
-        $data = invade($job)->data;
-
-        return $data->email === $user->email
-            && in_array(SubscriberTagEnum::Verified->value, $data->tags, true)
-            && in_array(SubscriberTagEnum::SignupSourceOrganic->value, $data->tags, true)
-            && $data->user_id === (string) $user->id;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
 test('user registering without invitation does not trigger subscriber sync', function (): void {

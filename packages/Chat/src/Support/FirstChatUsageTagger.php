@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Tags the authenticated user's Mailcoach subscriber with "has-ai-usage" the
- * first time they send a chat message.
+ * Syncs the authenticated user's Mailcoach profile the first time they send a
+ * chat message, so has-ai-usage lands immediately instead of waiting for the
+ * nightly reconcile sweep.
  *
  * Called from SupersededAwareConversationStore::storeUserMessage() rather than
  * an Eloquent observer: laravel/ai persists chat messages via a raw query
  * builder insert (see Laravel\Ai\Storage\DatabaseConversationStore), so the
- * Eloquent AgentConversationMessage model — a read-only shadow over that same
- * table — never fires model events for real chat traffic.
+ * Eloquent AgentConversationMessage model (a read-only shadow over that same
+ * table) never fires model events for real chat traffic.
  */
 final readonly class FirstChatUsageTagger
 {
@@ -31,7 +30,7 @@ final readonly class FirstChatUsageTagger
         /** @var User|null $user */
         $user = auth()->user();
 
-        if (! $user instanceof User || ! $user->mailcoach_subscriber_uuid) {
+        if (! $user instanceof User) {
             return;
         }
 
@@ -46,10 +45,6 @@ final readonly class FirstChatUsageTagger
             return;
         }
 
-        dispatch(new ModifySubscriberTagsJob(
-            (string) $user->id,
-            [SubscriberTagEnum::HasAiUsage->value],
-            TagAction::Add,
-        ))->afterCommit();
+        dispatch(new SyncSubscriberJob((string) $user->id))->afterCommit();
     }
 }

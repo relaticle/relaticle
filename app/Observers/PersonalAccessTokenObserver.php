@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 
@@ -20,7 +18,7 @@ final readonly class PersonalAccessTokenObserver
 
         $user = $token->tokenable;
 
-        if (! $user instanceof User || ! $user->mailcoach_subscriber_uuid) {
+        if (! $user instanceof User) {
             return;
         }
 
@@ -33,10 +31,6 @@ final readonly class PersonalAccessTokenObserver
             return;
         }
 
-        dispatch(new ModifySubscriberTagsJob(
-            (string) $user->id,
-            [SubscriberTagEnum::HasApiToken->value],
-            TagAction::Add,
-        ))->afterCommit();
+        dispatch(new SyncSubscriberJob((string) $user->id))->afterCommit();
     }
 }

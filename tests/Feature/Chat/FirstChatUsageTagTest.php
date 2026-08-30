@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\SubscriberTagEnum;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -45,78 +44,56 @@ function seedChatConversation(User $user): string
 }
 
 beforeEach(function (): void {
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
 });
 
-test('sending the first chat message dispatches the has-ai-usage tag job', function (): void {
-    $user = User::factory()->withPersonalTeam()->create([
-        'mailcoach_subscriber_uuid' => 'sub-uuid-1',
-    ]);
+test('sending the first chat message dispatches a profile sync', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
     $conversationId = seedChatConversation($user);
 
     storeChatUserMessage($user, $conversationId, 'hello');
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
-        return invade($job)->userId === (string) $user->id
-            && invade($job)->tags === [SubscriberTagEnum::HasAiUsage->value];
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
-test('a second chat message does not dispatch the tag job again', function (): void {
-    $user = User::factory()->withPersonalTeam()->create([
-        'mailcoach_subscriber_uuid' => 'sub-uuid-1',
-    ]);
+test('a second chat message does not dispatch a sync again', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
     $conversationId = seedChatConversation($user);
 
     storeChatUserMessage($user, $conversationId, 'first');
 
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
 
     storeChatUserMessage($user, $conversationId, 'second');
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('a first message in a second conversation does not dispatch the tag job again', function (): void {
-    $user = User::factory()->withPersonalTeam()->create([
-        'mailcoach_subscriber_uuid' => 'sub-uuid-1',
-    ]);
+test('a first message in a second conversation does not dispatch a sync again', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
     storeChatUserMessage($user, seedChatConversation($user), 'first');
 
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
 
     storeChatUserMessage($user, seedChatConversation($user), 'second, different conversation');
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('a user without a mailcoach subscriber uuid does not dispatch the tag job', function (): void {
-    $user = User::factory()->withPersonalTeam()->create([
-        'mailcoach_subscriber_uuid' => null,
-    ]);
-    $this->actingAs($user);
-
-    storeChatUserMessage($user, seedChatConversation($user), 'hello');
-
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
-});
-
-test('sending a chat message when subscriber sync is disabled does not dispatch the tag job', function (): void {
+test('sending a chat message when subscriber sync is disabled does not dispatch', function (): void {
     config()->set('mailcoach-sdk.enabled_subscribers_sync', false);
 
-    $user = User::factory()->withPersonalTeam()->create([
-        'mailcoach_subscriber_uuid' => 'sub-uuid-1',
-    ]);
+    $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
 
     storeChatUserMessage($user, seedChatConversation($user), 'hello');
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });

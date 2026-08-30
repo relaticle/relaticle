@@ -2,15 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Data\SubscriberData;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
-use App\Jobs\Email\SyncRecencyBucketJob;
 use App\Jobs\Email\SyncSubscriberJob;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\Facades\Queue;
 
-mutates(SyncSubscriberJob::class, SyncRecencyBucketJob::class, ModifySubscriberTagsJob::class);
+mutates(SyncSubscriberJob::class);
 
 /**
  * A Mailcoach TLS outage on 2026-08-26 turned 25 real failures into 1,046
@@ -26,7 +22,8 @@ mutates(SyncSubscriberJob::class, SyncRecencyBucketJob::class, ModifySubscriberT
  *
  * These assert the exact payload values the queue Worker reads.
  */
-test('mailcoach jobs retry on attempts alone, with nothing able to swallow the exception', function (object $job, int $tries, string $backoff): void {
+test('the subscriber sync retries on attempts alone, with nothing able to swallow the exception', function (): void {
+    $job = new SyncSubscriberJob('user-1');
     $queue = Queue::connection('sync');
 
     // array_merge() mirrors CallQueuedHandler::dispatchThroughMiddleware() exactly:
@@ -37,30 +34,15 @@ test('mailcoach jobs retry on attempts alone, with nothing able to swallow the e
     );
 
     expect($queue->getJobExpiration($job))->toBeNull()
-        ->and($queue->getJobTries($job))->toBe($tries)
-        ->and($queue->getJobBackoff($job))->toBe($backoff)
+        ->and($queue->getJobTries($job))->toBe(5)
+        ->and($queue->getJobBackoff($job))->toBe('60,300,900,3600')
         ->and($middleware)->toBe([]);
-})->with([
-    'sync subscriber' => [
-        fn (): SyncSubscriberJob => new SyncSubscriberJob(SubscriberData::from(['email' => 'a@b.test'])),
-        5,
-        '60,300,900,3600',
-    ],
-    'sync recency bucket' => [
-        fn (): SyncRecencyBucketJob => new SyncRecencyBucketJob('user-1', 'sub-1', null, 'active-7d'),
-        5,
-        '60,300,900,3600',
-    ],
-    'modify subscriber tags' => [
-        fn (): ModifySubscriberTagsJob => new ModifySubscriberTagsJob('user-1', ['use-case:sales'], TagAction::Add),
-        6,
-        '60,300,900,1800,3600',
-    ],
-]);
+});
 
-test('the unique subscriber sync bounds its lock so a killed worker cannot block an email forever', function (): void {
-    $job = new SyncSubscriberJob(SubscriberData::from(['email' => 'a@b.test']));
+test('the unique subscriber sync bounds its lock so a killed worker cannot block a user forever', function (): void {
+    $job = new SyncSubscriberJob('user-1');
 
     expect($job)->toBeInstanceOf(ShouldBeUnique::class)
+        ->and($job->uniqueId())->toBe('user-1')
         ->and($job->uniqueFor)->toBeGreaterThan(array_sum([60, 300, 900, 3600]));
 });
