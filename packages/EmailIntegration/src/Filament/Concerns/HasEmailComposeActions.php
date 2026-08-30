@@ -7,8 +7,6 @@ namespace Relaticle\EmailIntegration\Filament\Concerns;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\RichEditor;
@@ -19,7 +17,6 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -35,8 +32,6 @@ use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailSignature;
-use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
@@ -61,48 +56,10 @@ trait HasEmailComposeActions
     {
         return Action::make('composeEmail')
             ->label(__('filament/concerns/email-compose.actions.compose.label'))
-            ->slideOver()
             ->icon('heroicon-o-pencil-square')
-            ->modalWidth(Width::SevenExtraLarge)
-            ->keyBindings(['command+e', 'ctrl+e'])
-            ->tooltip('⌘ + e')
             ->visible(fn (): bool => $this->hasActiveConnectedAccount())
-            ->fillForm(function (): array {
-                $account = ConnectedAccount::query()
-                    ->where('user_id', $this->getAuthenticatedUser()->getKey())
-                    ->where('team_id', filament()->getTenant()?->getKey())
-                    ->where('status', 'active')
-                    ->defaultFirst()
-                    ->first();
-
-                if ($account === null) {
-                    return [];
-                }
-
-                $signature = EmailSignature::query()
-                    ->where('connected_account_id', $account->getKey())
-                    ->where('is_default', true)
-                    ->first();
-
-                return [
-                    'connected_account_id' => $account->getKey(),
-                    'signature_id' => $signature?->getKey(),
-                    'body_html' => resolve(EmailTemplateRenderService::class)
-                        ->applySignatureBlock('<p></p>', $signature),
-                    'privacy_tier' => $this->defaultPrivacyTier()->value,
-                ];
-            })
-            ->schema($this->composeFormSchema())
-            ->action(function (array $data): void {
-                $record = $this->getCrmRecord();
-
-                $email = resolve(SendEmailAction::class)->execute(
-                    data: $this->buildSendData($data, EmailCreationSource::COMPOSE),
-                    linkToType: $record::class,
-                    linkToId: $record->getKey(),
-                );
-
-                $this->sendQueuedNotification($email);
+            ->action(function (): void {
+                $this->dispatch('composer:open');
             });
     }
 
@@ -253,170 +210,6 @@ trait HasEmailComposeActions
         }
 
         $notification->send();
-    }
-
-    /**
-     * @return array<int, mixed>
-     */
-    private function composeFormSchema(): array
-    {
-        return [
-            Grid::make(2)
-                ->schema([
-                    Select::make('connected_account_id')
-                        ->label(__('filament/concerns/email-compose.fields.from.label'))
-                        ->options(fn (): array => $this->activeAccountOptions())
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
-
-                            $sig = EmailSignature::query()
-                                ->where('connected_account_id', $state)
-                                ->where('is_default', true)
-                                ->first();
-
-                            $set('signature_id', $sig?->getKey());
-
-                            // Swap the signature block for the new account's default,
-                            // keeping whatever the user has already typed.
-                            $body = (string) ($get('body_html') ?? '<p></p>');
-                            $set('body_html', resolve(EmailTemplateRenderService::class)
-                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
-                        }),
-
-                    Select::make('template_id')
-                        ->label(__('filament/concerns/email-compose.fields.template.label'))
-                        ->placeholder(__('filament/concerns/email-compose.fields.template.placeholder'))
-                        ->options(fn (): array => $this->templateOptions())
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
-
-                            /** @var EmailTemplate|null $template */
-                            $template = EmailTemplate::query()
-                                ->where('team_id', filament()->getTenant()?->getKey())
-                                ->whereKey($state)
-                                ->first();
-
-                            if ($template === null) {
-                                return;
-                            }
-
-                            // Keep the signature below the template body so picking a
-                            // template never wipes the user's signature.
-                            $sig = $this->resolveComposeSignature(
-                                $get('connected_account_id'),
-                                $get('signature_id'),
-                            );
-
-                            $rendered = resolve(EmailTemplateRenderService::class)
-                                ->renderWithSignature($template, $this->getCrmRecord(), $sig);
-
-                            if ($sig !== null) {
-                                $set('signature_id', $sig->getKey());
-                            }
-
-                            $set('subject', $rendered['subject']);
-                            $set('body_html', $rendered['body_html']);
-                        }),
-                ]),
-
-            TagsInput::make('to')
-                ->label(__('filament/concerns/email-compose.fields.to.label'))
-                ->placeholder(__('filament/concerns/email-compose.fields.to.placeholder'))
-                ->required()
-                ->splitKeys(['Tab', ',', ' '])
-                ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-
-            Grid::make(2)
-                ->schema([
-                    TagsInput::make('cc')
-                        ->label(__('filament/concerns/email-compose.fields.cc.label'))
-                        ->placeholder(__('filament/concerns/email-compose.fields.cc.placeholder'))
-                        ->splitKeys(['Tab', ',', ' '])
-                        ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-
-                    TagsInput::make('bcc')
-                        ->label(__('filament/concerns/email-compose.fields.bcc.label'))
-                        ->placeholder(__('filament/concerns/email-compose.fields.bcc.placeholder'))
-                        ->splitKeys(['Tab', ',', ' '])
-                        ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-                ]),
-
-            TextInput::make('subject')
-                ->required()
-                ->maxLength(255),
-
-            RichEditor::make('body_html')
-                ->label(__('filament/concerns/email-compose.fields.body.label'))
-                ->required()
-                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                ->customBlocks([SignatureBlock::class])
-                ->toolbarButtons([
-                    'bold', 'italic', 'underline', 'strike',
-                    'link', 'bulletList', 'orderedList',
-                    'blockquote', 'h2', 'h3', 'undo', 'redo',
-                ]),
-
-            Section::make('Attachments')
-                ->collapsed()
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->hiddenLabel()
-                        ->multiple()
-                        ->visibility('private')
-                        ->disk('local')
-                        ->directory('email-attachments')
-                        ->maxSize(10240)
-                        ->storeFileNamesIn('attachment_file_names')
-                        ->nullable(),
-                ]),
-
-            Section::make('Settings')
-                ->description(__('filament/concerns/email-compose.sections.settings.description'))
-                ->icon('heroicon-o-cog-6-tooth')
-                ->collapsed()
-                ->schema([
-                    Select::make('privacy_tier')
-                        ->label(__('filament/concerns/email-compose.fields.privacy_tier.label'))
-                        ->helperText(__('filament/concerns/email-compose.fields.privacy_tier.helper_text'))
-                        ->options(EmailPrivacyTier::class)
-                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
-                        ->required(),
-
-                    DateTimePicker::make('scheduled_for')
-                        ->label(__('filament/concerns/email-compose.fields.scheduled_for.label'))
-                        ->helperText(__('filament/concerns/email-compose.fields.scheduled_for.helper_text'))
-                        ->seconds(false)
-                        ->minDate(now())
-                        ->nullable(),
-
-                    Select::make('signature_id')
-                        ->label(__('filament/concerns/email-compose.fields.signature.label'))
-                        ->placeholder(__('filament/concerns/email-compose.fields.signature.placeholder'))
-                        ->options(fn (Get $get): array => EmailSignature::query()
-                            ->where('connected_account_id', $get('connected_account_id'))
-                            ->pluck('name', 'id')
-                            ->all()
-                        )
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            // A null state means "no signature" — strip the block.
-                            $sig = filled($state)
-                                ? EmailSignature::query()->whereKey($state)->first()
-                                : null;
-
-                            $body = (string) ($get('body_html') ?? '<p></p>');
-                            $set('body_html', resolve(EmailTemplateRenderService::class)
-                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
-                        }),
-                ]),
-        ];
     }
 
     /**
@@ -573,7 +366,7 @@ trait HasEmailComposeActions
     }
 
     /**
-     * Drives both the compose actions and the "connect a mailbox" empty states,
+     * Drives the compose launcher and the "connect a mailbox" empty states,
      * so it is read from blades as a computed property.
      */
     #[Computed]
@@ -608,35 +401,6 @@ trait HasEmailComposeActions
     }
 
     /**
-     * Resolve the signature to attach when composing: the explicitly selected
-     * one, else the chosen account's default, else the active account's default.
-     */
-    private function resolveComposeSignature(?string $accountId, ?string $signatureId): ?EmailSignature
-    {
-        if (filled($signatureId)) {
-            return EmailSignature::query()->whereKey($signatureId)->first();
-        }
-
-        if (blank($accountId)) {
-            $accountId = ConnectedAccount::query()
-                ->where('user_id', $this->getAuthenticatedUser()->getKey())
-                ->where('team_id', filament()->getTenant()?->getKey())
-                ->where('status', 'active')
-                ->defaultFirst()
-                ->value('id');
-        }
-
-        if (blank($accountId)) {
-            return null;
-        }
-
-        return EmailSignature::query()
-            ->where('connected_account_id', $accountId)
-            ->where('is_default', true)
-            ->first();
-    }
-
-    /**
      * @return array<string, string>
      */
     private function activeAccountOptions(): array
@@ -648,23 +412,6 @@ trait HasEmailComposeActions
             ->defaultFirst()
             ->get()
             ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
-            ->all();
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function templateOptions(): array
-    {
-        return EmailTemplate::query()
-            ->where(fn (Builder $q): Builder => $q
-                ->where('team_id', filament()->getTenant()?->getKey())
-                ->where(fn (Builder $q2): Builder => $q2
-                    ->where('is_shared', true)
-                    ->orWhere('created_by', $this->getAuthenticatedUser()->getKey())
-                )
-            )
-            ->pluck('name', 'id')
             ->all();
     }
 

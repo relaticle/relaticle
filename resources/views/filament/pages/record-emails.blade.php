@@ -21,8 +21,8 @@
     <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
 
         {{-- Toolbar: what you are looking at on the left, what you can do with it on
-             the right, one control height throughout. Compose is not here — on a
-             record page it is a header action, alongside the record's own actions. --}}
+             the right, one control height throughout. Compose is the header action,
+             which opens the global floating composer. --}}
         <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
 
             <div class="flex min-w-0 flex-1 items-center gap-3">
