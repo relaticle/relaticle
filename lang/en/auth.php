@@ -21,6 +21,16 @@ return [
         'email_placeholder' => 'Enter your email address',
         'password_placeholder' => 'Password',
     ],
+    'verify_email' => [
+        'heading' => 'Check your inbox',
+        'description' => 'Open the verification link we just sent to',
+        'resend' => 'Resend the email',
+        'resend_in' => 'Resend in :seconds seconds',
+        'resend_in_one' => 'Resend in 1 second',
+        'spam_hint' => 'It can take a minute to arrive. Check your spam folder too.',
+        'wrong_email' => 'Wrong email address?',
+        'sign_out' => 'Sign out',
+    ],
     'footer' => [
         'terms_notice' => 'By proceeding you acknowledge that you have read, understood and agree to our :terms.',
         'terms_of_service' => 'Terms of Service',
