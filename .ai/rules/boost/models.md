@@ -9,8 +9,11 @@ paths:
 
 ### Email canonicalization
 
-- Emails are stored canonical: trimmed, lowercase (`User.email` and
-  `TeamInvitation.email` set-mutators enforce it). Postgres compares
-  case-sensitively, so every lookup against an email column must canonicalize
-  the input first via `App\Support\EmailAddress::canonicalize()`; never write
-  a raw `where('email', $userInput)`.
+- Emails are stored canonical: trimmed, lowercase. The `AsCanonicalEmail`
+  inbound cast enforces it on `User.email` and `TeamInvitation.email`; reuse it
+  for any new email column. Casts never touch query input, so every lookup
+  against an email column must canonicalize first via
+  `App\Support\EmailAddress::canonicalize()`; never write a raw
+  `where('email', $userInput)`. Same ladder for future scalar normalization:
+  one inbound cast per concept in `app/Casts`, value objects only for
+  compound values.

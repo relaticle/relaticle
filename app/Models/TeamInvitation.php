@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\EmailAddress;
+use App\Casts\AsCanonicalEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -34,14 +33,6 @@ final class TeamInvitation extends JetstreamTeamInvitation
         return $this->belongsTo(Team::class);
     }
 
-    /**
-     * @return Attribute<string, string>
-     */
-    protected function email(): Attribute
-    {
-        return Attribute::set(fn (string $value): string => EmailAddress::canonicalize($value));
-    }
-
     public function isExpired(): bool
     {
         if ($this->expires_at === null) {
@@ -60,6 +51,7 @@ final class TeamInvitation extends JetstreamTeamInvitation
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'expires_at' => 'datetime',
         ];
     }
