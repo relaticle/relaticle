@@ -21,8 +21,10 @@ use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
+use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Hash;
@@ -68,9 +70,25 @@ final class Login extends \Filament\Auth\Pages\Login
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE),
                 $this->getFormContentComponent(),
                 Html::make(fn (): string => $this->getDiscoveryHintHtml()),
+                Html::make(fn (): string => $this->getTermsFooterHtml()),
                 $this->getMultiFactorChallengeFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
             ]);
+    }
+
+    public function getMaxWidth(): Width
+    {
+        return Width::Small;
+    }
+
+    public function getHeading(): string
+    {
+        return __('auth.login.welcome');
+    }
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        return null;
     }
 
     public function authenticate(): ?LoginResponse
@@ -194,6 +212,16 @@ final class Login extends \Filament\Auth\Pages\Login
         return '';
     }
 
+    private function getTermsFooterHtml(): string
+    {
+        $termsLink = '<a href="'.e(url('/terms-of-service')).'" class="underline hover:text-gray-700 dark:hover:text-gray-300">'.e(__('auth.login.terms_of_service')).'</a>';
+        $privacyLink = '<a href="'.e(url('/privacy-policy')).'" class="underline hover:text-gray-700 dark:hover:text-gray-300">'.e(__('auth.login.privacy_policy')).'</a>';
+
+        return '<p class="mt-8 text-center text-xs text-gray-500 dark:text-gray-400">'
+            .__('auth.login.terms_notice', ['terms' => $termsLink, 'privacy' => $privacyLink])
+            .'</p>';
+    }
+
     protected function discover(): void
     {
         $email = mb_strtolower(trim((string) ($this->form->getState()['email'] ?? '')));
@@ -291,6 +319,8 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         return TextInput::make('email')
             ->label(__('filament-panels::auth/pages/login.form.email.label'))
+            ->hiddenLabel()
+            ->placeholder(__('auth.login.email_placeholder'))
             ->email()
             ->required()
             ->maxLength(255)
@@ -311,6 +341,8 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         return TextInput::make('password')
             ->label(__('filament-panels::auth/pages/login.form.password.label'))
+            ->hiddenLabel()
+            ->placeholder(__('auth.login.password_placeholder'))
             ->hint(fn (): ?HtmlString => ($this->authMethod === 'password' && filament()->hasPasswordReset())
                 ? new HtmlString(Blade::render('<x-filament::link :href="filament()->getRequestPasswordResetUrl()" tabindex="-1"> {{ __(\'filament-panels::auth/pages/login.actions.request_password_reset.label\') }}</x-filament::link>'))
                 : null)

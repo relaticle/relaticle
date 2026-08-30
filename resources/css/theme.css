@@ -227,13 +227,14 @@
     }
 }
 
-/* Login/register brand card: matches the deletion-interstitial's card
-   treatment. Scoped off the onboarding wizard, which strips fi-simple-main
-   down to a transparent, borderless shell for its own split-screen layout. */
+/* Open-canvas auth surface: no card chrome, just the page wash behind a
+   centered column. Scoped off the onboarding wizard, which strips
+   fi-simple-main down to a transparent, borderless shell for its own
+   split-screen layout. */
 .fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-layout {
     @apply bg-gray-50 dark:bg-gray-950;
 }
 
 .fi-panel-app:not(.fi-onboarding-wizard) .fi-simple-main {
-    @apply shadow-sm sm:rounded-2xl;
+    @apply bg-transparent shadow-none ring-0 dark:bg-transparent dark:ring-0;
 }
