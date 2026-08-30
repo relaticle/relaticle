@@ -247,6 +247,31 @@ it('re-confirms when removing a passkey even inside the freshness window', funct
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
+it('ignores a client-supplied attempt marker when adding a passkey', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+    createPasskey(auth()->user(), 'Existing Key');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', data: ['confirm_started_at' => '0'])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony')
+        ->assertNotDispatched('passkey-register');
+
+    expect(IdentityConfirmation::confirmedRecently())->toBeFalse();
+});
+
+it('ignores a client-supplied attempt marker when removing a passkey', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+    $passkey = createPasskey(auth()->user(), 'Existing Key');
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', data: ['confirm_started_at' => '0'], arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
 // --- Naming ---------------------------------------------------------------
 
 it('registers without asking for a name', function (): void {

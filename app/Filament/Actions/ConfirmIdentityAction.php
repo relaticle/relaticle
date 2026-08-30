@@ -148,10 +148,12 @@ final class ConfirmIdentityAction extends Action
 
         // alwaysConfirm ignores the freshness window (and any within() override): proof is
         // scoped to this attempt's own start time so the passkey ceremony re-entry terminates.
+        // The attempt marker travels through client-writable form state, so it can only ever
+        // tighten the gate: a proof that does not exist at all still fails the freshness check.
         $attemptStartedAt = (int) ($data['confirm_started_at'] ?? 0);
         $confirmedAt = (int) session('auth.password_confirmed_at', 0);
 
-        return $confirmedAt < $attemptStartedAt;
+        return ! IdentityConfirmation::confirmedRecently() || $confirmedAt < $attemptStartedAt;
     }
 
     /**
