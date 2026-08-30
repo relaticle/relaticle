@@ -76,8 +76,19 @@
                          cancelHoverOpen() { clearTimeout(this.hoverTimer) },
                          closeOnHoverLeave(slug) {
                              this.closeTimer = setTimeout(() => {
-                                 if (this.openDropdown === slug) { this.openDropdown = null; this.outgoingDropdown = null }
+                                 if (this.openDropdown === slug) { this.closeAll() }
                              }, 200)
+                         },
+                         // A full close (not a swap) still needs its content to fade out WITH
+                         // the card rather than vanishing the instant openDropdown clears — so
+                         // it borrows the same outgoingDropdown mechanism a swap uses, just with
+                         // no incoming layer to slide past.
+                         closeAll() {
+                             clearTimeout(this.swapTimer)
+                             const wasOpen = this.openDropdown
+                             this.openDropdown = null
+                             this.outgoingDropdown = wasOpen
+                             this.swapTimer = setTimeout(() => { this.outgoingDropdown = null }, 220)
                          },
                          // Sets the sweep direction before switching content, so both layers
                          // that are about to render already know which way to move.
@@ -96,7 +107,7 @@
                              }
                          },
                          toggle(slug) {
-                             if (this.openDropdown === slug) { this.openDropdown = null; this.outgoingDropdown = null; return }
+                             if (this.openDropdown === slug) { this.closeAll(); return }
                              this.swapTo(slug)
                          },
                          panelStyle(slug, isTwoColumn) {
@@ -110,12 +121,12 @@
                              return `left:${left}px;width:${width}px`
                          },
                      }"
-                     @keydown.escape.window="openDropdown = null; outgoingDropdown = null"
-                     @click.outside="openDropdown = null; outgoingDropdown = null">
+                     @keydown.escape.window="closeAll()"
+                     @click.outside="closeAll()">
                     @foreach($navItems as $item)
                         @if($item->url === null && count($item->children) > 0)
                             @php($slug = \Illuminate\Support\Str::slug($item->label))
-                            <div @keydown.escape="if (openDropdown === '{{ $slug }}') { openDropdown = null; $refs['trigger-{{ $slug }}'].focus(); }"
+                            <div @keydown.escape="if (openDropdown === '{{ $slug }}') { closeAll(); $refs['trigger-{{ $slug }}'].focus(); }"
                                  @mouseenter="openOnHover('{{ $slug }}')"
                                  @mouseleave="cancelHoverOpen(); closeOnHoverLeave('{{ $slug }}')">
                                 <button type="button" x-ref="trigger-{{ $slug }}"
@@ -152,7 +163,7 @@
                          are mounted at once (stacked with absolute inset-0), each carrying its
                          own slide-out/slide-in — a real two-layer swipe, not one element
                          re-skinning itself. --}}
-                    <div x-show="openDropdown !== null || outgoingDropdown !== null"
+                    <div x-show="openDropdown !== null"
                          x-transition:enter="transition-[translate,scale,opacity] duration-250 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
                          x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.97]"
                          x-transition:enter-end="opacity-100 translate-y-0 scale-100"
@@ -188,7 +199,9 @@
                                          }"
                                          id="menu-{{ $slug }}"
                                          class="p-2 transition-[translate,opacity] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none @if($isTwoColumn) grid grid-cols-[1.35fr_1fr] divide-x divide-gray-100 dark:divide-white/[0.06] @endif"
-                                         :class="isLeaving ? 'absolute inset-0 bg-white dark:bg-gray-900 ' + (direction > 0 ? '-translate-x-3 opacity-0' : 'translate-x-3 opacity-0') : (settled ? 'translate-x-0 opacity-100' : (isCurrent && outgoingDropdown ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0'))">
+                                         :class="isLeaving
+                                             ? 'absolute inset-0 bg-white dark:bg-gray-900 ' + (openDropdown ? (direction > 0 ? '-translate-x-3 opacity-0' : 'translate-x-3 opacity-0') : 'opacity-0')
+                                             : (settled ? 'translate-x-0 opacity-100' : (isCurrent && outgoingDropdown ? (direction > 0 ? 'translate-x-3 opacity-0' : '-translate-x-3 opacity-0') : 'opacity-0'))">
                                         @foreach($item->children as $child)
                                             @if($child->url === null && count($child->children) > 0)
                                                 <div class="px-2 first:pl-0 last:pr-0">
