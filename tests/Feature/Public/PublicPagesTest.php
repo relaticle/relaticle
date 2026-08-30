@@ -325,20 +325,22 @@ describe('Hero AI tab — conversation', function () {
         $body = (string) $this->get('/')->assertSuccessful()->getContent();
 
         // Both writes the demo performs are proposals in the product
-        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
-        // so each must reach the transcript carrying an Approved outcome, and
-        // the dock must offer a decision for each before it lands. Advertising
-        // an unattended write would contradict the review-before-write contract
-        // the demo's own second exchange is built to show off.
+        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction), so
+        // each must be announced as a proposal and the dock must offer a
+        // decision before it lands. Advertising an unattended write would
+        // contradict the review-before-write contract the demo's own second
+        // exchange is built to show off.
         //
-        // Asserted on the review CHROME rather than on a card heading: the row
-        // renders the record as a chip plus an operation label, and pinning that
-        // wording made this test fail on a pure restyle while the invariant it
-        // guards -- no write without an approval -- still held.
-        expect(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2)
-            ->and(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
+        // Asserted on the review CHROME rather than on a card heading or an
+        // outcome badge: the decided row renders the record as a chip plus an
+        // operation label, and pinning that wording made this test fail on a
+        // pure restyle while the invariant it guards -- no write without an
+        // approval -- still held.
+        expect(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
             ->and($body)->toContain('Review the proposal below to update the task')
-            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems');
+            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems')
+            ->and($body)->toContain('Discard')
+            ->and($body)->toContain('Save changes');
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -351,9 +353,10 @@ describe('Hero AI tab — conversation', function () {
             ->and($body)->not->toContain('rounded-br-md bg-primary-50')
             ->and($body)->not->toContain('rounded-br-md bg-primary-600');
 
-        // A decided proposal collapses to one line carrying the dock's identity:
-        // an operation-tinted entity tile and the record label in bold, NOT a
-        // record pill (chips are reserved for inline clickable references).
+        // The docked proposal names the operation it is asking to approve; the
+        // decided row it collapses into carries only the operation-tinted entity
+        // tile and the record label in bold, NOT a record pill (chips are
+        // reserved for inline clickable references).
         expect($body)->toContain('Create Person')
             ->and($body)->toContain('Update Task')
             ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
