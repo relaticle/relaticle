@@ -73,12 +73,19 @@
 
             resolveColor(value) {
                 if (!value) return null;
-                var probe = document.createElement('div');
-                probe.style.color = value;
-                document.body.appendChild(probe);
-                var rgb = getComputedStyle(probe).color.match(/\d+(\.\d+)?/g);
-                document.body.removeChild(probe);
-                return rgb ? rgb.slice(0, 3).map(Number) : null;
+                // getComputedStyle(...).color can come back as the source's own
+                // notation (e.g. "oklch(...)") verbatim rather than normalized rgb() —
+                // parsing that with a plain \d+ regex reads the oklch(L C H) triplet
+                // as raw RGB channels (0-1, 0-1, up to ~360), which clamps to near-black
+                // with a maxed-out blue channel. A 1x1 canvas fillStyle round-trip
+                // always normalizes to rgb()/rgba(), so it's the only reliable path.
+                var canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 1;
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = value;
+                ctx.fillRect(0, 0, 1, 1);
+                var pixel = ctx.getImageData(0, 0, 1, 1).data;
+                return [pixel[0], pixel[1], pixel[2]];
             },
 
             resize() {
@@ -175,7 +182,7 @@
                     if (dot.glow < 0.01) continue;
 
                     var r = this.baseDotSize * dot.scale;
-                    var alpha = dot.glow * 0.85;
+                    var alpha = dot.glow;
 
                     ctx.beginPath();
                     ctx.arc(dot.x, dot.y, r, 0, Math.PI * 2);
