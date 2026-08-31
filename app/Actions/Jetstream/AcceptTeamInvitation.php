@@ -18,7 +18,7 @@ use Laravel\Jetstream\Contracts\AddsTeamMembers;
  * response and does not touch the view layer.
  *
  * Every caller is expected to have already confirmed the invitation is valid
- * and that the user's email matches it — those checks stay caller-specific
+ * and that the user's email matches it. Those checks stay caller-specific
  * because each surface renders a different UX for a mismatch. Deletion state
  * has no such reason to vary, so both the user's and the team's scheduled-
  * deletion status are enforced here, where every caller inherits them. An
@@ -74,17 +74,17 @@ final readonly class AcceptTeamInvitation
 
     /**
      * Inside a Filament panel request, ApplyTenantScopes globally scopes User to
-     * members of the currently-viewed tenant. $team here is — by definition —
+     * members of the currently-viewed tenant. $team here is, by definition,
      * usually a *different* team than the one the caller is currently browsing,
      * so every User lookup AddsTeamMembers performs internally (the team owner,
      * hasUserWithEmail(), findUserByEmailOrFail()) would silently miss under that
      * scope.
      *
      * Suspend only that one named scope entry on User for the duration of the
-     * add, then restore that exact entry — a Closure or a Scope instance,
-     * whichever it was — afterward. No other scope on User, and no scope on any
+     * add, then restore that exact entry, a Closure or a Scope instance,
+     * whichever it was. No other scope on User, and no scope on any
      * other model, is ever read or touched. When the scope was never registered
-     * in the first place (the accept-flow controller, queued jobs, tests — none
+     * in the first place (the accept-flow controller, queued jobs, and tests, none
      * of which run behind the panel's tenant middleware), skip the suspension
      * entirely rather than registering a scope that didn't exist before.
      */

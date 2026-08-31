@@ -120,8 +120,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Textual order in a route's middleware array does not decide execution
-        // order: SortedMiddleware resorts by this priority list, and — critically
-        // — an unmapped middleware sitting between two mapped ones (e.g. between
+        // order: SortedMiddleware resorts by this priority list. Critically,
+        // an unmapped middleware sitting between two mapped ones (e.g. between
         // the 'web' group's SubstituteBindings and 'auth') gets dragged along
         // when the higher-priority one jumps forward. Only registering our own
         // class here keeps ThrottleBeforeAuthentication running before auth,

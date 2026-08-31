@@ -337,7 +337,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     /**
      * Whether the user's membership role on the given team is Viewer.
      *
-     * The owner is never a viewer — ownership outranks the pivot role, and
+     * The owner is never a viewer. Ownership outranks the pivot role, and
      * `ownedTeams` is checked first so an owner row carrying a stale pivot
      * value cannot lock them out of their own workspace.
      */

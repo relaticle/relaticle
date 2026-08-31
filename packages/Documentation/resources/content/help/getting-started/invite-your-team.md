@@ -14,8 +14,8 @@ workspace, edit records, or just view them.
    **Workspace Settings**.
 2. Click the **Members** tab. **Invite people** is the first section.
 3. Type the addresses into **Send invite to**, separated by a comma, a
-   space, or a new line — up to 10 in one go.
-4. Choose an **Invite as** role — **Administrator**, **Editor**, or
+   space, or a new line. You can send up to 10 in one go.
+4. Choose an **Invite as** role: **Administrator**, **Editor**, or
    **Viewer**. Everyone in this batch joins with that role.
 5. Click **Send invitations**.
 

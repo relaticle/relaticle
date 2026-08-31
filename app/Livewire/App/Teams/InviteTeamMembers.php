@@ -32,7 +32,7 @@ use Livewire\Attributes\Locked;
 final class InviteTeamMembers extends BaseLivewireComponent
 {
     /**
-     * Bounds one invite submission — generous for real bulk-inviting a team,
+     * Bounds one invite submission. Generous for real bulk-inviting a team,
      * but stops a single authorized call from queuing an unbounded number of
      * Mail sends (the onboarding wizard's invite step caps at 5 for the same
      * reason; this screen is used long after onboarding, so it allows more).
@@ -41,7 +41,7 @@ final class InviteTeamMembers extends BaseLivewireComponent
 
     /**
      * Bounds cumulative invite volume per actor within the window below,
-     * independent of how many separate submissions it takes to reach it —
+     * independent of how many separate submissions it takes to reach it.
      * `rateLimit()` alone only throttles the number of calls, not the number
      * of emails each call can queue.
      */
@@ -211,8 +211,8 @@ final class InviteTeamMembers extends BaseLivewireComponent
         }
 
         // Volume-based, not call-based: `rateLimit()` would only throttle how
-        // often this method runs, not how many emails a single run queues —
-        // the submission cap above already bounds one submission, this bounds
+        // often this method runs, not how many emails a single run queues.
+        // The submission cap above bounds one submission; this bounds
         // cumulative volume across submissions from the same actor.
         $rateLimitKey = 'invite-team-members:'.$this->authUser()->id;
 

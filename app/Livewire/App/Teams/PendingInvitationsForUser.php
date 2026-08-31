@@ -91,7 +91,7 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
     }
 
     /**
-     * The client-supplied id is never trusted alone — it is only ever resolved
+     * The client-supplied id is never trusted alone. It is only ever resolved
      * against the collection already scoped to the signed-in user's email.
      */
     private function ownedInvitation(string $invitationId): ?TeamInvitation

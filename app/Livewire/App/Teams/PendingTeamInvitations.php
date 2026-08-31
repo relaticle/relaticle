@@ -30,8 +30,8 @@ use Livewire\Attributes\On;
  * on page three.
  *
  * There is deliberately no per-invitation "copy link" action. The raw token is
- * only ever held in memory at mint time — `TeamInvitation::issueToken()` stores
- * a SHA-256 hash — so a copy action could only work by re-minting, which would
+ * only ever held in memory at mint time, because `TeamInvitation::issueToken()`
+ * stores a SHA-256 hash, so a copy action could only work by re-minting, which would
  * silently invalidate the link already sitting in the invitee's inbox. Twenty
  * excludes the token from its listing query for the same reason, and Slack and
  * Notion offer no per-invitation link either. Sharing a link out-of-band is
@@ -98,7 +98,7 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
 
     /**
      * Falls back to the raw role string for a legacy or unregistered role key
-     * rather than throwing — Jetstream::findRole()'s untyped PHPDoc return
+     * rather than throwing. Jetstream::findRole()'s untyped PHPDoc return
      * makes PHPStan misjudge a plain `?->` chain as never-null here.
      */
     private function roleLabel(string $role): string

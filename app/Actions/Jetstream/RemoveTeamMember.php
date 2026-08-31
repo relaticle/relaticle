@@ -66,7 +66,7 @@ final readonly class RemoveTeamMember implements RemovesTeamMembers
 
     /**
      * Only the owner may remove another Admin. An Admin removing themselves
-     * (leaving the workspace) is unaffected — the self-exception in
+     * (leaving the workspace) is unaffected. The self-exception in
      * authorize() already allows that regardless of role.
      */
     private function ensureAdminIsNotRemovingAnotherAdmin(User $user, Team $team, User $teamMember): void

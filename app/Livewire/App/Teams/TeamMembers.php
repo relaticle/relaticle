@@ -28,7 +28,7 @@ use Livewire\Attributes\Locked;
 
 /**
  * The workspace's people directory. Inviting lives in InviteTeamMembers and
- * pending invitations in PendingTeamInvitations — three sections down the page,
+ * pending invitations in PendingTeamInvitations, three sections down the page,
  * so the roster stays a roster and the actionable sets are not buried inside
  * it. Merging them into one paginated table hid pending invites behind
  * pagination, which is why Twenty and Slack keep them apart too.
@@ -73,7 +73,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                     Tables\Columns\TextColumn::make('name')
                         ->description(fn (User $record): string => $record->email),
                     // Every other row wears its role on the updateTeamRole button,
-                    // which the owner never gets — this keeps their row labelled
+                    // which the owner never gets. This keeps their row labelled
                     // without opening a role-change surface on it.
                     Tables\Columns\TextColumn::make('owner_label')
                         ->badge()
@@ -99,8 +99,8 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
      * `team_user` pivot, so the owner is pulled in by a second `where` leg and
      * carries a null `team_role`.
      *
-     * Selecting through `users` also drops orphaned pivot rows structurally —
-     * production is missing the `team_user` foreign keys, so a deleted account
+     * Selecting through `users` also drops orphaned pivot rows structurally.
+     * Production is missing the `team_user` foreign keys, so a deleted account
      * can leave a row whose user is gone, and `Filament::getUserAvatarUrl()` is
      * typed non-nullable and 500s on it.
      *
@@ -149,7 +149,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
     /**
      * Falls back to the raw role string for a legacy or unregistered role key
-     * rather than throwing — Jetstream::findRole()'s untyped PHPDoc return
+     * rather than throwing. Jetstream::findRole()'s untyped PHPDoc return
      * makes PHPStan misjudge a plain `?->` chain as never-null here.
      */
     private function roleLabel(string $role): string
