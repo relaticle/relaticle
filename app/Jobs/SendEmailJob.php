@@ -39,6 +39,10 @@ final class SendEmailJob implements ShouldQueue
                 return null;
             }
 
+            if ($lockedEmail->status === EmailStatus::SENT) {
+                return $lockedEmail;
+            }
+
             // Accept any non-terminal state. The dispatcher claims QUEUED → SENDING
             // before enqueuing, so first attempts arrive here as SENDING; Laravel
             // retries of the same job also arrive as SENDING.
@@ -61,11 +65,14 @@ final class SendEmailJob implements ShouldQueue
             return;
         }
 
-        $sent = $sendingService->send($email);
+        if ($email->status !== EmailStatus::SENT) {
+            $email = $sendingService->send($email);
+            $this->syncBatchCounters($email->batch_id);
+        }
 
-        $this->syncBatchCounters($sent->batch_id);
+        $linkEmailAction->execute($email);
 
-        $linkEmailAction->execute($sent);
+        $this->syncBatchCounters($email->batch_id);
     }
 
     public function failed(Throwable $exception): void

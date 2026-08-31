@@ -182,7 +182,17 @@ it('labels inbound mailbox mail as received and outbound mail as sent', function
         'privacy_tier' => EmailPrivacyTier::FULL,
     ]);
 
-    $person->emails()->attach([$inbound->getKey(), $outbound->getKey()]);
+    $unsentOutbound = Email::factory()->outbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Draft pricing follow-up',
+        'sent_at' => null,
+        'direction' => EmailDirection::OUTBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    $person->emails()->attach([$inbound->getKey(), $outbound->getKey(), $unsentOutbound->getKey()]);
 
     $emailEvents = $person->timeline()
         ->get()
@@ -192,7 +202,8 @@ it('labels inbound mailbox mail as received and outbound mail as sent', function
 
     expect($emailEvents)->toHaveCount(2)
         ->and($emailEvents[$inbound->getKey()]->event)->toBe('email_received')
-        ->and($emailEvents[$outbound->getKey()]->event)->toBe('email_sent');
+        ->and($emailEvents[$outbound->getKey()]->event)->toBe('email_sent')
+        ->and($emailEvents->has($unsentOutbound->getKey()))->toBeFalse();
 });
 
 describe('ActivityLogSummary::from()', function (): void {

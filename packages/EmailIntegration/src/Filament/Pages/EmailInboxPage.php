@@ -7,11 +7,8 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -21,11 +18,8 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
-use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
-use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
@@ -36,9 +30,7 @@ use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
-use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
-use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -46,24 +38,21 @@ use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
-use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailShare;
-use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
-use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class EmailInboxPage extends Page
 {
     use HasEmailFeatureFlag;
+    use HasEmailReaderActions;
     use WithPagination;
 
     protected string $view = 'filament.pages.email-inbox';
@@ -183,8 +172,8 @@ final class EmailInboxPage extends Page
     /**
      * No page heading. The board is the page — a title bar above it repeating the word
      * already highlighted in the sidebar only pushes the list down. Filament drops the
-     * whole header block when the heading and header actions are both empty, which is
-     * why Compose moved onto the board's own toolbar.
+     * whole header block when the heading and header actions are both empty. Compose
+     * is the global floating composer (`c` / the composer:open event).
      */
     public function getHeading(): string
     {
@@ -400,56 +389,6 @@ final class EmailInboxPage extends Page
         unset($this->emails);
     }
 
-    protected function composeEmailAction(): Action
-    {
-        return Action::make('composeEmail')
-            ->label(__('filament/pages/email-inbox.compose.label'))
-            // Sits in the board toolbar, so it matches the height of the controls
-            // beside it rather than the smaller page-header default.
-            ->size(Size::Medium)
-            ->slideOver()
-            ->icon('heroicon-o-pencil-square')
-            ->modalWidth(Width::SevenExtraLarge)
-            ->keyBindings(['command+e', 'ctrl+e'])
-            ->tooltip('⌘ + e')
-            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
-            ->fillForm(function (): array {
-                // Default to the account currently filtered in the inbox; fall back
-                // to the first active account when viewing "all" or none selected.
-                $accounts = $this->userActiveAccounts();
-                $account = $accounts->get($this->accountId) ?? $accounts->first();
-
-                if ($account === null) {
-                    return [];
-                }
-
-                $signature = EmailSignature::query()
-                    ->where('connected_account_id', $account->getKey())
-                    ->where('is_default', true)
-                    ->first();
-
-                return [
-                    'connected_account_id' => $account->getKey(),
-                    'signature_id' => $signature?->getKey(),
-                    'body_html' => resolve(EmailTemplateRenderService::class)
-                        ->applySignatureBlock('<p></p>', $signature),
-                    'privacy_tier' => $this->defaultPrivacyTier()->value,
-                ];
-            })
-            ->schema($this->composeFormSchema())
-            ->action(function (array $data): void {
-                resolve(SendEmailAction::class)->execute(
-                    data: $this->buildSendData($data, EmailCreationSource::COMPOSE),
-                );
-
-                Notification::make()
-                    ->title(__('filament/pages/email-inbox.compose.notifications.queued.title'))
-                    ->body(__('filament/pages/email-inbox.compose.notifications.queued.body'))
-                    ->success()
-                    ->send();
-            });
-    }
-
     /**
      * Legacy single action mounted by name from the email-thread reply buttons
      * (the `reply-email` browser event → {@see openReplyModal()}), where the mode
@@ -570,198 +509,6 @@ final class EmailInboxPage extends Page
         Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
     }
 
-    protected function manageSharingAction(): Action
-    {
-        return Action::make('manageSharing')
-            ->label(__('filament/pages/email-inbox.sharing.label'))
-            ->icon('ri-share-line')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.sharing.label'))
-            ->modalHeading(__('filament/pages/email-inbox.sharing.modal_heading'))
-            ->modalWidth(Width::FiveExtraLarge)
-            ->modalSubmitActionLabel('Save')
-            ->schema([
-                // Two halves of one decision, side by side: what the workspace at large
-                // gets, and who is named individually. Stacked, the second half reads as
-                // an afterthought below the fold.
-                Grid::make(['default' => 1, 'md' => 12])
-                    ->schema([
-                        // Cards rather than a select: each tier is a decision about who
-                        // sees what, which a dropdown of four nouns hides. Same cards as
-                        // the account settings page.
-                        Section::make(__('filament/pages/email-inbox.sharing.fields.privacy_tier.label'))
-                            ->icon('heroicon-o-globe-alt')
-                            ->compact()
-                            ->columnSpan(['default' => 1, 'md' => 5])
-                            ->schema([
-                                Radio::make('privacy_tier')
-                                    ->hiddenLabel()
-                                    ->options(EmailPrivacyTier::class)
-                                    ->view('email-integration::forms.sharing-tier-cards')
-                                    ->viewData(['ariaLabel' => __('filament/pages/email-inbox.sharing.fields.privacy_tier.label')])
-                                    ->required(),
-                            ]),
-
-                        Section::make(__('filament/pages/email-inbox.sharing.fields.shares.label'))
-                            ->description(__('filament/pages/email-inbox.sharing.fields.shares.description'))
-                            ->icon('heroicon-o-user-group')
-                            ->compact()
-                            ->columnSpan(['default' => 1, 'md' => 7])
-                            ->schema([
-                                Repeater::make('shares')
-                                    ->hiddenLabel()
-                                    ->defaultItems(0)
-                                    // Who was added first says nothing about access, so
-                                    // the drag handle is just noise in the row header.
-                                    ->reorderable(false)
-                                    ->addActionLabel(__('filament/pages/email-inbox.sharing.fields.shares.add_action_label'))
-                                    // Not ->table(): that layout quietly stacks once its
-                                    // container is this narrow, which is what put the
-                                    // delete button on a line of its own. Naming the row
-                                    // instead gives each entry a header that carries the
-                                    // delete inline, and the two fields sit side by side.
-                                    ->itemLabel(fn (array $state): string => $this->shareRowLabel($state))
-                                    ->columns(2)
-                                    ->schema([
-                                        Select::make('tier')
-                                            ->label(__('filament/pages/email-inbox.sharing.fields.tier.label'))
-                                            ->hiddenLabel()
-                                            ->options(EmailPrivacyTier::class)
-                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->required(),
-
-                                        Select::make('shared_with')
-                                            ->label(__('filament/pages/email-inbox.sharing.fields.shared_with.label'))
-                                            ->hiddenLabel()
-                                            ->placeholder(__('filament/pages/email-inbox.sharing.fields.shared_with.placeholder'))
-                                            ->options(fn (): array => $this->teammateOptions())
-                                            ->multiple()
-                                            ->searchable()
-                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->required(),
-                                    ]),
-                            ]),
-                    ]),
-            ])
-            ->fillForm(function (array $arguments): array {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
-
-                if (! $email instanceof Email) {
-                    return [];
-                }
-
-                return [
-                    'privacy_tier' => $email->privacy_tier->value,
-                    'shares' => $this->shareFormRows($email),
-                ];
-            })
-            ->action(function (array $data, array $arguments): void {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'share');
-
-                abort_if(! $email instanceof Email, 403);
-
-                resolve(UpdateEmailSharingAction::class)->execute(
-                    $email,
-                    $this->authUser(),
-                    $data['privacy_tier'] instanceof EmailPrivacyTier
-                        ? $data['privacy_tier']
-                        : EmailPrivacyTier::from($data['privacy_tier']),
-                    $data['shares'] ?? [],
-                );
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.sharing.notifications.saved.title'))
-                    ->send();
-            });
-    }
-
-    /**
-     * @return array<int, array{tier: string, shared_with: array<int, int|string>}>
-     */
-    private function shareFormRows(Email $email): array
-    {
-        return $email->shares()
-            ->get()
-            ->groupBy(fn (EmailShare $share): string => $this->tierValue($share->tier))
-            ->map(fn (Collection $shares, string $tier): array => [
-                'tier' => $tier,
-                'shared_with' => $shares->pluck('shared_with')->all(),
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @param  array{tier?: mixed}  $state
-     */
-    private function shareRowLabel(array $state): string
-    {
-        $tier = $state['tier'] ?? null;
-
-        if ($tier instanceof EmailPrivacyTier) {
-            return $tier->getLabel();
-        }
-
-        if (is_string($tier) || is_int($tier)) {
-            return EmailPrivacyTier::tryFrom((string) $tier)?->getLabel()
-                ?? __('filament/pages/email-inbox.sharing.fields.shares.new_item');
-        }
-
-        return __('filament/pages/email-inbox.sharing.fields.shares.new_item');
-    }
-
-    private function tierValue(mixed $tier): string
-    {
-        if ($tier instanceof EmailPrivacyTier) {
-            return $tier->value;
-        }
-
-        if (is_string($tier) || is_int($tier)) {
-            return (string) $tier;
-        }
-
-        return '';
-    }
-
-    private function resolveTeamEmail(?string $emailId, string $ability): ?Email
-    {
-        if ($emailId === null) {
-            return null;
-        }
-
-        $user = $this->authUser();
-
-        $email = Email::query()
-            ->forTeam($user->current_team_id)
-            ->whereKey($emailId)
-            ->first();
-
-        if ($email === null) {
-            return null;
-        }
-
-        if (! $user->can($ability, $email)) {
-            return null;
-        }
-
-        return $email;
-    }
-
-    private function requesterNameForOwnedRequest(?string $requestId): string
-    {
-        if ($requestId === null) {
-            return 'this user';
-        }
-
-        return EmailAccessRequest::query()
-            ->whereKey($requestId)
-            ->where('owner_id', $this->authUser()->getKey())
-            ->first()?->requester->name ?? 'this user';
-    }
-
     /**
      * The viewer's own mailbox addresses, lowercased. Rows use these to leave the
      * reader out of their participant line: repeating your own address on every row
@@ -783,94 +530,6 @@ final class EmailInboxPage extends Page
             ->filter()
             ->values()
             ->all();
-    }
-
-    /**
-     * Teammates who can be given access to an email: everyone else on the team.
-     *
-     * @return array<string, string>
-     */
-    private function teammateOptions(): array
-    {
-        $user = $this->authUser();
-
-        return User::query()
-            ->where('current_team_id', $user->current_team_id)
-            ->where('id', '!=', $user->getKey())
-            ->orderBy('name')
-            ->pluck('name', 'id')
-            ->all();
-    }
-
-    protected function summarizeThreadAction(): Action
-    {
-        return Action::make('summarizeThread')
-            ->label(__('filament/pages/email-inbox.summarize_thread.label'))
-            ->icon('heroicon-o-sparkles')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.summarize_thread.label'))
-            ->modalHeading(__('filament/pages/email-inbox.summarize_thread.modal_heading'))
-            ->modalIcon('heroicon-o-sparkles')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close')
-            ->modalContent(function (array $arguments): View {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'viewBody');
-
-                if (! $email instanceof Email) {
-                    return view('filament.actions.ai-summary', ['summary' => null]);
-                }
-
-                return $this->buildThreadSummaryView($email);
-            });
-    }
-
-    protected function requestAccessAction(): Action
-    {
-        return Action::make('requestAccess')
-            ->label(__('filament/pages/email-inbox.request_access.label'))
-            ->icon('heroicon-o-key')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/email-inbox.request_access.label'))
-            ->schema([
-                Select::make('tier_requested')
-                    ->label(__('filament/pages/email-inbox.request_access.fields.tier_requested.label'))
-                    ->options([
-                        EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
-                        EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
-                    ])
-                    ->required(),
-            ])
-            ->action(function (array $data, array $arguments): void {
-                $email = $this->resolveTeamEmail($arguments['emailId'] ?? null, 'requestAccess');
-
-                abort_if(! $email instanceof Email, 403);
-
-                $request = resolve(RequestEmailAccessAction::class)->execute(
-                    $email,
-                    $this->authUser(),
-                    $data['tier_requested'] instanceof EmailPrivacyTier
-                        ? $data['tier_requested']
-                        : EmailPrivacyTier::from($data['tier_requested']),
-                );
-
-                if (! $request instanceof EmailAccessRequest) {
-                    Notification::make()
-                        ->warning()
-                        ->title(__('filament/pages/email-inbox.request_access.notifications.pending.title'))
-                        ->send();
-
-                    return;
-                }
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.request_access.notifications.sent.title'))
-                    ->send();
-            });
     }
 
     protected function approveAccessRequestAction(): Action
@@ -939,163 +598,6 @@ final class EmailInboxPage extends Page
                     ->title(__('filament/pages/email-inbox.deny_access_request.notifications.denied.title'))
                     ->send();
             });
-    }
-
-    /**
-     * @return array<int, mixed>
-     */
-    private function composeFormSchema(): array
-    {
-        return [
-            Grid::make(2)
-                ->schema([
-                    Select::make('connected_account_id')
-                        ->label(__('filament/pages/email-inbox.compose_form.from.label'))
-                        ->options(fn (): array => $this->activeAccountOptions())
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
-
-                            $sig = EmailSignature::query()
-                                ->where('connected_account_id', $state)
-                                ->where('is_default', true)
-                                ->first();
-
-                            $set('signature_id', $sig?->getKey());
-
-                            // Swap the signature block for the new account's default,
-                            // keeping whatever the user has already typed.
-                            $body = (string) ($get('body_html') ?? '<p></p>');
-                            $set('body_html', resolve(EmailTemplateRenderService::class)
-                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
-                        }),
-
-                    Select::make('template_id')
-                        ->label(__('filament/pages/email-inbox.compose_form.template.label'))
-                        ->placeholder(__('filament/pages/email-inbox.compose_form.template.placeholder'))
-                        ->options(fn (): array => $this->templateOptions())
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            if ($state === null) {
-                                return;
-                            }
-
-                            /** @var EmailTemplate|null $template */
-                            $template = EmailTemplate::query()
-                                ->where('team_id', filament()->getTenant()?->getKey())
-                                ->whereKey($state)
-                                ->first();
-
-                            if ($template === null) {
-                                return;
-                            }
-
-                            // Keep the signature below the template body so picking a
-                            // template never wipes the user's signature.
-                            $sig = $this->resolveComposeSignature(
-                                $get('connected_account_id'),
-                                $get('signature_id'),
-                            );
-
-                            $rendered = resolve(EmailTemplateRenderService::class)
-                                ->renderWithSignature($template, null, $sig);
-
-                            if ($sig instanceof EmailSignature) {
-                                $set('signature_id', $sig->getKey());
-                            }
-
-                            $set('subject', $rendered['subject']);
-                            $set('body_html', $rendered['body_html']);
-                        }),
-                ]),
-
-            TagsInput::make('to')
-                ->label(__('filament/pages/email-inbox.compose_form.to.label'))
-                ->placeholder(__('filament/pages/email-inbox.compose_form.to.placeholder'))
-                ->required()
-                ->splitKeys(['Tab', ',', ' '])
-                ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-
-            Grid::make(2)
-                ->schema([
-                    TagsInput::make('cc')
-                        ->label(__('filament/pages/email-inbox.compose_form.cc.label'))
-                        ->placeholder(__('filament/pages/email-inbox.compose_form.cc.placeholder'))
-                        ->splitKeys(['Tab', ',', ' '])
-                        ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-
-                    TagsInput::make('bcc')
-                        ->label(__('filament/pages/email-inbox.compose_form.bcc.label'))
-                        ->placeholder(__('filament/pages/email-inbox.compose_form.bcc.placeholder'))
-                        ->splitKeys(['Tab', ',', ' '])
-                        ->suggestions(fn (): array => $this->contactEmailSuggestions()),
-                ]),
-
-            TextInput::make('subject')
-                ->required()
-                ->maxLength(255),
-
-            RichEditor::make('body_html')
-                ->label(__('filament/pages/email-inbox.compose_form.body.label'))
-                ->required()
-                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                ->customBlocks([SignatureBlock::class])
-                ->toolbarButtons([
-                    'bold', 'italic', 'underline', 'strike',
-                    'link', 'bulletList', 'orderedList',
-                    'blockquote', 'h2', 'h3', 'undo', 'redo',
-                ]),
-
-            Section::make('Attachments')
-                ->collapsed()
-                ->schema([
-                    FileUpload::make('attachments')
-                        ->hiddenLabel()
-                        ->multiple()
-                        ->visibility('private')
-                        ->disk('local')
-                        ->directory('email-attachments')
-                        ->maxSize(10240)
-                        ->storeFileNamesIn('attachment_file_names')
-                        ->nullable(),
-                ]),
-
-            Section::make('Settings')
-                ->description(__('filament/pages/email-inbox.compose_form.settings.description'))
-                ->icon('heroicon-o-cog-6-tooth')
-                ->collapsed()
-                ->schema([
-                    Select::make('privacy_tier')
-                        ->label(__('filament/pages/email-inbox.compose_form.privacy.label'))
-                        ->helperText(__('filament/pages/email-inbox.compose_form.privacy.helper_text'))
-                        ->options(EmailPrivacyTier::class)
-                        ->default(fn (): string => $this->defaultPrivacyTier()->value)
-                        ->required(),
-
-                    Select::make('signature_id')
-                        ->label(__('filament/pages/email-inbox.compose_form.signature.label'))
-                        ->placeholder(__('filament/pages/email-inbox.compose_form.signature.placeholder'))
-                        ->options(fn (Get $get): array => EmailSignature::query()
-                            ->where('connected_account_id', $get('connected_account_id'))
-                            ->pluck('name', 'id')
-                            ->all()
-                        )
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
-                            // A null state means "no signature" — strip the block.
-                            $sig = filled($state)
-                                ? EmailSignature::query()->whereKey($state)->first()
-                                : null;
-
-                            $body = (string) ($get('body_html') ?? '<p></p>');
-                            $set('body_html', resolve(EmailTemplateRenderService::class)
-                                ->applySignatureBlock($body !== '' ? $body : '<p></p>', $sig));
-                        }),
-                ]),
-        ];
     }
 
     /**
@@ -1241,8 +743,8 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * Drives both the compose action and the "connect a mailbox" empty state,
-     * so it is read from the blade as a computed property.
+     * Drives the "connect a mailbox" empty state, so it is read from the blade
+     * as a computed property.
      */
     #[Computed]
     public function hasActiveConnectedAccount(): bool
@@ -1299,34 +801,6 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * Resolve the signature to attach when composing: the explicitly selected
-     * one, else the chosen account's default, else the active account's default.
-     */
-    private function resolveComposeSignature(?string $accountId, ?string $signatureId): ?EmailSignature
-    {
-        if (filled($signatureId)) {
-            return EmailSignature::query()->whereKey($signatureId)->first();
-        }
-
-        if (blank($accountId)) {
-            $accountId = ConnectedAccount::query()
-                ->where('user_id', $this->authUser()->getKey())
-                ->where('team_id', filament()->getTenant()?->getKey())
-                ->where('status', 'active')
-                ->value('id');
-        }
-
-        if (blank($accountId)) {
-            return null;
-        }
-
-        return EmailSignature::query()
-            ->where('connected_account_id', $accountId)
-            ->where('is_default', true)
-            ->first();
-    }
-
-    /**
      * The user's active connected accounts for the current team, default first,
      * keyed by id. Cached per request so the switcher and list filter share it.
      *
@@ -1374,40 +848,6 @@ final class EmailInboxPage extends Page
     public function showAccountSwitcher(): bool
     {
         return $this->userActiveAccounts()->count() > 1;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function templateOptions(): array
-    {
-        return EmailTemplate::query()
-            ->where(fn (Builder $q): Builder => $q
-                ->where('team_id', filament()->getTenant()?->getKey())
-                ->where(fn (Builder $q2): Builder => $q2
-                    ->where('is_shared', true)
-                    ->orWhere('created_by', $this->authUser()->getKey())
-                )
-            )
-            ->pluck('name', 'id')
-            ->all();
-    }
-
-    private function buildThreadSummaryView(Email $email): View
-    {
-        $thread = EmailThread::query()
-            ->where('thread_id', $email->thread_id)
-            ->where('connected_account_id', $email->connected_account_id)
-            ->first();
-
-        if ($thread === null) {
-            return view('filament.actions.ai-summary', ['summary' => null]);
-        }
-
-        $summary = resolve(EmailThreadSummaryService::class)
-            ->getSummary($thread, $this->authUser());
-
-        return view('filament.actions.ai-summary', ['summary' => $summary]);
     }
 
     private function authUser(): User

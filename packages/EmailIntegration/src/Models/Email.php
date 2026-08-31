@@ -58,6 +58,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property Carbon|null $scheduled_for
  * @property string|null $last_error
  * @property int $attempts
+ * @property Carbon|null $linked_at
  * @property EmailPriority $priority
  */
 #[ObservedBy(EmailObserver::class)]
@@ -96,6 +97,7 @@ final class Email extends Model
         'scheduled_for',
         'last_error',
         'attempts',
+        'linked_at',
         'priority',
     ];
 
@@ -118,6 +120,7 @@ final class Email extends Model
         'is_internal' => 'boolean',
         'scheduled_for' => 'datetime',
         'attempts' => 'integer',
+        'linked_at' => 'datetime',
         'priority' => EmailPriority::class,
     ];
 

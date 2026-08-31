@@ -20,8 +20,10 @@ mutates(BaseEmailsRelationManager::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
-    $this->viewer = User::factory()->create(['current_team_id' => $this->owner->currentTeam->id]);
     $this->team = $this->owner->currentTeam;
+
+    $this->viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($this->viewer, ['role' => 'editor']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,
@@ -209,6 +211,7 @@ describe('manageSharing table action', function (): void {
 
     it('creates EmailShare rows for multiple teammates selected in one tier row', function (): void {
         $secondViewer = User::factory()->create(['current_team_id' => $this->team->id]);
+        $this->team->users()->attach($secondViewer, ['role' => 'editor']);
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
