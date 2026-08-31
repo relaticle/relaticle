@@ -12,7 +12,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
@@ -74,15 +73,7 @@ final class ActivityRelationManager extends RelationManager
                         'deleted' => 'danger',
                         default => 'gray',
                     })
-                    /**
-                     * A custom-field edit is logged under its own event name, but
-                     * to an administrator it is the same act as any other edit.
-                     */
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        null => '—',
-                        'custom_field_changes' => 'Updated',
-                        default => Str::headline($state),
-                    }),
+                    ->formatStateUsing(ActivityResource::eventLabel(...)),
                 TextColumn::make('properties')
                     ->label('Changes')
                     ->state(fn (Activity $record): array => ActivityResource::buildChangeSummary($record))

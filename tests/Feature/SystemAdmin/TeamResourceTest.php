@@ -94,6 +94,30 @@ it('shows only the viewed workspace activity, which the tenant scope would other
         ->assertSeeHtml("activity/{$mine->getKey()}");
 });
 
+it('reads a custom-field edit as the update it is, and names the field that moved', function (): void {
+    $team = User::factory()->withPersonalTeam()->create()->ownedTeams()->firstOrFail();
+
+    logTeamActivity($team, null, [
+        'event' => 'custom_field_changes',
+        'description' => 'custom_field_changes',
+        'properties' => ['custom_field_changes' => [['label' => 'Deal Stage', 'old' => 'New', 'new' => 'Won']]],
+    ]);
+    logTeamActivity($team, null, [
+        'event' => 'updated',
+        'description' => 'updated',
+        'attribute_changes' => ['attributes' => ['name' => 'Acme Global'], 'old' => ['name' => 'Acme']],
+    ]);
+
+    livewire(ActivityRelationManager::class, [
+        'ownerRecord' => $team,
+        'pageClass' => ViewTeam::class,
+    ])
+        ->assertSuccessful()
+        ->assertDontSee('custom_field_changes')
+        ->assertSee('Deal Stage: New → Won')
+        ->assertSee('Name: Acme → Acme Global');
+});
+
 it('counts a workspace activity on the tab badge', function (): void {
     $team = User::factory()->withPersonalTeam()->create()->ownedTeams()->firstOrFail();
 

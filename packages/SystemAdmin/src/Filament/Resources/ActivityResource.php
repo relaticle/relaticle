@@ -95,6 +95,19 @@ final class ActivityResource extends Resource
     }
 
     /**
+     * A custom-field edit is logged under its own event name, but to an
+     * administrator it is the same act as any other edit.
+     */
+    public static function eventLabel(?string $state): string
+    {
+        return match ($state) {
+            null => '—',
+            'custom_field_changes' => 'Updated',
+            default => Str::headline($state),
+        };
+    }
+
+    /**
      * The filters that read the same wherever activity is listed: what kind of
      * record moved, what happened to it, and when.
      *
@@ -192,7 +205,8 @@ final class ActivityResource extends Resource
                         'created' => 'success',
                         'deleted' => 'danger',
                         default => 'gray',
-                    }),
+                    })
+                    ->formatStateUsing(self::eventLabel(...)),
                 TextColumn::make('description')
                     ->limit(60)
                     ->wrap(),
@@ -232,7 +246,8 @@ final class ActivityResource extends Resource
                             'created' => 'success',
                             'deleted' => 'danger',
                             default => 'gray',
-                        }),
+                        })
+                        ->formatStateUsing(self::eventLabel(...)),
                     TextEntry::make('team.name')
                         ->label('Team')
                         ->placeholder('—')
