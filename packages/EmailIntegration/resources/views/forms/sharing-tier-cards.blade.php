@@ -8,7 +8,7 @@
         'icon' => $tier->getIcon(),
         'label' => $tier->getLabel(),
         'description' => $tier->getDescription(),
-    ], EmailPrivacyTier::cases());
+    ], $tiers ?? EmailPrivacyTier::cases());
 
     /**
      * The settings page leads with a "whatever the workspace has set" card; a single
@@ -42,6 +42,7 @@
                 <input
                     type="radio"
                     value="{{ $option['value'] }}"
+                    @disabled($isDisabled())
                     {{ $applyStateBindingModifiers('wire:model') }}="{{ $statePath }}"
                     class="fi-radio-input mt-1 shrink-0"
                 />

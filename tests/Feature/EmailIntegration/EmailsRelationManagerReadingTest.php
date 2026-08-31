@@ -6,9 +6,11 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -16,7 +18,7 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 
-mutates(BaseEmailsRelationManager::class);
+mutates(BaseEmailsRelationManager::class, HasEmailReaderActions::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -40,6 +42,65 @@ beforeEach(function (): void {
 });
 
 describe('requestAccess table action', function (): void {
+    it('renders the available access levels as radio cards', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->mountAction(TestAction::make('requestAccess')->table($email))
+            ->assertMountedActionModalSeeHtml('role="radiogroup"')
+            ->assertMountedActionModalSeeHtml('value="subject"')
+            ->assertMountedActionModalSeeHtml('value="full"')
+            ->assertMountedActionModalSee(EmailPrivacyTier::SUBJECT->getDescription())
+            ->assertMountedActionModalSee(EmailPrivacyTier::FULL->getDescription())
+            ->assertMountedActionModalDontSee(EmailPrivacyTier::METADATA_ONLY->getLabel())
+            ->assertMountedActionModalDontSee(EmailPrivacyTier::PRIVATE->getLabel());
+    });
+
+    it('shows an existing pending request as a read-only selected card', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::SUBJECT)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $component = livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->mountAction(TestAction::make('requestAccess')->table($email))
+            ->assertSchemaStateSet([
+                'tier_requested' => EmailPrivacyTier::SUBJECT->value,
+            ])
+            ->assertFormFieldDisabled('tier_requested')
+            ->assertMountedActionModalDontSee('Submit');
+
+        expect(preg_match_all('/<input(?=[^>]*type="radio")(?=[^>]*disabled)[^>]*>/', $component->getMountedActionModalHtml()))
+            ->toBe(2);
+    });
+
     it('creates an EmailAccessRequest and notifies the owner', function (): void {
         $this->actingAs($this->viewer);
 

@@ -368,9 +368,10 @@ final class EmailInboxPage extends Page
                     ->orWhere('created_by', $user->getKey()))
                 ->count(),
             EmailPageTab::REQUESTS->value => EmailAccessRequest::query()
-                ->where('owner_id', $user->getKey())
+                ->where(fn (Builder $query): Builder => $query
+                    ->where('owner_id', $user->getKey())
+                    ->orWhere('requester_id', $user->getKey()))
                 ->whereHas('email', fn (Builder $query): Builder => $query->where('team_id', $teamId))
-                ->where('status', EmailAccessRequestStatus::PENDING)
                 ->count(),
         ];
     }
