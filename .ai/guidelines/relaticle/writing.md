@@ -29,6 +29,13 @@ exception is allowlisted: the standalone `'—'` string literal, used as a data
 glyph for empty values in activity-log and custom-field diffs. Never as prose
 punctuation.
 
+Apply the rule silently. Never announce it in a commit subject, a commit body,
+or a PR: no "drop em-dashes", no "to satisfy the writing rule". `git log` is a
+public surface of this repo, and that phrasing reads as a machine cleaning up
+after itself. Fold the rewrite into the commit that owns the file. When the
+rewrite is the whole change, describe what the copy now does, the way
+`chore(docs): tighten billing, i18n, gtm, and launch-plan copy` does.
+
 One trap when rewriting: a colon is the natural replacement, but a bare `: `
 inside an unquoted YAML front-matter value in
 `packages/Documentation/resources/content` throws a ParseException that 500s
