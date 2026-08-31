@@ -42,33 +42,7 @@ final class LocalSeeder extends Seeder
 
         $this->call(SystemAdministratorSeeder::class);
 
-        $user = User::factory()
-            ->withPersonalTeam()
-            ->create([
-                'name' => 'Manuk Minasyan',
-                'email' => 'manuk.minasyan1@gmail.com',
-            ]);
-
-        $teamId = $user->personalTeam()->id;
-        //
-        //        User::factory()
-        //            ->withPersonalTeam()
-        //            ->create([
-        //                'name' => 'Test User',
-        //                'email' => 'test@example.com',
-        //            ]);
-        //
-        //        // Create 10 Test Users
-        User::factory()
-            ->count(10)
-            ->create()
-            ->after(function (User $user) use ($teamId): void {
-                // Assign the user to the personal team.
-                $user->teams()->attach($teamId, [
-                    'role' => 'member',
-                ]);
-            });
-
+        $this->seedDeveloperWorkspace();
         $this->seedBillingStatusFixture();
         $this->topUpAiCreditsForLocalTeams();
         $this->seedViewerTimezoneBoundaryFixture();
@@ -107,6 +81,36 @@ final class LocalSeeder extends Seeder
         //                $opportunity->saveCustomFieldValue($customFields->get('stage'), $customFields->get('stage')->options->random()->id);
         //            })
         //            ->create();
+    }
+
+    /**
+     * The developer's own workspace and ten members to populate it.
+     *
+     * Guarded as a whole rather than per row: re-running this on a seeded
+     * database used to abort the entire seeder on the owner's unique email,
+     * which left every fixture below it unreachable. Making only the owner
+     * idempotent would trade that for ten more members on every run.
+     */
+    private function seedDeveloperWorkspace(): void
+    {
+        $email = 'manuk.minasyan1@gmail.com';
+
+        if (User::query()->where('email', $email)->exists()) {
+            $this->command?->info('Developer workspace already seeded.');
+
+            return;
+        }
+
+        $teamId = User::factory()
+            ->withPersonalTeam()
+            ->create(['name' => 'Manuk Minasyan', 'email' => $email])
+            ->personalTeam()
+            ->id;
+
+        User::factory()
+            ->count(10)
+            ->create()
+            ->each(fn (User $member) => $member->teams()->attach($teamId, ['role' => 'member']));
     }
 
     /**
@@ -262,6 +266,12 @@ final class LocalSeeder extends Seeder
             'email_verified_at' => now(),
             'timezone' => null,
         ]);
+
+        if (Team::query()->where('name', 'Boundary Evening Team')->exists()) {
+            $this->command?->info('Viewer-timezone boundary fixture already seeded.');
+
+            return;
+        }
 
         foreach (['Evening' => $evening, 'AfterMidnight' => $afterMidnight] as $label => $instant) {
             $owner = User::factory()->withTeam()->create([
