@@ -280,7 +280,7 @@ def main(argv: list[str]) -> int:
 
     # PR mode
     pr_num = argv[1]
-    # Reject anything that isn't a plain PR number — a value like "../etc/passwd"
+    # Reject anything that isn't a plain PR number. A value like "../etc/passwd"
     # would otherwise let an untrusted caller write outside .context/reviews/.
     if not pr_num.isdigit():
         print(

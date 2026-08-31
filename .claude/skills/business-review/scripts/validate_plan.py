@@ -14,7 +14,7 @@ Substance gates enforced (not just JSON shape):
   - tier >= 2  =>  every journey has >=1 sad_path   (forbids happy-path-only on broad/critical PRs)
   - AC ids in journeys resolve against acceptance-criteria.json
   - journey ids resolve against references/journeys.json IF that manifest exists (else a warning),
-    UNLESS the journey is marked "synthesized": true — a journey derived for this diff (Move A),
+    UNLESS the journey is marked "synthesized": true, a journey derived for this diff (Move A),
     which earns its place by substance, not catalog membership
   - changed_surfaces (opt-in): every user-reachable changed surface is covered by some journey
     (Move A), and every gated changed surface has an attested precondition that activates its
@@ -55,7 +55,7 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                     change_types: set[str] | None = None) -> tuple[list[str], list[str]]:
     """Return (errors, warnings). known_journeys=None means the manifest is absent.
     change_types=None means the diff classification was not supplied (the authoring
-    cross-check is skipped — back-compat)."""
+    cross-check is skipped for back-compat)."""
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -102,7 +102,7 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                 errors.append(f"duplicate journey id '{jid}'")
             ids_seen.add(jid)
             if is_synth:
-                # Synthesized journeys are derived from THIS diff (Move A) — they are
+                # Synthesized journeys are derived from THIS diff (Move A), so they are
                 # intentionally not in the catalog manifest. They earn their place by
                 # the same substance bar as catalog journeys (checked above), not by
                 # membership. A synthesized journey with no human-readable name is a
@@ -115,7 +115,7 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                     f"(add it to the catalog, or mark the journey \"synthesized\": true)"
                 )
             elif known_journeys is None:
-                warnings.append(f"journey id '{jid}' not verified — references/journeys.json absent")
+                warnings.append(f"journey id '{jid}' not verified: references/journeys.json absent")
 
         personas = j.get("personas")
         if "personas" in j and (not isinstance(personas, list) or len(personas) == 0):
@@ -148,7 +148,7 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
                     elif ac not in ac_ids:
                         errors.append(f"journey {jid} references AC {ac} not in acceptance-criteria.json")
 
-    # Move A + B — changed-surface coverage and precondition gates.
+    # Move A + B: changed-surface coverage and precondition gates.
     # Both are opt-in on the presence of `changed_surfaces`: a plan that does not
     # declare it is unaffected (back-compat with legacy/test plans). When declared,
     # every user-reachable changed surface MUST be covered by some journey, and every
@@ -181,19 +181,19 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
             if is_authoring and reachable:
                 has_reachable_authoring = True
             # An authoring/configuration surface (create + save the thing the diff adds)
-            # cannot be waived as non-reachable — that is the dodge that lets an authoring
+            # cannot be waived as non-reachable. That is the dodge that lets an authoring
             # bug ship green. It MUST be covered by an author->persist->consume journey.
             if is_authoring and not reachable:
                 errors.append(
-                    f"authoring surface '{sid}' is marked reachable:false — an authoring/"
+                    f"authoring surface '{sid}' is marked reachable:false; an authoring/"
                     f"configuration surface cannot be waived; it must be covered by an "
                     f"author->persist->consume journey (only consumption-side or internal "
                     f"surfaces may be waived non-reachable)"
                 )
                 continue
             if not reachable:
-                continue  # consumption/internal surface, explicitly non-reachable — waived
-            # covered_by accepts a single journey id OR a list of them — a bare
+                continue  # consumption/internal surface, explicitly non-reachable, so waived
+            # covered_by accepts a single journey id OR a list of them. A bare
             # string must not iterate into characters (latent bug found
             # 2026-06-12, PR 336 run: it silently contributed nothing and the
             # "no journey covers it" error misdirected the plan author).
@@ -211,36 +211,36 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
             if not covered:
                 errors.append(
                     f"changed surface '{sid}' is user-reachable but no journey covers it "
-                    f"(add a journey whose covers_surfaces includes it — synthesize one if "
-                    f"the catalog has none — or mark the surface \"reachable\": false with a reason)"
+                    f"(add a journey whose covers_surfaces includes it, synthesizing one if "
+                    f"the catalog has none, or mark the surface \"reachable\": false with a reason)"
                 )
             gate = s.get("gated_by")
             if gate and gate not in activated_gates:
                 errors.append(
                     f"changed surface '{sid}' is gated by '{gate}' but no attested precondition "
                     f"activates it (add a preconditions_activated entry "
-                    f"{{\"gate\": \"{gate}\", \"attested\": true}} — a feature you did not "
+                    f"{{\"gate\": \"{gate}\", \"attested\": true}}. A feature you did not "
                     f"activate is a feature you did not review)"
                 )
 
         # Anti-dodge cross-check (Move A hardening): if the diff changes a builder /
-        # configuration capability (classifier change_types include `form` — field types,
-        # FormBuilder, Filament Forms schemas — or `feature_flag`), the plan MUST declare
-        # at least one REACHABLE authoring surface. This catches the omission dodge — not
-        # listing the authoring surface at all — which the coverage gate alone can't see.
+        # configuration capability (classifier change_types include `form` for field types,
+        # FormBuilder and Filament Forms schemas, or `feature_flag`), the plan MUST declare
+        # at least one REACHABLE authoring surface. This catches the omission dodge of not
+        # listing the authoring surface at all, which the coverage gate alone can't see.
         AUTHORING_TRIGGERS = {"form", "feature_flag"}
         if change_types and (AUTHORING_TRIGGERS & change_types) and not has_reachable_authoring:
             triggers = ", ".join(sorted(AUTHORING_TRIGGERS & change_types))
             errors.append(
                 f"diff changes a builder/configuration capability (change_types: {triggers}) "
                 f"but the plan declares no reachable authoring surface "
-                f"(kind:\"authoring\", reachable:true) — the author->persist->consume arc is "
+                f"(kind:\"authoring\", reachable:true). The author->persist->consume arc is "
                 f"unwaivable when the diff adds something a creator configures"
             )
 
     # Persona-breadth check (tiering table: tier 2 -> 3 personas, tier 3 -> 3-5).
     # A single-persona plan at tier >= 2 is sometimes legitimate (single-role
-    # surface), but it must SAY so via persona_rationale — silent
+    # surface), but it must SAY so via persona_rationale. A silent
     # under-provisioning is how breadth quietly evaporates (gap found
     # 2026-06-12: a tier-2 run walked one persona and no gate noticed).
     if tier_for_gate >= 2:
@@ -251,7 +251,7 @@ def validate_schema(plan: dict, ac_ids: set[int], known_journeys: set[str] | Non
         if len(distinct_personas) < 2 and not plan.get("persona_rationale"):
             warnings.append(
                 f"tier {tier_for_gate} plan uses {len(distinct_personas)} distinct persona(s) "
-                f"but the tiering table calls for 3+ — add top-level 'persona_rationale' "
+                f"but the tiering table calls for 3+; add a top-level 'persona_rationale' "
                 f"explaining why fewer archetypes genuinely cover this diff, or add personas"
             )
 
@@ -379,7 +379,7 @@ def run_tests() -> int:
             plan.update(overrides)
         return plan
 
-    # T-synthesized-journey-ok — a synthesized id is accepted even WITH a manifest present
+    # T-synthesized-journey-ok: a synthesized id is accepted even WITH a manifest present
     e, _ = validate_schema(synth_plan(), {3}, {"J1", "J3"})
     check("T-synthesized-journey-ok", e == [], str(e))
 
@@ -463,31 +463,31 @@ def run_tests() -> int:
 
     # ---- Move A hardening: authoring-class diff must declare a reachable authoring surface ----
 
-    # T-crosscheck-form-requires-authoring — change_types includes 'form', no authoring surface => fail
+    # T-crosscheck-form-requires-authoring: change_types includes 'form', no authoring surface => fail
     p = synth_plan({"changed_surfaces": [
         {"id": "x:downstream", "kind": "consumption", "reachable": True, "covered_by": ["S1"]}]})
     p["journeys"][0]["covers_surfaces"] = ["x:downstream"]
     e, _ = validate_schema(p, {3}, {"J1", "J3"}, change_types={"form"})
     check("T-crosscheck-form-requires-authoring", any("no reachable authoring surface" in x for x in e), str(e))
 
-    # T-crosscheck-satisfied — same change_types but a reachable authoring surface present
+    # T-crosscheck-satisfied: same change_types but a reachable authoring surface present
     p = synth_plan({"changed_surfaces": [
         {"id": "builder:create-booking-field", "kind": "authoring", "reachable": True}]})
     e, _ = validate_schema(p, {3}, {"J1", "J3"}, change_types={"form", "feature_flag"})
     check("T-crosscheck-satisfied", e == [], str(e))
 
-    # T-crosscheck-skipped-when-no-classification — change_types=None => no authoring requirement
+    # T-crosscheck-skipped-when-no-classification: change_types=None => no authoring requirement
     p = synth_plan({"changed_surfaces": [
         {"id": "x:downstream", "kind": "consumption", "reachable": True, "covered_by": ["S1"]}]})
     p["journeys"][0]["covers_surfaces"] = ["x:downstream"]
     e, _ = validate_schema(p, {3}, {"J1", "J3"}, change_types=None)
     check("T-crosscheck-skipped-no-classification", e == [], str(e))
 
-    # T-crosscheck-non-authoring-changetype-ok — 'table' is not an authoring trigger
+    # T-crosscheck-non-authoring-changetype-ok: 'table' is not an authoring trigger
     e, _ = validate_schema(p, {3}, {"J1", "J3"}, change_types={"table"})
     check("T-crosscheck-non-authoring-changetype-ok", e == [], str(e))
 
-    # T-no-changed-surfaces-backcompat — legacy plan without changed_surfaces unaffected
+    # T-no-changed-surfaces-backcompat: legacy plan without changed_surfaces unaffected
     e, _ = validate_schema(base_plan(), ac_ids, known)
     check("T-no-changed-surfaces-backcompat", e == [], str(e))
 

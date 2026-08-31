@@ -8,7 +8,7 @@ Usage:
 
 Reads:
     ~/.claude/business-review/relaticle/regressions.json
-                                             (the ledger — MACHINE-LOCAL, deliberately not in
+                                             (the ledger; MACHINE-LOCAL, deliberately not in
                                               the repo: the repo is public and the ledger
                                               records production incident history. Override
                                               with $BR_LEDGER. Bootstrapped empty if missing.)
@@ -20,7 +20,7 @@ Reads:
 Writes:
     <REVIEW_DIR>/regression-checks.json      ({matched: [{id, class, severity, check, repro}]})
 
-Match mode refuses to run (exit 1) when NEITHER pr-files.txt NOR pr-diff.patch exists —
+Match mode refuses to run (exit 1) when NEITHER pr-files.txt NOR pr-diff.patch exists,
 "0 matched" against absent inputs is a vacuous pass, not a sweep.
 
 Exit codes: 0 ok / gate passed, 1 gate failed or error, 2 bad usage. Pure stdlib.
@@ -40,7 +40,7 @@ FRONTMATTER_RE = re.compile(r"<!--json\s*\n(.*?)\n-->", re.DOTALL)
 DEFAULT_LEDGER = "~/.claude/business-review/relaticle/regressions.json"
 
 LEDGER_SKELETON = {
-    "_doc": "Regression ledger — confirmed findings converted into standing checks. "
+    "_doc": "Regression ledger: confirmed findings converted into standing checks. "
             "Machine-local (kept out of the public repo; records production incident history). "
             "Read by check_regressions.py in Stage 1; fix mode appends an entry for every "
             "confirmed-then-fixed finding. See references/regression-ledger.md.",
@@ -137,7 +137,7 @@ def gate_plan(review_dir: Path) -> list[str]:
     failures: list[str] = []
     checks_path = review_dir / "regression-checks.json"
     if not checks_path.exists():
-        return ["regression-checks.json missing — run check_regressions.py <REVIEW_DIR> first"]
+        return ["regression-checks.json missing; run check_regressions.py <REVIEW_DIR> first"]
     matched = json.loads(checks_path.read_text()).get("matched", [])
     if not matched:
         return []
@@ -194,7 +194,7 @@ def _selftest() -> int:
              "trigger": {"change_types": ["form"]}, "check": "double-click", "repro": []},
         ]}))
 
-        # T1: the missed-regression lock — PR-326-shaped diff MUST match REG-001
+        # T1: the missed-regression lock. A PR-326-shaped diff MUST match REG-001
         (review / "pr-files.txt").write_text("packages/Chat/src/Enums/AiCreditType.php\n")
         (review / "pr-diff.patch").write_text(
             "--- a/packages/Chat/src/Enums/AiCreditType.php\n"
@@ -294,7 +294,7 @@ def main(argv: list[str]) -> int:
     if not (review_dir / "pr-files.txt").exists() and not (review_dir / "pr-diff.patch").exists():
         print(
             "error: neither pr-files.txt nor pr-diff.patch exists in "
-            f"{review_dir} — refusing to report a vacuous '0 matched'. "
+            f"{review_dir}: refusing to report a vacuous '0 matched'. "
             "Write the touched-file list and diff first.",
             file=sys.stderr,
         )

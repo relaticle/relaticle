@@ -22,7 +22,7 @@ from pathlib import Path
 SKILL_DIR = Path(".claude/skills/business-review")
 FIXTURES_DIR = SKILL_DIR / "evals" / "fixtures"
 
-# Fixture names go straight into a filesystem path — restrict to a safe alphabet
+# Fixture names go straight into a filesystem path, so restrict to a safe alphabet
 # so `../escape` or absolute paths cannot land outside FIXTURES_DIR.
 FIXTURE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 
@@ -57,8 +57,8 @@ def promote(pr_num: str, fixture_name: str) -> Path:
 
     # The v3 artifact set run_evals.py's aggregator consumes (plan + findings +
     # critic + confirmations), plus the diff/AC for context. Legacy v1 names kept
-    # for back-compat. (Bug found 2026-06-12: the list held ONLY v1 names —
-    # pr-diff.patch, pr-context.json — so promoting a v3 run produced an empty
+    # for back-compat. (Bug found 2026-06-12: the list held ONLY v1 names,
+    # pr-diff.patch and pr-context.json, so promoting a v3 run produced an empty
     # inputs/ and a fixture that failed run_evals with "no verdict-final.json".)
     candidates = [
         ("plan.md", False),
@@ -119,7 +119,7 @@ def promote(pr_num: str, fixture_name: str) -> Path:
         "## What this fixture tests\n\n"
         "(Fill in: what edge case does this fixture exercise? What would regress without it?)\n\n"
         "## Notes\n\n"
-        "(Fill in: anything unusual about the PR — sparse description, large diff, "
+        "(Fill in: anything unusual about the PR, such as a sparse description, large diff, "
         "tricky AC, etc.)\n"
     )
     return dst
