@@ -4,11 +4,11 @@
 # Exit code: 0 = SKIP, 1 = RUN.
 #
 # Diff source priority:
-#   1. $MANUAL_TESTING_TEST_DIFF (newline-separated paths) — for testing.
-#   2. `git diff HEAD --name-only` — real diff in the working tree.
+#   1. $MANUAL_TESTING_TEST_DIFF (newline-separated paths), for testing.
+#   2. `git diff HEAD --name-only`, the real diff in the working tree.
 #
 # Branch override for testing:
-#   $MANUAL_TESTING_TEST_BRANCH — when set, used instead of `git rev-parse`.
+#   $MANUAL_TESTING_TEST_BRANCH takes precedence over `git rev-parse` when set.
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ if [[ "${MANUAL_TESTING_SKIP:-0}" == "1" ]]; then
     exit 0
 fi
 
-# Branch check — never run on main / master / release/*
+# Branch check: never run on main / master / release/*
 if [[ "${MANUAL_TESTING_TEST_BRANCH+set}" == "set" ]]; then
     branch="$MANUAL_TESTING_TEST_BRANCH"
 else

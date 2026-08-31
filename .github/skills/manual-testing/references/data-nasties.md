@@ -153,9 +153,9 @@ Use **File / Image** payloads above.
 
 ### Encrypted (any field-type variant)
 After saving, **must verify**:
-- DB row's column contains ciphertext (not plaintext) — `php artisan tinker --execute 'DB::table("custom_field_values")->where("id", <id>)->value("value");'`
+- DB row's column contains ciphertext, not plaintext: `php artisan tinker --execute 'DB::table("custom_field_values")->where("id", <id>)->value("value");'`
 - Decrypted value matches input on read.
-- Cross-tenant probe: as Team A, attempt to read Team B's encrypted field — expected: empty/error, never plaintext.
+- Cross-tenant probe: as Team A, attempt to read Team B's encrypted field. Expect empty or error, never plaintext.
 
 ### Conditional / Computed
 - Required field hidden after dependency change → does form still validate?

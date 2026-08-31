@@ -2,7 +2,7 @@ name: Tests
 
 on: [pull_request]
 
-# A new push to the same PR makes the in-flight run obsolete — cancel it so the
+# A new push to the same PR makes the in-flight run obsolete, so cancel it and the
 # runners go to the newest commit instead of finishing work nobody will read.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,8 +38,8 @@ jobs:
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
       # PHPStan and Rector both do a full cold analysis without their result cache
-      # (~22s each). The key is deliberately stable — one entry per dependency and
-      # config set, reused by every PR — because the PHPStan cache is ~150MB and a
+      # (~22s each). The key is deliberately stable, one entry per dependency and
+      # config set reused by every PR, because the PHPStan cache is ~150MB and a
       # per-commit key would churn through the repo's 10GB cache budget. Both tools
       # revalidate changed files against a restored cache, so staleness is safe.
       - name: Cache Static Analysis Results
@@ -68,7 +68,7 @@ jobs:
       # file_put_contents and the generated PHP file stops parsing.
       #
       # The cache only helps repeat runs, and every CI run starts from a fresh
-      # checkout, so make it unwritable — the plugin already treats a failed
+      # checkout, so make it unwritable. The plugin already treats a failed
       # write as a cache miss. Warnings about the unwritable path are expected.
       # Lowering fork concurrency is not an alternative: Analyser.php divides
       # the process count by 3, so anything not divisible by 3 hits a TypeError.
