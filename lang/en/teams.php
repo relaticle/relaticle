@@ -123,13 +123,15 @@ return [
         'general' => 'General',
         'members' => 'Members',
         'custom_fields' => 'Custom Fields',
+        'import_history' => 'Import History',
         'activity' => 'Activity',
         'billing' => 'Billing',
     ],
 
     'activity' => [
-        'description' => 'Every change your members make to records, including deletions.',
         'system' => 'System',
+        'search_placeholder' => 'Search by record name',
+        'record_destroyed' => 'This record has been permanently deleted.',
         'yes' => 'Yes',
         'no' => 'No',
         'columns' => [
@@ -163,6 +165,15 @@ return [
         'empty' => [
             'heading' => 'No activity yet',
             'description' => 'Changes your members make to records will show up here.',
+        ],
+        'changes_modal' => [
+            'trigger' => 'View all changes',
+            'close' => 'Close',
+        ],
+        'no_results' => [
+            'heading' => 'Nothing matches these filters',
+            'description' => 'Try a different search term, or widen the date range.',
+            'action' => 'Clear filters',
         ],
     ],
 

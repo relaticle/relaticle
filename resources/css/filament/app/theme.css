@@ -206,29 +206,167 @@
     display: none;
 }
 
-body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
-    display: none;
-}
-
 @media (width < 64rem) {
     body:has([data-page-heading]) .fi-topbar-start {
         @apply flex min-w-0 flex-1;
     }
 }
 
+/* ===================================
+   Sidebar collapse: motion and the toggle
+   =================================== */
+
+:root {
+    --sidebar-motion-duration: 220ms;
+    --sidebar-motion-easing: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* The panel ships `lg:transition-none` on the sidebar while the content beside
+   it transitions, so a desktop collapse snapped in one place and slid in the
+   other. One curve and one duration for the width, the toggle and the labels. */
 @media (width >= 64rem) {
-    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-inline-end: calc(var(--spacing) * 11);
+    .fi-sidebar {
+        transition-property: width;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
     }
 
-    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-top: calc(var(--spacing) * 4);
-        margin-inline-start: calc(var(--spacing) * 1);
-        margin-inline-end: calc(var(--spacing) * 9);
+    /* Filament sizes the collapsed rail from its content, and `auto` cannot be
+       animated from a fixed width. `--collapsed-sidebar-width` comes from the
+       panel's `collapsedSidebarWidth()`, so both ends are explicit. */
+    .fi-sidebar:not(.fi-sidebar-open) {
+        width: var(--collapsed-sidebar-width);
+    }
 
-        .fi-tenant-menu-trigger {
-            padding: calc(var(--spacing) * 1);
-        }
+    /* Keeping the icons start-aligned means they hold their column while the
+       width animates, rather than drifting in from the centre of a 20rem panel. */
+    .fi-sidebar-item-btn,
+    .fi-sidebar-group-dropdown-trigger-btn,
+    .fi-tenant-menu-trigger {
+        @apply justify-start;
+    }
+
+    /* Text slides out behind the narrowing edge instead of rewrapping into it.
+       Left to reflow, the workspace name went from one line to three and back
+       during a single collapse. */
+    .fi-sidebar-item-label,
+    .fi-sidebar-group-label,
+    .fi-tenant-menu-trigger-text,
+    .fi-tenant-menu-trigger-tenant-name,
+    .fi-tenant-menu-trigger-current-tenant-label {
+        @apply whitespace-nowrap;
+    }
+
+    .fi-sidebar-item-btn,
+    .fi-sidebar-group-btn,
+    .fi-sidebar-search,
+    .fi-tenant-menu-trigger-text {
+        @apply overflow-hidden;
+    }
+
+    /* The lane the toggle sits in, beside the switcher when open. It has to
+       clear everything the button occupies, which is its 4.5 inset plus its own
+       8 of width: anything narrower and the trigger's box runs under the button
+       even though the workspace name still looks clear of it. It is not
+       transitioned: animating it let the trigger's edge overtake the button,
+       and the fading workspace name ran out from under it. Snapping it at the
+       start of the collapse is invisible, since the name is already clipped by
+       the panel edge well before it reaches the button. */
+    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-inline-end: calc(var(--spacing) * 14);
+    }
+
+    /* On the rail the toggle drops below the switcher rather than beside it,
+       so the rail can be narrow enough to centre both on the navigation's icon
+       column. The avatar is pinned so the narrow box cannot squeeze it. */
+    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-top: calc(var(--spacing) * 3);
+        margin-inline: calc(var(--spacing) * 3.5);
+        padding-bottom: calc(var(--spacing) * 11);
+    }
+
+    .fi-tenant-menu-trigger .fi-avatar {
+        @apply shrink-0;
+    }
+}
+
+/* The panel's own collapse button is inline in the topbar view, with no config
+   to turn it off. Hiding it leaves one toggle, in the sidebar it controls. */
+body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
+    display: none;
+}
+
+.fi-sidebar-toggle-btn {
+    @apply absolute top-4 z-20 hidden h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:flex dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-200;
+
+    /* 4.5 spacing from the trailing edge is also the centre of the collapsed
+       rail, so this one value serves both states and the button never moves
+       horizontally relative to the panel. It rides the edge as the panel
+       animates, which is the only path across the sidebar that crosses no
+       labels: everything beside it is clipped by that same edge. */
+    inset-inline-end: calc(var(--spacing) * 4.5);
+
+    /* Expanding: the button leaves the rail immediately, so it is back on the
+       header line before the panel is wide enough to show one. */
+    transition-property: color, background-color, top;
+    transition-duration: var(--sidebar-motion-duration),
+        var(--sidebar-motion-duration), calc(var(--sidebar-motion-duration) / 2);
+    transition-timing-function: var(--sidebar-motion-easing);
+
+    .fi-sidebar-toggle-icon {
+        @apply h-5 w-5;
+    }
+}
+
+/* On the rail the button drops to the row below the workspace avatar, which is
+   the only thing that changes between the two states.
+
+   Collapsing, that drop is the last thing to happen: running it against the
+   width made the button descend past a sidebar still at full width. A CSS
+   transition is read off the state being entered, so the delay belongs here and
+   not on the rule above. */
+#fi-main-sidebar:not(.fi-sidebar-open) .fi-sidebar-toggle-btn {
+    top: calc(var(--spacing) * 14);
+    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2);
+}
+
+/* One glyph per direction, swapped by the sidebar's own state class so the icon
+   never lags a frame behind the panel it describes. */
+.fi-sidebar-toggle-icon-expand,
+#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-collapse {
+    @apply block;
+}
+
+.fi-sidebar-toggle-icon-collapse,
+#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-expand {
+    @apply hidden;
+}
+
+/* Labels fade out before the panel narrows past them, and back in behind the
+   widening edge. Without a leave transition the panel emptied on frame one. */
+.fi-sidebar-item-label,
+.fi-sidebar-item-badge-ctn,
+.fi-sidebar-group-btn,
+.fi-sidebar-search,
+.fi-tenant-menu-trigger-text,
+.fi-tenant-menu-trigger .fi-icon {
+    &.fi-transition-enter {
+        transition-delay: calc(var(--sidebar-motion-duration) / 2.5);
+        transition-duration: calc(var(--sidebar-motion-duration) / 2);
+    }
+
+    &.fi-transition-leave {
+        @apply lg:transition;
+
+        transition-duration: calc(var(--sidebar-motion-duration) / 3);
+    }
+
+    &.fi-transition-leave-start {
+        @apply opacity-100;
+    }
+
+    &.fi-transition-leave-end {
+        @apply opacity-0;
     }
 }
 
@@ -464,9 +602,22 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply rounded-md w-6 h-6 shrink-0;
 }
 
-/* Ensure tenant menu dropdown is visible above content when sidebar is collapsed */
+/* The workspace dropdown overhangs the topbar, but it lives inside the sidebar,
+   and on desktop Filament gives the sidebar z-index 20 against the topbar's 30.
+   No z-index on the panel itself can win that: it is confined to its ancestor's
+   stacking context, so the topbar painted over the top of the list. Lifting the
+   sidebar is the fix; 31 clears the topbar and stays under modals at 40. */
+@media (width >= 64rem) {
+    .fi-sidebar {
+        @apply z-[31];
+    }
+}
+
+/* Inside the sidebar's own stacking context the panel and the collapse toggle
+   both sat at 20, so the later toggle won and floated over the first menu item
+   on the collapsed rail. */
 .fi-tenant-menu .fi-dropdown-panel {
-    @apply z-50;
+    @apply z-30;
 }
 
 /* Checkbox and Radio */

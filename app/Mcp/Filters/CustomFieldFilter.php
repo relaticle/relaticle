@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -207,7 +208,7 @@ final readonly class CustomFieldFilter implements Filter
 
             match ($operator) {
                 'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
-                'contains' => $q->where($valueColumn, 'ILIKE', '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], (string) $operand).'%'),
+                'contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
                 'in' => $q->whereIn($valueColumn, $operand),
                 'has_any' => $q->whereJsonContains($valueColumn, $operand),
                 default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),

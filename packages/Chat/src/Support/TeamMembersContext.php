@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use App\Models\User;
+use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 
 /**

@@ -32,6 +32,7 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ViewTeam;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ActivityRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\CompaniesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ConversationsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ImportsRelationManager;
@@ -233,6 +234,7 @@ final class TeamResource extends Resource
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
             SubscriptionsRelationManager::class,
+            ActivityRelationManager::class,
         ];
     }
 

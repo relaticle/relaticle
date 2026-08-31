@@ -198,7 +198,6 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Agents\CrmAssistant',
         'Relaticle\Chat\Services\TipTapDocumentParser',
         'Relaticle\Chat\Support\ChatTelemetry',
-        'Relaticle\Chat\Support\LikePattern',
         'Relaticle\Chat\Support\PromptText',
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',

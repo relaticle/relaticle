@@ -17,25 +17,21 @@ use Illuminate\Support\Str;
  */
 final readonly class ActivityChangeSummary
 {
-    private const string ARROW = ' → ';
-
-    private const string EMPTY = '—';
-
     /**
-     * @return list<string>
+     * @return list<array{label: string, old: string, new: string}>
      */
     public static function for(Activity $activity): array
     {
         return [
-            ...self::nativeLines($activity),
-            ...self::customFieldLines($activity),
+            ...self::nativeChanges($activity),
+            ...self::customFieldChanges($activity),
         ];
     }
 
     /**
-     * @return list<string>
+     * @return list<array{label: string, old: string, new: string}>
      */
-    private static function nativeLines(Activity $activity): array
+    private static function nativeChanges(Activity $activity): array
     {
         $changes = $activity->attribute_changes?->toArray() ?? [];
 
@@ -46,20 +42,24 @@ final readonly class ActivityChangeSummary
             return [];
         }
 
-        $lines = [];
+        $rows = [];
 
         foreach ($new as $key => $value) {
-            $before = self::stringify($old[$key] ?? null);
-            $after = self::stringify($value);
+            $before = ActivityValue::display($old[$key] ?? null);
+            $after = ActivityValue::display($value);
 
             if ($before === $after) {
                 continue;
             }
 
-            $lines[] = Str::headline((string) $key).': '.$before.self::ARROW.$after;
+            $rows[] = [
+                'label' => Str::headline((string) $key),
+                'old' => $before,
+                'new' => $after,
+            ];
         }
 
-        return $lines;
+        return $rows;
     }
 
     /**
@@ -69,14 +69,14 @@ final readonly class ActivityChangeSummary
      * `batch_custom_field_properties`. Rows written outside a batch have no
      * aggregate and speak for themselves.
      *
-     * @return list<string>
+     * @return list<array{label: string, old: string, new: string}>
      */
-    private static function customFieldLines(Activity $activity): array
+    private static function customFieldChanges(Activity $activity): array
     {
         $payloads = self::aggregatedPayloads($activity)
             ?? [$activity->properties?->toArray() ?? []];
 
-        $lines = [];
+        $rows = [];
 
         foreach ($payloads as $payload) {
             $changes = $payload['custom_field_changes'] ?? null;
@@ -91,22 +91,22 @@ final readonly class ActivityChangeSummary
                 }
 
                 $label = $change['label'] ?? $change['code'] ?? null;
-                $before = self::stringify($change['old'] ?? null);
-                $after = self::stringify($change['new'] ?? null);
+                $before = ActivityValue::display($change['old'] ?? null);
+                $after = ActivityValue::display($change['new'] ?? null);
 
                 if (! is_string($label) || $before === $after) {
                     continue;
                 }
 
-                $line = $label.': '.$before.self::ARROW.$after;
+                $row = ['label' => $label, 'old' => $before, 'new' => $after];
 
-                if (! in_array($line, $lines, true)) {
-                    $lines[] = $line;
+                if (! in_array($row, $rows, true)) {
+                    $rows[] = $row;
                 }
             }
         }
 
-        return $lines;
+        return $rows;
     }
 
     /**
@@ -127,24 +127,5 @@ final readonly class ActivityChangeSummary
         }
 
         return array_values(array_filter($decoded, is_array(...)));
-    }
-
-    private static function stringify(mixed $value): string
-    {
-        if (is_array($value)) {
-            $label = $value['label'] ?? null;
-
-            return is_string($label) && $label !== '' ? $label : self::EMPTY;
-        }
-
-        if (in_array($value, [null, '', []], true)) {
-            return self::EMPTY;
-        }
-
-        if (is_bool($value)) {
-            return $value ? __('teams.activity.yes') : __('teams.activity.no');
-        }
-
-        return is_scalar($value) ? (string) $value : self::EMPTY;
     }
 }

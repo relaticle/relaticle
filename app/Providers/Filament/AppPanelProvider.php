@@ -74,7 +74,6 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
-use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
 {
@@ -276,6 +275,10 @@ final class AppPanelProvider extends PanelProvider
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
+            // Navigation icons stay start-aligned so they hold their column
+            // while the sidebar animates. 4.25rem is the width at which that
+            // column is also the centre of the collapsed rail.
+            ->collapsedSidebarWidth('4.25rem')
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
@@ -347,6 +350,16 @@ final class AppPanelProvider extends PanelProvider
                 fn (): View|Factory => view('filament.app.analytics')
             )
             /**
+             * The sidebar collapse toggle is panel chrome, so the panel owns it.
+             * TENANT_MENU_AFTER puts it inside the sidebar, level with the
+             * workspace switcher; `.fi-sidebar-toggle-btn` places it in both the
+             * open and the collapsed rail.
+             */
+            ->renderHook(
+                PanelsRenderHook::TENANT_MENU_AFTER,
+                fn (): View|Factory => view('filament.app.sidebar-toggle')
+            )
+            /**
              * The activation checklist lives here rather than on the dashboard
              * so it follows the user into People or Opportunities instead of
              * existing only on Home. SIDEBAR_FOOTER renders after the nav and
@@ -407,14 +420,14 @@ final class AppPanelProvider extends PanelProvider
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
             ->tenantProfile(EditTeam::class)
+            // A negative sort is what puts an item in the group above the
+            // workspace switcher, next to Workspace Settings (sort -2), instead
+            // of stranding it below the workspace list.
             ->tenantMenuItems([
-                Action::make('import_history')
-                    ->label(__('filament/panel.tenant_menu.import_history'))
-                    ->icon(Heroicon::OutlinedClock)
-                    ->url(fn (): string => ImportHistory::getUrl()),
                 Action::make('billing')
                     ->label(__('billing.title'))
                     ->icon(Heroicon::OutlinedCreditCard)
+                    ->sort(-1)
                     ->url(fn (): string => Billing::getUrl())
                     ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
