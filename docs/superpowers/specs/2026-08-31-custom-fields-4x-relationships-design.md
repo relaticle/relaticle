@@ -79,9 +79,14 @@ Indexes:
 - (tenant_id, relationship_id, from_id) and (tenant_id, relationship_id, to_id),
   partial WHERE active_until IS NULL.
 - (from_entity_type, from_id) and (to_entity_type, to_id) for cascade sweeps.
-- Cardinality as partial uniques over active edges: unique per constrained end for
-  one_to_one, one_to_many, many_to_one; unique (relationship_id, from, to) for many_to_many;
-  unique over (least(from_id, to_id), greatest(from_id, to_id)) for symmetric definitions.
+- A static partial unique over active edges on (relationship_id, from, to) prevents duplicate
+  edges for every cardinality. Symmetric edges are canonicalized by the writer before insert,
+  so the same index covers them.
+- Per-end exclusivity (the one sides of one_to_one, one_to_many, many_to_one) cannot be a static
+  index in a shared table: the constrained end varies per definition, and per-definition indexes
+  would be dynamic DDL. It is enforced inside the writer transaction: pg_advisory_xact_lock
+  scoped to the relationship on Postgres, lockForUpdate elsewhere, plus the validation layer.
+  Refined during plan writing; a DB constraint trigger can be added later without schema change.
 - MySQL hosts: app-level enforcement plus a documented generated-column recipe.
   Postgres gets the database-enforced wall.
 
