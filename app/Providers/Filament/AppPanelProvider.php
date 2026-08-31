@@ -316,7 +316,7 @@ final class AppPanelProvider extends PanelProvider
                 ResizedColumnPlugin::make(),
             ])
             ->renderHook(
-                PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
                 fn (): View|Factory => view('filament.auth.developer_login'),
             )
             ->renderHook(

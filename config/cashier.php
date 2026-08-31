@@ -58,6 +58,9 @@ return [
             // settle later via this event. Without it StripeWebhookController's
             // async handler never fires and the pack is never fulfilled.
             'checkout.session.async_payment_succeeded',
+            // Cashier's defaults stop at payment_succeeded; without this the
+            // owner is never told a renewal failed.
+            'invoice.payment_failed',
         ],
     ],
 

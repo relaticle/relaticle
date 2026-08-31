@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Laravel\Cashier\Subscription;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
@@ -201,6 +202,49 @@ function billingStatusTeam(): Team
     return User::factory()->withPersonalTeam()->create()->ownedTeams()->firstOrFail();
 }
 
+/**
+ * @return array<string, array{0: callable(Team): void, 1: BillingStatus}>
+ */
+function billingStatusArrangements(): array
+{
+    return [
+        'a trial reads Trial, never Pro' => [
+            fn (Team $team) => $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save(),
+            BillingStatus::Trialing,
+        ],
+        'a paid subscription reads Pro' => [
+            function (Team $team): void {
+                $team->forceFill(['plan' => Plan::Pro])->save();
+                Subscription::factory()->active()->create(['team_id' => $team->getKey()]);
+            },
+            BillingStatus::Subscribed,
+        ],
+        'a lapsed subscription reads Past due, not Pro' => [
+            function (Team $team): void {
+                $team->forceFill(['plan' => Plan::Pro])->save();
+                Subscription::factory()->pastDue()->create(['team_id' => $team->getKey()]);
+            },
+            BillingStatus::PastDue,
+        ],
+        'a hand-assigned plan reads Granted, not Pro' => [
+            fn (Team $team) => $team->forceFill(['plan' => Plan::Pro])->save(),
+            BillingStatus::Granted,
+        ],
+        'an enterprise workspace reads Enterprise' => [
+            fn (Team $team) => $team->forceFill(['plan' => Plan::Enterprise])->save(),
+            BillingStatus::Enterprise,
+        ],
+        'a pre-billing workspace reads Free (legacy)' => [
+            fn (Team $team) => $team->forceFill(['hosted_free_grandfathered_at' => now()])->save(),
+            BillingStatus::Grandfathered,
+        ],
+        'a workspace with nothing bought reads Free' => [
+            fn (Team $team): null => null,
+            BillingStatus::Free,
+        ],
+    ];
+}
+
 it('labels a workspace by why it has its plan, not by the plan alone', function (callable $arrange, BillingStatus $expected): void {
     $team = billingStatusTeam();
     $arrange($team);
@@ -211,65 +255,104 @@ it('labels a workspace by why it has its plan, not by the plan alone', function 
         ->assertCanSeeTableRecords([$team])
         ->assertSee($expected->getLabel())
         ->assertSeeHtml($expected->getDescription());
-})->with([
-    'a trial reads Trial, never Pro' => [
-        fn (Team $team) => $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save(),
-        BillingStatus::Trialing,
-    ],
-    'a paid subscription reads Pro' => [
-        function (Team $team): void {
-            $team->forceFill(['plan' => Plan::Pro])->save();
-            $team->subscriptions()->create([
-                'type' => 'default',
-                'stripe_id' => 'sub_active',
-                'stripe_status' => 'active',
-                'stripe_price' => 'price_pro_monthly_test',
-                'quantity' => 1,
-            ]);
-        },
-        BillingStatus::Subscribed,
-    ],
-    'a lapsed subscription reads Past due, not Pro' => [
-        function (Team $team): void {
-            $team->forceFill(['plan' => Plan::Pro])->save();
-            $team->subscriptions()->create([
-                'type' => 'default',
-                'stripe_id' => 'sub_due',
-                'stripe_status' => 'past_due',
-                'stripe_price' => 'price_pro_monthly_test',
-                'quantity' => 1,
-            ]);
-        },
-        BillingStatus::PastDue,
-    ],
-    'a hand-assigned plan reads Granted, not Pro' => [
-        fn (Team $team) => $team->forceFill(['plan' => Plan::Pro])->save(),
-        BillingStatus::Granted,
-    ],
-    'an enterprise workspace reads Enterprise' => [
-        fn (Team $team) => $team->forceFill(['plan' => Plan::Enterprise])->save(),
-        BillingStatus::Enterprise,
-    ],
-    'a pre-billing workspace reads Free (legacy)' => [
-        fn (Team $team) => $team->forceFill(['hosted_free_grandfathered_at' => now()])->save(),
-        BillingStatus::Grandfathered,
-    ],
-]);
+})->with(billingStatusArrangements());
+
+it('filters workspaces by the badge they show, and by no other', function (): void {
+    $teams = [];
+
+    foreach (billingStatusArrangements() as [$arrange, $status]) {
+        $team = billingStatusTeam();
+        $arrange($team);
+        $teams[$status->value] = $team->fresh();
+    }
+
+    expect(array_keys($teams))
+        ->toEqualCanonicalizing(array_column(BillingStatus::cases(), 'value'));
+
+    expect(collect($teams)->map(fn (Team $team): string => $team->billingStatus()->value)->all())
+        ->toBe(array_combine(array_keys($teams), array_keys($teams)));
+
+    foreach ($teams as $value => $team) {
+        livewire(ListTeams::class)
+            ->filterTable('billing_status', [$value])
+            ->assertCanSeeTableRecords([$team])
+            ->assertCanNotSeeTableRecords(collect($teams)->except($value)->values()->all());
+    }
+});
+
+it('filters on the subscription a workspace bills on now, not a superseded one', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Subscription::factory()->pastDue()->create([
+        'team_id' => $team->getKey(),
+        'created_at' => now()->subMonths(2),
+        'updated_at' => now()->subMonths(2),
+    ]);
+
+    Subscription::factory()->active()->create(['team_id' => $team->getKey()]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::Subscribed])
+        ->assertCanSeeTableRecords([$team]);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::PastDue])
+        ->assertCanNotSeeTableRecords([$team]);
+});
+
+it('filters a workspace still inside its grace period as Pro, the way the badge reads it', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Subscription::factory()->unpaid()->create([
+        'team_id' => $team->getKey(),
+        'ends_at' => now()->addDays(5),
+    ]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::Subscribed])
+        ->assertCanSeeTableRecords([$team]);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::PastDue])
+        ->assertCanNotSeeTableRecords([$team]);
+});
+
+it('filters on the default subscription, ignoring a newer one of another type', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Subscription::factory()->active()->create([
+        'team_id' => $team->getKey(),
+        'created_at' => now()->subMonths(2),
+        'updated_at' => now()->subMonths(2),
+    ]);
+
+    Subscription::factory()->pastDue()->create([
+        'team_id' => $team->getKey(),
+        'type' => 'addon',
+    ]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::Subscribed])
+        ->assertCanSeeTableRecords([$team]);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::PastDue])
+        ->assertCanNotSeeTableRecords([$team]);
+});
 
 it('prefers a live subscription over a trial that has not run out yet', function (): void {
     $team = billingStatusTeam();
     $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
-    $team->subscriptions()->create([
-        'type' => 'default',
-        'stripe_id' => 'sub_converted',
-        'stripe_status' => 'active',
-        'stripe_price' => 'price_pro_monthly_test',
-        'quantity' => 1,
-    ]);
+    Subscription::factory()->active()->create(['team_id' => $team->getKey()]);
 
     expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
-});
-
-it('reads a workspace with nothing bought and no trial as Free', function (): void {
-    expect(billingStatusTeam()->billingStatus())->toBe(BillingStatus::Free);
 });

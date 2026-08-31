@@ -1,7 +1,6 @@
 <x-filament-panels::page>
     @php
         $purchased = (int) ($balance?->purchased_credits ?? 0);
-        $allowance = $team->plan->credits();
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
@@ -101,6 +100,8 @@
                                     {{ $isGrandfathered
                                         ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
                                         : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                @elseif($pastDue)
+                                    {{ __('billing.manage.past_due_tagline') }}
                                 @elseif($isSubscribed)
                                     {{ __('billing.manage.auto_renews') }}
                                 @elseif($isPaused)
@@ -208,6 +209,10 @@
                 <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.enterprise.title') }}</h3>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.body') }}</p>
             </div>
+        @elseif($pastDue)
+            {{-- The past-due panel above already states the problem and carries
+                 the portal button. Claiming "You're on Pro" underneath it, in a
+                 success card, contradicts the panel it sits below. --}}
         @elseif($canManageSubscription)
             <div class="{{ $card }} p-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

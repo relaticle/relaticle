@@ -8,6 +8,8 @@ use App\Models\Team;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasLabel;
+use Illuminate\Database\Eloquent\Builder;
+use Laravel\Cashier\Subscription;
 
 /**
  * Why a workspace has the plan it has.
@@ -73,6 +75,32 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
         return self::Free;
     }
 
+    /**
+     * The query counterpart of fromTeam(), so a table can be filtered by the
+     * badge it renders.
+     *
+     * fromTeam() returns on the first predicate that holds, which a filter has
+     * to reproduce: matching Subscribed on its own would also return every
+     * past-due workspace. Case declaration order is the precedence order, so
+     * every status that outranks this one is excluded before its own predicate
+     * applies.
+     *
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    public function applyToQuery(Builder $query): Builder
+    {
+        foreach (self::cases() as $case) {
+            if ($case === $this) {
+                break;
+            }
+
+            $query->whereNot(fn (Builder $outranking): Builder => $case->constrain($outranking));
+        }
+
+        return $this->constrain($query);
+    }
+
     public function getLabel(): string
     {
         return match ($this) {
@@ -114,5 +142,51 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             self::Grandfathered, self::Free => 'gray',
             self::Granted => 'warning',
         };
+    }
+
+    /**
+     * This status's own predicate, blind to the statuses that outrank it.
+     * Only applyToQuery() may call it.
+     *
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    private function constrain(Builder $query): Builder
+    {
+        return match ($this) {
+            self::PastDue => $query->whereHas('latestDefaultSubscription', self::pastDue(...)),
+            self::Subscribed => $query->whereHas('latestDefaultSubscription', self::valid(...)),
+            self::Enterprise => $query->where('plan', Plan::Enterprise),
+            self::Trialing => $query->onGenericTrial(),
+            self::Grandfathered => $query->whereNotNull('hosted_free_grandfathered_at'),
+            self::Granted => $query->whereNot('plan', Plan::Free),
+            self::Free => $query->where('plan', Plan::Free),
+        };
+    }
+
+    /**
+     * @param  Builder<Subscription>  $query
+     * @return Builder<Subscription>
+     */
+    private static function pastDue(Builder $query): Builder
+    {
+        return $query->pastDue();
+    }
+
+    /**
+     * Cashier's `Subscription::valid()` as a query. Cashier ships no
+     * `scopeValid`, so the three scopes behind it are OR'd here rather than a
+     * stripe_status list being hardcoded and drifting from the predicate the
+     * badge uses.
+     *
+     * @param  Builder<Subscription>  $query
+     * @return Builder<Subscription>
+     */
+    private static function valid(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $subscription): Builder => $subscription
+            ->where(fn (Builder $active): Builder => $active->active())
+            ->orWhere(fn (Builder $onTrial): Builder => $onTrial->onTrial())
+            ->orWhere(fn (Builder $onGracePeriod): Builder => $onGracePeriod->onGracePeriod()));
     }
 }
