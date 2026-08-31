@@ -54,3 +54,16 @@ it('keeps database notifications enabled for the rest of the panel', function ()
 it('offers a keyboard shortcut hint on the search field', function (): void {
     expect(Filament::getPanel('app')->getGlobalSearchKeyBindings())->toContain('command+k', 'ctrl+k');
 });
+
+it('renders exactly one sidebar collapse toggle, in the sidebar above the navigation', function (): void {
+    expect(substr_count($this->html, 'data-sidebar-workspace-toggle'))->toBe(1);
+
+    expect(strpos($this->html, 'fi-sidebar fi-main-sidebar'))
+        ->toBeLessThan(strpos($this->html, 'data-sidebar-workspace-toggle'))
+        ->and(strpos($this->html, 'data-sidebar-workspace-toggle'))
+        ->toBeLessThan(strpos($this->html, 'fi-sidebar-nav'));
+});
+
+it('sizes the collapsed rail to the width that centres the navigation icons', function (): void {
+    expect(Filament::getPanel('app')->getCollapsedSidebarWidth())->toBe('4.25rem');
+});

@@ -275,6 +275,10 @@ final class AppPanelProvider extends PanelProvider
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
+            // Navigation icons stay start-aligned so they hold their column
+            // while the sidebar animates. 4.25rem is the width at which that
+            // column is also the centre of the collapsed rail.
+            ->collapsedSidebarWidth('4.25rem')
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
@@ -344,6 +348,16 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            /**
+             * The sidebar collapse toggle is panel chrome, so the panel owns it.
+             * TENANT_MENU_AFTER puts it inside the sidebar, level with the
+             * workspace switcher; `.fi-sidebar-toggle-btn` places it in both the
+             * open and the collapsed rail.
+             */
+            ->renderHook(
+                PanelsRenderHook::TENANT_MENU_AFTER,
+                fn (): View|Factory => view('filament.app.sidebar-toggle')
             )
             /**
              * The activation checklist lives here rather than on the dashboard
