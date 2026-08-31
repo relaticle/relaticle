@@ -45,7 +45,8 @@ it('creates a person from stored outbound mail after the workspace switches to S
     ]);
 
     app(LinkEmailAction::class)->execute($email);
-    expect(People::query()->where('team_id', $this->team->id)->where('name', 'New Prospect')->exists())->toBeFalse();
+    expect($email->fresh()->linked_at)->not->toBeNull()
+        ->and(People::query()->where('team_id', $this->team->id)->where('name', 'New Prospect')->exists())->toBeFalse();
 
     $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
 

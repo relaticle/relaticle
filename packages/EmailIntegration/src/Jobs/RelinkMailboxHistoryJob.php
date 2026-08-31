@@ -60,7 +60,7 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
                         $email->setRelation('team', $team);
                     }
 
-                    $linkEmail->execute($email);
+                    $linkEmail->reapply($email);
                 });
 
             Meeting::query()

@@ -41,7 +41,24 @@ final readonly class LinkEmailAction
      */
     public function execute(Email $email): void
     {
-        DB::transaction(function () use ($email): void {
+        $this->claimAndLink($email, reapply: false);
+    }
+
+    /**
+     * Re-run CRM linking under the current workspace policy.
+     *
+     * Mailbox history re-import must create people after a None → Selective (or All)
+     * switch even though `linked_at` was set on the first pass. autoAttach() still
+     * skips metric increments for records already on the email.
+     */
+    public function reapply(Email $email): void
+    {
+        $this->claimAndLink($email, reapply: true);
+    }
+
+    private function claimAndLink(Email $email, bool $reapply): void
+    {
+        DB::transaction(function () use ($email, $reapply): void {
             /** @var Email|null $locked */
             $locked = Email::query()
                 ->withoutGlobalScopes()
@@ -49,13 +66,19 @@ final readonly class LinkEmailAction
                 ->lockForUpdate()
                 ->first();
 
-            if ($locked === null || $locked->linked_at !== null) {
+            if ($locked === null) {
+                return;
+            }
+
+            if (! $reapply && $locked->linked_at !== null) {
                 return;
             }
 
             $this->link($email);
 
-            $locked->updateQuietly(['linked_at' => now()]);
+            if ($locked->linked_at === null) {
+                $locked->updateQuietly(['linked_at' => now()]);
+            }
         });
     }
 
