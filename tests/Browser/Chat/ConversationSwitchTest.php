@@ -110,14 +110,14 @@ it('places the conversation title in the topbar and the toggle beside the worksp
 
     $collapsedChrome = <<<'JS'
             (() => {
+                const sidebar = document.querySelector('#fi-main-sidebar');
                 const workspace = document.querySelector('#fi-main-sidebar > .fi-tenant-menu');
                 const avatar = document.querySelector('.fi-tenant-menu-trigger .fi-avatar');
                 const toggle = document.querySelector('[data-sidebar-workspace-toggle]');
-                const navIcon = document.querySelector('.fi-sidebar-item-btn svg');
+                const railRect = sidebar.getBoundingClientRect();
                 const workspaceRect = workspace.getBoundingClientRect();
                 const avatarRect = avatar.getBoundingClientRect();
                 const toggleRect = toggle.getBoundingClientRect();
-                const navIconRect = navIcon.getBoundingClientRect();
                 const centerX = (rect) => rect.left + rect.width / 2;
                 const workspaceHit = document.elementFromPoint(
                     centerX(avatarRect),
@@ -132,10 +132,13 @@ it('places the conversation title in the topbar and the toggle beside the worksp
                     stacked: toggleRect.top >= avatarRect.bottom,
                     workspaceWidth: workspaceRect.width,
                     toggleWidth: toggleRect.width,
-                    sharedIconColumn: Math.abs(centerX(avatarRect) - centerX(toggleRect)) <= 1
-                        && Math.abs(centerX(navIconRect) - centerX(toggleRect)) <= 1,
+                    sharedRailColumn: Math.abs(centerX(avatarRect) - centerX(toggleRect)) <= 1
+                        && Math.abs(centerX(toggleRect) - centerX(railRect)) <= 3
+                        && toggleRect.left >= railRect.left
+                        && toggleRect.right <= railRect.right,
                     avatarToggleColumnDelta: centerX(avatarRect) - centerX(toggleRect),
-                    navToggleColumnDelta: centerX(navIconRect) - centerX(toggleRect),
+                    toggleRailColumnDelta: centerX(toggleRect) - centerX(railRect),
+                    railWidth: railRect.width,
                     workspaceHit: !!workspaceHit.closest('.fi-tenant-menu'),
                     toggleHit: !!toggleHit.closest('[data-sidebar-workspace-toggle]'),
                     workspaceHitTag: workspaceHit.tagName + '.' + String(workspaceHit.className).slice(0, 60),
@@ -146,13 +149,15 @@ it('places the conversation title in the topbar and the toggle beside the worksp
 
     // Exact widths differ per renderer (32px locally, 38px on the CI runner's
     // font metrics); the contract is a compact avatar-sized control, not a pixel.
+    // The column is measured against the rail's own box for the same reason: an
+    // icon glyph's centre moved 5px between local and CI, the rail's did not.
     $compact = static fn (mixed $width): bool => is_numeric($width) && $width >= 28 && $width <= 44;
 
     $collapsedOk = static fn (mixed $probe): bool => is_array($probe)
         && $probe['stacked'] === true
         && $compact($probe['workspaceWidth'])
         && $compact($probe['toggleWidth'])
-        && $probe['sharedIconColumn'] === true
+        && $probe['sharedRailColumn'] === true
         && $probe['workspaceHit'] === true
         && $probe['toggleHit'] === true;
 
