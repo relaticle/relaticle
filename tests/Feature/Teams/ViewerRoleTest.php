@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\TaskField;
 use App\Enums\TeamRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -98,4 +101,42 @@ test('viewer is read-only through the API too', function (): void {
     $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/companies', ['name' => 'Blocked Co'])
         ->assertForbidden();
+});
+
+test('viewer cannot move a task card across board columns', function (): void {
+    $statusField = CustomField::query()
+        ->forEntity(Task::class)
+        ->where('code', TaskField::STATUS)
+        ->first();
+
+    $todo = $statusField->options->firstWhere('name', 'To do');
+    $inProgress = $statusField->options->firstWhere('name', 'In progress');
+
+    $task = Task::factory()->recycle([$this->owner, $this->team])->create();
+    $task->saveCustomFieldValue($statusField, $todo->getKey());
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    livewire(TasksBoard::class)
+        ->call('moveCard', (string) $task->id, (string) $inProgress->getKey())
+        ->assertForbidden();
+
+    $currentValue = $task->fresh()->customFieldValues()
+        ->where('custom_field_id', $statusField->getKey())
+        ->value($statusField->getValueColumn());
+
+    expect($currentValue)->toBe($todo->getKey());
+});
+
+test('viewer is not offered write actions on the task board', function (): void {
+    Task::factory()->recycle([$this->owner, $this->team])->create();
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->team);
+
+    livewire(TasksBoard::class)
+        ->assertActionHidden('edit')
+        ->assertActionHidden('delete')
+        ->assertActionHidden('create');
 });
