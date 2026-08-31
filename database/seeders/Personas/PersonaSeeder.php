@@ -9,6 +9,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Services\CreditService;
+use Throwable;
 
 /**
  * Turns a Persona into a workspace you can log into.
@@ -25,7 +27,7 @@ final readonly class PersonaSeeder
     ) {}
 
     /**
-     * @return array{persona: Persona, team: Team, billing: string}
+     * @return array{persona: Persona, team: Team, billing: string, note: string}
      */
     public function seed(Persona $persona): array
     {
@@ -34,15 +36,55 @@ final readonly class PersonaSeeder
 
         $this->members($team, $persona);
 
-        if ($persona->needsStripe()) {
-            $this->stripe->subscribe($team, $persona);
-        }
+        // Billing first: the allowance depends on the subscription Stripe just
+        // wrote, and a past-due workspace refills at the Free tier.
+        $note = $persona->needsStripe() ? $this->bill($team, $persona) : '';
+
+        $this->allowance($team);
 
         return [
             'persona' => $persona,
             'team' => $team,
+            'note' => $note,
             'billing' => Team::query()->with('subscriptions')->findOrFail($team->getKey())->billingStatus()->value,
         ];
+    }
+
+    /**
+     * Bill the sandbox, reporting rather than throwing.
+     *
+     * Only the Stripe leg is caught: it is the one step that depends on a
+     * credential and a network this checkout may not have, and a local seed must
+     * still produce the four workspaces that need neither. A failure anywhere
+     * else is a real defect and is left to surface.
+     */
+    private function bill(Team $team, Persona $persona): string
+    {
+        if (! $this->stripe->available()) {
+            return 'no test-mode STRIPE_SECRET, billed nothing';
+        }
+
+        try {
+            $this->stripe->subscribe($team, $persona);
+
+            return '';
+        } catch (Throwable $e) {
+            return 'Stripe failed: '.Str::limit($e->getMessage(), 70);
+        }
+    }
+
+    /**
+     * Give the workspace the credit allowance its plan actually grants.
+     *
+     * The balance is created when the team is, before the persona's plan is
+     * force-filled, so it holds the Free allowance no matter which plan the
+     * persona claims. Left alone, a Pro persona shows a Pro allowance on the
+     * billing page while holding a Free one, which is the exact divergence
+     * these fixtures exist to make visible rather than reproduce.
+     */
+    private function allowance(Team $team): void
+    {
+        resolve(CreditService::class)->resetPeriod($team->refresh()->load('subscriptions'));
     }
 
     /**

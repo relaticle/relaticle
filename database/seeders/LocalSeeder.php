@@ -14,8 +14,9 @@ use Illuminate\Support\Collection;
 /**
  * Local development data: one login per state worth reproducing by hand.
  *
- * Everything this seeder creates is declared in PersonaCatalog. Adding a login
- * means adding a row there, not code here.
+ * Every login it creates is declared in PersonaCatalog. Adding one means adding
+ * a row there, not code here. The two fixtures it calls first are not logins:
+ * the sysadmin accounts, and the viewer-timezone boundary rows.
  *
  * Run it as often as you like. Every write is an upsert keyed on the persona's
  * email, so a second run converges instead of duplicating or aborting.
@@ -35,6 +36,7 @@ final class LocalSeeder extends Seeder
         }
 
         $this->call(SystemAdministratorSeeder::class);
+        $this->call(ViewerTimezoneBoundarySeeder::class);
 
         $this->seedPersonas(PersonaCatalog::only($this->slugs()));
     }
@@ -73,11 +75,15 @@ final class LocalSeeder extends Seeder
                 $persona->label(),
                 $persona->workspace,
                 $this->billingCell($persona, $result['billing']),
+                $result['note'],
             ];
         }
 
         $this->command?->newLine();
-        $this->command?->table(['Login (password: '.PersonaCatalog::PASSWORD.')', 'Workspace', 'Billing'], $rows);
+        $this->command?->table(
+            ['Login (password: '.PersonaCatalog::PASSWORD.')', 'Workspace', 'Billing', 'Note'],
+            $rows,
+        );
     }
 
     /**

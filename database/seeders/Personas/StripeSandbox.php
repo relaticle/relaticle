@@ -149,12 +149,23 @@ final readonly class StripeSandbox
     }
 
     /**
+     * Whether this checkout can bill the sandbox at all. A clone with no Stripe
+     * keys is the normal case, not an error: the seeder skips these personas
+     * rather than aborting the whole local seed over a credential it does not
+     * need for the other four.
+     */
+    public function available(): bool
+    {
+        return str_contains((string) config('cashier.secret'), '_test_');
+    }
+
+    /**
      * A live key here would create real customers and real charges.
      */
     private function assertTestMode(): void
     {
         throw_unless(
-            str_contains((string) config('cashier.secret'), '_test_'),
+            $this->available(),
             RuntimeException::class,
             'Refusing to seed: STRIPE_SECRET is not a test-mode key.',
         );
