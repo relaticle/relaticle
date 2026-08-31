@@ -7,13 +7,26 @@ use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
+use Livewire\Features\SupportTesting\Testable;
 
 mutates(ActivityLog::class);
+
+/**
+ * The slide-over body is rendered by the panel layout, which a component test
+ * never boots — so the diff is read off the mounted action's own view, which is
+ * the exact markup the panel would print.
+ */
+function slideOverChanges(Testable $component): string
+{
+    return (string) $component->instance()->getMountedAction()->getModalContent();
+}
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create(['name' => 'Ada Owner']);
@@ -179,12 +192,16 @@ test('one batch spanning two records keeps each record its own row and payload',
         'properties' => ['custom_field_changes' => [['label' => 'Company Only Field', 'old' => null, 'new' => 'Set']]],
     ]);
 
-    livewire(ActivityLog::class)
+    $component = livewire(ActivityLog::class)
         ->assertOk()
         ->assertCanSeeTableRecords($rows->all())
         ->assertSee('Batch Company')
         ->assertSee('Batch Person')
-        ->assertSee('Company Only Field: — → Set', escape: false);
+        ->mountAction(TestAction::make('viewChanges')->table($rows->first()));
+
+    expect(slideOverChanges($component))
+        ->toContain('Company Only Field')
+        ->toContain('Set');
 });
 
 test('a create and a delete in one request both stay on the record', function (): void {
@@ -235,7 +252,7 @@ test('a save touching several custom fields shows every one of them', function (
     $company = Company::factory()->for($this->team)->create(['name' => 'Many Fields Co']);
     $batch = (string) Str::uuid();
 
-    Activity::withoutGlobalScopes()->create([
+    $created = Activity::withoutGlobalScopes()->create([
         'log_name' => 'crm',
         'description' => 'created',
         'event' => 'created',
@@ -252,11 +269,19 @@ test('a save touching several custom fields shows every one of them', function (
     seedCustomFieldRow($this, $company, $batch, 'Priority', 'None', 'High');
     seedCustomFieldRow($this, $company, $batch, 'Due Date', 'None', '2026-08-08');
 
-    livewire(ActivityLog::class)
+    $component = livewire(ActivityLog::class)
         ->assertOk()
         ->assertSee('Status: None → To do', escape: false)
-        ->assertSee('Priority: None → High', escape: false)
-        ->assertSee('Due Date: None → 2026-08-08', escape: false);
+        ->assertDontSee('Priority: None → High', escape: false)
+        ->mountAction(TestAction::make('viewChanges')->table($created));
+
+    expect(slideOverChanges($component))
+        ->toContain('Status')
+        ->toContain('To do')
+        ->toContain('Priority')
+        ->toContain('High')
+        ->toContain('Due Date')
+        ->toContain('2026-08-08');
 });
 
 test('custom field rows with no native sibling collapse without borrowing each others diffs', function (): void {
@@ -267,13 +292,23 @@ test('custom field rows with no native sibling collapse without borrowing each o
     $second = seedCustomFieldRow($this, $company, $batch, 'Description', 'Old copy', 'New copy');
     $third = seedCustomFieldRow($this, $company, $batch, 'Due Date', '2026-07-20', '2026-08-20');
 
-    livewire(ActivityLog::class)
+    $component = livewire(ActivityLog::class)
         ->assertOk()
         ->assertCanSeeTableRecords([$first])
         ->assertCanNotSeeTableRecords([$second, $third])
         ->assertSee('Priority: Medium → High', escape: false)
-        ->assertSee('Description: Old copy → New copy', escape: false)
-        ->assertSee('Due Date: 2026-07-20 → 2026-08-20', escape: false);
+        ->mountAction(TestAction::make('viewChanges')->table($first));
+
+    expect(slideOverChanges($component))
+        ->toContain('Priority')
+        ->toContain('Medium')
+        ->toContain('High')
+        ->toContain('Description')
+        ->toContain('Old copy')
+        ->toContain('New copy')
+        ->toContain('Due Date')
+        ->toContain('2026-07-20')
+        ->toContain('2026-08-20');
 });
 
 test('a stale morph alias whose model is gone does not take the page down', function (): void {
@@ -390,4 +425,102 @@ test('it filters down to deletions only', function (): void {
         ->filterTable('event', 'deleted')
         ->assertSee('Gone Already')
         ->assertDontSee('Still Here');
+});
+
+test('an untouched rich editor is not reported as a change', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Empty Editor Co']);
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => null, 'label' => '—'],
+            'new' => ['value' => '<p></p>', 'label' => '<p></p>'],
+        ]]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Empty Editor Co')
+        ->assertDontSee('<p></p>', escape: false)
+        ->assertDontSee('Description:', escape: false);
+});
+
+test('rich editor markup is read as its text, never as tags', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Rich Editor Co']);
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => '<p></p>', 'label' => '<p></p>'],
+            'new' => ['value' => '<p><strong>Renewal</strong></p><p>due Friday</p>', 'label' => '<p><strong>Renewal</strong></p><p>due Friday</p>'],
+        ]]],
+    ]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Description: — → Renewal due Friday', escape: false)
+        ->assertDontSee('<strong>', escape: false);
+});
+
+test('a row whose only change fits inline offers no slide-over', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'One Change Co']);
+    $company->update(['name' => 'One Change Co Renamed']);
+
+    $updated = Activity::withoutGlobalScopes()->where('event', 'updated')->sole();
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertActionHidden(TestAction::make('viewChanges')->table($updated));
+});
+
+test('searching finds a record by the name it carries now', function (): void {
+    Company::factory()->for($this->team)->create(['name' => 'Findable Holdings']);
+    Company::factory()->for($this->team)->create(['name' => 'Unrelated Ltd']);
+
+    livewire(ActivityLog::class)
+        ->searchTable('findable')
+        ->assertSee('Findable Holdings')
+        ->assertDontSee('Unrelated Ltd');
+});
+
+test('searching still finds a record that no longer exists', function (): void {
+    $destroyed = Company::factory()->for($this->team)->create(['name' => 'Erased Industries']);
+    $destroyed->delete();
+    $destroyed->forceDelete();
+
+    Company::factory()->for($this->team)->create(['name' => 'Unrelated Ltd']);
+
+    livewire(ActivityLog::class)
+        ->searchTable('erased')
+        ->assertSee('Erased Industries')
+        ->assertDontSee('Unrelated Ltd');
+});
+
+test('a task row links to the modal that edits it', function (): void {
+    $task = Task::factory()->for($this->team)->create(['title' => 'Renew the contract']);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Renew the contract')
+        ->assertSee('tableActionRecord='.$task->getKey());
 });

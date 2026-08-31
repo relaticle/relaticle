@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
-use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
@@ -13,7 +12,6 @@ use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
@@ -53,7 +51,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -74,7 +71,6 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\CustomFieldsPlugin;
-use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
 {
@@ -406,18 +402,7 @@ final class AppPanelProvider extends PanelProvider
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
-            ->tenantProfile(EditTeam::class)
-            ->tenantMenuItems([
-                Action::make('import_history')
-                    ->label(__('filament/panel.tenant_menu.import_history'))
-                    ->icon(Heroicon::OutlinedClock)
-                    ->url(fn (): string => ImportHistory::getUrl()),
-                Action::make('billing')
-                    ->label(__('billing.title'))
-                    ->icon(Heroicon::OutlinedCreditCard)
-                    ->url(fn (): string => Billing::getUrl())
-                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
-            ]);
+            ->tenantProfile(EditTeam::class);
 
         return $panel;
     }

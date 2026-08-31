@@ -11,11 +11,13 @@ use App\Filament\Pages\Team\ActivityLog;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\Team;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
+use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 /**
  * The workspace settings tab strip. Every page it links to uses this concern, so
@@ -45,36 +47,57 @@ trait HasWorkspaceSettingsNavigation
                 ->label(__('teams.tabs.general'))
                 ->icon(Heroicon::OutlinedCog6Tooth)
                 ->url(fn (): string => EditTeam::getUrl())
-                ->isActiveWhen(fn (): bool => request()->routeIs(EditTeam::getRouteName()))
+                ->isActiveWhen($this->isCurrentPage(EditTeam::class))
                 ->visible(fn (): bool => EditTeam::canView($tenant)),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.members'))
                 ->icon(Heroicon::OutlinedUsers)
                 ->url(fn (): string => Members::getUrl())
-                ->isActiveWhen(fn (): bool => request()->routeIs(Members::getRouteName()))
+                ->isActiveWhen($this->isCurrentPage(Members::class))
                 ->visible(fn (): bool => Members::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.custom_fields'))
                 ->icon(Heroicon::OutlinedCube)
                 ->url(fn (): string => CustomFields::getUrl())
-                ->isActiveWhen(fn (): bool => request()->routeIs(CustomFields::getRouteName()))
+                ->isActiveWhen($this->isCurrentPage(CustomFields::class))
                 ->visible(fn (): bool => CustomFields::canAccess()),
+
+            NavigationItem::make()
+                ->label(__('teams.tabs.import_history'))
+                ->icon(Heroicon::OutlinedArrowUpTray)
+                ->url(fn (): string => ImportHistory::getUrl())
+                ->isActiveWhen($this->isCurrentPage(ImportHistory::class))
+                ->visible(fn (): bool => ImportHistory::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.activity'))
                 ->icon(Heroicon::OutlinedClock)
                 ->url(fn (): string => ActivityLog::getUrl())
-                ->isActiveWhen(fn (): bool => request()->routeIs(ActivityLog::getRouteName()))
+                ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.billing'))
                 ->icon(Heroicon::OutlinedCreditCard)
                 ->url(fn (): string => Billing::getUrl())
-                ->isActiveWhen(fn (): bool => request()->routeIs(Billing::getRouteName()))
+                ->isActiveWhen($this->isCurrentPage(Billing::class))
                 ->visible(fn (): bool => Feature::active(BillingFeature::class)),
         ];
+    }
+
+    /**
+     * Matching on the rendered page rather than the current route, because every
+     * interaction on these pages — a table sort, a modal, switching entity type —
+     * re-renders the strip inside a `livewire.update` request, where no page route
+     * is current and every tab would come back unhighlighted.
+     *
+     * @param  class-string  $page
+     * @return Closure(): bool
+     */
+    private function isCurrentPage(string $page): Closure
+    {
+        return fn (): bool => static::class === $page;
     }
 }
