@@ -329,7 +329,7 @@ final class ActivityResource extends Resource
             return collect($new)
                 ->map(fn (mixed $value, string $key): string => sprintf(
                     '%s: %s → %s',
-                    $key,
+                    Str::headline($key),
                     self::stringifyValue($old[$key] ?? null),
                     self::stringifyValue($value),
                 ))
@@ -344,7 +344,7 @@ final class ActivityResource extends Resource
             return collect($old)
                 ->map(fn (mixed $value, string $key): string => sprintf(
                     '%s: %s → %s',
-                    $key,
+                    Str::headline($key),
                     self::stringifyValue($value),
                     self::stringifyValue(null),
                 ))
@@ -353,7 +353,7 @@ final class ActivityResource extends Resource
         }
 
         return collect($properties)
-            ->map(fn (mixed $value, string $key): string => "{$key}: ".self::stringifyValue($value))
+            ->map(fn (mixed $value, string $key): string => Str::headline($key).': '.self::stringifyValue($value))
             ->values()
             ->all();
     }

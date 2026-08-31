@@ -12,6 +12,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
@@ -38,7 +39,6 @@ final class ActivityRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('description')
             ->defaultSort('created_at', 'desc')
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['causer', 'subject']))
             ->recordUrl(fn (Activity $record): string => ActivityResource::getUrl('view', ['record' => $record]))
@@ -73,9 +73,22 @@ final class ActivityRelationManager extends RelationManager
                         'created' => 'success',
                         'deleted' => 'danger',
                         default => 'gray',
+                    })
+                    /**
+                     * A custom-field edit is logged under its own event name, but
+                     * to an administrator it is the same act as any other edit.
+                     */
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        null => '—',
+                        'custom_field_changes' => 'Updated',
+                        default => Str::headline($state),
                     }),
-                TextColumn::make('description')
-                    ->limit(60)
+                TextColumn::make('properties')
+                    ->label('Changes')
+                    ->state(fn (Activity $record): array => ActivityResource::buildChangeSummary($record))
+                    ->listWithLineBreaks()
+                    ->limitList(1)
+                    ->placeholder('—')
                     ->wrap(),
             ])
             ->filters([
