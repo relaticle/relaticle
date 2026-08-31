@@ -524,3 +524,52 @@ test('a task row links to the modal that edits it', function (): void {
         ->assertSee('Renew the contract')
         ->assertSee('tableActionRecord='.$task->getKey());
 });
+
+test('searching never reaches into another workspace records', function (): void {
+    $stranger = User::factory()->withTeam()->create(['name' => 'Mallory Stranger']);
+
+    $this->actingAs($stranger);
+    Filament::setTenant($stranger->currentTeam);
+    Company::factory()->for($stranger->currentTeam)->create(['name' => 'Findable Holdings']);
+
+    $this->actingAs($this->owner);
+    Filament::setTenant($this->team);
+    Company::factory()->for($this->team)->create(['name' => 'Findable Domestics']);
+
+    livewire(ActivityLog::class)
+        ->searchTable('findable')
+        ->assertSee('Findable Domestics')
+        ->assertDontSee('Findable Holdings');
+});
+
+test('the slide-over stamps the change in the readers own timezone', function (): void {
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    $this->owner->forceFill(['timezone' => 'Asia/Yerevan'])->save();
+    $this->travelTo('2026-08-08 22:30:00');
+
+    $company = Company::factory()->for($this->team)->create(['name' => 'Timezone Co']);
+    $batch = (string) Str::uuid();
+
+    $created = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'created',
+        'event' => 'created',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'batch_uuid' => $batch,
+    ]);
+
+    seedCustomFieldRow($this, $company, $batch, 'Status', 'None', 'To do');
+    seedCustomFieldRow($this, $company, $batch, 'Priority', 'None', 'High');
+
+    $component = livewire(ActivityLog::class)
+        ->assertOk()
+        ->mountAction(TestAction::make('viewChanges')->table($created));
+
+    expect((string) $component->instance()->getMountedAction()->getModalDescription())
+        ->toContain('Aug 9, 2026 2:30 AM')
+        ->not->toContain('Aug 8');
+});

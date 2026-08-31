@@ -18,6 +18,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -281,6 +282,11 @@ final class ActivityLog extends Page implements HasTable
             ->visible(fn (Activity $record): bool => count(ActivityChangeSummary::for($record)) > 1);
     }
 
+    /**
+     * The row's own timestamp is converted for the reader by the column, which
+     * reads `FilamentTimezone` itself. Nothing does that for a string built by
+     * hand, so the same instant printed here has to be converted here too.
+     */
     private function changesDescription(Activity $record): string
     {
         $causer = $record->causer?->getAttribute('name');
@@ -289,7 +295,7 @@ final class ActivityLog extends Page implements HasTable
             $this->typeLabel($record->subject_type),
             $this->eventLabel($record->event),
             is_string($causer) && $causer !== '' ? $causer : __('teams.activity.system'),
-            $record->created_at?->toDayDateTimeString() ?? ActivityValue::EMPTY,
+            $record->created_at?->copy()->setTimezone(FilamentTimezone::get())->toDayDateTimeString() ?? ActivityValue::EMPTY,
         ]);
     }
 
@@ -520,25 +526,15 @@ final class ActivityLog extends Page implements HasTable
         return $indicators;
     }
 
+    /**
+     * The indicator bar is already the answer to "is anything narrowing this
+     * table": it unions the search term, the per-column searches and every
+     * filter's own indicators, so the empty state cannot disagree with the
+     * chips the reader can see above it.
+     */
     private function isFiltered(): bool
     {
-        if (filled($this->getTableSearch())) {
-            return true;
-        }
-
-        foreach ($this->tableFilters ?? [] as $state) {
-            if (! is_array($state)) {
-                continue;
-            }
-
-            foreach ($state as $value) {
-                if (filled($value) && $value !== false) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return $this->getTable()->getFilterIndicators() !== [];
     }
 
     private function eventLabel(?string $state): string
