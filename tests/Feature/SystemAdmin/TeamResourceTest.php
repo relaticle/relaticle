@@ -195,6 +195,52 @@ it('filters on the subscription a workspace bills on now, not a superseded one',
         ->assertCanNotSeeTableRecords([$team]);
 });
 
+it('filters a workspace still inside its grace period as Pro, the way the badge reads it', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Subscription::factory()->unpaid()->create([
+        'team_id' => $team->getKey(),
+        'ends_at' => now()->addDays(5),
+    ]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::Subscribed])
+        ->assertCanSeeTableRecords([$team]);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::PastDue])
+        ->assertCanNotSeeTableRecords([$team]);
+});
+
+it('filters on the default subscription, ignoring a newer one of another type', function (): void {
+    $team = billingStatusTeam();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    Subscription::factory()->active()->create([
+        'team_id' => $team->getKey(),
+        'created_at' => now()->subMonths(2),
+        'updated_at' => now()->subMonths(2),
+    ]);
+
+    Subscription::factory()->pastDue()->create([
+        'team_id' => $team->getKey(),
+        'type' => 'addon',
+    ]);
+
+    expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::Subscribed])
+        ->assertCanSeeTableRecords([$team]);
+
+    livewire(ListTeams::class)
+        ->filterTable('billing_status', [BillingStatus::PastDue])
+        ->assertCanNotSeeTableRecords([$team]);
+});
+
 it('prefers a live subscription over a trial that has not run out yet', function (): void {
     $team = billingStatusTeam();
     $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
