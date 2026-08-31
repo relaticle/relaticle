@@ -6,6 +6,7 @@ return [
     'actions' => [
         'compose' => [
             'label' => 'Compose',
+            'tooltip' => 'c',
         ],
         'undo' => [
             'label' => 'Undo',
