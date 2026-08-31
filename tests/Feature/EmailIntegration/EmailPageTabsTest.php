@@ -125,16 +125,30 @@ it('counts drafts, pending outbox mail and available templates for the tab badge
     ]);
 });
 
-it('shows received access requests in the emails tab bar', function (): void {
-    $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+it('shows the total incoming and sent access requests in the emails tab bar', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'status' => 'active',
+    ]));
 
     EmailAccessRequest::factory()->pending()->create([
         'owner_id' => $this->user->id,
-        'requester_id' => $requester->id,
+        'requester_id' => $teammate->id,
         'email_id' => Email::factory()->private()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->user->id,
             'connected_account_id' => $this->account->id,
+        ])->id,
+    ]);
+    EmailAccessRequest::factory()->approved()->create([
+        'owner_id' => $teammate->id,
+        'requester_id' => $this->user->id,
+        'email_id' => Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+            'connected_account_id' => $teammateAccount->id,
         ])->id,
     ]);
 
@@ -142,7 +156,7 @@ it('shows received access requests in the emails tab bar', function (): void {
         ->assertSee('Requests');
 
     expect($page->instance()->tabCounts())
-        ->toMatchArray(['requests' => 1]);
+        ->toMatchArray(['requests' => 2]);
 });
 
 it('refreshes the tab badges when the composer saves a draft', function (): void {

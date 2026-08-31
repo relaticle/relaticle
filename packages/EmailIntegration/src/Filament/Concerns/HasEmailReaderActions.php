@@ -20,6 +20,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -204,14 +205,36 @@ trait HasEmailReaderActions
                     && $this->readerUser()->can('requestAccess', $record);
             })
             ->schema([
-                Select::make('tier_requested')
+                Radio::make('tier_requested')
                     ->label(__('filament/pages/record-emails.fields.tier_requested.label'))
                     ->options([
                         EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
                         EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
                     ])
+                    ->view('email-integration::forms.sharing-tier-cards')
+                    ->viewData([
+                        'ariaLabel' => __('filament/pages/record-emails.fields.tier_requested.label'),
+                        'tiers' => [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::FULL],
+                    ])
                     ->required(),
             ])
+            ->mountUsing(function (Action $action, Schema $schema, array $arguments, mixed $record = null): void {
+                $email = $this->emailForReaderAction($record instanceof Email ? $record : null, $arguments, 'requestAccess');
+                $pendingRequest = $email instanceof Email
+                    ? EmailAccessRequest::query()
+                        ->where('email_id', $email->getKey())
+                        ->where('requester_id', $this->readerUser()->getKey())
+                        ->where('status', EmailAccessRequestStatus::PENDING)
+                        ->first()
+                    : null;
+
+                $schema->fill(['tier_requested' => $pendingRequest?->tier_requested]);
+
+                if ($pendingRequest instanceof EmailAccessRequest) {
+                    $schema->disabled();
+                    $action->modalSubmitAction(false);
+                }
+            })
             ->action(function (array $data, array $arguments, mixed $record = null): void {
                 $email = $this->emailForReaderAction($record instanceof Email ? $record : null, $arguments, 'requestAccess');
 
