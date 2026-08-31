@@ -451,6 +451,26 @@ it('notifies once per invoice, not once per Stripe retry attempt', function (): 
     expect($team->owner->notifications()->count())->toBe(1);
 });
 
+it('alarms on a plan change that failed to bill', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        'billing_reason' => 'subscription_update',
+    ]))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(1);
+});
+
+it('stays quiet when the very first subscription charge fails', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        'billing_reason' => 'subscription_create',
+    ]))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(0);
+});
+
 it('raises no subscription alarm for a one-off invoice', function (): void {
     $team = stripeBillingTeam();
 
