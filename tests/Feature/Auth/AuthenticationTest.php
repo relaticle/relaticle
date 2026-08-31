@@ -519,6 +519,39 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
         ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
 });
 
+test('signup with an expired invitation does not auto-verify the email', function (): void {
+    Event::fake([Verified::class]);
+    Notification::fake();
+
+    $team = Team::factory()->create();
+    $email = 'expired-signup-'.uniqid().'@gmail.com';
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => $email,
+    ]);
+
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+    $invitation->forceFill(['expires_at' => now()->subDay()])->save();
+
+    session(['url.intended' => route('team-invitations.token.accept', ['token' => $rawToken])]);
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', mb_strtolower($email))->first();
+
+    expect($user)->not->toBeNull()
+        ->and($user->hasVerifiedEmail())->toBeFalse();
+
+    Event::assertNotDispatched(Verified::class);
+});
+
 test('a fresh teamless signup lands on tenant registration, not the login page', function (): void {
     $email = 'fresh-signup-'.uniqid().'@gmail.com';
 
