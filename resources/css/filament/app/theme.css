@@ -264,13 +264,16 @@
         @apply overflow-hidden;
     }
 
-    /* The lane the toggle sits in, beside the switcher when open. It is not
+    /* The lane the toggle sits in, beside the switcher when open. It has to
+       clear everything the button occupies, which is its 4.5 inset plus its own
+       8 of width: anything narrower and the trigger's box runs under the button
+       even though the workspace name still looks clear of it. It is not
        transitioned: animating it let the trigger's edge overtake the button,
        and the fading workspace name ran out from under it. Snapping it at the
        start of the collapse is invisible, since the name is already clipped by
        the panel edge well before it reaches the button. */
     #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-inline-end: calc(var(--spacing) * 11);
+        margin-inline-end: calc(var(--spacing) * 14);
     }
 
     /* On the rail the toggle drops below the switcher rather than beside it,
