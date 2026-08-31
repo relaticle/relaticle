@@ -34,7 +34,7 @@ Any path match in the diff forces **Impact = 5**, regardless of the anchor. Run 
 | `Gate::define`, `->authorize(`, `Auth::user()` | Authorization wiring |
 | `BelongsToTeamCreator`, `tenant_id`, `team_id`, `belongsToTeam(` | Multi-tenant boundary |
 | Global scope additions/removals | Tenant scoping |
-| `app/Models/{Company,People,Opportunity,Task,Note}.php` | The 5 custom-fields-bearing models — exposed on every surface |
+| `app/Models/{Company,People,Opportunity,Task,Note}.php` | The 5 custom-fields-bearing models, exposed on every surface |
 | `database/migrations/**` with `drop`, `dropColumn`, `dropIfExists` | Destructive schema |
 | `app/Mcp/Tools/Base*Tool.php` | Changes propagate to all 29 entity tools |
 | `app/Filament/Resources/**Policy*` | Filament-level role enforcement |
@@ -46,12 +46,12 @@ Any path match in the diff forces **Impact = 5**, regardless of the anchor. Run 
 
 | Score | Tier | Matrix breadth | Auto-fix permission (ceiling) |
 |---|---|---|---|
-| 1-5 | smoke | 1 persona (Default), happy path + 1 negative, single surface | Disabled — report only |
+| 1-5 | smoke | 1 persona (Default), happy path + 1 negative, single surface | Disabled (report only) |
 | 6-11 | light | 2 personas, 1-2 tours, basic data nasties, surface-relevant | High only, never in auth/tenancy/migration code |
 | 12-19 | medium | 3-4 personas (Cross-Tenant Spy if model touched), 2-3 tours, full nasties on changed inputs | High only |
 | 20-25 | deep | Full persona roster, all relevant tours, **multi-tenant checklist mandatory**, MCP + API parity check | High only, **never** in auth/tenancy/migration code |
 
-The auto-fix permission column is a **ceiling**. At smoke tier, even a High finding becomes "report only" — auto-fix is suppressed because the risk score was so low to begin with that surfacing a High finding signals the score itself was wrong.
+The auto-fix permission column is a **ceiling**. At smoke tier, even a High finding becomes "report only". Auto-fix is suppressed because the risk score was so low to begin with that surfacing a High finding signals the score itself was wrong.
 
 ## Surface scoping (independent of score)
 
@@ -65,7 +65,7 @@ The auto-fix permission column is a **ceiling**. At smoke tier, even a High find
 | `app/Policies/**` | Every surface that consumes the policy (grep callers) |
 | `database/migrations/**` | `migrate:fresh --seed` smoke + every surface touching the changed tables |
 | `app/Actions/**` | Every caller of the action (grep) |
-| `resources/views/**`, `resources/css/**`, `resources/js/**`, `app/View/**`, `tailwind.config.*`, `vite.config.*`, `app/Filament/Components/**`, `app/Filament/Theme*` | Filament UI + Livewire (visual change — Supermodel mandatory; consult `references/visual-probes.md`) |
+| `resources/views/**`, `resources/css/**`, `resources/js/**`, `app/View/**`, `tailwind.config.*`, `vite.config.*`, `app/Filament/Components/**`, `app/Filament/Theme*` | Filament UI + Livewire (visual change, so Supermodel is mandatory; consult `references/visual-probes.md`) |
 
 A change to `TaskPolicy.php` therefore expands to Filament UI + REST API + MCP because the same policy gates all three.
 

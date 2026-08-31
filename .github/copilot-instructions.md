@@ -2,13 +2,13 @@
 
 ## Repository Context
 
-Multi-tenant SaaS CRM with paying customers. Tenant isolation is the highest-priority concern — a single cross-tenant data leak is a critical security incident. The app uses Filament panels with a per-request `TeamScope` global scope applied via middleware, not in model boot. `Model::unguard()` is enabled globally.
+Multi-tenant SaaS CRM with paying customers. Tenant isolation is the highest-priority concern. A single cross-tenant data leak is a critical security incident. The app uses Filament panels with a per-request `TeamScope` global scope applied via middleware, not in model boot. `Model::unguard()` is enabled globally.
 
 Stack: PHP 8.5, Laravel 13, Filament 5, Livewire 4, Pest 4, Tailwind CSS 4.
 
 CI enforces: PHPStan level 7, Pint formatting, Rector, 99.9% type coverage, full test suite. CI does **not** enforce: code coverage percentage, mutation testing, or required reviewer count.
 
-## Tenant Isolation — Flag These
+## Tenant Isolation: Flag These
 
 This app scopes data via `ApplyTenantScopes` middleware which registers `TeamScope` on: Company, People, Opportunity, Task, Note. Scoping happens per-request inside the Filament panel. Code running outside that middleware context (jobs, commands, API routes) has no automatic tenant filter.
 
@@ -31,14 +31,14 @@ return parent::getEloquentQuery()
     ->withoutGlobalScopes();
 ```
 
-## Authorization — Flag These
+## Authorization: Flag These
 
 Policies exist for Company, People, Opportunity, Task, Note. They check `$user->belongsToTeam($record->team)`.
 
 - New controller action or Livewire method without `$this->authorize()` or policy check
 - New Filament resource without a corresponding policy
 - Livewire actions that modify records without verifying the record belongs to the current team
-- Mass assignment from user-supplied request data — `Model::unguard()` is global, so `$fillable` is the only guard
+- Mass assignment from user-supplied request data. `Model::unguard()` is global, so `$fillable` is the only guard
 
 ```php
 // Correct: authorize before acting
@@ -56,7 +56,7 @@ public function delete(string $id): void
 }
 ```
 
-## Data Safety — Flag These
+## Data Safety: Flag These
 
 - Raw SQL with interpolated variables instead of parameter bindings (`?`)
 - `DB::table()->upsert()` or `DB::table()->insert()` on team-scoped tables without a `team_id` in the data payload
@@ -73,13 +73,13 @@ DB::select('SELECT * FROM companies WHERE team_id = ?', [$teamId]);
 DB::select("SELECT * FROM companies WHERE team_id = {$teamId}");
 ```
 
-## Test Coverage — Flag These
+## Test Coverage: Flag These
 
 New features or modified behavior should include corresponding Pest tests. There is no coverage gate in CI, so this must be caught in review.
 
 - New Filament resource, Livewire component, or controller action without tests
 - Modified business logic without updated tests
-- Tests that only check the happy path — also cover validation failures and authorization denials
+- Tests that only check the happy path. Cover validation failures and authorization denials too
 - Tests that create records without scoping to a specific team (relying on implicit scope rather than explicit `->for($team)`)
 
 ## PHP Standards
@@ -95,8 +95,8 @@ New features or modified behavior should include corresponding Pest tests. There
 
 ## Code Style
 
-- Happy path last — handle errors first, return early
-- Avoid `else` — use early returns
+- Happy path last. Handle errors first and return early
+- Avoid `else`; use early returns
 - String interpolation over concatenation
 - Descriptive names: `$failedChecks` not `$checks` with a comment
 
@@ -111,8 +111,8 @@ New features or modified behavior should include corresponding Pest tests. There
 - Queued jobs with `ShouldQueue` for expensive operations
 - `casts()` method, not `$casts` property
 - Middleware in `bootstrap/app.php`, not a Kernel class
-- **PostgreSQL exclusively** — no SQLite/MySQL compatibility layers, driver checks, or conditional SQL
-- Migrations: only `up()` methods — no `down()` methods
+- **PostgreSQL exclusively**. No SQLite/MySQL compatibility layers, driver checks, or conditional SQL
+- Migrations carry only `up()` methods, never `down()`
 
 ## Filament 5
 
@@ -120,7 +120,7 @@ New features or modified behavior should include corresponding Pest tests. There
 - Layout (Grid, Section, Tabs): `Filament\Schemas\Components\`
 - Infolist entries: `Filament\Infolists\Components\`
 - Utilities (Get, Set): `Filament\Schemas\Components\Utilities\`
-- All actions: `Filament\Actions\` — no `Filament\Tables\Actions\`
+- All actions live in `Filament\Actions\`, never `Filament\Tables\Actions\`
 - Icons: `Heroicon` enum, not strings
 - File visibility: `private` by default
 - `Grid`, `Section`, `Fieldset` no longer span all columns by default

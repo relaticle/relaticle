@@ -20,8 +20,8 @@ sentence. Two sentences usually, or a colon when the second half genuinely
 explains the first. Never run a find-and-replace over the character.
 
 Vary construction. A writer reaches for one rhythm now and then. A page that
-reaches for it fifteen times reads as machine-written, whatever punctuation it
-wears.
+reaches for it fifteen times reads as one template applied over and over,
+whatever punctuation it wears.
 
 `tests/Arch/ConventionsTest.php` enforces this across `app/`, `packages/`,
 `resources/`, `lang/`, `config/`, `database/`, `routes/`, and `bootstrap/`. One
