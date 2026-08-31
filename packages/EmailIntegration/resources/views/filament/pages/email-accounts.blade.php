@@ -26,7 +26,7 @@
                     ])->filter()->join(', ');
                 @endphp
 
-                <div class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-white/10">
+                <div wire:key="email-account-{{ $account->getKey() }}" class="flex flex-col gap-3 rounded-lg border border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
                     <div class="flex min-w-0 flex-1 items-center gap-3">
                         <x-filament::icon :icon="$account->provider->getIcon()" class="h-5 w-5 shrink-0 text-gray-400" />
 
@@ -45,25 +45,67 @@
                         </div>
                     </div>
 
-                    <div class="flex shrink-0 items-center gap-2">
-                        <x-filament::badge
-                            :color="$account->isImportingHistory() ? 'warning' : $account->status->getColor()"
-                            :icon="$account->isImportingHistory() ? 'heroicon-m-arrow-path' : ($account->isActive() ? 'heroicon-m-bolt' : 'heroicon-m-exclamation-triangle')"
-                            :title="$account->last_synced_at ? __('filament/pages/email-accounts.synced_at', ['time' => $account->last_synced_at->diffForHumans()]) : null"
-                        >
-                            @if ($account->isImportingHistory())
-                                @if ($account->initial_sync_estimated)
-                                    {{ __('filament/pages/email-accounts.importing_progress', [
-                                        'imported' => number_format($account->initial_sync_imported),
-                                        'estimated' => number_format($account->initial_sync_estimated),
-                                    ]) }}
+                    <div @class([
+                        'flex items-center gap-3',
+                        'w-full sm:w-auto' => $account->isImportingHistory(),
+                        'shrink-0' => ! $account->isImportingHistory(),
+                    ])>
+                        @if ($account->isImportingHistory())
+                            @php
+                                $imported = $account->initial_sync_imported;
+                                $estimated = $account->initial_sync_estimated;
+                                $percent = $account->initialSyncProgressPercent();
+                            @endphp
+
+                            <div class="min-w-0 flex-1 sm:w-52 sm:flex-none">
+                                <div class="flex items-baseline justify-between gap-2">
+                                    <p class="text-xs font-medium text-gray-600 dark:text-gray-300">
+                                        {{ __('filament/pages/email-accounts.importing') }}
+                                    </p>
+
+                                    @if ($percent !== null)
+                                        <p class="text-xs font-semibold tabular-nums text-gray-950 dark:text-white">
+                                            {{ __('filament/pages/email-accounts.importing_percent', ['percent' => $percent]) }}
+                                        </p>
+                                    @endif
+                                </div>
+
+                                @if ($percent !== null)
+                                    <div
+                                        class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/15"
+                                        role="progressbar"
+                                        aria-busy="true"
+                                        aria-valuemin="0"
+                                        aria-valuemax="{{ $estimated }}"
+                                        aria-valuenow="{{ min($imported, $estimated) }}"
+                                        aria-valuetext="{{ __('filament/pages/email-accounts.importing_percent', ['percent' => $percent]) }}"
+                                        aria-label="{{ __('filament/pages/email-accounts.importing') }}"
+                                    >
+                                        <div
+                                            class="h-full w-full origin-left rounded-full bg-primary-600 motion-reduce:transition-none motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out dark:bg-primary-400"
+                                            style="transform: scaleX({{ $percent / 100 }})"
+                                        ></div>
+                                    </div>
                                 @else
-                                    {{ __('filament/pages/email-accounts.importing_count', ['count' => number_format($account->initial_sync_imported)]) }}
+                                    <div
+                                        class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/15"
+                                        role="progressbar"
+                                        aria-busy="true"
+                                        aria-label="{{ __('filament/pages/email-accounts.importing') }}"
+                                    >
+                                        <div class="ei-import-indeterminate h-full rounded-full bg-primary-600 dark:bg-primary-400"></div>
+                                    </div>
                                 @endif
-                            @else
+                            </div>
+                        @else
+                            <x-filament::badge
+                                :color="$account->status->getColor()"
+                                :icon="$account->isActive() ? 'heroicon-m-bolt' : 'heroicon-m-exclamation-triangle'"
+                                :title="$account->last_synced_at ? __('filament/pages/email-accounts.synced_at', ['time' => $account->last_synced_at->diffForHumans()]) : null"
+                            >
                                 {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
-                            @endif
-                        </x-filament::badge>
+                            </x-filament::badge>
+                        @endif
 
                         {{ $this->accountActions($account->getKey(), $account->status, [$this->editSettingsAction()]) }}
                     </div>

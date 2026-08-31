@@ -98,6 +98,33 @@
     }
 }
 
+/*
+ * Mailbox history import: slide the fill with transform, not width
+ * (layout-safe, GPU-friendly). Disabled when the user prefers reduced motion.
+ */
+@keyframes ei-import-indeterminate {
+    0% {
+        transform: translateX(-120%);
+    }
+
+    100% {
+        transform: translateX(380%);
+    }
+}
+
+.ei-import-indeterminate {
+    width: 32%;
+    animation: ei-import-indeterminate 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ei-import-indeterminate {
+        animation: none;
+        transform: none;
+        opacity: 0.75;
+    }
+}
+
 .email-composer-body {
     @apply flex h-full flex-col;
 

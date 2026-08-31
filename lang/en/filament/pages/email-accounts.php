@@ -80,8 +80,7 @@ return [
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
     'importing' => 'Importing',
-    'importing_count' => ':count emails',
-    'importing_progress' => ':imported of :estimated emails',
+    'importing_percent' => ':percent%',
     'capabilities' => [
         'email' => 'Email',
         'calendar' => 'Calendar',

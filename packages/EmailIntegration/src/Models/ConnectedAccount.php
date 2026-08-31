@@ -236,6 +236,21 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * Percent of the first mailbox import, or null when the provider has not
+     * given a size estimate yet (indeterminate).
+     */
+    public function initialSyncProgressPercent(): ?int
+    {
+        $estimated = $this->initial_sync_estimated;
+
+        if ($estimated === null || $estimated <= 0) {
+            return null;
+        }
+
+        return min(100, (int) round(($this->initial_sync_imported / $estimated) * 100));
+    }
+
+    /**
      * Whether emails of the given direction should be synced, per the user's
      * inbox/sent toggles. The single source of truth for direction gating —
      * consulted on the store path so it covers both providers and both the

@@ -515,3 +515,19 @@ it('stores body in email_bodies table', function (): void {
         'body_text' => 'Plain text body',
     ]);
 });
+
+it('bumps mailbox import progress while the history cursor is still empty', function (): void {
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(0);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(1);
+});
+
+it('does not bump mailbox import progress after the history cursor is written', function (): void {
+    $this->account->update(['sync_cursor' => 'history-1']);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(0);
+});

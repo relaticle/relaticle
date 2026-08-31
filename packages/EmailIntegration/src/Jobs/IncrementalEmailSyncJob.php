@@ -104,7 +104,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $accountId = (int) $account->getKey();
+        $accountId = (string) $account->getKey();
         $newCursor = $delta->newCursor;
 
         Bus::batch(array_map(
@@ -114,7 +114,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Incremental sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(function () use ($accountId, $newCursor): void {
+            ->then(static function () use ($accountId, $newCursor): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
                 $account?->update([
                     'sync_cursor' => $newCursor,
