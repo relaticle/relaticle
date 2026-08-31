@@ -13,8 +13,8 @@ just read, create, and update records.
 1. Click your workspace name at the top of the sidebar, then click
    **Workspace Settings**.
 2. Under **Add Member**, type their address into **Email**.
-3. Choose **Administrator** — can perform any action — or **Editor** — can
-   read, create, and update.
+3. Choose **Administrator** (can perform any action) or **Editor** (can
+   read, create, and update).
 4. Click **Add**.
 
 ![The Add Member form with the Email field and a choice between the Administrator and Editor roles](/help-assets/getting-started/invite-your-team-1.png)
