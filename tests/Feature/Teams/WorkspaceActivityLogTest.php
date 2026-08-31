@@ -573,3 +573,18 @@ test('the slide-over stamps the change in the readers own timezone', function ()
         ->toContain('Aug 9, 2026 2:30 AM')
         ->not->toContain('Aug 8');
 });
+
+test('searching finds a record whose name was never written into a payload', function (): void {
+    $silent = Company::factory()->for($this->team)->create(['name' => 'Silent Partners Ltd']);
+    $unrelated = Company::factory()->for($this->team)->create(['name' => 'Unrelated Ltd']);
+
+    Activity::withoutGlobalScopes()->delete();
+
+    seedCustomFieldRow($this, $silent, (string) Str::uuid(), 'Priority', 'Low', 'High');
+    seedCustomFieldRow($this, $unrelated, (string) Str::uuid(), 'Priority', 'Low', 'High');
+
+    livewire(ActivityLog::class)
+        ->searchTable('silent')
+        ->assertSee('Silent Partners Ltd')
+        ->assertDontSee('Unrelated Ltd');
+});

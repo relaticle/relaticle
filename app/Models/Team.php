@@ -8,6 +8,8 @@ use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Models\ActivityLog\Activity;
+use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
 use App\Support\ReservedSlugAwareGenerateSlugAction;
 use Database\Factories\TeamFactory;
@@ -353,5 +355,17 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     public function imports(): HasMany
     {
         return $this->hasMany(Import::class);
+    }
+
+    /**
+     * The relation already pins `team_id`, so the tenant scope adds nothing —
+     * and outside the app panel there is no tenant, which would narrow it to
+     * nothing at all.
+     *
+     * @return HasMany<Activity, $this>
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class)->withoutGlobalScope(TeamScope::class);
     }
 }
