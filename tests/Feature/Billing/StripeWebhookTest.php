@@ -438,6 +438,19 @@ it('notifies the workspace owner when a renewal charge fails', function (): void
         ->and($notification->data['body'])->toBe(__('billing.payment_failed.notification_body'));
 });
 
+it('notifies once per invoice, not once per Stripe retry attempt', function (): void {
+    $team = stripeBillingTeam();
+
+    foreach ([1, 2, 3] as $attempt) {
+        sendStripeWebhook(invoicePaymentFailedEvent($team, [
+            'id' => 'in_test_retried',
+            'attempt_count' => $attempt,
+        ]))->assertOk();
+    }
+
+    expect($team->owner->notifications()->count())->toBe(1);
+});
+
 it('raises no subscription alarm for a one-off invoice', function (): void {
     $team = stripeBillingTeam();
 

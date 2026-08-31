@@ -68,6 +68,11 @@ final class StripeWebhookController extends CashierWebhookController
      * key would match nothing and silently notify no one. A credit-pack invoice
      * has no such parent and must not raise a subscription alarm.
      *
+     * Stripe repeats this event for every retry of the same invoice — eight
+     * over two weeks under the default Smart Retries policy — so only the first
+     * attempt is news. A missing count is read as the first, because failing
+     * toward one extra alarm beats failing toward silence.
+     *
      * @param  array<string, mixed>  $payload
      */
     protected function handleInvoicePaymentFailed(array $payload): Response
@@ -77,6 +82,10 @@ final class StripeWebhookController extends CashierWebhookController
         $customer = $object['customer'] ?? null;
 
         if (($object['parent']['type'] ?? null) !== 'subscription_details' || ! is_string($customer)) {
+            return $this->successMethod();
+        }
+
+        if (($object['attempt_count'] ?? 1) !== 1) {
             return $this->successMethod();
         }
 
