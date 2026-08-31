@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Support\DetectsPublicMarkdownRequest;
 use App\Support\Markdown\DecodeHtmlEntitiesPostprocessor;
+use App\Support\Markdown\UnwrapEmailAutolinksPostprocessor;
 use Spatie\MarkdownResponse\Actions\GeneratesCacheKey;
 use Spatie\MarkdownResponse\Postprocessors\CollapseBlankLinesPostprocessor;
 use Spatie\MarkdownResponse\Postprocessors\RemoveHtmlTagsPostprocessor;
@@ -80,6 +81,7 @@ return [
      * Each class must implement the Postprocessor interface.
      */
     'postprocessors' => [
+        UnwrapEmailAutolinksPostprocessor::class,
         RemoveHtmlTagsPostprocessor::class,
         DecodeHtmlEntitiesPostprocessor::class,
         CollapseBlankLinesPostprocessor::class,
