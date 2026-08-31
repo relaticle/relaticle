@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\BillingStatus;
 use App\Enums\CreationSource;
+use App\Enums\Plan;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\Company;
@@ -13,6 +15,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
@@ -20,6 +23,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -65,6 +69,7 @@ final class LocalSeeder extends Seeder
                 ]);
             });
 
+        $this->seedBillingStatusFixture();
         $this->topUpAiCreditsForLocalTeams();
         $this->seedViewerTimezoneBoundaryFixture();
         //
@@ -102,6 +107,127 @@ final class LocalSeeder extends Seeder
         //                $opportunity->saveCustomFieldValue($customFields->get('stage'), $customFields->get('stage')->options->random()->id);
         //            })
         //            ->create();
+    }
+
+    /**
+     * One workspace per BillingStatus plus a subscription per Stripe status, so
+     * every badge, tooltip and filter option in the sysadmin billing surfaces
+     * has a row behind it without hunting for production-shaped data.
+     *
+     * The subscription rows are local only. Cashier reads them without calling
+     * Stripe, and `past_due` and `unpaid` cannot be reached through the Stripe
+     * test API at all without a test clock, so seeding them here is the only
+     * way to see those badges. "Open in Stripe" will not resolve on these rows.
+     */
+    private function seedBillingStatusFixture(): void
+    {
+        if (Team::query()->where('slug', 'billing-free')->exists()) {
+            $this->command?->info('Billing fixture already seeded.');
+
+            return;
+        }
+
+        $monthly = (string) config('services.stripe.prices.pro_monthly', 'price_local_pro_monthly');
+        $yearly = (string) config('services.stripe.prices.pro_yearly', 'price_local_pro_yearly');
+
+        $subscribed = $this->billingWorkspace('Subscribed', ['plan' => Plan::Pro, 'stripe_id' => 'cus_local_subscribed']);
+        Subscription::factory()->active()->withPrice($monthly)->create(['team_id' => $subscribed->getKey()]);
+
+        $pastDue = $this->billingWorkspace('Past due', ['plan' => Plan::Pro, 'stripe_id' => 'cus_local_past_due']);
+        Subscription::factory()->pastDue()->withPrice($yearly)->create(['team_id' => $pastDue->getKey()]);
+
+        $this->billingWorkspace('Trialing', [
+            'plan' => Plan::Pro,
+            'trial_ends_at' => now()->addDays(9),
+            'pro_trial_used_at' => now()->subDays(5),
+        ]);
+
+        $this->billingWorkspace('Enterprise', ['plan' => Plan::Enterprise]);
+
+        $this->billingWorkspace('Granted', ['plan' => Plan::Pro]);
+
+        $this->billingWorkspace('Grandfathered', ['hosted_free_grandfathered_at' => now()->subYear()]);
+
+        $this->billingWorkspace('Free');
+
+        $this->seedSupersededSubscriptionWorkspace($monthly);
+        $this->seedSubscriptionHistoryWorkspace($monthly);
+
+        $seeded = collect(BillingStatus::cases())
+            ->map(fn (BillingStatus $status): string => $status->getLabel())
+            ->join(', ', ' and ');
+
+        $this->command?->info("Seeded a billing workspace for each of: {$seeded}.");
+    }
+
+    /**
+     * The case `Team::latestDefaultSubscription()` exists for: a lapsed
+     * subscription still on file under a live one. It must read Pro, not Past
+     * due, on every surface and in the Billing filter.
+     */
+    private function seedSupersededSubscriptionWorkspace(string $price): void
+    {
+        $team = $this->billingWorkspace('Resubscribed', ['plan' => Plan::Pro, 'stripe_id' => 'cus_local_resubscribed']);
+
+        Subscription::factory()->pastDue()->withPrice($price)->create([
+            'team_id' => $team->getKey(),
+            'created_at' => now()->subMonths(4),
+            'updated_at' => now()->subMonths(4),
+            'ends_at' => now()->subMonths(3),
+        ]);
+
+        Subscription::factory()->active()->withPrice($price)->create([
+            'team_id' => $team->getKey(),
+            'created_at' => now()->subMonth(),
+            'updated_at' => now()->subMonth(),
+        ]);
+    }
+
+    /**
+     * The statuses no other fixture workspace produces, as one workspace's
+     * billing history, so the Subscriptions table has a row for every option in
+     * its status filter.
+     */
+    private function seedSubscriptionHistoryWorkspace(string $price): void
+    {
+        $team = $this->billingWorkspace('History', ['stripe_id' => 'cus_local_history']);
+
+        $history = [
+            10 => Subscription::factory()->incompleteAndExpired(),
+            9 => Subscription::factory()->incomplete(),
+            8 => Subscription::factory()->trialing(now()->subMonths(8)->addDays(14)),
+            // Cashier ships no `paused` state; Stripe writes it when a trial ends
+            // with no payment method on file.
+            7 => Subscription::factory()->state(['stripe_status' => 'paused']),
+            6 => Subscription::factory()->unpaid(),
+            5 => Subscription::factory()->canceled()->state(['ends_at' => now()->subMonths(4)]),
+        ];
+
+        foreach ($history as $monthsAgo => $factory) {
+            $factory->withPrice($price)->create([
+                'team_id' => $team->getKey(),
+                'created_at' => now()->subMonths($monthsAgo),
+                'updated_at' => now()->subMonths($monthsAgo),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function billingWorkspace(string $label, array $attributes = []): Team
+    {
+        $slug = 'billing-'.Str::slug($label);
+
+        $owner = User::factory()->withTeam()->create([
+            'name' => "{$label} Owner",
+            'email' => "{$slug}@example.test",
+        ]);
+
+        $team = $owner->currentTeam;
+        $team->forceFill(['name' => "Billing · {$label}", 'slug' => $slug, ...$attributes])->save();
+
+        return $team;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -109,25 +110,11 @@ final class AiCreditBalanceResource extends Resource
                     ->sortable()
                     ->color('primary')
                     ->url(RecordLink::to(TeamResource::class, 'team')),
-                TextColumn::make('origin')
-                    ->label('Origin')
-                    ->state(function (AiCreditBalance $record): string {
-                        $team = $record->team;
-
-                        return match (true) {
-                            $team->subscription()?->valid() ?? false => 'subscription',
-                            $team->trial_ends_at?->isFuture() ?? false => 'trial',
-                            $team->plan !== Plan::default() => 'manual',
-                            default => '—',
-                        };
-                    })
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'subscription' => 'success',
-                        'trial' => 'info',
-                        'manual' => 'warning',
-                        default => 'gray',
-                    }),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->state(fn (AiCreditBalance $record): BillingStatus => $record->team->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                    ->badge(),
                 TextColumn::make('credits_remaining')
                     ->numeric()
                     ->sortable()
