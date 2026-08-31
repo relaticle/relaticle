@@ -25,7 +25,8 @@ it('counts the days left on an active trial', function (): void {
 
     expect($state)->not->toBeNull()
         ->and($state['label'])->toBe('10 days left on trial!')
-        ->and($state['action'])->toBe(__('billing.sidebar.keep_pro'));
+        ->and($state['action'])->toBe(__('billing.sidebar.keep_pro'))
+        ->and($state['urgent'])->toBeFalse();
 });
 
 it('says one day, singular, on the final day', function (): void {
@@ -46,6 +47,37 @@ it('asks a paused workspace to subscribe', function (): void {
     expect($state)->not->toBeNull()
         ->and($state['label'])->toBe(__('billing.sidebar.paused'))
         ->and($state['action'])->toBe(__('billing.sidebar.subscribe'));
+});
+
+it('flags a past-due workspace even though its subscription still reads valid', function (): void {
+    $this->team->forceFill(['plan' => Plan::Pro])->save();
+    $this->team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_sidebar_past_due',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $state = resolve(SidebarBillingState::class)->for($this->team->fresh());
+
+    expect($state)->not->toBeNull()
+        ->and($state['label'])->toBe(__('billing.sidebar.past_due'))
+        ->and($state['action'])->toBe(__('billing.sidebar.fix'))
+        ->and($state['urgent'])->toBeTrue();
+});
+
+it('asks nothing of a paying subscriber', function (): void {
+    $this->team->forceFill(['plan' => Plan::Pro])->save();
+    $this->team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_sidebar_active',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    expect(resolve(SidebarBillingState::class)->for($this->team->fresh()))->toBeNull();
 });
 
 it('asks nothing of a grandfathered free workspace', function (): void {

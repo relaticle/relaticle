@@ -148,12 +148,15 @@ final readonly class ChatController
 
             $isFree = $team->plan === Plan::Free;
             $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
+            // Not $team->plan->credits(): a past-due workspace refills at the
+            // Free allowance, so the plan's figure would name credits it never got.
+            $allowance = $this->creditService->allowanceFor($team);
 
             return response()->json([
                 'error' => 'credits_exhausted',
-                'message' => "You have used all {$team->plan->credits()} credits for this {$team->plan->getLabel()} plan period.",
+                'message' => "You have used all {$allowance} credits for this {$team->plan->getLabel()} plan period.",
                 'plan' => $team->plan->value,
-                'allowance' => $team->plan->credits(),
+                'allowance' => $allowance,
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
                 'upgrade_url' => $isFree ? $this->billingUrl($team) : null,

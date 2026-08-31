@@ -35,6 +35,8 @@ return [
         'keep_pro' => 'Keep Pro',
         'paused' => 'Your workspace is paused',
         'subscribe' => 'Subscribe',
+        'past_due' => 'Payment failed',
+        'fix' => 'Fix',
     ],
 
     'trial' => [
@@ -92,11 +94,17 @@ return [
         'body' => 'Update your payment method, download invoices, or change your plan in the billing portal.',
         'button' => 'Manage subscription',
         'auto_renews' => 'Renews automatically',
+        'past_due_tagline' => 'Renewal failed. Stripe is retrying.',
         'cancel_scheduled_title' => 'Cancellation scheduled',
         'cancel_scheduled_body' => 'Cloud Pro stays active until :date. After that, workspace access pauses.',
         'cancel_scheduled_legacy_body' => 'Cloud Pro stays active until :date. Then this workspace returns to its grandfathered Free plan.',
         'past_due_title' => 'Payment issue',
         'past_due_body' => 'Your last payment failed. Update your payment method to keep Pro.',
+    ],
+    'payment_failed' => [
+        'notification_title' => 'Payment failed for :workspace',
+        'notification_body' => 'Update your payment method to keep Pro. Stripe will retry the charge.',
+        'notification_action' => 'Fix payment',
     ],
     'enterprise' => [
         'title' => 'Enterprise plan',

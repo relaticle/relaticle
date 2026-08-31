@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Billing;
 
 use App\Actions\Billing\GrantPurchasedCredits;
+use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\RestoreWorkspaceTrial;
 use App\Models\Team;
 use Illuminate\Support\Facades\Log;
@@ -21,8 +22,11 @@ final class StripeWebhookController extends CashierWebhookController
      */
     private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
 
-    public function __construct(private readonly RestoreWorkspaceTrial $restoreTrial, private readonly GrantPurchasedCredits $grantCredits)
-    {
+    public function __construct(
+        private readonly RestoreWorkspaceTrial $restoreTrial,
+        private readonly GrantPurchasedCredits $grantCredits,
+        private readonly NotifyWorkspaceOfPaymentFailure $notifyPaymentFailure,
+    ) {
         parent::__construct();
     }
 
@@ -53,6 +57,36 @@ final class StripeWebhookController extends CashierWebhookController
         }
 
         return $response;
+    }
+
+    /**
+     * Cashier ships no handler for this event, so WebhookHandled never fires for
+     * it and a listener on that event could never see it.
+     *
+     * The subscription lives at parent.subscription_details on the current API
+     * version, which dropped the top-level `subscription` key. Reading the old
+     * key would match nothing and silently notify no one. A credit-pack invoice
+     * has no such parent and must not raise a subscription alarm.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleInvoicePaymentFailed(array $payload): Response
+    {
+        /** @var array<string, mixed> $object */
+        $object = $payload['data']['object'] ?? [];
+        $customer = $object['customer'] ?? null;
+
+        if (($object['parent']['type'] ?? null) !== 'subscription_details' || ! is_string($customer)) {
+            return $this->successMethod();
+        }
+
+        $team = Team::query()->where('stripe_id', $customer)->first();
+
+        if ($team instanceof Team) {
+            $this->notifyPaymentFailure->execute($team);
+        }
+
+        return $this->successMethod();
     }
 
     /**

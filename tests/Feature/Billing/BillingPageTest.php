@@ -186,7 +186,11 @@ it('shows past-due warning', function (): void {
         'quantity' => 1,
     ]);
 
-    livewire(Billing::class)->assertSee(__('billing.manage.past_due_title'));
+    livewire(Billing::class)
+        ->assertSee(__('billing.manage.past_due_title'))
+        ->assertSee(__('billing.manage.past_due_tagline'))
+        ->assertDontSee(__('billing.manage.auto_renews'))
+        ->assertDontSee(__('billing.manage.title'));
 });
 
 it('shows enterprise manual state without upgrade actions', function (): void {

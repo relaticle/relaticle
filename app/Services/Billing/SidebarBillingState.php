@@ -14,7 +14,7 @@ use Laravel\Pennant\Feature;
  * The sidebar's one-line billing prompt. Derives from the same state the
  * Billing page shows, so the two cannot tell a workspace different stories.
  *
- * Returns null for every workspace with nothing to ask for: subscribers,
+ * Returns null for every workspace with nothing to ask for: paying subscribers,
  * Enterprise, grandfathered free, and any install with billing switched off.
  */
 final readonly class SidebarBillingState
@@ -22,12 +22,28 @@ final readonly class SidebarBillingState
     public function __construct(private HostedWorkspaceAccess $access) {}
 
     /**
-     * @return array{label: string, action: string}|null
+     * `urgent` separates a failure from an offer: past due is the only state
+     * here reporting something already broken, and the row renders it in danger
+     * colours rather than the same neutral pill as an upgrade prompt.
+     *
+     * @return array{label: string, action: string, urgent: bool}|null
      */
     public function for(Team $team): ?array
     {
         if (! Feature::active(Billing::class)) {
             return null;
+        }
+
+        // Ranked above the valid() check for the same reason BillingStatus ranks
+        // PastDue above Subscribed: keepPastDueSubscriptionsActive() leaves
+        // valid() true throughout dunning, so asking it first returns null and
+        // leaves the one state that ends in losing the workspace unmentioned.
+        if ($team->subscription()?->pastDue() === true) {
+            return [
+                'label' => __('billing.sidebar.past_due'),
+                'action' => __('billing.sidebar.fix'),
+                'urgent' => true,
+            ];
         }
 
         if ($team->subscription()?->valid() === true || $team->plan === Plan::Enterprise) {
@@ -40,6 +56,7 @@ final readonly class SidebarBillingState
                     'days' => $this->daysLeft($team),
                 ]),
                 'action' => __('billing.sidebar.keep_pro'),
+                'urgent' => false,
             ];
         }
 
@@ -53,6 +70,7 @@ final readonly class SidebarBillingState
         return [
             'label' => __('billing.sidebar.paused'),
             'action' => __('billing.sidebar.subscribe'),
+            'urgent' => false,
         ];
     }
 
