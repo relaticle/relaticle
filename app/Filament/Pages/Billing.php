@@ -22,6 +22,7 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
 use Throwable;
 
 final class Billing extends Page
@@ -149,6 +150,9 @@ final class Billing extends Page
 
         return [
             'team' => $team,
+            // Not $team->plan->credits(): a past-due workspace refills at the Free
+            // allowance, so the plan's figure would name credits it never gets.
+            'allowance' => resolve(CreditService::class)->allowanceFor($team),
             'isOwner' => $this->user()->ownsTeam($team),
             'subscription' => $subscription,
             'pastDue' => $subscription?->pastDue() ?? false,

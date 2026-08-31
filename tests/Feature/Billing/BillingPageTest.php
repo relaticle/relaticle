@@ -193,6 +193,28 @@ it('shows past-due warning', function (): void {
         ->assertDontSee(__('billing.manage.title'));
 });
 
+it('meters a past-due workspace against the allowance it will be refilled with', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_due_allowance',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())->update([
+        'credits_remaining' => 0,
+        'credits_used' => Plan::Free->credits(),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee('/ '.number_format(Plan::Free->credits()))
+        ->assertDontSee('/ '.number_format(Plan::Pro->credits()))
+        ->assertSee('100%');
+});
+
 it('shows enterprise manual state without upgrade actions', function (): void {
     [, $team] = billingPageOwner();
     $team->forceFill(['plan' => Plan::Enterprise])->save();

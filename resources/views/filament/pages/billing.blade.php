@@ -1,7 +1,6 @@
 <x-filament-panels::page>
     @php
         $purchased = (int) ($balance?->purchased_credits ?? 0);
-        $allowance = $team->plan->credits();
         $used = (int) ($balance?->credits_used ?? 0);
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
