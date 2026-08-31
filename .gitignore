@@ -45,6 +45,8 @@ yarn-error.log
 /docs/*
 !/docs/i18n.md
 !/docs/billing.md
+!/docs/superpowers/
+!/docs/superpowers/**
 api.json
 .scribe/
 /public/vendor/scribe
