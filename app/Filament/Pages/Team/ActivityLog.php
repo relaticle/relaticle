@@ -486,28 +486,16 @@ final class ActivityLog extends Page implements HasTable
      * body arrives here stripped but not shortened, and uncapped it would ship
      * the whole note into the title of every row on the page.
      *
-     * Every part is a value someone typed into the CRM, so every part is escaped.
-     *
      * @param  array{label: string, old: string, new: string}  $state
      */
     private function changeLine(array $state): HtmlString
     {
-        $plain = Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH);
-        $old = Str::limit($state['old'], self::VALUE_LENGTH);
-        $new = Str::limit($state['new'], self::VALUE_LENGTH);
-
-        return new HtmlString(sprintf(
-            '<span title="%s">'
-            .'<span class="text-gray-500 dark:text-gray-400">%s:</span> '
-            .'<span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">%s</span> '
-            .'<span class="text-gray-300 dark:text-gray-600" aria-hidden="true">→</span> '
-            .'<span class="font-medium text-gray-950 dark:text-white">%s</span>'
-            .'</span>',
-            e($plain),
-            e($state['label']),
-            e($old),
-            e($new),
-        ));
+        return new HtmlString(view('filament.pages.team.activity-line', [
+            'label' => $state['label'],
+            'old' => Str::limit($state['old'], self::VALUE_LENGTH),
+            'new' => Str::limit($state['new'], self::VALUE_LENGTH),
+            'title' => Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH),
+        ])->render());
     }
 
     /**
