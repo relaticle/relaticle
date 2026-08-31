@@ -106,7 +106,7 @@ it('sends no effort at all when the configured value is not one Anthropic accept
  * ModelProbe only earns its place if it fails on the request CrmAssistant would
  * really send. Sampling parameters are read off the agent running the prompt, so
  * a probe agent that carried its own (absent) sampling config would sail through
- * while production failed on every turn — which is exactly RELATICLE-CRM-6D, and
+ * while production failed on every turn. That is exactly RELATICLE-CRM-6D, and
  * exactly what the first version of this probe did.
  */
 it('probes with the assistant\'s own sampling parameters, not its own', function (): void {

@@ -44,7 +44,7 @@ beforeEach(function (): void {
 
 /**
  * Insert an activity row directly so each test controls the batch_uuid it groups
- * on — the per-request stamping itself is covered separately and end-to-end in the
+ * on. The per-request stamping itself is covered separately and end-to-end in the
  * browser flow.
  *
  * @param  array<string, mixed>  $attributeChanges

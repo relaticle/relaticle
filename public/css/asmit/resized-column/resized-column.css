@@ -34,7 +34,7 @@ thead th.fi-ta-header-cell[data-column-name] {
     overflow: hidden;
 }
 
-/* Resize handle — short bar centered on the header edge (not full height). */
+/* Resize handle: short bar centered on the header edge (not full height). */
 thead th.fi-ta-header-cell[data-column-name]::after {
     content: '';
     position: absolute;
@@ -110,7 +110,7 @@ thead th.fi-ta-header-cell[data-column-name].resized-column-is-resizing::after {
     background-color: var(--resized-column-handle-active-color);
 }
 
-/* Containing block for resize ::after / grips — scoped so we do not
+/* Containing block for resize ::after / grips, scoped so we do not
    override Filament/Primo sticky positioning on plain header cells. */
 thead th.fi-ta-header-cell[data-column-name] {
     position: relative;
@@ -247,7 +247,7 @@ thead th.fi-ta-header-cell.resized-reorderable-col {
     overflow: hidden;
 }
 
-/* Reorder grip — SVG ::before (same pattern as pin icon) paints with the HTML. */
+/* Reorder grip: SVG ::before (same pattern as pin icon) paints with the HTML. */
 thead th.fi-ta-header-cell.resized-reorderable-col:not([data-sticky])::before {
     content: '';
     position: absolute;
@@ -302,7 +302,7 @@ thead th.fi-ta-header-cell.resized-reorderable-col:not([data-sticky])::before {
     opacity: 0.4;
 }
 
-/* Pin icon on pinned column headers — CSS ::before paints with the HTML so
+/* Pin icon on pinned column headers. CSS ::before paints with the HTML so
    icons do not wait for Alpine init + Livewire morph + scheduleStickyRefresh. */
 thead th.fi-ta-header-cell[data-sticky]::before,
 thead th.fi-ta-header-cell.resized-sticky::before {
@@ -394,7 +394,7 @@ thead th.fi-ta-header-cell.resized-sticky {
 }
 
 /*
- * Sticky surface tokens — opaque backgrounds so scrolled columns do not bleed through.
+ * Sticky surface tokens: opaque backgrounds so scrolled columns do not bleed through.
  * Defaults resolve to Filament's own table surface variables (light + dark).
  *
  * Override any of these anywhere (:root, .fi-ta-ctn, a single table) and it wins,
@@ -411,7 +411,7 @@ thead th.fi-ta-header-cell.resized-sticky {
     --resized-sticky-surface-emphasis: var(--gray-50, #f9fafb);
 }
 
-/* Filament toggles `.dark` on <html>, so scope the dark surfaces there — a table
+/* Filament toggles `.dark` on <html>, so scope the dark surfaces there. A table
    rendered outside .fi-ta-ctn (modal, widget, custom view) still resolves.
    Filament's dark tints are translucent (5% white over the surface); a pinned cell
    has to be opaque, so composite the same colour instead. */
@@ -433,7 +433,7 @@ thead th.fi-ta-header-cell.resized-sticky {
     isolation: isolate;
 }
 
-/* Every pinned cell is opaque — body, footer/summary, selection cell, whatever
+/* Every pinned cell is opaque: body, footer/summary, selection cell, whatever
    Filament renders. Keyed off the attribute alone so a cell without .fi-ta-cell
    never scrolls transparent. */
 [data-sticky-applied] {

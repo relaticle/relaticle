@@ -59,7 +59,7 @@ final class Billing extends Page
     public function startTrial(StartProTrial $startProTrial): void
     {
         // The button is only rendered for an eligible workspace, but the
-        // Livewire method is reachable regardless — enforce it server-side.
+        // Livewire method is reachable regardless, so enforce it server-side.
         if (! $this->trialAvailable()) {
             Notification::make()->title(__('billing.trial.not_available'))->danger()->send();
 
@@ -165,7 +165,7 @@ final class Billing extends Page
 
     /**
      * A manual trial start is the escape hatch for a workspace that never
-     * received its automatic creation-time trial — grandfathered pre-billing
+     * received its automatic creation-time trial: grandfathered pre-billing
      * workspaces and workspaces created while trials were per-user.
      */
     private function trialAvailable(): bool

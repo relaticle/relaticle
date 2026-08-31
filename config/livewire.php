@@ -16,7 +16,7 @@ return [
     | DoS protection while accommodating realistic editor content.
     |
     | The full payload array is repeated here because Laravel's
-    | mergeConfigFrom uses a shallow array_merge — omitting any sibling key
+    | mergeConfigFrom uses a shallow array_merge, so omitting any sibling key
     | drops the package default to null and disables that guard.
     */
 

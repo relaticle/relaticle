@@ -23,13 +23,13 @@ beforeEach(function (): void {
  * Regression for the chat-approve cross-tenant custom-field write (and the 504 it
  * caused at scale).
  *
- * When approve() runs there may be no resolvable tenant context — so the custom-fields
+ * When approve() runs there may be no resolvable tenant context, so the custom-fields
  * TenantScope no-ops and saveCustomFields() iterates EVERY tenant's field definitions.
  * PendingActionService::approve() sets the tenant context from the action's team before
  * executing.
  *
  * The test invokes the service directly with the tenant context torn down, which
- * faithfully reproduces the no-tenant request (an HTTP feature test cannot — the
+ * faithfully reproduces the no-tenant request (an HTTP feature test cannot, because the
  * test process keeps a Filament tenant resolved, masking the bug).
  */
 it('scopes custom-field writes to the action tenant when approving a create', function (): void {

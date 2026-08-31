@@ -24,7 +24,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
  * the strip is identical whichever tab you land on.
  *
  * Filament builds sub-navigation from the page class, not from panel config, and
- * hides items whose `visible()` resolves false — so each tab carries the same
+ * hides items whose `visible()` resolves false, so each tab carries the same
  * guard as its page.
  */
 trait HasWorkspaceSettingsNavigation
@@ -89,7 +89,7 @@ trait HasWorkspaceSettingsNavigation
 
     /**
      * Matching on the rendered page rather than the current route, because every
-     * interaction on these pages — a table sort, a modal, switching entity type —
+     * interaction on these pages (a table sort, a modal, switching entity type)
      * re-renders the strip inside a `livewire.update` request, where no page route
      * is current and every tab would come back unhighlighted.
      *

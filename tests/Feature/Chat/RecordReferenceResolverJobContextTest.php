@@ -14,7 +14,7 @@ beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->user->switchTeam($this->user->ownedTeams()->first());
     $this->actingAs($this->user);
-    // Deliberately do NOT call Filament::setTenant() — this mirrors the queued job context
+    // Deliberately do NOT call Filament::setTenant(); this mirrors the queued job context
 });
 
 it('resolves a company URL without Filament tenant bound, using auth user currentTeam', function (): void {

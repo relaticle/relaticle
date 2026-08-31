@@ -124,20 +124,20 @@ prev/next, each decided item) so one record's exclusions cannot leak onto the
 next. Audit truth: excluded codes persist in `result_data.excluded` (single)
 or `result_data.items[i].excluded` (batch item) and reach the model via
 `excludedFieldEntries()` -> `<resolved_actions>` ("fields unchecked by the
-user, NOT written") — without that line the model reports values it never
+user, NOT written"). Without that line the model reports values it never
 set, the same defect class `skippedItemLabels()` exists to prevent.
 
 ## Duplicates are caught by the REAL field rules, which need the tenant bound
 The card-level "Heads up: already proposed a moment ago" warning was removed
 (user-directed, 2026-08). Duplicate values (a person email above all) are
 rejected by the custom-fields package's own unique rules running inside
-`CustomFieldsRequestValidator` at proposal time — never re-implement them as
+`CustomFieldsRequestValidator` at proposal time. Never re-implement them as
 bespoke lookups in a tool; they drift, and any escape hatch they offer is a
 lie the real rule blocks later. Two load-bearing pieces:
 - `ProcessChatMessage::bindAuth()` binds `TenantContextService` for the whole
   job (restored in `releaseAuth()`). Without it the unique rules silently
-  no-op in the queued job — the exact bug that let chat create duplicate
-  emails while the panel form rejected them. Any new chat entry point that
+  no-op in the queued job. That is the exact bug that let chat create
+  duplicate emails while the panel form rejected them. Any new chat entry point that
   validates or writes custom fields needs the same binding.
 - `BaseWriteCreateTool` SKIPS a record that fails validation instead of
   aborting the call: the valid records still become one proposal, and
@@ -223,12 +223,12 @@ Edited from the sysadmin panel at /sysadmin/ai-models, seeded from `config/chat.
   the picker stores in `localStorage['chat:model']`, what `?model=` carries, and what
   `ai_credit_transactions.model` already records. So it is unique across the catalog
   (`distinct()` on the panel's Select, and `ratesFor()` would otherwise let a retired row
-  price an active one), and retagging a row makes it a different model — every user who
+  price an active one), and retagging a row makes it a different model. Every user who
   had picked the old tag silently lands back on Auto, which the client does by sanitizing
   its stored pick against the live options. That is the accepted cost of having no
   operator-typed id to mistype or rename; add a succession pointer if it ever stops being
   acceptable. `users.ai_preferences['default_model']` is read by `AiModelResolver` but has
-  never been written by any code path — check before assuming a preference is stored.
+  never been written by any code path. Check before assuming a preference is stored.
 - A disabled entry stays only so `AiSpendStatsWidget` can price historical
   `ai_credit_transactions` rows that still name its model. `ModelRegistry::ratesFor()`
   therefore reads disabled entries too, while `all()` skips them.
@@ -242,7 +242,7 @@ The catalog's credits and prices are edited through a per-row gear modal
 (`extraItemActions`) rather than as table columns, but they must still be declared in
 the repeater's schema as `Hidden::make()`. Filament builds state from the schema, so a
 key that is only in the stored array and not in the schema silently disappears the next
-time the form is saved — every price on every model, in one click. Filament renders
+time the form is saved, taking every price on every model with it in one click. Filament renders
 `Hidden` components inside a table repeater without giving them a column, which is
 exactly what makes this work. `ManageAiSettingsTest` pins it; do not "tidy away" those
 three Hidden fields.
@@ -251,7 +251,7 @@ three Hidden fields.
 `ManageAiSettings::modelOptions()` adds the entry's stored model to the option list. A
 Select silently drops a value that is not among its options, so without the merge every
 entry goes invalid the moment a provider is unreachable or its key is absent on this
-install — which is exactly what happened the first time this page was built. The same
+install. That is exactly what happened the first time this page was built. The same
 page must also coerce form state to primitives before writing (`normalizeModels()`): a
 Select bound to an enum hands back a `Plan` instance, and pint's `strict_comparison`
 fixer will rewrite any `==` you reach for, so cast instead of compare.
@@ -276,8 +276,8 @@ through the panel.
 The probe (`ModelProbe` + `ModelProbeAgent`) sends one real step carrying CrmAssistant's
 full surface so the provider can reject it before a bad model reaches the catalog. The
 trap: `TextGenerationOptions::forAgent()` reflects the agent that RUNS the prompt, so the
-first version — which delegated instructions, tools and providerOptions but not sampling
-parameters — passed with `#[Temperature(0.3)]` reintroduced, i.e. it did not catch the
+first version delegated instructions, tools and providerOptions but not sampling
+parameters, so it passed with `#[Temperature(0.3)]` reintroduced. It did not catch the
 bug it was built for. `ModelProbeAgent::temperature()`/`topP()` now delegate. Verified by
 reintroducing the attribute and watching the probe go red; keep that property.
 `tool_choice: none` rides on the `#[ToolChoice]` attribute rather than `providerOptions()`
@@ -288,9 +288,9 @@ save would let one provider with a stale key block edits to unrelated rows.
 
 ## Register every package settings class in config/settings.php
 spatie/laravel-settings auto-discovers `app_path('Settings')` only, and every settings
-class here lives in `packages/<Name>/src/Settings`. An unregistered one still WORKS —
-the container autowires the concrete class and `Settings::__get()` loads it lazily — so
-nothing fails loudly and the omission survives review. What it costs: no `scoped`
+class here lives in `packages/<Name>/src/Settings`. An unregistered one still WORKS,
+because the container autowires the concrete class and `Settings::__get()` loads it
+lazily, so nothing fails loudly and the omission survives review. What it costs: no `scoped`
 binding, so every `resolve()` is a fresh instance and its own query (three per
 `ManageAiSettings::save()`), and `SETTINGS_CACHE_ENABLED` can never reach the class
 while `ChatServiceProvider::boot()` reads it on every request, job and command.
@@ -305,7 +305,7 @@ their model lists through it: the derived strings interpolate into sentences, so
 that is absent or rotated renders "Every plan can use  and any self-hosted model you
 connect yourself" and "1x for ; 1.5x for ; 3x for )" on a public page. The whole test
 suite is blind to it because `phpunit.xml` sets a fake key for every provider. Use
-`offered()` there — enabled, tool-capable, non-self-hosted, key-independent — which
+`offered()` there (enabled, tool-capable, non-self-hosted, key-independent), which
 still cannot name a model `AiModelResolver::pick()` would refuse. `PricingPageTest`
 pins it with the keys nulled.
 
@@ -316,7 +316,7 @@ and a 24h `Cache::remember` over a vendor's bad minute blanks the model picker f
 
 ## composer test scripts need disableProcessTimeout
 Composer kills a script at 300s by default. `test:pest` had the guard and its siblings
-did not, so `composer test:pest:full` — the merge gate CLAUDE.md tells you to run —
+did not, so `composer test:pest:full`, the merge gate CLAUDE.md tells you to run,
 started aborting on the clock rather than on a test once the suite crossed five minutes.
 Every script that can run the whole suite or a slow subset now carries it. Add it to any
 new one.

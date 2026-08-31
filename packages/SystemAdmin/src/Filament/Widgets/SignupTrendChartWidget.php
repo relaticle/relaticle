@@ -58,7 +58,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
         /**
          * Intervals run whole buckets in the viewer's calendar, the last one
-         * being the bucket today falls in — so the window is derived from them
+         * being the bucket today falls in, so the window is derived from them
          * rather than from a bare `now() - N days`, which would start mid-bucket
          * and end a bucket short.
          */
@@ -114,7 +114,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
     /**
      * `created_at` is a UTC-bearing `timestamp without time zone`, so it is
-     * relabelled as UTC before being shifted into the viewer's zone — otherwise
+     * relabelled as UTC before being shifted into the viewer's zone. Otherwise
      * a signup just after local midnight buckets into the previous day.
      *
      * @return Collection<string, int>

@@ -6,12 +6,12 @@ updated: "2026-08-30"
 related: [help/records/company-records, help/records/restore-deleted-records]
 ---
 
-Companies, people, and opportunities each carry an **Activity log** tab — a
+Companies, people, and opportunities each carry an **Activity log** tab, a
 read-only history of changes, grouped by date, newest first. When a value
 looks wrong or a stage moved unexpectedly, this is where you find out who
 changed it and when.
 
-Each entry names the person and the field — "Alex changed Stage" — and
+Each entry names the person and the field, as in "Alex changed Stage", and
 scrolling loads older history as far back as the record goes. Field edits are
 covered, custom fields included; every teammate's changes appear, not just
 your own.
@@ -27,7 +27,7 @@ the API, and by the AI assistant.
 Workspace admins get **Workspace Settings → Activity**: the same history for
 every record type in one table, tasks and notes included. Each row is when,
 who, what action (created, updated, deleted, restored), which record, and
-what changed — filter by any of those or by date range.
+what changed. Filter by any of those or by date range.
 
 This is also where deletions live on. A record's own Activity log tab
 disappears with the record, but the workspace log keeps the entry and the

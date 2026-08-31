@@ -12,14 +12,14 @@ use App\Models\User;
 /**
  * The read-path twin of {@see CustomFieldsSchemaDescriber}.
  *
- * Most of what a CRM user filters on — stage, status, due date, priority, amount —
+ * Most of what a CRM user filters on (stage, status, due date, priority, amount)
  * lives in custom fields, so a list tool without them can only ever answer "all of
  * them". This inlines the tenant's filterable codes, their operators and their
  * option labels into the tool's `custom_fields` slot, so the assistant can build a
  * correct filter without a discovery round-trip.
  *
- * Filterability and operators come from {@see CustomFieldFilterSchema} — the same
- * source the MCP server uses — so the two surfaces cannot drift apart.
+ * Filterability and operators come from {@see CustomFieldFilterSchema}, the same
+ * source the MCP server uses, so the two surfaces cannot drift apart.
  */
 final readonly class CustomFieldsFilterDescriber
 {

@@ -118,7 +118,7 @@ it('opens the edit action when a card is clicked', function (): void {
 
 /**
  * Sibling of the tasks board badge: "closes today" is a claim about the viewer's
- * calendar. A close date is a plain date, so the stored value is midnight UTC — read
+ * calendar. A close date is a plain date, so the stored value is midnight UTC. Read
  * without conversion it still reads as the previous day for anyone far enough east,
  * and the pipeline card lands in the wrong urgency bucket.
  */
@@ -146,7 +146,7 @@ it('buckets the close-date badge against the user calendar, not the server clock
 /**
  * The mirror of the case above, for a viewer west of UTC. A close date is a plain
  * calendar date that the package stores at midnight UTC, so converting it into a
- * negative-offset zone walks it back past midnight and the card reads a day early —
+ * negative-offset zone walks it back past midnight and the card reads a day early.
  * the failure the eastern case cannot see, because moving midnight forward stays
  * inside the same day.
  */

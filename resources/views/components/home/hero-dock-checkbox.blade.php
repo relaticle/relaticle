@@ -3,7 +3,7 @@
      Always rendered checked: the hero shows a proposal exactly as the agent
      drafted it, before anyone has unchecked anything.
 
-     `locked` is the identity field's variant — always written, so the real card
+     `locked` is the identity field's variant, always written, so the real card
      renders it at 40% tint with a not-allowed cursor instead of a live control. --}}
 @props(['locked' => false])
 

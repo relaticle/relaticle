@@ -1,6 +1,6 @@
 <section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
 
-    {{-- Background system — layered depth --}}
+    {{-- Background system: layered depth --}}
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
 
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -116,7 +116,7 @@
                             </div>
                         </div>
 
-                        {{-- Tab panels — grid stacking for Safari-smooth crossfade.
+                        {{-- Tab panels use grid stacking for a Safari-smooth crossfade.
                              min-height matches the live chat panel so switching to an
                              image tab can't collapse the mockup frame.
 
@@ -132,7 +132,7 @@
                              its top-left corner, which is what the alt text
                              describes. --}}
                         <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
-                            {{-- AI Agent tab (default — featured) --}}
+                            {{-- AI Agent tab (default, featured) --}}
                             {{-- min-w-0: a grid item defaults to min-width:auto, so the
                                  chat panel's own table would size the column to its
                                  intrinsic width and push the transcript past the frame. --}}

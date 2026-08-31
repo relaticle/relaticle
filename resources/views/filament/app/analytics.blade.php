@@ -7,7 +7,7 @@
 <script>
 window.addEventListener('load', function() {
     function normalizeUrl(pathname) {
-        // Panel-level pages carry no tenant slug — track them as-is so the
+        // Panel-level pages carry no tenant slug, so track them as-is and the
         // auth funnel (/login, /register, …) doesn't collapse into /dashboard.
         var tenantless = ['/login', '/register', '/forgot-password', '/password-reset', '/email-verification', '/two-factor-authentication', '/new', '/logout'];
         for (var i = 0; i < tenantless.length; i++) {

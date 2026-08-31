@@ -230,7 +230,7 @@ test('a create and a delete in one request both stay on the record', function ()
 
 /**
  * Each custom field that moves is logged as its own row, so a save touching
- * three fields writes three siblings — not one.
+ * three fields writes three siblings, not one.
  */
 function seedCustomFieldRow(object $test, Company $company, string $batch, string $label, string $old, string $new): Activity
 {
@@ -401,7 +401,7 @@ test('filtering on updated covers custom field edits too', function (): void {
 
     // The custom-field edit is a later request, so it gets its own batch_uuid.
     // Without this the whole test shares one, RequestActivityBatch being scoped to
-    // a request, and the edit collapses into the company's `created` row instead —
+    // a request, and the edit collapses into the company's `created` row instead,
     // which is what the page is supposed to do to a create that carried fields.
     app()->forgetScopedInstances();
 

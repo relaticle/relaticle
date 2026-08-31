@@ -61,7 +61,7 @@
 }
 
 /* Search row (AppSidebar): the search field and the notifications trigger,
-   inset to exactly the gutter the navigation items sit in — the nav's `px-6`
+   inset to exactly the gutter the navigation items sit in: the nav's `px-6`
    less the groups' `-mx-2`. Padding rather than margin, so the rule separating
    it from the workspace switcher runs the full width of the sidebar. */
 .fi-sidebar-search-ctn {
@@ -500,7 +500,7 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 /* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
    z-index 21 so its own dropdowns clear the sticky table head at 19. That also
    puts it above a page-header action dropdown, whose panel is Filament's
-   default z-index 20 — the panel then renders *behind* the search field and
+   default z-index 20, so the panel renders *behind* the search field and
    filter/column triggers. Lift those panels over the toolbar; 22 keeps them
    under Filament chrome (topbar/sidebar, z-index 30). */
 .fi-header-actions-ctn .fi-dropdown-panel {

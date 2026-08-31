@@ -1,6 +1,6 @@
 /* TipTap chat editor styles */
 
-/* Placeholder for empty editor — Placeholder extension adds .is-editor-empty
+/* Placeholder for empty editor. The Placeholder extension adds .is-editor-empty
    and data-placeholder; we render the text via ::before. */
 .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
@@ -13,7 +13,7 @@
     color: var(--color-gray-500);
 }
 
-/* Mention chips inside the editor — match the existing chip styling so
+/* Mention chips inside the editor, matching the existing chip styling so
    atomic delete looks the same as historical-message rendering. */
 .ProseMirror span[data-mention-id] {
     display: inline-flex;

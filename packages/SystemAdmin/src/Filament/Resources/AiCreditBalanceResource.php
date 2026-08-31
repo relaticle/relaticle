@@ -60,7 +60,7 @@ final class AiCreditBalanceResource extends Resource
                 TextInput::make('credits_remaining')
                     ->numeric()
                     ->minValue(fn (?AiCreditBalance $record): int => $record?->purchased_credits ?? 0)
-                    ->helperText('Cannot go below purchased credits — the DB enforces purchased_credits <= credits_remaining.')
+                    ->helperText('Cannot go below purchased credits. The DB enforces purchased_credits <= credits_remaining.')
                     ->required(),
                 TextInput::make('credits_used')
                     ->numeric()
@@ -89,7 +89,7 @@ final class AiCreditBalanceResource extends Resource
                     TextEntry::make('purchased_credits')
                         ->numeric()
                         ->label('Purchased credits')
-                        ->helperText('Floor for credits_remaining — the DB rejects a lower value.'),
+                        ->helperText('Floor for credits_remaining. The DB rejects a lower value.'),
                     TextEntry::make('period_starts_at')->dateTime(),
                     TextEntry::make('period_ends_at')->dateTime(),
                     TextEntry::make('updated_at')->dateTime(),
@@ -257,7 +257,7 @@ final class AiCreditBalanceResource extends Resource
             ->modalHeading('Reset billing period')
             ->modalDescription(fn (AiCreditBalance $record): string => 'Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.'
                 .(($record->team->subscription()?->valid() ?? false)
-                    ? ' WARNING: this team has an active Stripe subscription — webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
+                    ? ' WARNING: this team has an active Stripe subscription, so webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
                     : ''))
             ->schema([
                 Select::make('plan')

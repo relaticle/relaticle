@@ -146,14 +146,14 @@ test('export datetimes name and use the requesting user timezone', function () {
 
     $exporter = new TaskExporter(Export::latest()->first(), ['created_at' => 'Created At'], []);
 
-    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo — the date rolls over.
+    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo, so the date rolls over.
     expect($exporter($task->fresh())[0])->toBe('2026-08-19 08:30:00');
 });
 
 /**
  * Custom-field datetimes reach the exporter from the package, bypassing the helper the
  * native columns use. Left alone they wrote the stored UTC under a bare header, in the
- * same file whose other headers say `(Asia/Tokyo)` — so a due date could land a full
+ * same file whose other headers say `(Asia/Tokyo)`, so a due date could land a full
  * calendar day off with nothing signalling it.
  */
 test('custom field datetimes export in the user timezone with the zone named', function () {

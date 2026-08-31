@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One user's rating of one assistant message — the quality signal pipeline.
+ * One user's rating of one assistant message, feeding the quality signal pipeline.
  *
  * @property string $id
  * @property string $team_id

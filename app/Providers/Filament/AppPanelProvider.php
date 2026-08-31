@@ -173,12 +173,12 @@ final class AppPanelProvider extends PanelProvider
 
     /**
      * Gates the browser timezone detection script below, which posts to an app-panel
-     * route. Panel rendering itself no longer reads this — that resolution is global
+     * route. Panel rendering itself no longer reads this; that resolution is global
      * and lives in AppServiceProvider::configureFilament(), because TimezoneManager
      * holds a single slot and a second writer here would silently win on boot order.
      *
      * The web guard is shared with the sysadmin panel's SystemAdministrator, whose
-     * zone is chosen on its own profile page and never detected — narrow to the
+     * zone is chosen on its own profile page and never detected, so narrow to the
      * customer model rather than assuming.
      */
     private function signedInUser(): ?User
@@ -436,13 +436,13 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
-     * Support entries for the user menu — every support form type that resolves
+     * Support entries for the user menu: every support form type that resolves
      * to a URL, opening its Maxforms form in a new tab. Empty when nothing is
      * configured, so the user menu simply shows no support entries.
      *
      * Everything is resolved lazily: the URL carries the signed-in user and
-     * workspace as prefill, and the feature flag is only decided per request —
-     * neither is known while the panel is being configured.
+     * workspace as prefill, and the feature flag is only decided per request.
+     * Neither is known while the panel is being configured.
      *
      * @return list<Action>
      */

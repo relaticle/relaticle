@@ -1053,7 +1053,7 @@ return new class extends Migration
      * Cutover a primary key from integer to ULID.
      *
      * MySQL requires removing AUTO_INCREMENT before dropping the primary key (Error 1075).
-     * PostgreSQL uses sequences — this step is unnecessary and skipped.
+     * PostgreSQL uses sequences, so this step is unnecessary and skipped.
      */
     private function cutoverPrimaryKey(string $table): void
     {

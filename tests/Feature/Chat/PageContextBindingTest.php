@@ -174,8 +174,8 @@ it('persists the bound record as a page_context row on the user message', functi
 /**
  * The pill attaches like a pre-filled attachment: to the next message only. Once
  * the client has sent it, `pageContextConsumed` clears the pill and the following
- * turns carry `page_context: null` even while the user stays on the same record —
- * this is what the Alpine layer now does. This test proves the server side of that
+ * turns carry `page_context: null` even while the user stays on the same record.
+ * This is what the Alpine layer now does. This test proves the server side of that
  * contract: nothing here re-attaches a previously bound record on the caller's
  * behalf, so a second turn that (correctly) omits page_context persists none.
  */
@@ -197,7 +197,7 @@ it('carries no page_context row on a second message in the same conversation onc
     ))->handle(resolve(CreditService::class));
 
     // The client already sent the pill once; it is consumed now, so this turn
-    // (still on the same record) sends no page_context — exactly as the browser
+    // (still on the same record) sends no page_context, exactly as the browser
     // does after `pageContextConsumed` flips true.
     (new ProcessChatMessage(
         user: $this->user,
@@ -237,7 +237,7 @@ it('carries no page_context row on a second message in the same conversation onc
  * The discriminating case: a message with BOTH a typed mention and a bound
  * page context must write TWO rows. The pre-fix `persistMentions()` guard
  * (`if ($this->mentions === []) return;`) only ever wrote the mention row and
- * silently dropped page context — asserting a bare "no row" absence can't
+ * silently dropped page context. Asserting a bare "no row" absence can't
  * tell that apart from the feature simply not existing yet, so this is the
  * test that actually fails against the old code.
  */
@@ -394,7 +394,7 @@ function seedMentionRow(string $messageId, string $type, string $recordId, strin
 /**
  * Drive contextLedger() through the job's public handle() entry point and
  * capture what it handed to the agent, via the container's own resolution
- * hook rather than reflection — CrmAssistant::$contextLedger is already a
+ * hook rather than reflection, since CrmAssistant::$contextLedger is already a
  * public property.
  *
  * @return list<array{type: string, id: string, label: string}>

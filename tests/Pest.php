@@ -74,7 +74,7 @@ function chatChannelAuth(User $user, string $conversationId): bool
 /**
  * Invoke the App.Models.User.{id} broadcast channel authorization callback.
  *
- * Mirrors chatChannelAuth — retrieves the registered closure via reflection
+ * Mirrors chatChannelAuth. Retrieves the registered closure via reflection
  * and invokes it directly, so tests exercise the real production callback.
  */
 function userChannelAuth(User $user, string $id): bool

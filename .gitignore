@@ -63,7 +63,7 @@ test-results.xml
 /.amp
 /.agents
 
-# business-review regression ledger is machine-local (~/.claude/business-review/) — never commit it
+# business-review regression ledger is machine-local (~/.claude/business-review/); never commit it
 .claude/skills/business-review/regressions.json
 
 # Pest browser plugin writes a PNG here for every failed assertion

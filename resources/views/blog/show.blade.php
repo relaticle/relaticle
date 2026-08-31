@@ -1,8 +1,8 @@
 @php
     // The panel's SEO section writes title/description to the post's `seo` row and
-    // wins when set. Ink's own renderer can't honour it — getDynamicSEOData() always
-    // returns the post title, which takes precedence in prepareForUsage() — so the
-    // override has to be applied here.
+    // wins when set. Ink's own renderer can't honour it, because getDynamicSEOData()
+    // always returns the post title, which takes precedence in prepareForUsage().
+    // The override has to be applied here instead.
     $seoTitle = $post->seo->title ?: $post->title;
     $seoDescription = $post->seo->description
         ?: ($post->excerpt ?: \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', strip_tags($post->content))), 155));

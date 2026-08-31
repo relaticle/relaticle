@@ -20,7 +20,7 @@ it('has an explicit hosted Free grandfathering column', function (): void {
 it('defaults new teams to the Free plan value', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
-    // Cast wired in Task 3 — for now assert the raw default.
+    // Cast wired in Task 3; for now assert the raw default.
     expect($user->currentTeam->getRawOriginal('plan'))->toBe('free');
 });
 

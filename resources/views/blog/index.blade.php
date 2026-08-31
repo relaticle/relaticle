@@ -10,8 +10,8 @@
     };
 
     // Listings paginate, so page 2+ must self-canonicalise or a post reachable only
-    // from there has no canonical page pointing at it. Only `page` is carried over —
-    // search and tracking params stay out. Search results are noindex,follow: they
+    // from there has no canonical page pointing at it. Only `page` is carried over,
+    // so search and tracking params stay out. Search results are noindex,follow: they
     // are an infinite, low-value URL space that should not be indexed.
     $searchQuery = request()->query('q');
     $currentPage = (int) request()->query('page', 1);
@@ -57,7 +57,7 @@
             @if($posts->isEmpty())
                 <div class="text-center py-16 space-y-4">
                     @if($posts->total() > 0)
-                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist — the archive only goes up to page {{ $posts->lastPage() }}.</p>
+                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist. The archive only goes up to page {{ $posts->lastPage() }}.</p>
                         <a href="{{ $posts->url(1) }}"
                            class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
                             <x-ri-arrow-left-line class="w-4 h-4" />

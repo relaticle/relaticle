@@ -73,7 +73,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(SubdomainRootResponse::class);
 
         // Outermost (last prepend wins the front slot) so the noindex header
-        // also lands on responses SubdomainRootResponse short-circuits — the
+        // also lands on responses SubdomainRootResponse short-circuits. The
         // api/mcp root banners are exactly the crawlable secondary-host URLs.
         $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
 
@@ -140,7 +140,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Stale tabs and deploy boundaries produce checksum failures that
         // Livewire already renders as 419 (page expired -> client refreshes).
-        // They are user-state noise, not actionable errors — keep them out of
+        // They are user-state noise, not actionable errors, so keep them out of
         // Sentry (issue #125406836).
         $exceptions->dontReport(CorruptComponentPayloadException::class);
     })

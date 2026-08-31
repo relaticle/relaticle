@@ -22,7 +22,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-2">
 
-            {{-- Agent-Native Infrastructure — 2col 2row — external agents (MCP / REST) --}}
+            {{-- Agent-Native Infrastructure, 2col 2row: external agents (MCP / REST) --}}
             <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 lg:row-span-2 overflow-hidden flex flex-col">
                 <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
                     <x-ri-git-merge-line class="w-4 h-4 text-primary dark:text-primary-400"/>
@@ -139,7 +139,7 @@
                 </div>
             </div>
 
-            {{-- Built-in AI Chat — the in-app conversational agent --}}
+            {{-- Built-in AI Chat: the in-app conversational agent --}}
             <div id="card-builtin-ai" class="{{ $cardBase }} p-6 overflow-hidden">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-chat-smile-3-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
@@ -243,7 +243,7 @@
                 </div>
             </div>
 
-            {{-- Task Management — 2col --}}
+            {{-- Task Management, 2col --}}
             <div id="card-tasks" class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 overflow-hidden">
                 <div class="flex flex-col md:flex-row md:gap-6">
                     <div class="md:flex-1">
@@ -252,7 +252,7 @@
                             Task Management
                         </h3>
                         <p class="{{ $cardDesc }}">
-                            Create, assign, and track tasks linked to contacts, companies, and deals. Ask the chat to draft follow-ups, reschedule tasks, or roll up what's due — destructive edits ask before they run.
+                            Create, assign, and track tasks linked to contacts, companies, and deals. Ask the chat to draft follow-ups, reschedule tasks, or roll up what's due. Destructive edits ask before they run.
                         </p>
                     </div>
                     <div class="mt-4 md:mt-0 md:flex-1 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
@@ -276,7 +276,7 @@
             {{-- Simple feature cards row 2 --}}
             @foreach([
                 ['ri-team-line', 'Team Collaboration', 'Multi-workspace support with role-based permissions and 5-layer authorization. Every team member sees exactly what they should.'],
-                ['ri-download-cloud-2-line', 'Import & Export', 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime — your data is yours.'],
+                ['ri-download-cloud-2-line', 'Import & Export', 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime. Your data is yours.'],
             ] as [$icon, $title, $desc])
                 <div class="{{ $cardBase }} p-6">
                     <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
@@ -287,13 +287,13 @@
                 </div>
             @endforeach
 
-            {{-- Notes & Activity Log — spans full width on tablet to avoid orphan gap --}}
+            {{-- Notes & Activity Log, spanning full width on tablet to avoid an orphan gap --}}
             <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-1">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-quill-pen-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
                     Notes & Activity Log
                 </h3>
-                <p class="{{ $cardDesc }}">Capture notes linked to any record — by hand, by voice, or by asking the chat. Search and retrieve context instantly across notes, messages, and activity.</p>
+                <p class="{{ $cardDesc }}">Capture notes linked to any record, by hand, by voice, or by asking the chat. Search and retrieve context instantly across notes, messages, and activity.</p>
             </div>
 
             {{-- CTA Card --}}
@@ -319,28 +319,28 @@
             document.addEventListener('DOMContentLoaded', function() {
                 var e = [0.22, 1, 0.36, 1];
 
-                // Cards entrance — staggered fade up (visible by default for Lighthouse/no-JS)
+                // Cards entrance: staggered fade up (visible by default for Lighthouse/no-JS)
                 inView('#features .grid', function() {
                     animate('.feat-card', { y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
                 }, { amount: 0.1 });
 
-                // Built-in AI Chat — bubbles fill in sequence (user → assistant → suggestion)
+                // Built-in AI Chat: bubbles fill in sequence (user → assistant → suggestion)
                 inView('#card-builtin-ai', function() {
                     animate('#card-builtin-ai .ai-fill', { width: ['0%', '100%'] }, { delay: stagger(0.18, { start: 0.3 }), duration: 0.6, ease: e });
                     animate('#ai-sparkle', { scale: [1, 1.2, 1] }, { duration: 0.5, delay: 0.2, ease: e });
                 }, { amount: 0.4 });
 
-                // Data Model — form fields slide in from left
+                // Data Model: form fields slide in from left
                 inView('#card-data', function() {
                     animate('#card-data .field-row', { x: [-16, 0] }, { delay: stagger(0.1, { start: 0.3 }), duration: 0.4, ease: e });
                 }, { amount: 0.4 });
 
-                // Sales Pipeline — segments scale in from left
+                // Sales Pipeline: segments scale in from left
                 inView('#card-sales', function() {
                     animate('.pipe-seg', { scaleX: [0, 1] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.6, ease: e });
                 }, { amount: 0.4 });
 
-                // Tasks — rows slide in staggered from right
+                // Tasks: rows slide in staggered from right
                 inView('#card-tasks', function() {
                     animate('.task-row', { x: [20, 0] }, { delay: stagger(0.15, { start: 0.2 }), duration: 0.45, ease: e });
                 }, { amount: 0.3 });

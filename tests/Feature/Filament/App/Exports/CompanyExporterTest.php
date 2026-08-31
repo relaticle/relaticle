@@ -155,6 +155,6 @@ test('export values are converted out of utc into the requesting user timezone',
     $exporter = new CompanyExporter($export, ['created_at' => 'Created At'], []);
     $row = $exporter($company->fresh());
 
-    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo — the date rolls over.
+    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo, so the date rolls over.
     expect($row[0])->toBe('2026-08-19 08:30:00');
 });

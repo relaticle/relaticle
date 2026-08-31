@@ -45,7 +45,7 @@ use Override;
  * The workspace audit trail: who changed or deleted which record, and when.
  *
  * A record's own timeline disappears with the record on a permanent delete, so
- * this page reads the activity rows directly — they outlive their subject, and
+ * this page reads the activity rows directly. They outlive their subject, and
  * the name captured in the delete payload still identifies what was destroyed.
  */
 final class ActivityLog extends Page implements HasTable
@@ -55,7 +55,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * Custom-field edits are logged under their own event name rather than the
-     * trait's `updated`, but to an admin they are the same act — so they share a
+     * trait's `updated`, but to an admin they are the same act, so they share a
      * label, and filtering on it has to match both.
      */
     private const array EVENT_ALIASES = [
@@ -146,8 +146,8 @@ final class ActivityLog extends Page implements HasTable
      * One save writes the trait's own event plus one `custom_field_changes` row
      * per custom field that moved, all sharing a `batch_uuid`. Reporting them
      * all put a phantom update next to every create, so they collapse onto a
-     * single surviving row — the native event when there is one, otherwise the
-     * first custom-field row — which carries every sibling payload with it.
+     * single surviving row: the native event when there is one, otherwise the
+     * first custom-field row, whichever carries every sibling payload with it.
      */
     public function table(Table $table): Table
     {
@@ -305,8 +305,8 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * Rows written for one record inside one request. The batch is stamped per
-     * request, not per save, so a request touching several records shares it —
-     * the subject columns are what keep one record's payload off another's row.
+     * request, not per save, so a request touching several records shares it.
+     * The subject columns are what keep one record's payload off another's row.
      *
      * Only ever used to fold a `custom_field_changes` row into its native
      * sibling. Collapsing the batch itself would swallow a genuine event, since
@@ -324,7 +324,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * A destroyed record survives only in its own payload, and a record whose
-     * name never moved was never written into one — so neither source alone can
+     * name never moved was never written into one, so neither source alone can
      * answer "show me every row about Acme". Both are searched.
      *
      * @param  Builder<Activity>  $query
@@ -361,7 +361,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * The name the record carried at the time of the event wins. Reading the
-     * live record instead would rewrite history on every rename — and there is
+     * live record instead would rewrite history on every rename, and there is
      * no live record left to read once it has been destroyed.
      */
     private function recordName(Activity $record): string
@@ -406,7 +406,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * Tasks and notes have no record page of their own, so their canonical URL
-     * is the index deep link that opens the edit modal — the same URL the search
+     * is the index deep link that opens the edit modal, the same URL the search
      * tools and digest emails publish, built by the same class.
      */
     private function subjectUrl(Activity $record): ?string
@@ -427,8 +427,8 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * Resolved for the whole page at once rather than through `subject`, because
-     * a morph alias whose model has since been removed from the codebase — a
-     * stale row from a retired feature — makes eager loading the relation throw
+     * a morph alias whose model has since been removed from the codebase (a
+     * stale row from a retired feature) makes eager loading the relation throw
      * and takes the entire audit log down with it. Unknown aliases simply have
      * no live record; the row still renders from its own payload.
      */
@@ -479,7 +479,7 @@ final class ActivityLog extends Page implements HasTable
     }
 
     /**
-     * Reads as one sentence — field, what it was, what it became — with the
+     * Reads as one sentence (field, what it was, what it became) with the
      * before struck through so the after is what the eye lands on. The title
      * carries the same sentence in plain text, which is what a reader gets back
      * when a long value wraps or is clipped. It is capped too: a rich-editor

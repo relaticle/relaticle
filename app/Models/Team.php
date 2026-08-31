@@ -358,8 +358,8 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     }
 
     /**
-     * The relation already pins `team_id`, so the tenant scope adds nothing —
-     * and outside the app panel there is no tenant, which would narrow it to
+     * The relation already pins `team_id`, so the tenant scope adds nothing.
+     * Outside the app panel there is no tenant, which would narrow it to
      * nothing at all.
      *
      * @return HasMany<Activity, $this>

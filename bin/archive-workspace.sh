@@ -21,7 +21,7 @@ unlink_site() {
 unlink_site "$FOLDER"
 
 # An older setup may have linked the workspace name rather than the folder.
-# Only touch that site when it provably points at THIS directory — the name
+# Only touch that site when it provably points at THIS directory. The name
 # can also belong to a different workspace's folder.
 WORKSPACE_NAME="${CONDUCTOR_WORKSPACE_NAME:-}"
 if [[ -n "$WORKSPACE_NAME" && "$WORKSPACE_NAME" != "$FOLDER" ]] &&

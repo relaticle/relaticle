@@ -8,7 +8,7 @@
 
 {{--
     Draws ONLY the mouse-proximity glow highlight on top of the existing static
-    SVG dot pattern in this partial — it never redraws the base dots themselves,
+    SVG dot pattern in this partial. It never redraws the base dots themselves,
     so the original grid (tile size, dot position/size, opacity, color) stays
     pixel-identical to the pre-existing design. Geometry here (spacing/dotOffset/
     dotSize) must match the sibling <pattern> tile (x/y/width/height, circle
@@ -74,8 +74,8 @@
             resolveColor(value) {
                 if (!value) return null;
                 // getComputedStyle(...).color can come back as the source's own
-                // notation (e.g. "oklch(...)") verbatim rather than normalized rgb() —
-                // parsing that with a plain \d+ regex reads the oklch(L C H) triplet
+                // notation (e.g. "oklch(...)") verbatim rather than normalized rgb().
+                // Parsing that with a plain \d+ regex reads the oklch(L C H) triplet
                 // as raw RGB channels (0-1, 0-1, up to ~360), which clamps to near-black
                 // with a maxed-out blue channel. A 1x1 canvas fillStyle round-trip
                 // always normalizes to rgb()/rgba(), so it's the only reliable path.
@@ -99,7 +99,7 @@
                 // Anchor the grid phase to this block's position on the page so the
                 // glow dots land exactly on top of the sibling SVG pattern's dots,
                 // which tile from the SAME shared coordinate space (userSpaceOnUse
-                // starts at each block's own 0,0 — matching offsetLeft/offsetTop here).
+                // starts at each block's own 0,0, matching offsetLeft/offsetTop here).
                 this.buildGrid();
             },
 

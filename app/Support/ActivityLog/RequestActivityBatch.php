@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
  * key the timeline groups on when collapsing a single save's native + custom-field
  * rows into one entry.
  *
- * Bound as a scoped container instance — Laravel forgets scoped instances between
+ * Bound as a scoped container instance. Laravel forgets scoped instances between
  * HTTP requests and between queue jobs, so the uuid never leaks across them.
  */
 final class RequestActivityBatch
