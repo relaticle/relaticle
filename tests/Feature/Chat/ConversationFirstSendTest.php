@@ -28,7 +28,7 @@ it('chat-interface view embeds the new chat.conversations.create route', functio
     $response->assertOk();
 
     // The route is emitted via @js() inside @script @endscript, which Livewire
-    // packs into a wire:effect attribute — slashes are JSON-escaped (\/) AND
+    // packs into a wire:effect attribute, so slashes are JSON-escaped (\/) AND
     // the result lives inside an HTML attribute, so each backslash is doubled.
     $createPath = parse_url(route('chat.conversations.create'), PHP_URL_PATH);
     $escapedPath = str_replace('/', '\\\\\\/', $createPath);

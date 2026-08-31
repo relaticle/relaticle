@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * Workspace member directory for the chat tools: backs ListTeamMembersTool and
  * validates team-member fields (company account_owner_id, task assignee_ids),
- * which accept ONLY workspace users — never CRM contacts.
+ * which accept ONLY workspace users, never CRM contacts.
  */
 final readonly class TeamMembersContext
 {
@@ -51,7 +51,7 @@ final readonly class TeamMembersContext
     /**
      * Validate a team-member field value at proposal time: null and '' pass
      * (absent / unassign), a scalar id or list of ids must all be workspace
-     * members — checked with one exact query, never the display-capped list.
+     * members, checked with one exact query, never the display-capped list.
      * Returns the model-facing error naming the valid members, or null.
      */
     public static function memberFieldError(User $user, string $field, mixed $value): ?string

@@ -19,8 +19,8 @@ use Throwable;
  * every Opus 4.7 turn fail with a 400, and nothing short of a real request to
  * the real endpoint could have caught it. A probe that sends a simplified body
  * would have passed while production kept failing, so this one carries the full
- * CrmAssistant surface — every tool schema, the cached system blocks, the
- * tool_choice guard and the effort dial — and lets the provider judge it.
+ * CrmAssistant surface (every tool schema, the cached system blocks, the
+ * tool_choice guard and the effort dial) and lets the provider judge it.
  *
  * It runs through `prompt()`, the same public entry point a real turn uses, so
  * nothing here can quietly drift from production. ModelProbeAgent forbids tool

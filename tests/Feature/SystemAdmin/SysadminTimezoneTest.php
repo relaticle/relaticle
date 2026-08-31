@@ -13,7 +13,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 mutates(EditProfile::class);
 
 /**
- * 2026-08-18 23:30 UTC is 2026-08-19 08:30 in Tokyo — deliberately across the date
+ * 2026-08-18 23:30 UTC is 2026-08-19 08:30 in Tokyo, deliberately across the date
  * line, so a test that only compares the clock time cannot pass by accident.
  */
 function sysadminKnownInstant(): Carbon

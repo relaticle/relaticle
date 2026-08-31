@@ -41,7 +41,7 @@ use UnitEnum;
  * A vendor retiring a model or shipping a new one is not a code change, but it
  * used to need one. The safety this buys back is ModelProbe: nothing can be saved
  * until the provider has accepted a real request built the way a real turn builds
- * it. That gate is the whole point of the page — see RELATICLE-CRM-6D, where a
+ * it. That gate is the whole point of the page. See RELATICLE-CRM-6D, where a
  * request the app happily built was rejected by the provider on every single turn.
  *
  * @property-read Schema $form
@@ -140,7 +140,7 @@ final class ManageAiSettings extends Page
                                         ->extraAttributes(['style' => 'min-width: 11rem']),
                                     // Hidden, not absent: a table repeater renders Hidden
                                     // components without giving them a column, and a field
-                                    // missing from the schema is dropped from getState() —
+                                    // missing from the schema is dropped from getState(),
                                     // so leaving these out would silently discard every
                                     // plan and price on the next save.
                                     //
@@ -353,7 +353,7 @@ final class ManageAiSettings extends Page
      * Capabilities are never taken from the form, they are taken from the stored
      * catalog or from a probe. The form is redrawn from whatever the operator last
      * saw and a re-added row carries none at all, so trusting it would store an
-     * enabled model as tool-incapable and drop it out of every picker — the silent
+     * enabled model as tool-incapable and drop it out of every picker, the silent
      * failure this gate exists to stop (Sentry RELATICLE-CRM-6D).
      *
      * A pairing already carrying a measurement is skipped. Re-verifying the whole
@@ -543,8 +543,8 @@ final class ManageAiSettings extends Page
      * The providers this install can actually reach, plus whatever a stored row
      * already names.
      *
-     * A provider with no API key can serve nothing — save() rejects every model
-     * under one — so offering it is offering a dead end. The merge of the current
+     * A provider with no API key can serve nothing, because save() rejects every
+     * model under one, so offering it is offering a dead end. The merge of the current
      * value is load-bearing for the same reason as in modelOptions(): a Select
      * silently drops a value missing from its options, so a row naming a provider
      * that is keyed in production but not here would blank itself on render.

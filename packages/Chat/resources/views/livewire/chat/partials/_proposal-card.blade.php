@@ -2,7 +2,7 @@
 
      Two render modes, both gated by the transcript x-for in chat-interface.blade.php:
        1. status === 'pending' (a partially-resolved batch still docked at the
-          composer): COMPACT progress view — only the resolved per-item chips plus
+          composer): COMPACT progress view with only the resolved per-item chips plus
           a muted "N of M resolved" hint. The full editor lives in the dock, so we
           deliberately omit the header, fields, and final badge to avoid a
           confusing duplicate.

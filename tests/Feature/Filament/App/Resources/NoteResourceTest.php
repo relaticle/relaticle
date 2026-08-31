@@ -193,7 +193,7 @@ it('accepts deeply nested rich-editor JSON in custom field action data', functio
     // partial updates with deeply nested dot paths. The default Livewire 4
     // payload.max_nesting_depth = 10 is insufficient: the prefix
     // (mountedActions.0.data.custom_fields.<field>) already consumes 5 levels,
-    // leaving only 5 for TipTap content — easily exceeded.
+    // leaving only 5 for TipTap content, which is easily exceeded.
     $deepPath = 'mountedActions.0.data.custom_fields.body.content.1.content.1.content.2.content.0.content';
 
     livewire(ManageNotes::class)

@@ -25,7 +25,7 @@ use RuntimeException;
 /**
  * Orchestrates editing a chat create-proposal before approval: re-validate the
  * edited core + custom fields, rewrite the clean action_data, and re-render
- * display_data — never executing the action and never dispatching a
+ * display_data, never executing the action and never dispatching a
  * continuation. Driven by the docked ProposalCard's saveField flow.
  */
 final readonly class ProposalEditor
@@ -38,7 +38,7 @@ final readonly class ProposalEditor
     /**
      * Re-validate the edited fields, rewrite action_data, and re-render
      * display_data for a single create-proposal (or one batch item). Returns
-     * the refreshed PendingAction; it stays Pending — the action is never run.
+     * the refreshed PendingAction; it stays Pending, and the action is never run.
      *
      * @param  array<string, mixed>  $input  the edited fields keyed by code
      */
@@ -279,7 +279,7 @@ final readonly class ProposalEditor
 
             // Only the edited codes change; every other custom field on the record is
             // preserved. A code edited to an empty/invalid value (dropped by the
-            // validator, so absent from $cleanFields) is removed individually — never
+            // validator, so absent from $cleanFields) is removed individually, never
             // the whole map.
             foreach (array_keys($editedCustomFields) as $code) {
                 if (array_key_exists($code, $cleanFields)) {

@@ -131,7 +131,7 @@ final class ChatSidePanel extends BaseLivewireComponent
     {
         /**
          * The panel also renders on tenant-less pages (workspace creation, email
-         * verification), where the chat routes have no URL to resolve — the
+         * verification), where the chat routes have no URL to resolve. The
          * header's full-page link hides itself when these are null.
          */
         $tenant = Filament::getTenant();

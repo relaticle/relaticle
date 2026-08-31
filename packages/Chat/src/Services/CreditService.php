@@ -127,7 +127,7 @@ final readonly class CreditService
     /**
      * Grant prepaid credits from a completed pack checkout. Idempotent on
      * $idempotencyKey (the Stripe checkout session id) via the ledger's
-     * (team_id, idempotency_key) unique index — webhook replays are a no-op.
+     * (team_id, idempotency_key) unique index, so webhook replays are a no-op.
      *
      * @param  array<string, mixed>  $metadata
      */
@@ -177,7 +177,7 @@ final readonly class CreditService
      * Spending drains the monthly allowance first, so the prepaid bucket only
      * shrinks once the allowance is gone. A refund has to reverse that: when
      * every remaining credit was prepaid, the credit came out of the prepaid
-     * bucket and must go back there — otherwise it silently becomes an
+     * bucket and must go back there. Otherwise it silently becomes an
      * allowance credit that the next period reset wipes.
      */
     private function purchasedAfter(AiCreditBalance $balance, int $newRemaining): int

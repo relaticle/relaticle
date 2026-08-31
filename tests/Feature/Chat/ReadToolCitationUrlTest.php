@@ -42,7 +42,7 @@ beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->user->switchTeam($this->user->ownedTeams()->first());
     $this->actingAs($this->user);
-    // Deliberately no Filament::setTenant() — mirrors job context
+    // Deliberately no Filament::setTenant(), mirroring job context
 });
 
 // --- GetCompanyTool ---

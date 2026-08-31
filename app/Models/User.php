@@ -125,7 +125,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * The zone this user's calendar is expressed in. `timezone` is nullable: a user
      * who never chose one and whose browser was never detected falls back to the app
      * default, so every caller that turns a stored UTC value into a wall clock reads
      * it from here rather than repeating the fallback.
@@ -210,7 +210,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
-     * verified — every framework, Filament, and policy check that reads
+     * verified, so every framework, Filament, and policy check that reads
      * hasVerifiedEmail() honors the flag uniformly through this single override.
      */
     public function hasVerifiedEmail(): bool
@@ -277,7 +277,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * The ids of every team the user can reach, owned or joined.
      *
      * Authorization runs once per table row, so resolving a record's `team`
-     * relation inside a policy costs a query per row — and throws once a query
+     * relation inside a policy costs a query per row, and throws once a query
      * hydrates more than one row, because that is when Eloquent arms its strict
      * lazy-loading guard. Matching the record's foreign key against this set
      * keeps authorization off the record's relations entirely.

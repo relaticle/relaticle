@@ -52,7 +52,7 @@ function seedResolvedAssistantMsg(string $conversationId, User $user, DateTimeIn
 it('keeps actions resolved before the last assistant message in context', function (): void {
     // Regression: a rejection followed by any later assistant turn used to fall
     // out of the resolved window, leaving only the stale "pending approval"
-    // tool result in the replayed transcript — the model then told the user the
+    // tool result in the replayed transcript. The model then told the user the
     // proposal was still awaiting approval instead of proposing again.
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);

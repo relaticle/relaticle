@@ -47,7 +47,7 @@ abstract class BaseExporter extends Exporter
      * are produced at two different moments: `formatStateUsing` runs inside the queued
      * job, which has no session and reads the user off the export record, while
      * `getColumns()` is static and only ever evaluated for labels during the interactive
-     * column-mapping step — Filament freezes those labels into the export's columnMap
+     * column-mapping step. Filament freezes those labels into the export's columnMap
      * and writes the header row from that, never re-deriving it in the job.
      */
     public function timezone(): string
@@ -56,7 +56,7 @@ abstract class BaseExporter extends Exporter
     }
 
     /**
-     * Header-row timezone, resolved from the session — see timezone() for why.
+     * Header-row timezone, resolved from the session. See timezone() for why.
      */
     public static function requestTimezone(): string
     {
@@ -90,7 +90,7 @@ abstract class BaseExporter extends Exporter
     /**
      * The custom-field columns arrive from the package already built, so they never pass
      * through `dateTimeColumn()` above. Left alone they write the stored UTC under a bare
-     * header, in the same file where the native columns say `(Asia/Tokyo)` — and the
+     * header, in the same file where the native columns say `(Asia/Tokyo)`, and the
      * neighbouring suffix is what makes that dangerous, because it tells the reader the
      * file is local when one column is not.
      *

@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Only the API (API_DOMAIN), MCP (MCP_DOMAIN), and Filament panels bind their
  * routes to a domain; everything else answers on any hostname that reaches
  * the app, so the marketing site and docs were served as indexable duplicates
- * on api./mcp./app. and the sysadmin host — each with a self-referencing
+ * on api./mcp./app. and the sysadmin host, each with a self-referencing
  * canonical. Guests hitting a public GET route on a non-primary host are
  * 301'd to the same path on the APP_URL host instead.
  *
@@ -24,7 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
  * domainless plumbing (chat, 2FA, logout, Livewire, broadcasting, Passport,
  * Sanctum), so only unauthenticated GET/HEAD requests are redirected, and
  * signed routes are exempt because signatures are computed over the absolute
- * URL — rewriting the host would 403 every invitation link.
+ * URL, so rewriting the host would 403 every invitation link.
  *
  * Socialite routes are exempt by name: redirect_uri must match the host the
  * user started on (Google's is GOOGLE_REDIRECT_URI or a relative path).

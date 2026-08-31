@@ -21,7 +21,7 @@ use PHPStan\Type\ObjectType;
  * Keeps authorization off the authorized record's relations.
  *
  * A policy runs once per row, so resolving a relation there costs a query per
- * row — and throws outright once a query hydrates more than one row, because
+ * row, and throws outright once a query hydrates more than one row, because
  * Eloquent only arms its strict lazy-loading guard at that point
  * (Builder::hydrate sets it when count($items) > 1). That makes the defect
  * invisible in any single-record test and fatal on a populated table.

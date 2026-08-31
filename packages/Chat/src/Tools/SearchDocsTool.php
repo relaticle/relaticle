@@ -35,7 +35,7 @@ final readonly class SearchDocsTool implements Tool
     /**
      * One well-matched article otherwise wins every slot with its own
      * sub-headings, burying the second article that answers the other half of
-     * the question — the help centre covers connecting Claude, the developer
+     * the question. The help centre covers connecting Claude, the developer
      * guide covers connecting anything else.
      */
     private const int MAX_SECTIONS_PER_PAGE = 2;
@@ -69,7 +69,7 @@ final readonly class SearchDocsTool implements Tool
 
     public function description(): string
     {
-        return 'Search Relaticle\'s own product documentation — the help centre and the developer guides — '
+        return 'Search Relaticle\'s own product documentation, both the help centre and the developer guides, '
             .'and get back the matching sections plus a link to each. Covers connecting external AI assistants '
             .'and MCP clients (Claude, ChatGPT, Cursor, Codex), access tokens, the REST API, self-hosting, '
             .'billing and plans, AI credits, imports, exports, custom fields, and every in-app feature. '

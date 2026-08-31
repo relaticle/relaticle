@@ -63,7 +63,7 @@ it('honours forwarded headers from loopback so reverse proxies on the host work'
     ]);
 });
 
-it('emits https asset URLs when the proxy forwards X-Forwarded-Proto: https — the actual mechanism behind the unstyled-CSS bug', function (): void {
+it('emits https asset URLs when the proxy forwards X-Forwarded-Proto: https, the actual mechanism behind the unstyled-CSS bug', function (): void {
     Route::get('/_vite-asset-probe', fn (): array => [
         'asset' => asset('build/app.css'),
         'scheme' => request()->getScheme(),
@@ -83,7 +83,7 @@ it('emits https asset URLs when the proxy forwards X-Forwarded-Proto: https — 
     expect($response->json('asset'))->toStartWith('https://');
 });
 
-it('emits http asset URLs when forwarded headers come from an untrusted public IP — confirming this would cause the unstyled-CSS bug if trust were misconfigured', function (): void {
+it('emits http asset URLs when forwarded headers come from an untrusted public IP, confirming this would cause the unstyled-CSS bug if trust were misconfigured', function (): void {
     Route::get('/_vite-asset-probe', fn (): array => [
         'asset' => asset('build/app.css'),
         'scheme' => request()->getScheme(),

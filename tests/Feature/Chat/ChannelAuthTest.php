@@ -72,7 +72,7 @@ it('refuses optimistic claim when another user already holds the conversation id
         'updated_at' => now(),
     ]);
 
-    // Eve later tries to subscribe to the same id — must be denied.
+    // Eve later tries to subscribe to the same id, which must be denied.
     expect(chatChannelAuth($eve, CONV_FRESH))->toBeFalse();
 });
 

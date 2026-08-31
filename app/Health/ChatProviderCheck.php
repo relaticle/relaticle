@@ -48,7 +48,7 @@ final class ChatProviderCheck extends Check
      * thinking before it emits anything. OpenAI rejects a budget under 16 and
      * returns an incomplete response when the budget runs out, so no value both
      * stays free and stays green at an every-minute cadence. A revoked key and
-     * a retired model — the two persistent faults this check exists to catch —
+     * a retired model, the two persistent faults this check exists to catch,
      * are precisely what this endpoint reports, as 401 and 404.
      *
      * Provider overload and rate limiting are transient and nothing we can act
@@ -127,8 +127,8 @@ final class ChatProviderCheck extends Check
 
     /**
      * The catalogue is user-selectable, so there is no single configured model
-     * per provider. Prefer the entry available on every plan — the one most
-     * turns actually use — and fall back to the cheapest plan on offer.
+     * per provider. Prefer the entry available on every plan, the one most
+     * turns actually use, and fall back to the cheapest plan on offer.
      *
      * `isServable()` is the same question every picker asks, so a model this
      * check watches is exactly a model a user can land on. Self-hosted models are

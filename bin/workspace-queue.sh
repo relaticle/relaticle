@@ -2,7 +2,7 @@
 # Runs this workspace's queue worker (Horizon) and restarts it when PHP changes.
 #
 # Horizon holds every class in memory for the life of a worker, so a worker
-# started before an edit keeps executing the old code until it is terminated —
+# started before an edit keeps executing the old code until it is terminated,
 # chat prompts and job logic silently run a version you already changed.
 # watchexec sends SIGTERM on a PHP change, which Horizon's master handles as a
 # graceful shutdown, then relaunches. Boot is the entire cost (~6 CPU-seconds,

@@ -15,7 +15,7 @@ final readonly class UserObserver
      * Conversations in teams the user merely belonged to survive the purge, and
      * participant_id is a polymorphic key, so no foreign key can null itself on
      * delete the way agent_conversations.user_id used to. This lives on the model
-     * rather than in DeleteUser so that every delete path is covered — the
+     * rather than in DeleteUser so that every delete path is covered. The
      * SystemAdmin panel deletes users through plain Eloquent, not the
      * DeletesUsers contract.
      */

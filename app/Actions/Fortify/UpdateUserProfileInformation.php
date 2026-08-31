@@ -56,7 +56,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
     }
 
     /**
-     * Clearing the select writes null — that is a deliberate "use the app default".
+     * Clearing the select writes null, a deliberate "use the app default".
      * An absent key means the caller is not managing the timezone at all, so the
      * stored value is left alone.
      *

@@ -272,8 +272,8 @@ final class ChatInterface extends BaseLivewireComponent
      * Authoritative latest assistant message for the conversation, used by the
      * client to reconcile the streamed bubble against persisted state on stream_end
      * (and on the watchdog timeout). Also returns the conversation's still-pending
-     * proposal cards so a dropped `.tool_result` websocket event — which would
-     * otherwise leave the approve/reject CTA missing until a full reload — is
+     * proposal cards so a dropped `.tool_result` websocket event, which would
+     * otherwise leave the approve/reject CTA missing until a full reload, is
      * self-healed by the client merging any cards it never received.
      *
      * Read-tool display blocks ride along for the same reason: they are never
@@ -368,7 +368,7 @@ final class ChatInterface extends BaseLivewireComponent
      * without requiring a full page reload.
      *
      * On a brand-new chat the conversation is created client-side via a fetch,
-     * so the server-side $conversationId stays null until a reload — the client
+     * so the server-side $conversationId stays null until a reload. The client
      * therefore passes its own id, scoped to the authed user and team by
      * FindConversation.
      */

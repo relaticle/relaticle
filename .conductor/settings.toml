@@ -1,8 +1,8 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 # Gitignored files each new worktree needs (.env, Passport keys) are copied via
-# .worktreeinclude at the repo root. Everything else — Herd site, .env
-# rewrites, per-workspace testing DB, dependencies, build — lives in the
+# .worktreeinclude at the repo root. Everything else (Herd site, .env
+# rewrites, per-workspace testing DB, dependencies, build) lives in the
 # scripts, shared with Polyscope (polyscope.json calls the same files).
 
 [scripts]
@@ -20,7 +20,7 @@ default = true
 icon = "globe"
 available_in = ["local"]
 
-# Chat (and any queued work) needs a worker owned by THIS workspace — nothing
+# Chat (and any queued work) needs a worker owned by THIS workspace. Nothing
 # starts one automatically, and without it sent messages queue forever. The
 # script wraps Horizon in watchexec so an edited job or prompt is picked up
 # instead of running from the worker's boot-time memory.

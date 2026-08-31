@@ -51,8 +51,8 @@ final class ChatBrowser
      *
      * Since the chat drawer rework the interface is rendered collapsed on the
      * dashboard, so `offsetParent` is null even though the component is mounted
-     * and its data is live. Prefer a visible host when there is one — a page may
-     * mount both the drawer and an inline interface — and otherwise fall back to
+     * and its data is live. Prefer a visible host when there is one, since a page may
+     * mount both the drawer and an inline interface, and otherwise fall back to
      * the mounted one rather than handing `undefined` to `Alpine.$data()`.
      */
     public static function resolveInterface(string $variable = 'data'): string

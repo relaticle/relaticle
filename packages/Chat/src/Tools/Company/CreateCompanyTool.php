@@ -32,7 +32,7 @@ final class CreateCompanyTool extends BaseWriteCreateTool
         return [
             'name' => $schema->string()->description('The company name.')->required(),
             'account_owner_id' => $schema->string()->description(
-                'OPTIONAL — the team member who owns this company (a user id from the'
+                'OPTIONAL. The team member who owns this company (a user id from the'
                 .' list team members tool, never a contact/person). Defaults to the current user.',
             ),
         ];

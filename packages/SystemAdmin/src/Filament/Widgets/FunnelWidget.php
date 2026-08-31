@@ -65,7 +65,7 @@ final class FunnelWidget extends StatsOverviewWidget
 
     /**
      * A user counts as an organic sign-up unless they were added to a team
-     * they do not own within 24h of registering — the signature of accepting
+     * they do not own within 24h of registering, the signature of accepting
      * an invitation (register -> immediately attached to the inviter's team).
      */
     private function countOrganicSignups(CarbonImmutable $start, CarbonImmutable $end): int
@@ -90,8 +90,8 @@ final class FunnelWidget extends StatsOverviewWidget
     }
 
     /**
-     * Reuses HasPeriodComparison::getDistinctActiveColumnValues() — the same
-     * helper ActivationRateWidget's getActiveCreatorIds() calls — at team
+     * Reuses HasPeriodComparison::getDistinctActiveColumnValues(), the same
+     * helper ActivationRateWidget's getActiveCreatorIds() calls, at team
      * grain instead of creator grain, so the source filter only lives in one
      * place.
      */
@@ -103,8 +103,8 @@ final class FunnelWidget extends StatsOverviewWidget
     /**
      * Reuses Cashier's own `active` scope (the same predicate
      * SyncTeamPlanFromSubscription/HostedWorkspaceAccess rely on via
-     * Subscription::valid()) rather than hardcoding a stripe_status list —
-     * this app also calls Cashier::keepPastDueSubscriptionsActive(), so the
+     * Subscription::valid()) rather than hardcoding a stripe_status list.
+     * This app also calls Cashier::keepPastDueSubscriptionsActive(), so the
      * "active" set is wider than a literal ['active', 'trialing'].
      */
     private function countSubscribedTeams(CarbonImmutable $start, CarbonImmutable $end): int

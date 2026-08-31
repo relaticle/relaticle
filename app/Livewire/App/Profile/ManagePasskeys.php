@@ -68,7 +68,7 @@ final class ManagePasskeys extends BaseLivewireComponent
      * Confirm the user's identity (passkey ceremony, password fallback, or session alone
      * for passwordless accounts), then run the browser registration ceremony.
      * markConfirmed() is always called before dispatching so the subsequent register POST
-     * satisfies the vendor RequirePassword middleware — even for passwordless accounts the
+     * satisfies the vendor RequirePassword middleware. Even for passwordless accounts the
      * identity gate would otherwise short-circuit.
      *
      * No name is collected here. The AAGUID that identifies the authenticator only exists

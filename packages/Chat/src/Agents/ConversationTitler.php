@@ -21,7 +21,7 @@ use Laravel\Ai\Promptable;
  * and pinned to the provider's cheapest model, so titling a chat costs a
  * fraction of a turn and can never trigger a CRM write.
  *
- * Structured output rather than free text — a chatty model that answers
+ * Structured output rather than free text. A chatty model that answers
  * "Sure! Here's a title: ..." would otherwise become the title verbatim.
  */
 #[UseCheapestModel]

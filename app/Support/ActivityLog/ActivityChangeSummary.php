@@ -65,7 +65,7 @@ final readonly class ActivityChangeSummary
     /**
      * Each custom field that moved is logged as its own row. The audit table
      * collapses a save to a single row, so the survivor carries every sibling
-     * payload — including its own — aggregated into
+     * payload, including its own, aggregated into
      * `batch_custom_field_properties`. Rows written outside a batch have no
      * aggregate and speak for themselves.
      *

@@ -27,15 +27,15 @@ use LogicException;
  *
  * First invocation: if the gate is not satisfied and the user has a passkey, it
  * dispatches the browser confirm ceremony and halts (modal stays open). The global
- * JS handler runs the WebAuthn assertion — which refreshes auth.password_confirmed_at
- * server-side — then re-invokes callMountedAction. On re-entry the gate is satisfied
+ * JS handler runs the WebAuthn assertion, which refreshes auth.password_confirmed_at
+ * server-side, then re-invokes callMountedAction. On re-entry the gate is satisfied
  * and confirmedUsing() runs. The password path validates and marks confirmed inline,
  * with no ceremony.
  *
  * Irreversible actions opt into alwaysConfirm(): the freshness window is ignored and a
  * fresh proof is demanded on every attempt. Re-entry is scoped to the attempt's own
  * start time (a hidden timestamp) rather than the global window, so the passkey ceremony
- * — which refreshes auth.password_confirmed_at — still terminates the loop on re-entry.
+ * (which refreshes auth.password_confirmed_at) still terminates the loop on re-entry.
  */
 final class ConfirmIdentityAction extends Action
 {

@@ -237,7 +237,7 @@ it('never double-grants across a mid-trial conversion', function (): void {
     app(StartProTrial::class)->execute($team->owner, $team);
 
     // Convert mid-trial. The plan is already Pro, so SyncTeamPlanFromSubscription
-    // short-circuits: NO new grant at conversion — the trial allowance keeps running.
+    // short-circuits: NO new grant at conversion, and the trial allowance keeps running.
     test()->travelTo(new DateTimeImmutable('2026-07-01 12:00:00', new DateTimeZone('UTC')));
     sendStripeWebhook(stripeSubscriptionEvent($team->refresh(), 'created'))->assertSuccessful();
 
@@ -256,7 +256,7 @@ it('never double-grants across a mid-trial conversion', function (): void {
     $balance->refresh();
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
-        ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle — never a third
+        ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle, never a third
 });
 
 /** @return array<string, mixed> */
@@ -400,7 +400,7 @@ it('logs and grants nothing when a payment-mode session is missing pack metadata
 it('subscribes the Stripe endpoint to every checkout event the controller handles', function (): void {
     // `cashier:webhook` provisions the endpoint from config('cashier.webhook.events').
     // A handler that isn't in that list never fires in production, however well
-    // it is covered here — these tests POST to the route directly.
+    // it is covered here; these tests POST to the route directly.
     $handled = collect((new ReflectionClass(StripeWebhookController::class))->getMethods(ReflectionMethod::IS_PROTECTED))
         ->map(fn (ReflectionMethod $method): string => $method->getName())
         ->filter(fn (string $name): bool => str_starts_with($name, 'handleCheckoutSession'))

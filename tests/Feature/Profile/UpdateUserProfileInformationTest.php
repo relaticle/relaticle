@@ -388,7 +388,7 @@ describe('photo url generation', function () {
         ]);
 
         // Queue workers / scheduler hydrate Request from empty CLI globals, which
-        // yields a `localhost` host — the helper must fall back to the disk URL.
+        // yields a `localhost` host, so the helper must fall back to the disk URL.
         app()->instance('request', Request::create('http://localhost/'));
 
         expect($user->getFilamentAvatarUrl())

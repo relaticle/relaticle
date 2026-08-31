@@ -117,7 +117,7 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
 
     $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
         'document' => ChatDocument::fromText('hi'),
-        // no model — defaults to Auto via resolver
+        // no model, so it defaults to Auto via resolver
     ]);
 
     $response->assertStatus(200);

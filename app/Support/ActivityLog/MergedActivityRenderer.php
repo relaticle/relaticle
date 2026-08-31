@@ -10,8 +10,8 @@ use Relaticle\ActivityLog\Support\ActivityLogSummary;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 /**
- * Renders one same-save group — native column changes and custom-field changes
- * that shared a `batch_uuid` — as a single timeline entry. The package's
+ * Renders one same-save group (native column changes and custom-field changes
+ * that shared a `batch_uuid`) as a single timeline entry. The package's
  * batch-merge unions every grouped row's payload into `$entry->properties`, so
  * both the native `attributes`/`old` maps and the `custom_field_changes` list
  * arrive here together.

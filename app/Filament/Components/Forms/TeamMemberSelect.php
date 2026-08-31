@@ -85,7 +85,7 @@ final class TeamMemberSelect extends Select
      * `users.id = ?` fails with SQLSTATE[42P10]. Selecting the comparison as an
      * aliased column and ordering by that alias satisfies the rule. The alias is
      * a pure function of `users.id`, which is already part of the distinct row
-     * (it's the primary key), so it cannot introduce new distinct combinations —
+     * (it's the primary key), so it cannot introduce new distinct combinations;
      * row counts under DISTINCT are unchanged.
      *
      * Defensively re-selects the model's own columns first if nothing has been
