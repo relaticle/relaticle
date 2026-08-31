@@ -448,3 +448,24 @@ test('a POST for an already-member user cleans up the stale invitation without e
     expect($this->team->users()->where('users.id', $invitee->id)->count())->toBe(1)
         ->and(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
 });
+
+test('viewing the invitation page does not spend the allowance the join POST needs', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+        'role' => 'editor',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    $this->actingAs($this->user);
+
+    foreach (range(1, 10) as $ignored) {
+        $this->get(route('team-invitations.token.accept', ['token' => $rawToken]))->assertOk();
+    }
+
+    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
+
+    expect($this->user->fresh()->belongsToTeam($this->team))->toBeTrue();
+});

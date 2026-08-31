@@ -83,28 +83,30 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
-Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+    // Separate buckets: a shared one lets repeated views of the invite page
+    // spend the allowance the accept POST needs.
     Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
         ->name('team-invitations.token.accept');
 
     Route::post('/invitations/{token}', [AcceptTeamInvitationController::class, 'store'])
         ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
         ->name('team-invitations.token.join');
 });
 
-Route::middleware([ThrottleBeforeAuthentication::class.':10,1', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])
+Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])
     ->group(function (): void {
-        // Separate buckets: a shared one lets repeated views of the invite page
-        // spend the allowance the accept POST needs.
         Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware('throttle:10,1,team-join-show')
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-show')
             ->name('teams.join');
 
         Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware('throttle:10,1,team-join-confirm')
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-confirm')
             ->name('teams.join.confirm');
     });
 

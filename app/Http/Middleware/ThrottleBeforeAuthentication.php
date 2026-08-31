@@ -36,11 +36,15 @@ use Symfony\Component\HttpFoundation\Response;
  * class's own priority registration only affects routes that use it by
  * name; the plain `throttle` alias (routes/api.php, routes/ai.php) is
  * untouched.
+ *
+ * ThrottleRequests keys on the user id (or the IP for a guest) and nothing
+ * else, so every route sharing this middleware without a distinct $prefix
+ * shares one bucket.
  */
 final readonly class ThrottleBeforeAuthentication
 {
-    public function handle(Request $request, Closure $next, string $maxAttempts = '10', string $decayMinutes = '1'): Response
+    public function handle(Request $request, Closure $next, string $maxAttempts = '10', string $decayMinutes = '1', string $prefix = ''): Response
     {
-        return resolve(ThrottleRequests::class)->handle($request, $next, $maxAttempts, (int) $decayMinutes);
+        return resolve(ThrottleRequests::class)->handle($request, $next, $maxAttempts, (int) $decayMinutes, $prefix);
     }
 }
