@@ -147,7 +147,7 @@ it('closes the picker when the query drops below the 2-char minimum', function (
     $opened = $page->script(WAIT_FOR_OPTIONS);
     expect($opened)->not->toBeEmpty();
 
-    // Backspace back down to "@A" (one char) — the suggestion must close.
+    // Backspace back down to "@A" (one char). The suggestion must close.
     $page->keys(EDITOR, ['Backspace']);
 
     $stillOpen = $page->script(<<<'JS'

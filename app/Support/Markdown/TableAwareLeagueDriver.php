@@ -12,7 +12,7 @@ use Spatie\MarkdownResponse\Drivers\MarkdownDriver;
  * league/html-to-markdown's default Environment never registers TableConverter,
  * so <table> markup collapses into a run-on line of cell text instead of a pipe
  * table. Spatie's own LeagueDriver just does `new HtmlConverter($options)`, which
- * takes the library default — there is no config option to add converters, so
+ * takes the library default. There is no config option to add converters, so
  * this driver builds the same HtmlConverter and adds TableConverter to its
  * environment before converting. Registered in place of the vendor binding in
  * AppServiceProvider.

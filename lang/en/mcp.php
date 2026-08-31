@@ -13,8 +13,8 @@ return [
             'description' => ':client will only see data from the workspace you choose. To use a different one later, revoke this connector on the Access Tokens page in Relaticle and add it again.',
             'aria_label' => 'Workspace selection',
             'personal' => 'Personal',
-            'paused' => 'Paused — subscribe to connect',
-            'all_paused' => 'Every workspace on this account is paused. Subscribe to Cloud Pro before connecting — a connector authorized against a paused workspace cannot read or write any data.',
+            'paused' => 'Paused. Subscribe to connect',
+            'all_paused' => 'Every workspace on this account is paused. Subscribe to Cloud Pro before connecting. A connector authorized against a paused workspace cannot read or write any data.',
             'none' => [
                 'heading' => 'You do not belong to any workspaces.',
                 'description' => 'Create or join a workspace in Relaticle before authorizing this connector.',

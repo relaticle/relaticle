@@ -17,7 +17,7 @@ final class MessageFeedbackController
     /**
      * Upsert the current user's rating of an assistant message. A second POST
      * with the same rating refreshes category/comment; switching rating
-     * replaces it — one row per (user, message) always.
+     * replaces it, so there is always one row per (user, message).
      */
     public function store(Request $request, string $messageId): JsonResponse
     {

@@ -24,8 +24,8 @@ use PHPStan\Type\ObjectType;
  * Enforces the project's core write-path convention: all create/update/delete
  * operations go through action classes in app/Actions. Flags Eloquent write
  * calls (on models, eloquent builders, and relations) made from UI and
- * transport surfaces — controllers, MCP tools, Livewire components, Filament
- * resources, chat tools — where business logic must not live.
+ * transport surfaces (controllers, MCP tools, Livewire components, Filament
+ * resources, chat tools) where business logic must not live.
  *
  * Existing violations are grandfathered via path-scoped ignores in
  * phpstan.neon; new ones fail analysis.

@@ -125,7 +125,7 @@ it('marks a billing-paused workspace as unselectable on the consent screen', fun
     $response = $this->get(authorizeUrl($this->client));
 
     $response->assertOk();
-    $response->assertSee('Paused — subscribe to connect', false);
+    $response->assertSee('Paused. Subscribe to connect', false);
 });
 
 it('refuses to approve a connector for a billing-paused workspace', function (): void {
@@ -202,7 +202,7 @@ it('scopes MCP HTTP requests to the bound team and ignores X-Team-Id header', fu
             'arguments' => (object) [],
         ],
     ], [
-        // Deliberately point header at personal team — should be IGNORED.
+        // Deliberately point header at personal team; it should be IGNORED.
         'X-Team-Id' => $this->personalTeam->getKey(),
     ]);
 
@@ -213,7 +213,7 @@ it('scopes MCP HTTP requests to the bound team and ignores X-Team-Id header', fu
 
 it('rejects an MCP request when a Passport token has no team_id', function (): void {
     Passport::actingAs($this->user, scopes: ['*']);
-    // Intentionally do NOT set team_id — simulates a malformed token created
+    // Intentionally do NOT set team_id. This simulates a malformed token created
     // outside our consent flow. SetApiTeamContext should return null → request fails.
 
     $response = $this->postJson('/mcp', [

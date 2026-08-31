@@ -21,7 +21,7 @@ beforeEach(function (): void {
 });
 
 it('returns only opportunities with no activity in the last 30 days when stale_days is set', function (): void {
-    // Create the stale opportunity 40 days in the past — this also backdates its creation activity log entry
+    // Create the stale opportunity 40 days in the past; this also backdates its creation activity log entry
     $this->travelTo(now()->subDays(40));
     $staleOpp = Opportunity::factory()->for($this->team)->create(['name' => 'Stale Deal']);
 

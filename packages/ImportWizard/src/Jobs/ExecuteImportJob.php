@@ -86,7 +86,7 @@ final class ExecuteImportJob implements ShouldQueue
     private array $pendingTagOptions = [];
 
     /**
-     * Zone the CSV's naive datetimes are interpreted in — the importer's own, so an
+     * Zone the CSV's naive datetimes are interpreted in: the importer's own, so an
      * imported value lands on the same instant as the same string typed into the form.
      * Resolved once in handle() because the job runs on the queue with no session.
      */
@@ -623,7 +623,7 @@ final class ExecuteImportJob implements ShouldQueue
      * step, but nothing re-checked them at write time, so continuing past the warning
      * created them anyway.
      *
-     * Only enforced on create. An update legitimately carries a partial payload — a blank
+     * Only enforced on create. An update legitimately carries a partial payload. A blank
      * cell there means "leave this column alone", not "erase the name".
      *
      * @param  array<string, mixed>  $data

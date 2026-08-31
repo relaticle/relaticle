@@ -98,7 +98,7 @@ it('returns a refunded reservation to the purchased bucket once the allowance is
     $service->refundReservation($team, 1, 'resolve-turn-1');
 
     // Without restoring the prepaid bucket the credit survives as an allowance
-    // credit and resetPeriod() wipes it — the customer silently loses a credit
+    // credit and resetPeriod() wipes it, so the customer silently loses a credit
     // they paid for on every crashed turn.
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
     expect($balance->credits_remaining)->toBe(10)

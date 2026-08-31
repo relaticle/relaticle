@@ -14,7 +14,7 @@ it('adds cashier customer columns to teams', function (): void {
 it('creates cashier subscription tables keyed by team ulid', function (): void {
     expect(Schema::hasColumns('subscriptions', ['team_id', 'type', 'stripe_id', 'stripe_status', 'stripe_price', 'quantity', 'trial_ends_at', 'ends_at']))->toBeTrue()
         ->and(Schema::hasColumns('subscription_items', ['subscription_id', 'stripe_id', 'stripe_product', 'stripe_price', 'quantity']))->toBeTrue()
-        // Not toContain('char') — 'varchar' contains 'char', so a regression to
+        // Not toContain('char'), because 'varchar' contains 'char', so a regression to
         // string('team_id') would slip through while mismatching teams.id.
         ->and(Schema::getColumnType('subscriptions', 'team_id'))->toBe('bpchar')
         ->and(Schema::getColumnType('teams', 'id'))->toBe('bpchar');

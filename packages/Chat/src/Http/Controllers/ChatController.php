@@ -157,7 +157,7 @@ final readonly class ChatController
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
                 'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
-                // A top-up is only offered when a pack can actually be bought —
+                // A top-up is only offered when a pack can actually be bought;
                 // otherwise the CTA lands on a billing page with nothing to buy.
                 'top_up_available' => $canTopUp,
                 'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
@@ -223,7 +223,7 @@ final readonly class ChatController
 
     /**
      * Title the conversation from the message that just arrived, racing the turn
-     * rather than waiting for it — a chat that streams for a minute should not sit
+     * rather than waiting for it. A chat that streams for a minute should not sit
      * in the sidebar under a truncated sentence for that whole minute.
      *
      * ConversationTitleGate decides whether there is anything to do: it returns
@@ -372,13 +372,13 @@ final readonly class ChatController
     }
 
     /**
-     * Mark a turn (and everything after it) superseded — the server-truth side
+     * Mark a turn (and everything after it) superseded. This is the server-truth side
      * of Regenerate/Edit. Without this the client splice is a lie: reload
      * resurrects the replaced turns and the model keeps them in its history.
      *
      * anchor_id targets a persisted user message; when the client only has an
      * optimistic (not yet persisted) message it sends anchor_content instead,
-     * which must match the latest user row — a mismatch means that row belongs
+     * which must match the latest user row. A mismatch means that row belongs
      * to an OLDER turn (the optimistic one never persisted), and superseding it
      * would hide a good turn, so we refuse and supersede nothing.
      */

@@ -27,7 +27,7 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
      * @var list<AiCreditType>
      *
      * Refund/Adjustment rows are ledger artifacts (failed-job rollbacks,
-     * sysadmin grants/clawbacks), not consumption — excluding them keeps the
+     * sysadmin grants/clawbacks), not consumption. Excluding them keeps the
      * spend figures consumption-only, matching how the balances page's
      * credits_used meter counts usage.
      */
@@ -98,7 +98,7 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 + ($outputTokens / 1_000_000) * $rate['output_per_mtok'];
         }
 
-        $costDescription = 'Upper bound — prompt caching not deducted';
+        $costDescription = 'Upper bound; prompt caching not deducted';
 
         if ($unpriced !== []) {
             $costDescription .= '. Unpriced models: '.implode(', ', $unpriced);

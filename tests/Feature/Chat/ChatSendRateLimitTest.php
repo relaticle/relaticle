@@ -52,7 +52,7 @@ it('rejects an 11th request from a Free user within a minute with a 429', functi
     expect($response->json('retry_after_seconds'))->toBeGreaterThan(0);
 });
 
-it('isolates rate limits per team — different teams do not share the bucket', function (): void {
+it('isolates rate limits per team: different teams do not share the bucket', function (): void {
     // Team A
     $userA = User::factory()->withPersonalTeam()->create();
     $teamA = $userA->currentTeam;
@@ -80,7 +80,7 @@ it('isolates rate limits per team — different teams do not share the bucket', 
         $this->actingAs($userA)->postJson("/chat/{$convA}", $payload);
     }
 
-    // 11th request — rate limited
+    // 11th request, rate limited
     expect(
         $this->actingAs($userA)->postJson("/chat/{$convA}", $payload)->status()
     )->toBe(429);
@@ -101,7 +101,7 @@ it('isolates rate limits per team — different teams do not share the bucket', 
         'updated_at' => now(),
     ]);
 
-    // Team B's first request — should NOT be rate-limited
+    // Team B's first request, which should NOT be rate-limited
     expect(
         $this->actingAs($userB)->postJson("/chat/{$convB}", $payload)->status()
     )->not->toBe(429);
@@ -131,7 +131,7 @@ it('allows Pro users 30 requests per minute', function (): void {
         ]],
     ];
 
-    // Pro plan = 30/min — 11th request should NOT be 429
+    // Pro plan = 30/min, so the 11th request should NOT be 429
     for ($i = 0; $i < 11; $i++) {
         $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", $payload);
         expect($response->status())->not->toBe(429);

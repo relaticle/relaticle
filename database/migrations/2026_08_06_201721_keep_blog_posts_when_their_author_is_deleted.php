@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Ink ships blog_posts.author_id as ON DELETE CASCADE. Users are hard-deleted —
+     * Ink ships blog_posts.author_id as ON DELETE CASCADE. Users are hard-deleted:
      * App\Models\User has no SoftDeletes and app:purge-scheduled-deletions runs
-     * daily — so an author closing their account silently destroyed the company's
+     * daily. An author closing their account silently destroyed the company's
      * marketing content, past the post's own soft deletes and with no way back.
      *
      * The post is the asset; the author is an attribution. Orphan it instead.

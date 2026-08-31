@@ -29,7 +29,7 @@ final readonly class DocUrl
 
     /**
      * The `.md` variant every page answers to, courtesy of the markdown
-     * response middleware — what the article's "copy page" action fetches.
+     * response middleware, which is what the article's "copy page" action fetches.
      */
     public static function markdown(DocPage $page): string
     {

@@ -102,22 +102,22 @@ final class AppServiceProvider extends ServiceProvider
         // Cashier attaches signature verification only when the webhook secret
         // happens to be set, and also exposes an unauthenticated payment route
         // this app never links to. Register the webhook ourselves instead so
-        // verification is unconditional — see routes/web.php.
+        // verification is unconditional. See routes/web.php.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between
-        // them — the key the activity timeline groups a single save's rows on.
+        // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
 
         // Caches creation-source facts per team for the lifetime of a
-        // request/job — scoped so a queue worker resets it between jobs.
+        // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()
         // memoizes through once(), keyed on that shared object rather than the
         // model, so the first team evaluated in a process poisons the answer for
-        // every later one — wrong onboarding state in any request or Horizon
+        // every later one, giving wrong onboarding state in any request or Horizon
         // worker that touches two workspaces. Rebinding per resolve gives each
         // lookup its own step objects, so once() memoizes within one lookup as
         // intended. Registration lives here because a fresh registry starts empty.
@@ -192,7 +192,7 @@ final class AppServiceProvider extends ServiceProvider
             $parameters['teams'] = $teams;
             $parameters['pausedTeamIds'] = $pausedTeamIds;
 
-            // Never preselect a workspace the connector could not use — the user would
+            // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
             $currentTeamId = $user?->currentTeam?->getKey();
 
@@ -247,7 +247,7 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         // HasSEO creates a row per post but never removes it. A soft delete should
-        // keep it — the post can come back — but a force delete from the panel
+        // keep it, because the post can come back, but a force delete from the panel
         // would otherwise leave the seo row behind for good.
         Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
     }
@@ -485,7 +485,7 @@ final class AppServiceProvider extends ServiceProvider
     /**
      * The AI list tools memoise which custom fields are filterable, per tenant and
      * entity, for a minute. Hooking the model rather than the actions keeps the
-     * Filament management page — which writes definitions directly — from leaving
+     * Filament management page, which writes definitions directly, from leaving
      * the assistant insisting a field the user just added does not exist.
      */
     private function configureCustomFieldSchemaInvalidation(): void
@@ -537,8 +537,8 @@ final class AppServiceProvider extends ServiceProvider
          * signed-in account's chosen zone. Read by both table/infolist output and
          * DateTimePicker input, so one closure keeps display and entry symmetrical.
          *
-         * TimezoneManager is a single global slot, so this must stay the only writer
-         * — a second FilamentTimezone::set() anywhere would silently replace it, and
+         * TimezoneManager is a single global slot, so this must stay the only writer.
+         * A second FilamentTimezone::set() anywhere would silently replace it, and
          * which one survived would depend on service provider boot order. It lives
          * here rather than in a panel provider for the same reason: the resolution
          * spans every panel.

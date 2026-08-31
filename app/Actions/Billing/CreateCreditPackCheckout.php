@@ -15,7 +15,7 @@ final readonly class CreateCreditPackCheckout
 
     /**
      * Create a one-time Stripe Checkout session for a prepaid credit pack and
-     * return its redirect URL. Stripe round-trip — covered by the staging E2E
+     * return its redirect URL. Stripe round-trip, covered by the staging E2E
      * checklist, not unit tests (same policy as CreateProCheckout).
      */
     public function execute(Team $team, string $pack): string
@@ -29,7 +29,7 @@ final readonly class CreateCreditPackCheckout
 
     private function priceId(string $pack): string
     {
-        // $pack arrives from the browser — pin it to the purchasable pack keys
+        // $pack arrives from the browser, so pin it to the purchasable pack keys
         // so neither an arbitrary string nor a pack without a configured Stripe
         // price ever reaches checkout.
         $config = $this->catalog->find($pack);

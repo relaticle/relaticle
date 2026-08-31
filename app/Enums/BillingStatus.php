@@ -18,7 +18,7 @@ use Filament\Support\Contracts\HasLabel;
  * column is rendered on its own. This answers the question that column cannot.
  *
  * Read-only and derived. Nothing persists it, and it deliberately says nothing
- * about whether a workspace can currently reach the app — that is
+ * about whether a workspace can currently reach the app. That is
  * `HostedWorkspaceAccess`, which layers the billing feature flag on top.
  */
 enum BillingStatus: string implements HasColor, HasDescription, HasLabel

@@ -1,5 +1,5 @@
 {{--
-    Seeds the signed-in user's timezone from the browser once, then never again — the
+    Seeds the signed-in user's timezone from the browser once, then never again. The
     render hook that includes this only fires while `users.timezone` is still null, and
     the action behind the endpoint refuses to overwrite a value that is already set.
 

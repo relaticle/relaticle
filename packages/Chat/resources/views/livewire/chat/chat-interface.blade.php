@@ -178,18 +178,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),
-    // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
+    // Alpine re-initialises on SPA navigation, so this resets per record. A dismissal
     // applies to the record you dismissed it on, not to every record afterwards.
     pageContextDismissed: false,
     // The pill behaves like a pre-filled attachment: it attaches to the NEXT message
-    // only, then this flips true and the pill disappears — subsequent messages carry
+    // only, then this flips true and the pill disappears. Subsequent messages carry
     // no page_context until the bound record actually changes. Distinct from
     // pageContextDismissed (explicit "stop referring to this"): chat:context-updated
     // resets both, but only dismissal is a user action.
     pageContextConsumed: false,
 
     // Snapshot of the record this message is bound to, in the same shape
-    // ListConversationMessages returns after a reload — the optimistic bubble
+    // ListConversationMessages returns after a reload. The optimistic bubble
     // and the reloaded one must render identically. `url` isn't resolvable
     // client-side, so the chip falls back to its non-clickable branch until
     // a reload fills it in from the server.

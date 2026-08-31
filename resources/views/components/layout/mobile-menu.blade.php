@@ -20,7 +20,7 @@
         {{-- Focus lands here when the overlay opens, so the trap has somewhere to
              start and a keyboard user's first Tab walks the menu, not the page. --}}
         {{-- Same three-line construct as the header's hamburger, frozen in its
-             end state and sitting at the same screen position — the overlay
+             end state and sitting at the same screen position. The overlay
              fading in over the mid-morph hamburger reads as one continuous
              motion. Keep the box geometry in sync with that button. --}}
         <button type="button" @click="mobileMenu = false"

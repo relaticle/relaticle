@@ -10,7 +10,7 @@
 # The dev database (relaticle_app) stays shared across workspaces. We rewrite
 # APP_URL and SESSION_DOMAIN so absolute URLs and session cookies match
 # `<workspace>.test`, and blank APP_PANEL_DOMAIN and SYSADMIN_DOMAIN so both
-# panels serve path-based at `<workspace>.test/app` and `/sysadmin` — the
+# panels serve path-based at `<workspace>.test/app` and `/sysadmin`. The
 # copied `*.relaticle.test` values would route to the base checkout.
 #
 # Mac-only: uses BSD sed (`sed -i ''`). Both orchestrators are macOS-only.

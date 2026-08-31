@@ -15,7 +15,7 @@ use Tests\Helpers\ChatCatalog;
  * output, so stubbing it to an empty list passed the whole suite.
  *
  * Separate from ManageAiSettingsTest because that file's beforeEach stubs this exact
- * URL with an empty list, and Http stubs are matched in registration order — a second
+ * URL with an empty list, and Http stubs are matched in registration order. A second
  * fake for the same pattern is never reached, whatever you reset in between.
  */
 beforeEach(function (): void {
@@ -25,8 +25,8 @@ beforeEach(function (): void {
 });
 
 /**
- * A stored id the provider no longer lists is still offered — dropping it would blank
- * the row — but it is called out so an operator sees the drift.
+ * A stored id the provider no longer lists is still offered, because dropping it
+ * would blank the row, but it is called out so an operator sees the drift.
  */
 it('flags a stored model id the provider is no longer listing', function (): void {
     Http::fake(['api.anthropic.com/v1/models*' => Http::response(['data' => [

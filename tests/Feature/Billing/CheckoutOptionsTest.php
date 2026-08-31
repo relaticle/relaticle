@@ -109,7 +109,7 @@ it('rejects a pack whose price is not configured', function (): void {
  * The domain-mode block below rebuilds the application so the panel registers its
  * routes against a domain. That reboot drops Laravel's parallel-testing database
  * override, pointing the fresh app at the base test database instead of this
- * worker's — so these cases must not touch the database at all. An in-memory Team
+ * worker's, so these cases must not touch the database at all. An in-memory Team
  * is enough: the URL builders only read the tenant slug.
  */
 function unsavedTeam(): Team
@@ -119,7 +119,7 @@ function unsavedTeam(): Team
 
 /**
  * A subdomain-routed app panel (APP_PANEL_DOMAIN, as production runs) serves the
- * billing page at {domain}/{slug}/billing — there is no "/app" path prefix. Any
+ * billing page at {domain}/{slug}/billing. There is no "/app" path prefix. Any
  * URL handed to Stripe has to follow the registered route, otherwise returning
  * from Checkout lands on a 404.
  */

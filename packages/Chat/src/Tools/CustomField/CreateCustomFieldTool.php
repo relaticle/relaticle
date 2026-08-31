@@ -28,7 +28,7 @@ final class CreateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity — check ListCustomFieldsTool first. Admin-only — returns an error for non-owners. Returns a proposal for user approval.';
+        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for non-owners. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array

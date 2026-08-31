@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
 
-/** Cannot be final — Sanctum::actingAs() uses Mockery to mock this class in tests */
+/** Cannot be final; Sanctum::actingAs() uses Mockery to mock this class in tests */
 #[ObservedBy(PersonalAccessTokenObserver::class)]
 #[\Illuminate\Database\Eloquent\Attributes\Fillable([
     'name',

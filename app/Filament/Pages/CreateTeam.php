@@ -121,7 +121,7 @@ final class CreateTeam extends RegisterTenant
 
     /**
      * Where "Cancel" returns to when the user backs out of creating another
-     * workspace. Null during first-run onboarding — a user with no workspace
+     * workspace. Null during first-run onboarding: a user with no workspace
      * has nowhere to go back to, so no cancel affordance is offered.
      */
     public function getCancelUrl(): ?string
@@ -568,7 +568,7 @@ final class CreateTeam extends RegisterTenant
 
         // The tenant may already be set if the user clicked "Copy invite link" earlier
         // in the wizard, which pre-creates the team so the invite URL can exist.
-        // Reconcile name/slug here so later edits don't silently disappear — a regression
+        // Reconcile name/slug here so later edits don't silently disappear. This is a regression
         // the UI currently blocks via ->hiddenHeader(), but kept as defense-in-depth.
         if ($this->tenant instanceof Team) {
             $team = $this->tenant;

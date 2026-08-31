@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
  * matches on.
  *
  * Choice values are stored as option IDs, but the assistant only ever sees labels
- * (the convention every chat tool follows — see CustomFieldsRequestValidator on the
+ * (the convention every chat tool follows; see CustomFieldsRequestValidator on the
  * write path), so labels are translated here. An unknown code, operator or label is
  * rejected rather than silently dropped: a filter that quietly does nothing returns
  * the whole table, which reads as a confident, wrong answer.
@@ -104,7 +104,7 @@ final readonly class CustomFieldsFilterTranslator
         $id = $this->optionMap->idFor($entry, (string) $label);
 
         if ($id === null) {
-            // The stored casing, not the lowercased match keys — this string is read
+            // The stored casing, not the lowercased match keys. This string is read
             // by the assistant and echoed to the user.
             throw ValidationException::withMessages([
                 'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".

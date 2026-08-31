@@ -10,8 +10,8 @@ use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 
 /**
- * A trashed record is still reachable — the resources drop the soft-delete scope
- * so it can be reviewed and restored — and its timeline has to load with it.
+ * A trashed record is still reachable, because the resources drop the soft-delete
+ * scope so it can be reviewed and restored, and its timeline has to load with it.
  * Resolving the subject without dropping that scope 404s the whole tab, which is
  * exactly the history an admin opens a deleted record to read.
  */

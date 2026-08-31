@@ -17,7 +17,7 @@ use Relaticle\Chat\Services\CreditService;
  * Refund credit reservations whose turn died between reserve and settle
  * (worker crash, deploy kill, lost job). The refund uses the turn's RESOLUTION
  * key, so if the original job somehow settles later the unique
- * (team_id, idempotency_key) index makes that settle a silent no-op — refund
+ * (team_id, idempotency_key) index makes that settle a silent no-op, so refund
  * and settle can never both apply.
  */
 #[Description('Refund credit reservations that were never settled or refunded')]

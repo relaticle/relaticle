@@ -14,9 +14,9 @@ use Illuminate\Support\Collection;
  * LABELS from the assistant and both have to reach an option id, and they used to
  * do it with two separate lookups that had already drifted: one matched labels
  * case-sensitively, the other did not, so the same string could be accepted when
- * filtering and rejected when saving. Policy still belongs to each caller — the
- * write path alone cares about `acceptsArbitraryValues` and lookup fields — but
- * the lookup itself lives here.
+ * filtering and rejected when saving. Policy still belongs to each caller, since
+ * the write path alone cares about `acceptsArbitraryValues` and lookup fields.
+ * The lookup itself lives here.
  *
  * Matching ignores case, because the assistant echoes labels back in whatever
  * casing the sentence used and an option list is not a set of identifiers.

@@ -47,7 +47,7 @@ return new class extends Migration
         // participant_id was char(26) to fit a User ULID. A polymorphic key has no
         // fixed width, and char() blank-pads shorter keys on read, which would break
         // the strict participant comparisons in the chat authorization paths. bpchar
-        // to varchar is not binary-coercible, so this rewrites the table — unavoidable.
+        // to varchar is not binary-coercible, so this rewrites the table. Unavoidable.
         //
         // participant_type is added WITH a default so PostgreSQL 11+ records it in
         // pg_attribute.attmissingval and materialises it lazily. That backfills every
@@ -67,7 +67,7 @@ return new class extends Migration
             $table->text('approval_state')->nullable();
         });
 
-        // The default was a backfill device, not the column's contract — every writer
+        // The default was a backfill device, not the column's contract. Every writer
         // supplies participant_type explicitly, and anonymised rows set it to null.
         // Dropping it is a catalog update, so it costs nothing.
         DB::statement('ALTER TABLE agent_conversations ALTER COLUMN participant_type DROP DEFAULT');

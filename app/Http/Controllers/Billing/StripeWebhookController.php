@@ -15,7 +15,7 @@ final class StripeWebhookController extends CashierWebhookController
 {
     /**
      * Stripe statuses a subscription can be created in without ever granting
-     * access — a checkout whose first payment failed or was abandoned.
+     * access: a checkout whose first payment failed or was abandoned.
      *
      * @var list<string>
      */
@@ -58,7 +58,7 @@ final class StripeWebhookController extends CashierWebhookController
     /**
      * Fulfill credit-pack purchases for a checkout that settled synchronously.
      * Delayed-notification payment methods complete with payment_status
-     * 'unpaid' and settle later via checkout.session.async_payment_succeeded —
+     * 'unpaid' and settle later via checkout.session.async_payment_succeeded, so
      * fulfilling here without the gate would grant credits before the money
      * arrives, with nothing to reverse them if payment ultimately fails.
      *
@@ -95,7 +95,7 @@ final class StripeWebhookController extends CashierWebhookController
     /**
      * Fulfill credit-pack purchases for a settled (payment_status=paid)
      * checkout session. Subscription checkouts emit the same events and are
-     * ignored here (mode filter) — customer.subscription.* handles them.
+     * ignored here (mode filter); customer.subscription.* handles them.
      *
      * @param  array<string, mixed>  $session
      */

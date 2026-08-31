@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Documentation\Support;
 
 /**
- * The single navigation tree behind every documentation surface — the sidebar
+ * The single navigation tree behind every documentation surface: the sidebar
  * on all three page types, the help hub's section listing, and the /docs
  * index. Both areas are in one tree because the reader sees one site: an
  * article about importing data sits three links away from the MCP guide.

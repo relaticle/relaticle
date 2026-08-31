@@ -60,7 +60,7 @@
                          openDropdown: null,
                          // The dropdown a swap is animating away from. Kept mounted (and shown)
                          // alongside `openDropdown` for one transition window so the outgoing
-                         // content can slide out while the incoming one slides in — a real
+                         // content can slide out while the incoming one slides in. That is a real
                          // two-layer swipe, not a single element re-skinning itself.
                          outgoingDropdown: null,
                          direction: 1,
@@ -71,8 +71,8 @@
                          twoColumn: {{ Illuminate\Support\Js::from($twoColumnBySlug) }},
                          openOnHover(slug) {
                              clearTimeout(this.closeTimer)
-                             // Switching between triggers while one is already open is instant —
-                             // only the very first open of a hover session gets the settle delay,
+                             // Switching between triggers while one is already open is instant.
+                             // Only the very first open of a hover session gets the settle delay,
                              // so a fast pass across the bar doesn't flicker every panel it crosses.
                              if (this.openDropdown) { this.swapTo(slug); return }
                              this.hoverTimer = setTimeout(() => { this.swapTo(slug) }, 90)
@@ -84,7 +84,7 @@
                              }, 200)
                          },
                          // A full close (not a swap) still needs its content to fade out WITH
-                         // the card rather than vanishing the instant openDropdown clears — so
+                         // the card rather than vanishing the instant openDropdown clears, so
                          // it borrows the same outgoingDropdown mechanism a swap uses, just with
                          // no incoming layer to slide past.
                          closeAll() {
@@ -93,7 +93,7 @@
                              if (this.$refs.panel) { this.$refs.panel.style.height = '' }
                              // outgoingDropdown is set BEFORE openDropdown clears, so
                              // `openDropdown ?? outgoingDropdown` is never null-null on the same
-                             // tick — a gap there sends panelStyle() an unresolvable slug, which
+                             // tick. A gap there sends panelStyle() an unresolvable slug, which
                              // drops the inline width/height and collapses the card to a stray dot.
                              this.outgoingDropdown = this.openDropdown
                              this.openDropdown = null
@@ -101,7 +101,7 @@
                              // openDropdown, not outgoingDropdown) already runs and finishes on
                              // its own. Writing to outgoingDropdown again afterwards was enough to
                              // make Alpine re-run that transition's bookkeeping and re-show the
-                             // card at a collapsed size — so only clear it if a NEW open hasn't
+                             // card at a collapsed size, so only clear it if a NEW open hasn't
                              // already claimed it (swapTo re-purposes the same field).
                              const closingSlug = this.outgoingDropdown
                              this.swapTimer = setTimeout(() => {
@@ -121,7 +121,7 @@
                              this.outgoingDropdown = wasOpen
                              this.openDropdown = slug
                              // The outgoing layer only needs to stay mounted for the swap
-                             // animation itself — once it's done sliding out, drop it so it
+                             // animation itself. Once it's done sliding out, drop it so it
                              // stops occupying space/receiving events.
                              if (wasOpen) {
                                  this.morphHeight(priorHeight)
@@ -207,7 +207,7 @@
                          trigger is active (panelStyle), while its content swipes left or right
                          on a swap. During a swap BOTH the outgoing and incoming item's content
                          are mounted at once (stacked with absolute inset-0), each carrying its
-                         own slide-out/slide-in — a real two-layer swipe, not one element
+                         own slide-out/slide-in. That is a real two-layer swipe, not one element
                          re-skinning itself. --}}
                     <div x-show="openDropdown !== null"
                          x-transition:enter="transition-[translate,scale,opacity] duration-250 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
@@ -218,13 +218,13 @@
                          x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.97]"
                          x-cloak
                          {{-- Only recomputes while a dropdown is genuinely open. Once
-                              openDropdown clears, this stops re-evaluating — leaving it wired to
+                              openDropdown clears, this stops re-evaluating. Leaving it wired to
                               outgoingDropdown too meant the later `outgoingDropdown = null` write
                               (well after the close transition finished) re-ran this binding and
                               overwrote Alpine's own `display:none` with a bare left/width string,
                               silently re-showing the card at a collapsed size. --}}
                          x-bind:style="openDropdown ? panelStyle(openDropdown) : lastPanelStyle"
-                         {{-- The card morphs (left/width) only while a swap is in flight — both
+                         {{-- The card morphs (left/width) only while a swap is in flight, with both
                               slugs set. On a first open or a close this class is absent, so the
                               morph never fights Alpine's own enter/leave transition classes. --}}
                          x-bind:class="openDropdown && outgoingDropdown ? 'transition-[left,width,height] duration-200 ease-[var(--ease-out-expo)] motion-reduce:transition-none' : ''"
@@ -265,7 +265,7 @@
                                          }"
                                          id="menu-{{ $slug }}"
                                          {{-- Each layer is pinned to ITS panel's natural width, so
-                                              the card's left/width morph only ever clips it — the
+                                              the card's left/width morph only ever clips it. The
                                               content never re-wraps mid-swap, and the card's auto
                                               height reads the incoming layer's final height from
                                               the first frame. --}}

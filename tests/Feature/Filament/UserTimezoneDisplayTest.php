@@ -21,7 +21,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 /**
- * 2026-08-18 23:30 UTC is 2026-08-19 08:30 in Tokyo — deliberately across the date
+ * 2026-08-18 23:30 UTC is 2026-08-19 08:30 in Tokyo, deliberately across the date
  * line, so a test that only compares the clock time cannot pass by accident.
  */
 function knownInstant(): Carbon
@@ -60,7 +60,7 @@ it('resolves each panel through its own guard, so a customer zone never leaks in
     $this->actingAs($user);
 
     // The administrator has chosen no zone of their own, so the panel stays on UTC
-    // and correlates with server logs — see SysadminTimezoneTest for the opt-in.
+    // and correlates with server logs. See SysadminTimezoneTest for the opt-in.
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
@@ -132,7 +132,7 @@ it('labels sysadmin datetimes as utc so an admin never has to assume', function 
 
 it('does not ship the timezone detection script to signed-out visitors', function (): void {
     // The panel's own login page renders the same BODY_END hook, and the sync endpoint
-    // behind it is authenticated — a script there could only ever produce a 401.
+    // behind it is authenticated, so a script there could only ever produce a 401.
     $this->get(Filament::getPanel('app')->getLoginUrl())
         ->assertSuccessful()
         ->assertDontSee('resolvedOptions().timeZone', escape: false);
@@ -160,7 +160,7 @@ it('stops shipping the detection script once the user has a timezone', function 
 
 /**
  * A record's view page renders custom fields through the package's infolist entry, which
- * hardcoded `Y-m-d H:i:s` when the package had no format configured — which it never does
+ * hardcoded `Y-m-d H:i:s` when the package had no format configured, which it never does
  * here. So the page printed `2026-08-19 08:30:00` for the same field the table beside it
  * rendered as `Aug 19, 2026 08:30`. Same value, same row, two formats.
  */

@@ -236,7 +236,7 @@ it('does not leak tasks from another team where the user is also a member', func
 it('bounds today on the user calendar, not the server clock', function (): void {
     // At 2026-08-18 23:30 UTC the Tokyo calendar already reads the 19th, so Tokyo's
     // "today" began at 15:00 UTC. A task due 10:00 UTC that day therefore falls before
-    // it — overdue — while for a UTC reader at the very same instant it is still today.
+    // it (overdue) while for a UTC reader at the very same instant it is still today.
     $this->travelTo(Carbon::parse('2026-08-18 23:30:00', 'UTC'));
 
     $tokyo = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);

@@ -20,7 +20,7 @@ final readonly class ActivityValue
 
     /**
      * Block boundaries carry the only whitespace in `<p>a</p><p>b</p>`, so they
-     * become a space before the tags go — otherwise two paragraphs read as "ab".
+     * become a space before the tags go. Otherwise two paragraphs read as "ab".
      */
     private const string BLOCK_BOUNDARY = '/<\s*br\s*\/?\s*>|<\s*\/\s*(?:p|div|li|tr|h[1-6]|blockquote)\s*>/i';
 

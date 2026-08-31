@@ -14,7 +14,7 @@ use Spatie\Onboard\OnboardingSteps;
  * the setup-nudge command, and the chat agent's workspace-state block.
  *
  * Titles and descriptions live in lang files and are resolved by the
- * consumers via the `label_key`/`description_key` attributes — step titles
+ * consumers via the `label_key`/`description_key` attributes. Step titles
  * are evaluated at registration, before any user locale is known, so the
  * title given here is only a fallback identifier.
  *
