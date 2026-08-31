@@ -55,7 +55,7 @@ return [
             ...WebhookCommand::DEFAULT_EVENTS,
             'checkout.session.completed',
             // Delayed-notification payment methods complete as 'unpaid' and only
-            // settle later via this event — without it StripeWebhookController's
+            // settle later via this event. Without it StripeWebhookController's
             // async handler never fires and the pack is never fulfilled.
             'checkout.session.async_payment_succeeded',
         ],

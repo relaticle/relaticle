@@ -96,7 +96,7 @@
 
                             <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
                                 @if($onTrial)
-                                    {{ __('billing.trial.active_title') }} — {{ trans_choice('billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }}
+                                    {{ __('billing.trial.active_title') }} ({{ trans_choice('billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
                                         ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])

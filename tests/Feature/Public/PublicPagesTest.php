@@ -142,7 +142,7 @@ describe('Legal pages', function () {
 
 describe('Documentation pages', function () {
     // Shiki highlights code by spawning a node subprocess per fenced block, and
-    // these pages carry ~59 between them — over half this file's runtime. None
+    // these pages carry ~59 between them, over half this file's runtime. None
     // of the assertions here read highlighted output, so it is switched off and
     // covered once, explicitly, at the end of this block.
     beforeEach(function () {
@@ -281,7 +281,7 @@ describe('Social authentication routes', function () {
     });
 });
 
-describe('Hero AI tab — conversation', function () {
+describe('Hero AI tab: conversation', function () {
     it('renders the three exchanges in initial DOM', function () {
         $response = $this->get('/');
 
@@ -368,7 +368,7 @@ describe('Hero AI tab — conversation', function () {
     });
 });
 
-describe('Hero AI tab — app shell', function () {
+describe('Hero AI tab: app shell', function () {
     it('renders the sidebar navigation items', function () {
         $response = $this->get('/');
 
@@ -395,7 +395,7 @@ describe('Hero AI tab — app shell', function () {
         $response->assertStatus(200);
         $response->assertSee('Overdue tasks this week');
         $response->assertSee('Follow up with Priya Nair');
-        $response->assertSee('Renewal prep — Daniel Okafor', false);
+        $response->assertSee('Renewal prep: Daniel Okafor', false);
         $response->assertSee('All chats');
     });
 
@@ -418,7 +418,7 @@ describe('Hero AI tab — app shell', function () {
     });
 });
 
-describe('Hero AI tab — demo CTA', function () {
+describe('Hero AI tab: demo CTA', function () {
     it('does not show the Watch demo link when video file is missing', function () {
         $videoPath = public_path('videos/hero-demo.mp4');
         if (file_exists($videoPath)) {
@@ -784,7 +784,7 @@ describe('Response meta', function () {
     });
 });
 
-describe('Hero AI tab — animation timeline', function () {
+describe('Hero AI tab: animation timeline', function () {
     it('hides the data-table outer container at cycle start', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -803,7 +803,7 @@ describe('Hero AI tab — animation timeline', function () {
 
         // Hold is the read-time after exchange 3 settles before the loop
         // restarts from the entry phase. cycleMs no longer exists as a
-        // single magic number — timing is composed from entryHold +
+        // single magic number. Timing is composed from entryHold +
         // transition + exchange budgets.
         expect($body)->toContain('holdMs: 1500');
     });
@@ -867,7 +867,7 @@ describe('Hero AI tab — animation timeline', function () {
     });
 });
 
-describe('Hero AI tab — entry phase', function () {
+describe('Hero AI tab: entry phase', function () {
     it('renders the dashboard greeting mirroring app /', function () {
         $response = $this->get('/');
         $response->assertSuccessful();

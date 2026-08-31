@@ -122,7 +122,7 @@
     max-width: none;
 }
 
-/* Hero gradient text animation — slow, subtle shimmer */
+/* Hero gradient text animation: slow, subtle shimmer */
 @keyframes gradient-shift {
     0%, 100% { background-position: 0% center; }
     50% { background-position: 100% center; }
@@ -186,7 +186,7 @@
     100% { background-position: -50% center; }
 }
 
-/* Hero entrance animation — staggered fade + slide up */
+/* Hero entrance animation: staggered fade + slide up */
 @keyframes hero-fade-up {
     from {
         opacity: 0;
@@ -216,7 +216,7 @@
                 width var(--duration-base) var(--ease-out-expo);
 }
 
-/* Mobile menu entrance — smaller slide than the hero's, tuned for a list of
+/* Mobile menu entrance: a smaller slide than the hero's, tuned for a list of
    rows. Re-runs on every open because the overlay toggles display. Kept short
    and steep on purpose: a long expo tail drags text through sub-pixel
    translation for hundreds of ms, which renders soft and "snaps" sharp at the

@@ -4,7 +4,7 @@
 
 {{-- One link inside a mobile-menu accordion. Adopts the desktop mega-menu's
      icon tile; items without an icon (e.g. the Compare column) stay a plain
-     text row. Descriptions are dropped on purpose — the overlay is a fast
+     text row. Descriptions are dropped on purpose: the overlay is a fast
      jump list, not a browsing surface. --}}
 
 <a href="{{ $item->url }}" @click="mobileMenu = false"
