@@ -79,7 +79,7 @@ You have the right to:
 - **Delete** your account and associated data
 - **Object** to data processing for specific purposes
 
-To exercise these rights, contact us at [Contact Us](/contact). We will respond within 15 business days.
+To exercise these rights, email privacy@relaticle.com or use [Contact Us](/contact). We will respond within 15 business days.
 
 ## 7. Cookies
 
@@ -141,4 +141,4 @@ We may update this Privacy Policy from time to time. We will notify registered u
 
 ## 11. Contact
 
-Questions about this Privacy Policy? Reach us at [Contact Us](/contact).
+Questions about this Privacy Policy? Email privacy@relaticle.com or reach us at [Contact Us](/contact).
