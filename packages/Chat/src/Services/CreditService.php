@@ -425,9 +425,9 @@ final readonly class CreditService
      * A past-due workspace refills at the Free allowance rather than the one it
      * has stopped paying for. keepPastDueSubscriptionsActive() leaves valid()
      * true throughout dunning, so the plan column still reads Pro and this is
-     * the only place that can tell the difference — without it, a workspace
-     * that has stopped paying is granted a fresh paid-tier allowance every
-     * period, for as long as Stripe leaves the subscription past due.
+     * the only place that can tell the difference. Without it, a workspace that
+     * has stopped paying is granted a fresh paid-tier allowance every period,
+     * for as long as Stripe leaves the subscription past due.
      *
      * Purchased packs are untouched by this and by resetPeriod: that money
      * already changed hands.
