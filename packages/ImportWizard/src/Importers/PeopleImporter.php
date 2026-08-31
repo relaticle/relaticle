@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Importers;
 
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
 use Relaticle\ImportWizard\Data\ImportFieldCollection;
@@ -18,6 +19,9 @@ use Relaticle\ImportWizard\Data\MatchableField;
  */
 final class PeopleImporter extends BaseImporter
 {
+    /** @var list<string> */
+    private array $pendingCompanyLinkPersonIds = [];
+
     public function modelClass(): string
     {
         return People::class;
@@ -84,5 +88,36 @@ final class PeopleImporter extends BaseImporter
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    public function afterSave(Model $record, array $context): void
+    {
+        parent::afterSave($record, $context);
+
+        if ($record instanceof People) {
+            $this->pendingCompanyLinkPersonIds[] = $record->getKey();
+        }
+    }
+
+    public function linkPendingCompaniesFromEmails(): void
+    {
+        if ($this->pendingCompanyLinkPersonIds === []) {
+            return;
+        }
+
+        $linker = resolve(LinkPersonCompanyFromEmails::class);
+
+        foreach ($this->pendingCompanyLinkPersonIds as $personId) {
+            $person = People::query()->find($personId);
+
+            if ($person instanceof People) {
+                $linker->execute($person);
+            }
+        }
+
+        $this->pendingCompanyLinkPersonIds = [];
     }
 }
