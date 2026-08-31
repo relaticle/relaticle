@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\ActivityLog\ActivityChangeSummary;
 use App\Support\ActivityLog\ActivityValue;
 use App\Support\CanonicalRecordUrl;
+use App\Support\LikePattern;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -65,6 +66,9 @@ final class ActivityLog extends Page implements HasTable
 
     /** Characters of each side of a diff the table shows before the title takes over. */
     private const int VALUE_LENGTH = 60;
+
+    /** Characters of the full sentence the title carries before it, too, is clipped. */
+    private const int TITLE_LENGTH = 240;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
@@ -328,7 +332,7 @@ final class ActivityLog extends Page implements HasTable
      */
     private function searchByRecordName(Builder $query, string $search): Builder
     {
-        $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $search).'%';
+        $term = '%'.LikePattern::escape($search).'%';
 
         $query->where(fn (Builder $logged): Builder => $logged
             ->whereRaw("activity_log.attribute_changes #>> '{attributes,name}' ilike ?", [$term])
@@ -478,7 +482,9 @@ final class ActivityLog extends Page implements HasTable
      * Reads as one sentence — field, what it was, what it became — with the
      * before struck through so the after is what the eye lands on. The title
      * carries the same sentence in plain text, which is what a reader gets back
-     * when a long value wraps or is clipped.
+     * when a long value wraps or is clipped. It is capped too: a rich-editor
+     * body arrives here stripped but not shortened, and uncapped it would ship
+     * the whole note into the title of every row on the page.
      *
      * Every part is a value someone typed into the CRM, so every part is escaped.
      *
@@ -486,7 +492,7 @@ final class ActivityLog extends Page implements HasTable
      */
     private function changeLine(array $state): HtmlString
     {
-        $plain = $state['label'].': '.$state['old'].' → '.$state['new'];
+        $plain = Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH);
         $old = Str::limit($state['old'], self::VALUE_LENGTH);
         $new = Str::limit($state['new'], self::VALUE_LENGTH);
 

@@ -588,3 +588,35 @@ test('searching finds a record whose name was never written into a payload', fun
         ->assertSee('Silent Partners Ltd')
         ->assertDontSee('Unrelated Ltd');
 });
+
+test('a long rich editor body does not ship whole into every row title', function (): void {
+    $company = Company::factory()->for($this->team)->create(['name' => 'Long Copy Co']);
+    $body = str_repeat('a renewal note that keeps going. ', 200);
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'team_id' => $this->team->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => null, 'label' => '—'],
+            'new' => ['value' => '<p>'.$body.'</p>', 'label' => '<p>'.$body.'</p>'],
+        ]]],
+    ]);
+
+    $html = livewire(ActivityLog::class)->assertOk()->html();
+
+    preg_match('/<span title="([^"]*)"/', $html, $matches);
+
+    expect($matches[1] ?? '')
+        ->toContain('Description')
+        ->and(mb_strlen($body))->toBeGreaterThan(6000)
+        ->and(mb_strlen($matches[1] ?? ''))->toBeLessThan(300);
+});
