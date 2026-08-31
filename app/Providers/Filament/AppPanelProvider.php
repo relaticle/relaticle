@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Enums\SupportFormType;
+use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
@@ -12,6 +13,7 @@ use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
+use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditTeam;
@@ -51,6 +53,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Facades\FilamentTimezone;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -402,7 +405,18 @@ final class AppPanelProvider extends PanelProvider
         $panel
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
-            ->tenantProfile(EditTeam::class);
+            ->tenantProfile(EditTeam::class)
+            // A negative sort is what puts an item in the group above the
+            // workspace switcher, next to Workspace Settings (sort -2), instead
+            // of stranding it below the workspace list.
+            ->tenantMenuItems([
+                Action::make('billing')
+                    ->label(__('billing.title'))
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->sort(-1)
+                    ->url(fn (): string => Billing::getUrl())
+                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
+            ]);
 
         return $panel;
     }

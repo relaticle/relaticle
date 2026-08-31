@@ -9,6 +9,7 @@ use App\Filament\Pages\Team\ActivityLog;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
@@ -135,4 +136,19 @@ test('each page highlights its own tab even when no page route is current', func
         expect(activeWorkspaceTabLabels(app($page)))
             ->toBe([$label], "[{$page}] should highlight only its own tab");
     }
+});
+
+test('the tenant menu lists billing directly under workspace settings', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    $items = collect($panel->getTenantMenuItems())
+        ->filter(fn (Action $item): bool => $item->isVisible())
+        ->keys()
+        ->all();
+
+    expect($items)->toBe(['profile', 'billing', 'register'])
+        ->and($panel->getTenantMenuItems()['billing']->getSort())->toBeLessThan(0);
 });
