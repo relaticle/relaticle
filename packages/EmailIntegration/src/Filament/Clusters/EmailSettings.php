@@ -6,12 +6,15 @@ namespace Relaticle\EmailIntegration\Filament\Clusters;
 
 use BackedEnum;
 use Filament\Clusters\Cluster;
+use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 
 final class EmailSettings extends Cluster
 {
     use HasEmailFeatureFlag;
+
+    protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedEnvelope;
 

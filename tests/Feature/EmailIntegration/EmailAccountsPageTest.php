@@ -6,12 +6,15 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
 use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
+use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
+use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -156,6 +159,29 @@ it('lists the default account first', function (): void {
         ->all();
 
     expect($ids[0])->toBe($default->id);
+});
+
+it('queues mailbox history import from the account menu', function (): void {
+    Bus::fake();
+
+    livewire(EmailAccountsPage::class)
+        ->callAction('reimportHistory', arguments: ['account_id' => $this->account->id])
+        ->assertNotified();
+
+    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($this->account));
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($this->account));
+});
+
+it('does not re-import another user\'s account', function (): void {
+    $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherUser->id,
+    ]));
+
+    expect(fn () => livewire(EmailAccountsPage::class)
+        ->callAction('reimportHistory', arguments: ['account_id' => $otherAccount->id]))
+        ->toThrow(ModelNotFoundException::class);
 });
 
 it('renders Connect Gmail and hides Connect Outlook for now', function (): void {

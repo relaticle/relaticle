@@ -162,18 +162,30 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * @return array<int, mixed>
+     * @return array<int, Action>
      */
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            $this->composeEmailAction(),
+        ];
+    }
+
+    protected function composeEmailAction(): Action
+    {
+        return Action::make('composeEmail')
+            ->label(__('filament/concerns/email-compose.actions.compose.label'))
+            ->icon('heroicon-o-pencil-square')
+            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
+            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
+            ->action(function (): void {
+                $this->dispatch('composer:open');
+            });
     }
 
     /**
-     * No page heading. The board is the page — a title bar above it repeating the word
-     * already highlighted in the sidebar only pushes the list down. Filament drops the
-     * whole header block when the heading and header actions are both empty. Compose
-     * is the global floating composer (`c` / the composer:open event).
+     * No page heading. The sidebar already marks Email as active; the header row
+     * carries only the compose action above the tab strip.
      */
     public function getHeading(): string
     {

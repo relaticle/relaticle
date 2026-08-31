@@ -7,14 +7,18 @@ use App\Providers\AppServiceProvider;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Controllers\CallbackController;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
+use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
+use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(AppServiceProvider::class);
 mutates(CallbackController::class);
+mutates(ConnectAccountAction::class);
 
 it('resolves the azure socialite driver', function (): void {
     expect(fn () => Socialite::driver('azure'))->not->toThrow(Throwable::class);
@@ -55,6 +59,8 @@ it('stores an azure connected account and flips calendar capability when Graph c
         ->and($user->currentTeam->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
 
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
 });
 
 it('preserves the stored refresh token when a reconnect returns none', function (): void {
@@ -90,6 +96,41 @@ it('preserves the stored refresh token when a reconnect returns none', function 
     $account = $connect(null);      // re-consent returns none — must NOT clobber the stored token
 
     expect($account->refresh()->refresh_token)->toBe('original-refresh');
+});
+
+it('dispatches history import when a disconnected account is reconnected', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->trashed()->create([
+        'user_id' => $user->getKey(),
+        'team_id' => $user->current_team_id,
+        'email_address' => 'again@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-reconnect-import',
+    ]));
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-reconnect-import';
+    $social->email = 'again@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    expect($account->refresh()->trashed())->toBeFalse();
+
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
 });
 
 it('makes the first connected account the default and leaves later connections non-default', function (): void {

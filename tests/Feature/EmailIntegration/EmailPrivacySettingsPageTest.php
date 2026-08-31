@@ -181,7 +181,8 @@ it('shows record creation mode descriptions and the recommended badge', function
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.selective.description'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.modes.none.description'))
         ->assertSee(__('filament/pages/email-privacy-settings.record_creation.recommended'))
-        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'))
+        ->assertSee(__('filament/pages/email-privacy-settings.record_creation.description'));
 });
 
 it('pre-fills record creation settings from the team on mount', function (): void {

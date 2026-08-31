@@ -14,7 +14,6 @@ use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
-use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use RuntimeException;
 use Throwable;
 
@@ -58,7 +57,7 @@ final readonly class CallbackController
         $grantedScopes = $socialUser->approvedScopes;
         $hasCalendar = $this->detectCalendarCapability($provider, $grantedScopes);
 
-        $account = resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
+        resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
             userId: $user->getKey(),
             teamId: $user->currentTeam->getKey(),
             provider: $provider,
@@ -70,10 +69,6 @@ final readonly class CallbackController
             tokenExpiresAt: now()->addSeconds($socialUser->expiresIn),
             hasCalendar: $hasCalendar,
         ));
-
-        if ($hasCalendar) {
-            dispatch(new InitialCalendarSyncJob($account));
-        }
 
         return redirect(EmailAccountsPage::getUrl([
             'tenant' => $user->currentTeam->slug,

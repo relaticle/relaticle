@@ -11,6 +11,7 @@ use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
+use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -24,6 +25,7 @@ mutates(
     IncrementalCalendarSyncJob::class,
     InitialCalendarSyncJob::class,
     StoreMeetingJob::class,
+    RelinkMailboxHistoryJob::class,
 );
 
 it('routes inbound email and calendar sync jobs to emails-sync queue', function (): void {
@@ -52,7 +54,8 @@ it('routes inbound email and calendar sync jobs to emails-sync queue', function 
         ->and((new StoreEmailJob($account, 'msg-1'))->queue)->toBe('emails-sync')
         ->and((new IncrementalCalendarSyncJob($account))->queue)->toBe('emails-sync')
         ->and((new InitialCalendarSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new StoreMeetingJob($account, $event))->queue)->toBe('emails-sync');
+        ->and((new StoreMeetingJob($account, $event))->queue)->toBe('emails-sync')
+        ->and((new RelinkMailboxHistoryJob($account))->queue)->toBe('emails-sync');
 });
 
 it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue', function (): void {
