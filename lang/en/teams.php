@@ -226,6 +226,10 @@ return [
         ],
     ],
 
+    'invitation' => [
+        'members' => '{1} 1 person is already in this workspace|[2,*] :count people are already in this workspace',
+    ],
+
     'invite_link' => [
         'heading' => 'Invite link',
         'description' => 'Share one link instead of typing addresses. Anyone who opens it joins this workspace.',
@@ -238,7 +242,6 @@ return [
             'heading' => 'Join :workspace',
             'body' => 'You will join with :role access.',
             'joining_as' => 'Joining as',
-            'members' => '{1} 1 person is already in this workspace|[2,*] :count people are already in this workspace',
             'action' => 'Join workspace',
             'decline' => 'Not now',
         ],

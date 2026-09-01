@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Jetstream\AcceptTeamInvitation;
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -87,8 +88,11 @@ final readonly class AcceptTeamInvitationController
         return view('teams.accept-invitation', [
             'state' => 'ready',
             'teamName' => $invitation->team->name,
+            'teamAvatarUrl' => $invitation->team->getFilamentAvatarUrl(),
             'inviterName' => $invitation->inviter?->name,
             'roleName' => Jetstream::findRole($invitation->role)?->name,
+            'roleDescription' => TeamRole::description($invitation->role),
+            'memberCount' => $invitation->team->users()->count() + 1,
             'joinUrl' => route('team-invitations.token.join', ['token' => $request->route('token')]),
         ]);
     }

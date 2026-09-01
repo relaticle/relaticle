@@ -596,3 +596,29 @@ test('after switching, the invitation link sends a guest to login and back again
 
     $this->actingAs($invitee)->get($acceptUrl)->assertOk()->assertViewHas('state', 'ready');
 });
+
+test('the accept page explains what the invited role allows', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'viewer']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)
+        ->get(route('team-invitations.token.accept', ['token' => $raw]))
+        ->assertOk()
+        ->assertSee(__('teams.roles.viewer.description'));
+});
+
+test('the accept page counts the people already in the workspace', function (): void {
+    $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)
+        ->get(route('team-invitations.token.accept', ['token' => $raw]))
+        ->assertOk()
+        ->assertSee('1 person is already in this workspace');
+});
