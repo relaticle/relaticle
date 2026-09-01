@@ -133,7 +133,7 @@ it('approving an email that already belongs to a team member surfaces the valida
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
-it('rejects a role outside editor|admin before proposing', function (): void {
+it('rejects a role outside editor|viewer|admin before proposing', function (): void {
     $tool = app(InviteTeamMemberTool::class);
 
     $result = $tool->handle(new Request([
@@ -144,8 +144,37 @@ it('rejects a role outside editor|admin before proposing', function (): void {
 
     $decoded = json_decode($result, true);
 
-    expect($decoded['error'])->toContain('Role must be "editor" or "admin"')
+    expect($decoded['error'])->toContain('Role must be "editor", "viewer", or "admin"')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('proposes a viewer invitation, the role the members form also offers', function (): void {
+    $tool = app(InviteTeamMemberTool::class);
+
+    $result = $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => TeamRole::Viewer->value],
+        ],
+    ]));
+
+    expect(json_decode($result, true))->not->toHaveKey('error');
+
+    expect(pendingActionForTeam($this->user)->action_data['role'])->toBe(TeamRole::Viewer->value);
+});
+
+it('creates a viewer membership when a viewer invitation is approved and accepted', function (): void {
+    $tool = app(InviteTeamMemberTool::class);
+
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => TeamRole::Viewer->value],
+        ],
+    ]));
+
+    resolve(PendingActionService::class)->approve(pendingActionForTeam($this->user), $this->user);
+
+    expect(TeamInvitation::query()->where('email', 'read-only@example.com')->sole()->role)
+        ->toBe(TeamRole::Viewer->value);
 });
 
 it('rejects a batch over the configured max batch size', function (): void {

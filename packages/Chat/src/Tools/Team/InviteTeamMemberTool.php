@@ -48,7 +48,7 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
         return [
             'email' => $schema->string()->description('Email address to invite.')->required(),
             'role' => $schema->string()
-                ->description('Workspace role: "editor" (default) or "admin".'),
+                ->description('Workspace role: "editor" (default), "viewer", or "admin".'),
         ];
     }
 
@@ -85,8 +85,8 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
 
         $role = $record['role'] ?? TeamRole::Editor->value;
 
-        if (! in_array($role, [TeamRole::Editor->value, TeamRole::Admin->value], true)) {
-            return "Role must be \"editor\" or \"admin\", got \"{$role}\".";
+        if (! in_array($role, [TeamRole::Editor->value, TeamRole::Viewer->value, TeamRole::Admin->value], true)) {
+            return "Role must be \"editor\", \"viewer\", or \"admin\", got \"{$role}\".";
         }
 
         if ($role === TeamRole::Admin->value && ! Gate::forUser($user)->allows('promoteToAdmin', $team)) {
