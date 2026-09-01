@@ -12,11 +12,11 @@ Invitations, roles, and removals all live there, in three sections: **Invite
 people** to send invites, **Pending invitations** for people who have not
 joined yet, and **Members** for everyone who has.
 
-## What changed on 1 September 2026
+## A recent change to Administrator access
 
 Administrators can now invite people, revoke invitations, and change member
-roles. They could not before. Check your **Members** list if you granted
-that role earlier, because everyone holding it gained those abilities.
+roles. They could not before. Check your **Members** list if you granted that
+role earlier, because everyone holding it gained those abilities.
 
 ## The three roles
 
