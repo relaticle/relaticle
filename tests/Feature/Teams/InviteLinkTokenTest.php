@@ -7,6 +7,7 @@ use App\Actions\Jetstream\CreateTeam;
 use App\Enums\TeamRole;
 use App\Filament\Pages\Dashboard;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -265,4 +266,52 @@ test('teams without a configured default still grant editor', function (): void 
 
     expect($joiner->fresh()->teamRole($team->fresh())->key)
         ->toBe(TeamRole::Editor->value);
+});
+
+test('joining via the invite link consumes a pending email invitation for the same address', function (): void {
+    $owner = User::factory()->create();
+
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-consume',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => $joiner->email,
+        'role' => TeamRole::Editor->value,
+    ]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
+
+    expect(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
+});
+
+test('joining a team leaves a pending invitation to a different team alone', function (): void {
+    $owner = User::factory()->create();
+
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-other',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $elsewhere = TeamInvitation::factory()->create([
+        'team_id' => Team::factory()->create()->id,
+        'email' => $joiner->email,
+        'role' => TeamRole::Editor->value,
+    ]);
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $team->invite_link_token]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
+
+    expect(TeamInvitation::query()->whereKey($elsewhere->id)->exists())->toBeTrue();
 });
