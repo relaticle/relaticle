@@ -26,4 +26,15 @@ enum TeamRole: string
 
         return $registeredRole->name;
     }
+
+    public static function description(string $role): ?string
+    {
+        $registeredRole = Jetstream::findRole($role);
+
+        if ($registeredRole === null) {
+            return null;
+        }
+
+        return $registeredRole->description;
+    }
 }

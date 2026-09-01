@@ -64,6 +64,98 @@ test('GET on a valid token renders the join confirmation page', function (): voi
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
 
+test('the join page names the role the link grants', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-role-shown',
+        'onboarding_use_case' => 'other',
+    ]);
+    $team->update(['invite_link_default_role' => TeamRole::Viewer->value]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee('Viewer');
+});
+
+test('the join page offers a way out that does not join', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-not-now',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee('Not now')
+        ->assertSee(url()->getAppUrl(), false);
+
+    expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
+});
+
+test('the join page names the account that will join', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-signed-in-as',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee($joiner->email);
+});
+
+test('the join page counts the people already in the workspace', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-member-count',
+        'onboarding_use_case' => 'other',
+    ]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee('1 person is already in this workspace');
+
+    $team->users()->attach(User::factory()->create(), ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee('2 people are already in this workspace');
+});
+
+test('the join page explains what the granted role allows', function (): void {
+    $owner = User::factory()->create();
+    $team = resolve(CreateTeam::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-role-description',
+        'onboarding_use_case' => 'other',
+    ]);
+    $team->update(['invite_link_default_role' => TeamRole::Viewer->value]);
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('teams.join', ['token' => $team->invite_link_token]))
+        ->assertOk()
+        ->assertSee(__('teams.roles.viewer.description'));
+});
+
 test('the join page does not leak its token through the Referer header', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [
@@ -136,7 +228,7 @@ test('invalid token returns 404 on POST', function (): void {
         ->assertNotFound();
 });
 
-test('team with null invite_link_token is unreachable via the original token', function (): void {
+test('a disabled workspace link is unreachable via the token it used to carry', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [
         'name' => 'Acme',
@@ -144,12 +236,17 @@ test('team with null invite_link_token is unreachable via the original token', f
         'onboarding_use_case' => 'other',
     ]);
     $originalToken = $team->invite_link_token;
-    $team->update(['invite_link_token' => null]);
+
+    $team->disableInviteLink();
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
 
     $this->actingAs($joiner)
         ->get(route('teams.join', ['token' => $originalToken]))
+        ->assertNotFound();
+
+    $this->actingAs($joiner)
+        ->post(route('teams.join.confirm', ['token' => $originalToken]))
         ->assertNotFound();
 });
 

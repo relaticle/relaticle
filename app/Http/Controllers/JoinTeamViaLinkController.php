@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -32,7 +33,14 @@ final readonly class JoinTeamViaLinkController
             return $this->redirectToTeam($team, __('teams.accept.already_member', ['team' => $team->name]));
         }
 
-        return view('teams.join-via-link', ['team' => $team, 'token' => $token]);
+        return view('teams.join-via-link', [
+            'team' => $team,
+            'token' => $token,
+            'user' => $user,
+            'roleName' => TeamRole::label($team->invite_link_default_role),
+            'roleDescription' => TeamRole::description($team->invite_link_default_role),
+            'memberCount' => $team->users()->count() + 1,
+        ]);
     }
 
     public function store(Request $request, string $token, AddsTeamMembers $adder): RedirectResponse|View
