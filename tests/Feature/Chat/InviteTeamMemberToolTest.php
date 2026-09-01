@@ -177,7 +177,7 @@ it('refuses to propose an invitation for a member who does not own the workspace
         'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
     ]));
 
-    expect($result)->toContain('Only the workspace owner can invite teammates')
+    expect($result)->toContain('Only workspace owners and administrators can invite teammates')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
         ->and(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
@@ -194,13 +194,11 @@ it('never links the non-owner refusal to a page that would 403 for them', functi
         'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
     ]));
 
-    // Members::canAccess() is `can('update', $tenant)`, the exact complement of the
-    // guard above, so every user who reaches this refusal is barred from that page.
     $membersUrl = resolve(DestinationResolver::class)->resolve('team_members', $this->team);
 
     expect(Members::canAccess())->toBeFalse()
-        ->and($result)->toContain('Only the workspace owner can invite teammates')
-        ->and($result)->toContain('ask an owner')
+        ->and($result)->toContain('Only workspace owners and administrators can invite teammates')
+        ->and($result)->toContain('ask one')
         ->and($result)->not->toContain($membersUrl)
         ->and($result)->not->toContain('http');
 });
@@ -291,4 +289,36 @@ it('keeps the mail transport failure off the card on the batch path too', functi
         ->and($shown)->not->toContain('587');
 
     expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('lets an administrator propose an invitation', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $admin->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
+    ]));
+
+    expect($result)->not->toContain('Only the workspace owner can invite teammates')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(1);
+});
+
+it('refuses an administrator proposing another administrator', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $admin->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Admin->value]],
+    ]));
+
+    expect($result)->toContain('Only the workspace owner')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });

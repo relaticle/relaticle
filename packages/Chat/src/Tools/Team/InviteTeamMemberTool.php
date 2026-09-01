@@ -8,6 +8,7 @@ use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\TeamRole;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Gate;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class InviteTeamMemberTool extends BaseWriteCreateTool
@@ -62,23 +63,18 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
     }
 
     /**
-     * Inviting is owner-only (TeamPolicy::addTeamMember). InviteTeamMember enforces
-     * that again at approval, but through Gate::authorize(), whose
-     * AuthorizationException the proposal card does not catch: without this the
-     * Approve button would be a permanent no-op for anyone else. Refuse at
-     * proposal time instead, so the assistant can say why.
-     *
-     * The refusal names no page. `Members::canAccess()` is `can('update', $tenant)`,
-     * the exact complement of the guard below, so the Members page 403s for every
-     * user who can reach this message: linking it would trade a hallucinated URL
-     * (`app.relaticle.com/settings/members`, the bug that put a URL here at all)
-     * for a real one that dead-ends just the same. Forbid any link instead, so the
-     * model cannot invent one either.
+     * InviteTeamMember re-authorizes at approval through Gate::authorize(), whose
+     * AuthorizationException the proposal card does not catch, so an unauthorized
+     * proposal would leave Approve a permanent no-op. Refusing here lets the
+     * assistant say why instead, and the refusal names no page so the model
+     * cannot invent a URL for one.
      */
     protected function validateRecord(array $record, User $user): ?string
     {
-        if (! $user->ownsTeam($user->currentTeam)) {
-            return __('Only the workspace owner can invite teammates. Tell the user to ask an owner, and do not link to any page.');
+        $team = $user->currentTeam;
+
+        if (! Gate::forUser($user)->allows('addTeamMember', $team)) {
+            return __('Only workspace owners and administrators can invite teammates. Tell the user to ask one, and do not link to any page.');
         }
 
         $email = (string) ($record['email'] ?? '');
@@ -91,6 +87,10 @@ final class InviteTeamMemberTool extends BaseWriteCreateTool
 
         if (! in_array($role, [TeamRole::Editor->value, TeamRole::Admin->value], true)) {
             return "Role must be \"editor\" or \"admin\", got \"{$role}\".";
+        }
+
+        if ($role === TeamRole::Admin->value && ! Gate::forUser($user)->allows('promoteToAdmin', $team)) {
+            return __('Only the workspace owner can grant the Administrator role. Tell the user to ask the owner, and do not link to any page.');
         }
 
         return null;
