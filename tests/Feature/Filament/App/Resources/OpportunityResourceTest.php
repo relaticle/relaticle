@@ -209,7 +209,7 @@ it('denies non-team-member from viewing another team opportunity', function (): 
 /**
  * The date-time table column converts to the viewer's zone, but a date-only field must
  * not: a bare close date has no time of day, so shifting it moves the day itself for
- * anyone west of UTC. Los Angeles is UTC-7 in August — a naive conversion of
+ * anyone west of UTC. Los Angeles is UTC-7 in August, so a naive conversion of
  * 2026-08-19 00:00 renders as the 18th.
  */
 it('does not shift a date-only custom field into the user timezone', function (): void {

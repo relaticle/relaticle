@@ -8,7 +8,7 @@
     $count = count($rows);
     // Only updates (and custom-field-only saves, whose event isn't a known operation)
     // read as "changed" with a diff. Created/deleted/restored keep their own verb and
-    // never dump the row's attribute set — on create that is every logged column,
+    // never dump the row's attribute set. On create that is every logged column,
     // including internal system fields the user never touched.
     $isChange = $summary->operation === ActivityLogOperation::Updated
         || ($summary->operation === null && $count > 0);

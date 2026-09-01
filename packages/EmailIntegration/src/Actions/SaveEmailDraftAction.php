@@ -24,8 +24,8 @@ final readonly class SaveEmailDraftAction
      * Create or update a DRAFT email row. Drafts are never queued and never
      * team-visible (privacy_tier PRIVATE).
      *
-     * A draft made from another message keeps the link to it. Dropping it — as this
-     * did originally — meant a reply saved as a draft came back as a plain new
+     * A draft made from another message keeps the link to it. Dropping it, as this
+     * did originally, meant a reply saved as a draft came back as a plain new
      * message: reopening it could not show what was being answered, and sending it
      * threaded nowhere in the recipient's client. `source_email_id` carries that
      * link for replies AND forwards, resolved here to the original's RFC message id
@@ -89,7 +89,7 @@ final readonly class SaveEmailDraftAction
                 'folder' => EmailFolder::Drafts,
                 'status' => EmailStatus::DRAFT,
                 'privacy_tier' => EmailPrivacyTier::PRIVATE,
-                // Set below, once the new attachment rows exist — an update must not
+                // Set below, once the new attachment rows exist. An update must not
                 // clear the flag for files a previous save already attached.
                 'has_attachments' => $existing instanceof Email && $existing->has_attachments,
                 'is_internal' => false,

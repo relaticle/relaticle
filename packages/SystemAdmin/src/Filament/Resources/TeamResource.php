@@ -32,6 +32,7 @@ use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\CreateTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\EditTeam;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ViewTeam;
+use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ActivityRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\CompaniesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ConversationsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\TeamResource\RelationManagers\ImportsRelationManager;
@@ -59,6 +60,13 @@ final class TeamResource extends Resource
     protected static ?string $pluralModelLabel = 'Teams';
 
     protected static ?string $slug = 'teams';
+
+    /**
+     * `teams.plan` is capability, `BillingStatus` is provenance, and the two
+     * badges sit side by side. Without this the pair reads as a contradiction:
+     * a trialling workspace shows a green Pro next to an amber Trial.
+     */
+    private const string PLAN_TOOLTIP = 'What the workspace may use: its AI credit allowance and rate limit. A trial writes Pro here, so it cannot say whether anyone is paying. Billing answers that.';
 
     /**
      * @return Builder<Team>
@@ -118,9 +126,11 @@ final class TeamResource extends Resource
                     TextEntry::make('billing_status')
                         ->label('Billing')
                         ->state(fn (Team $record): BillingStatus => $record->billingStatus())
+                        ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
                         ->badge(),
                     TextEntry::make('plan')
                         ->label('Plan')
+                        ->tooltip(self::PLAN_TOOLTIP)
                         ->badge(),
                     TextEntry::make('trial_ends_at')
                         ->label('Trial Ends')
@@ -175,6 +185,7 @@ final class TeamResource extends Resource
                     ->badge(),
                 TextColumn::make('plan')
                     ->label('Plan')
+                    ->tooltip(self::PLAN_TOOLTIP)
                     ->badge()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -198,6 +209,11 @@ final class TeamResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                SelectFilter::make('billing_status')
+                    ->label('Billing')
+                    ->options(BillingStatus::class)
+                    ->multiple()
+                    ->query(self::filterByBillingStatus(...)),
                 TernaryFilter::make('personal_team')
                     ->label('Personal Team'),
                 SelectFilter::make('onboarding_use_case')
@@ -220,6 +236,32 @@ final class TeamResource extends Resource
             ]);
     }
 
+    /**
+     * Rows whose derived billing badge is one of the selected statuses.
+     *
+     * The badge is computed per row in PHP, so the filter cannot read a column.
+     * BillingStatus::applyToQuery() owns the translation, including the
+     * precedence between statuses, and each selection is OR'd here.
+     *
+     * @param  Builder<Team>  $query
+     * @param  array{values?: array<int, string>}  $data
+     * @return Builder<Team>
+     */
+    private static function filterByBillingStatus(Builder $query, array $data): Builder
+    {
+        $statuses = array_filter(array_map(BillingStatus::tryFrom(...), $data['values'] ?? []));
+
+        if ($statuses === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $anyStatus) use ($statuses): void {
+            foreach ($statuses as $status) {
+                $anyStatus->orWhere(fn (Builder $matching): Builder => $status->applyToQuery($matching));
+            }
+        });
+    }
+
     #[Override]
     public static function getRelations(): array
     {
@@ -233,6 +275,7 @@ final class TeamResource extends Resource
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
             SubscriptionsRelationManager::class,
+            ActivityRelationManager::class,
         ];
     }
 

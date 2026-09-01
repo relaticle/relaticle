@@ -1,7 +1,7 @@
 <x-filament-panels::page class="!pb-0">
     {{-- Rendered here rather than left to the page header: the app panel turns
          breadcrumbs off globally (AppPanelProvider::breadcrumbs(false)), so the stock
-         header would drop them. The crumbs themselves are Filament's — resource index,
+         header would drop them. The crumbs themselves are Filament's: resource index,
          the record, then this page. --}}
     <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" class="-mb-2" />
 
@@ -17,7 +17,7 @@
          Sized in CSS, not JS: an inline height set by Alpine is wiped by every
          Livewire re-render (x-init does not re-run after a morph), which drops the
          pane back to its min-height mid-interaction. The subtraction is the chrome
-         above it — topbar, record header and the resource tabs. --}}
+         above it: topbar, record header and the resource tabs. --}}
     <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
 
         {{-- Toolbar: what you are looking at on the left, what you can do with it on
@@ -91,7 +91,7 @@
     {{-- ── Reader ──────────────────────────────────────────────────────────
          A hand-rolled overlay rather than <x-filament::modal>. That component owns
          its open state in Alpine and sets window visibility from its own $nextTick,
-         which races a Livewire response that renders and opens it in one go — it
+         which races a Livewire response that renders and opens it in one go, so it
          ends up `isOpen` with the window still display:none. Driving the state here
          also keeps the chrome slim: Filament only renders its close button inside a
          heading block, and that block is far heavier than a mail reader wants.
@@ -101,7 +101,7 @@
          whatever was typed as a draft. --}}
     @if ($this->selectedEmail !== null)
         {{-- Animated in CSS rather than with x-show. Alpine visibility state does not
-             survive Livewire morphing this element — the state flips to shown while a
+             survive Livewire morphing this element. The state flips to shown while a
              stale inline `display: none` stays behind, leaving an invisible overlay.
              A mount animation has no state to fall out of sync. --}}
         <div
@@ -109,7 +109,7 @@
                 /**
                  * Save any reply in progress before the reader goes away. Closing
                  * removes the docked composer along with the reader, so an event asking
-                 * it to save its draft would arrive after it no longer exists — the
+                 * it to save its draft would arrive after it no longer exists, and the
                  * draft has to be persisted first, and awaited.
                  */
                 async closeReader() {

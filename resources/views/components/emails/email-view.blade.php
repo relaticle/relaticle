@@ -43,7 +43,7 @@
 @endphp
 
 {{-- `ready` lives here so the message frame can flip it while the loading state sits
-     with the frame itself — the header and actions are ready immediately and should
+     with the frame itself. The header and actions are ready immediately and should
      not be held back behind it. --}}
 <div
     x-data="{ ready: @js($safeHtml === null) }"
@@ -55,13 +55,13 @@
         <div class="flex shrink-0 items-center gap-2.5 border-b border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/30 px-6 py-2.5 text-sm text-blue-700 dark:text-blue-300">
             <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0" />
             <span class="font-medium">Internal email</span>
-            <span class="text-blue-400">—</span>
+            <span class="text-blue-400">&middot;</span>
             <span class="text-blue-600 dark:text-blue-400">visible only to workspace members and hidden from external views.</span>
         </div>
     @endif
 
     {{-- ── Header ──────────────────────────────────────────────────────────
-         Two quiet rows — subject, then who and when — instead of one block that
+         Two quiet rows, subject then who and when, instead of one block that
          crams sender, address, date, badges and every recipient together. The
          recipients collapse behind a disclosure; they are reference, not headline. --}}
 
@@ -109,7 +109,7 @@
              *
              * The region opts into smooth scrolling in CSS, so these plain assignments
              * ease. Some environments discard a smooth programmatic scroll outright
-             * rather than merely skipping the animation — hence the final check, which
+             * rather than merely skipping the animation. Hence the final check, which
              * forces the position only if the draft was never actually reached.
              */
             scrollToDraft() {
@@ -228,10 +228,10 @@
 
     {{-- Message and draft share one scroll region: replying appends the draft under
          the message and scrolls down to it, and scrolling back up shows the original
-         again. The body iframe therefore needs a height of its own — see below. --}}
+         again. The body iframe therefore needs a height of its own; see below. --}}
     {{-- `motion-safe:scroll-smooth` is what animates the jump to a new draft: the
          scroll is a plain scrollTop assignment, which the browser eases when the
-         element opts in — and the variant drops it for reduced-motion users. --}}
+         element opts in, and the variant drops it for reduced-motion users. --}}
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
 
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
@@ -274,7 +274,7 @@
                  region around it is the only scroller, and a short email leaves no dead
                  space before the draft.
 
-                 `allow-same-origin` is what makes that measurement possible — it lets
+                 `allow-same-origin` is what makes that measurement possible: it lets
                  THIS page read into the frame. It does not let anything run in there;
                  that is `allow-scripts`, which stays withheld, so untrusted email HTML
                  still cannot execute. The pair is only dangerous together, because a

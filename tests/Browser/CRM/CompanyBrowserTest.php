@@ -13,10 +13,7 @@ it('can create a company through the browser', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->press('New company')
@@ -33,10 +30,7 @@ it('paints the header action dropdown above the table toolbar', function (): voi
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->assertSee('Import / Export');
@@ -72,10 +66,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/companies")
         ->assertVisible('[data-page-heading]')

@@ -170,7 +170,7 @@ final readonly class PendingActionService
         // values. When approve() runs there may be no resolvable custom-fields tenant
         // context (the Livewire dock sets the Filament tenant but not necessarily the
         // custom-fields one). Without it the custom-fields TenantScope no-ops and
-        // saveCustomFields() iterates EVERY tenant's field definitions — writing value rows
+        // saveCustomFields() iterates EVERY tenant's field definitions, writing value rows
         // across all tenants (cross-tenant leak) and, at scale, exceeding the request
         // timeout. Scope it to the action's team, and restore the prior value afterward so
         // the override never outlives this call (TenantContextService resolves its context
@@ -289,7 +289,7 @@ final readonly class PendingActionService
 
     /**
      * Resolve a single item of a Create batch proposal. Each item is executed in
-     * its own transaction so partial progress survives a later item's failure —
+     * its own transaction so partial progress survives a later item's failure,
      * unlike approve(), which is atomic for the whole batch. The proposal stays
      * Pending until every item is resolved, then finalizes.
      *
@@ -513,7 +513,7 @@ final readonly class PendingActionService
             ->find($recordId);
 
         // A vanished record fails only this item (RuntimeException -> resolve-failed),
-        // never the sibling items — per-item resolution is independent, not atomic.
+        // never the sibling items. Per-item resolution is independent, not atomic.
         throw_if(! $model instanceof Model, RuntimeException::class, 'Record not found');
 
         return $model;
@@ -532,7 +532,7 @@ final readonly class PendingActionService
     /**
      * Atomically mark every still-pending action on a conversation as superseded.
      *
-     * Called when a new user message arrives on the same conversation thread —
+     * Called when a new user message arrives on the same conversation thread, where
      * the user has effectively moved on without approving or rejecting. Returns
      * the rows in their pre-update state so callers can surface them to the model.
      *
@@ -614,7 +614,7 @@ final readonly class PendingActionService
     /**
      * Fields the user unchecked before approving, per record. A field listed here
      * was NOT written even though the proposal's replayed tool result still shows
-     * it — without this the model reports values it never set, the same defect
+     * it. Without this the model reports values it never set, the same defect
      * skippedItemLabels() exists to prevent for whole records.
      *
      * @return list<array{record: string|null, fields: list<string>}>
@@ -1008,7 +1008,7 @@ final readonly class PendingActionService
 
     /**
      * Drop the user-unchecked fields from a record payload before execution. An
-     * absent key is simply not written (create) or left unchanged (update) — the
+     * absent key is simply not written (create) or left unchanged (update). The
      * stored action_data itself stays untouched, per the frozen-payload contract.
      *
      * @param  array<array-key, mixed>  $record

@@ -27,7 +27,7 @@ it('writes a Refund transaction row when refundReservation is called', function 
         ->and($refund->metadata['reason'])->toBe('reservation_refund');
 });
 
-it('refund is idempotent on the ledger — second call writes no extra row', function (): void {
+it('refund is idempotent on the ledger: a second call writes no extra row', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     $service = app(CreditService::class);

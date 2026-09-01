@@ -97,6 +97,7 @@ describe('Legal pages', function () {
 
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
+        $response->assertSee('privacy@relaticle.com');
         $response->assertSee('August 26, 2026');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
@@ -141,7 +142,7 @@ describe('Legal pages', function () {
 
 describe('Documentation pages', function () {
     // Shiki highlights code by spawning a node subprocess per fenced block, and
-    // these pages carry ~59 between them — over half this file's runtime. None
+    // these pages carry ~59 between them, over half this file's runtime. None
     // of the assertions here read highlighted output, so it is switched off and
     // covered once, explicitly, at the end of this block.
     beforeEach(function () {
@@ -228,7 +229,7 @@ describe('Authentication redirects', function () {
     it('redirects register to app panel', function () {
         $response = $this->get('/register');
 
-        $response->assertRedirect(url()->getAppUrl('register'));
+        $response->assertRedirect(url()->getAppUrl('login'));
     });
 
     it('redirects forgot password to app panel', function () {
@@ -267,10 +268,10 @@ describe('Social authentication routes', function () {
         $response->assertStatus(429); // Too Many Requests
     });
 
-    it('accepts github as a provider for redirect', function () {
+    it('rejects github as a provider for redirect', function () {
         $response = $this->get('/auth/redirect/github');
 
-        $response->assertStatus(302); // Redirect to GitHub
+        $response->assertNotFound();
     });
 
     it('accepts google as a provider for redirect', function () {
@@ -280,7 +281,7 @@ describe('Social authentication routes', function () {
     });
 });
 
-describe('Hero AI tab — conversation', function () {
+describe('Hero AI tab: conversation', function () {
     it('renders the three exchanges in initial DOM', function () {
         $response = $this->get('/');
 
@@ -325,20 +326,22 @@ describe('Hero AI tab — conversation', function () {
         $body = (string) $this->get('/')->assertSuccessful()->getContent();
 
         // Both writes the demo performs are proposals in the product
-        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
-        // so each must reach the transcript carrying an Approved outcome, and
-        // the dock must offer a decision for each before it lands. Advertising
-        // an unattended write would contradict the review-before-write contract
-        // the demo's own second exchange is built to show off.
+        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction), so
+        // each must be announced as a proposal and the dock must offer a
+        // decision before it lands. Advertising an unattended write would
+        // contradict the review-before-write contract the demo's own second
+        // exchange is built to show off.
         //
-        // Asserted on the review CHROME rather than on a card heading: the row
-        // renders the record as a chip plus an operation label, and pinning that
-        // wording made this test fail on a pure restyle while the invariant it
-        // guards -- no write without an approval -- still held.
-        expect(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2)
-            ->and(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
+        // Asserted on the review CHROME rather than on a card heading or an
+        // outcome badge: the decided row renders the record as a chip plus an
+        // operation label, and pinning that wording made this test fail on a
+        // pure restyle while the invariant it guards -- no write without an
+        // approval -- still held.
+        expect(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
             ->and($body)->toContain('Review the proposal below to update the task')
-            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems');
+            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems')
+            ->and($body)->toContain('Discard')
+            ->and($body)->toContain('Save changes');
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -351,9 +354,10 @@ describe('Hero AI tab — conversation', function () {
             ->and($body)->not->toContain('rounded-br-md bg-primary-50')
             ->and($body)->not->toContain('rounded-br-md bg-primary-600');
 
-        // A decided proposal collapses to one line carrying the dock's identity:
-        // an operation-tinted entity tile and the record label in bold, NOT a
-        // record pill (chips are reserved for inline clickable references).
+        // The docked proposal names the operation it is asking to approve; the
+        // decided row it collapses into carries only the operation-tinted entity
+        // tile and the record label in bold, NOT a record pill (chips are
+        // reserved for inline clickable references).
         expect($body)->toContain('Create Person')
             ->and($body)->toContain('Update Task')
             ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
@@ -364,7 +368,7 @@ describe('Hero AI tab — conversation', function () {
     });
 });
 
-describe('Hero AI tab — app shell', function () {
+describe('Hero AI tab: app shell', function () {
     it('renders the sidebar navigation items', function () {
         $response = $this->get('/');
 
@@ -391,7 +395,7 @@ describe('Hero AI tab — app shell', function () {
         $response->assertStatus(200);
         $response->assertSee('Overdue tasks this week');
         $response->assertSee('Follow up with Priya Nair');
-        $response->assertSee('Renewal prep — Daniel Okafor', false);
+        $response->assertSee('Renewal prep: Daniel Okafor', false);
         $response->assertSee('All chats');
     });
 
@@ -414,7 +418,7 @@ describe('Hero AI tab — app shell', function () {
     });
 });
 
-describe('Hero AI tab — demo CTA', function () {
+describe('Hero AI tab: demo CTA', function () {
     it('does not show the Watch demo link when video file is missing', function () {
         $videoPath = public_path('videos/hero-demo.mp4');
         if (file_exists($videoPath)) {
@@ -468,6 +472,24 @@ describe('Blog pages', function () {
         $this->get('/blog')
             ->assertStatus(200)
             ->assertSee($post->title);
+    });
+
+    it('renders the post cover uncropped on the index', function () {
+        Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('storage/ink/cover.png')
+            ->assertSee('aspect-video');
+    });
+
+    it('renders related posts through the shared card on a post page', function () {
+        $category = Category::factory()->create();
+        [$post, $related] = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($related->title);
     });
 
     it('canonicalises a paginated listing to its own page', function () {
@@ -762,7 +784,7 @@ describe('Response meta', function () {
     });
 });
 
-describe('Hero AI tab — animation timeline', function () {
+describe('Hero AI tab: animation timeline', function () {
     it('hides the data-table outer container at cycle start', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -781,7 +803,7 @@ describe('Hero AI tab — animation timeline', function () {
 
         // Hold is the read-time after exchange 3 settles before the loop
         // restarts from the entry phase. cycleMs no longer exists as a
-        // single magic number — timing is composed from entryHold +
+        // single magic number. Timing is composed from entryHold +
         // transition + exchange budgets.
         expect($body)->toContain('holdMs: 1500');
     });
@@ -845,7 +867,7 @@ describe('Hero AI tab — animation timeline', function () {
     });
 });
 
-describe('Hero AI tab — entry phase', function () {
+describe('Hero AI tab: entry phase', function () {
     it('renders the dashboard greeting mirroring app /', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -904,5 +926,19 @@ describe('Hero AI tab — entry phase', function () {
         expect($body)->toContain('transitionToConversation');
         expect($body)->toContain('entryHoldMs');
         expect($body)->toContain('entryTransitionMs');
+    });
+});
+
+describe('security.txt', function () {
+    it('serves the security contact with a future expiry', function () {
+        $response = $this->get('/.well-known/security.txt');
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
+        $response->assertSee('Contact: mailto:security@relaticle.com', false);
+        $response->assertSee('Canonical:', false);
+
+        preg_match('/Expires: (.+)/', (string) $response->getContent(), $matches);
+        expect(Carbon\Carbon::parse($matches[1])->isFuture())->toBeTrue();
     });
 });

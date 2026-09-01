@@ -53,7 +53,7 @@
  * The signature is a Filament custom block, so the editor wraps it in editing
  * chrome: a bordered card with a "Signature" heading, an edit button and a
  * delete button. None of that is sent to the recipient, and in a composer it
- * competes with the message being written — so inside the composer the block is
+ * competes with the message being written. Inside the composer the block is
  * rendered as what it actually is: plain signature text under a hairline.
  * Swapping or clearing it stays available in the bottom bar's signature menu.
  */
@@ -86,7 +86,7 @@
  * RichEditor exposes no height option, and its schema wrapper chain
  * (fi-sc > fi-grid-col > fi-sc-component > fi-fo-field > fi-fo-field-content-col)
  * is auto-height at every level, so the height has to be pushed down the chain
- * explicitly — one `h-full` anywhere in it is not enough.
+ * explicitly. One `h-full` anywhere in it is not enough.
  */
 .email-composer-body-ctn {
     & > .fi-sc,
@@ -101,7 +101,7 @@
 .email-composer-body {
     @apply flex h-full flex-col;
 
-    /* The unclassed div is the editor's own Alpine root — without it in the
+    /* The unclassed div is the editor's own Alpine root. Without it in the
        chain the height stops one level above the ProseMirror surface. */
     & .fi-input-wrp-content-ctn,
     & .fi-input-wrp-content-ctn > div:not([class]),

@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Deploy Relaticle with Docker or manually.
 order: 1
-updated: "2026-08-14"
+updated: "2026-08-30"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -83,7 +83,8 @@ These must be set or the containers will refuse to start.
 | `APP_URL` | `http://localhost` | Full URL where Relaticle is accessible. Include the scheme. |
 | `APP_PORT` | `80` | Host port the app container binds to. |
 | `APP_PANEL_DOMAIN` | (empty) | Set for subdomain routing (e.g., `app.example.com`). Leave empty for path mode (`/app`). |
-| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email — useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach `/app/register` can create a working account. |
+| `PASSKEYS_USER_HANDLE_SECRET` | `APP_KEY` | Derives the opaque WebAuthn user handle stored on each authenticator. Set it to its own random value (`openssl rand -base64 32`) before anyone registers a passkey, so rotating `APP_KEY` later does not change every user's handle. |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` | When `false`, users sign in without verifying their email. That is useful for self-hosters who haven't configured SMTP yet. The admin you create via `make:filament-user` is auto-verified regardless, so the default of `true` is safe for fresh Docker installs. Only set to `false` if your panel is on a private network: with verification disabled, anyone who can reach the sign-in page can create a working account. |
 | `LOG_CHANNEL` | `stderr` | Where logs go. `stderr` is recommended for Docker. |
 | `LOG_LEVEL` | `warning` | Minimum log level. Use `debug` for troubleshooting. |
 
@@ -116,36 +117,37 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 |----------|-------------|
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID for social login. |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret. |
+| `GOOGLE_REDIRECT_URI` | Absolute callback URL (`https://your-host/auth/callback/google`), or a relative path (`/auth/callback/google`) to derive the host from the request. |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra ID client id. The Microsoft button appears only when this is set; register `https://your-host/auth/callback/microsoft` as the redirect URI. |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra ID client secret. |
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
 
 ### AI Assistant
 
-The AI assistant works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured — with none configured, the assistant cannot answer.
+The AI assistant works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured. With none configured, the assistant cannot answer.
 
 There are two ways to run a self-hosted model, and you can use either or both:
 
-- **[Ollama](https://ollama.com)** (`OLLAMA_MODEL`) — the simplest path, with the best tool-calling support.
-- **Any OpenAI-compatible endpoint** (`SELF_HOSTED_AI_*`) — point at [vLLM](https://docs.vllm.ai) (best for many concurrent users), LM Studio, LocalAI, or a hosted gateway. Exposes multiple models at once.
+- **[Ollama](https://ollama.com)** (`OLLAMA_MODEL`): the simplest path, with the best tool-calling support.
+- **Any OpenAI-compatible endpoint** (`SELF_HOSTED_AI_*`): point at [vLLM](https://docs.vllm.ai) (best for many concurrent users), LM Studio, LocalAI, or a hosted gateway. Exposes multiple models at once.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | (empty) | Enables the Claude models in the chat picker. |
 | `OPENAI_API_KEY` | (empty) | Enables the GPT models in the chat picker. |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL of your Ollama server. From inside a Docker container, `localhost` is the container itself — use `http://host.docker.internal:11434` (or your host's LAN IP) to reach Ollama running on the host. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL of your Ollama server. From inside a Docker container, `localhost` is the container itself. Use `http://host.docker.internal:11434` (or your host's LAN IP) to reach Ollama running on the host. |
 | `OLLAMA_MODEL` | (empty) | Ollama model tag (e.g. `qwen3:14b`). Setting this adds the model to the chat picker. |
 | `SELF_HOSTED_AI_URL` | (empty) | Base URL of an OpenAI-compatible endpoint (e.g. `http://localhost:8000/v1`). |
 | `SELF_HOSTED_AI_KEY` | (empty) | API key for that endpoint, if it requires one (blank for most local servers). |
 | `SELF_HOSTED_AI_MODELS` | (empty) | Comma-separated model tags to expose (e.g. `qwen3:14b,llama3.1:70b`). Each becomes a picker entry. |
 
-**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably — `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only — cloud models run through the vendor SDK and are declined).
+**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably. `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only; cloud models run through the vendor SDK and are declined).
 
 **Known limitations with self-hosted models:**
 
 - Cloud providers enforce one-write-proposal-at-a-time at the API level; self-hosted models have no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
-- Each response must complete within 120 seconds. If a slow model exceeds it, the turn stops cleanly — your message stays in the conversation with a "didn't respond within the time limit" note and nothing is silently lost, so you can just retry. To avoid the limit, use a smaller/faster model or a GPU; "thinking" models like `qwen3` reason before answering and reach it sooner, so a non-thinking model or a shorter prompt helps for interactive use.
+- Each response must complete within 120 seconds. If a slow model exceeds it, the turn stops cleanly. Your message stays in the conversation with a "didn't respond within the time limit" note and nothing is silently lost, so you can just retry. To avoid the limit, use a smaller/faster model or a GPU; "thinking" models like `qwen3` reason before answering and reach it sooner, so a non-thinking model or a shorter prompt helps for interactive use.
 
 ### Feature Flags
 
@@ -154,7 +156,7 @@ Toggle features on or off. All are enabled by default. Useful for forks and cust
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
-| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and GitHub social login. Set to `false` to use only email/password authentication. |
+| `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
 
 ---
@@ -211,6 +213,8 @@ docker compose exec app php artisan sysadmin:create
 
 The app container serves HTTP on port 8080 internally. Place a reverse proxy in front to handle SSL termination and route traffic to the container.
 
+SSL is not optional if you want passkeys: browsers run WebAuthn over HTTPS only, and a passkey is bound to the host it was registered on. That host is `APP_PANEL_DOMAIN` when subdomain routing is on, and the `APP_URL` host otherwise, so serve the panel from one hostname and keep it stable.
+
 ### Nginx
 
 ```nginx
@@ -260,7 +264,7 @@ labels:
   - "traefik.http.services.relaticle.loadbalancer.server.port=8080"
 ```
 
-**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The app trusts `X-Forwarded-*` headers from RFC1918 private networks, loopback, and IPv6 ULA/link-local — covering Coolify/Dokploy/Traefik on a Docker network and reverse proxies on the host. Headers from public IPs are rejected, preventing spoofing.
+**Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The app trusts `X-Forwarded-*` headers from RFC1918 private networks, loopback, and IPv6 ULA/link-local, which covers Coolify/Dokploy/Traefik on a Docker network and reverse proxies on the host. Headers from public IPs are rejected, preventing spoofing.
 
 ---
 
@@ -431,7 +435,7 @@ If you prefer not to use Docker, you can deploy Relaticle directly on a server.
 - PHP 8.5+ with extensions: pdo_pgsql, gd, bcmath, mbstring, xml, redis
 - PostgreSQL 17+
 - Redis 7+
-- Node.js 20+
+- Node.js 22+
 - Composer 2+
 - Nginx or Apache
 - Supervisor (for queue workers)
@@ -449,7 +453,7 @@ cd /var/www/relaticle
 
 ```bash
 composer install --no-dev --optimize-autoloader
-npm ci && npm run build
+pnpm install --frozen-lockfile && pnpm run build
 ```
 
 3. Configure the environment:

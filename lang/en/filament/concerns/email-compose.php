@@ -21,7 +21,7 @@ return [
             'title' => 'Send cancelled',
         ],
         'too_late' => [
-            'title' => 'Too late — email already sent',
+            'title' => 'Too late, the email has already been sent',
         ],
     ],
     'fields' => [

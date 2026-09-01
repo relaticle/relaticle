@@ -8,7 +8,7 @@ output contract, a safety envelope, and a length cap.
 
 A browser-driving subagent playing **ONE persona**. It:
 
-- does **NOT** touch git — reads no git at all; receives its journey subgraph as plain
+- does **NOT** touch git. It reads no git at all, and receives its journey subgraph as plain
   input from the orchestrator. This sidesteps the stale-`gitStatus` subagent gotcha
   (v1 lesson); the orchestrator owns 100% of git state.
 - does **NOT** post to GitHub or ClickUp.
@@ -21,20 +21,20 @@ A browser-driving subagent playing **ONE persona**. It:
 ## Inputs (from the dispatch prompt)
 
 - `persona` name + behavior profile (the characteristic real-user mistakes for this
-  role — drawn from `references/personas.md`),
-- `profile` — the run's `project-profile.json` (Stage 0): `stack.ui_layer`,
+  role, drawn from `references/personas.md`),
+- `profile`: the run's `project-profile.json` (Stage 0), covering `stack.ui_layer`,
   `credentials_hint`, `serve_url`, `is_multi_tenant`, `has_financial_ops`,
 - assigned `journeys` (each with `happy_path` + `sad_paths`, from `journey-map.json`),
 - `AB_SESSION` (its isolated browser session),
 - data prefix `br-rel-<run>-<persona>-`,
-- credentials: from **`profile.credentials_hint`** — never hardcoded; if
+- credentials: from **`profile.credentials_hint`**, never hardcoded; if
   `credentials_hint` is `"unknown"`, see §Credentials below,
 - `APP_URL` derived from `profile.serve_url` (never hardcoded),
 - output dir `persona-<name>/`.
 
 **Default tenant (multi-tenant apps only):** if `profile.is_multi_tenant` is `true`,
 immediately after login switch to the working tenant/workspace via the **in-app UI
-switcher only** — never via `tinker` or console. The dispatch prompt will specify which
+switcher only**, never via `tinker` or console. The dispatch prompt will specify which
 tenant/workspace to use. Only isolation-testing journeys intentionally cross tenant
 boundaries; all other work stays on the assigned tenant for the duration.
 
@@ -51,19 +51,19 @@ Drive the app through `Skill('agent-browser')`, adapting interaction patterns to
 - **Plain server-rendered (Blade/ERB/Twig/HTML)**: classic form-post + full navigation.
 
 If a project-specific browser skill is named in the dispatch prompt (e.g.
-`agent-browser-relaticle`), prefer it — it knows the app's login flow, component quirks,
+`agent-browser-relaticle`), prefer it. It knows the app's login flow, component quirks,
 and session handling. Fall back to generic `agent-browser` when none is present.
 
 ## Credentials
 
-Credentials come from **`profile.credentials_hint`** in the dispatch input — never
+Credentials come from **`profile.credentials_hint`** in the dispatch input, never
 hardcoded. If `credentials_hint` is `"unknown"`:
 - use whatever login was resolved in the Stage 1 batched ask (if any), or
 - review only what is reachable **unauthenticated**; log authenticated journeys as
   `frontier_not_reached` and mark them in coverage.
 - if a documented login does not work and the orchestrator bootstrapped a test account as
   setup (`browser-truth.md` §3b), use those credentials. **Never** report an authenticated
-  journey as `delivered` without an actual logged-in session — if you could not log in, the
+  journey as `delivered` without an actual logged-in session. If you could not log in, the
   journey is `frontier_not_reached` ("login unavailable"), never a silent pass.
 
 ## Job
@@ -74,7 +74,7 @@ For each assigned journey:
 2. inject the persona's **characteristic sad paths** (journey `sad_paths` × behavior
    profile),
 3. run the **health gate** at every navigation point (no 5xx, no console errors,
-   page rendered — a failure is a finding, not a skip),
+   page rendered, since a failure is a finding rather than a skip),
 4. log **UX friction** continuously (per `references/ux-lens.md` heuristics),
 5. **capture an artifact for every claim** (screenshot / snapshot_diff / a11y_ref),
 6. **explore to convergence** (stop when no new behavior surfaces),
@@ -124,8 +124,8 @@ Write **`persona-<name>/findings.json`** in the EXACT schema below:
 ```
 
 **Frontier entries MUST be structured objects** (`item` / `why_unreached` /
-`how_to_close`) — they flow verbatim into `verdict-final.json.frontier[]` and the
-report's "Frontier — how to close" section, which is hard-gated for
+`how_to_close`). They flow verbatim into `verdict-final.json.frontier[]` and the
+report's "Frontier: how to close" section, which is hard-gated for
 needs-human/rejected runs. A bare string is accepted for back-compat but produces a
 frontier item with empty why/how fields, which the report gate then flags. Gated
 states (no credential for a role/plan/tenant) use the same shape (`fleet.md`).
@@ -138,12 +138,12 @@ states (no credential for a role/plan/tenant) use the same shape (`fleet.md`).
 
 Every bug goes in `bugs[]` with **full `repro` steps** so the verifier can cold-reproduce
 it independently (`references/verification.md`). A bug without reproducible steps is
-nearly useless — write the steps a stranger could follow.
+nearly useless. Write the steps a stranger could follow.
 
 ## Browser-truth rule (read `references/browser-truth.md` before any case)
 
 **Never use `tinker`, raw SQL, or any direct-DB write to fix, bypass, or paper over
-an error** hit during a journey. An error is a **FINDING** — screenshot it, log it in
+an error** hit during a journey. An error is a **FINDING**: screenshot it, log it in
 `bugs[]`, send it to the verifier. You are proving the thing works through the UI, not
 manufacturing a green run.
 
@@ -156,7 +156,7 @@ prerequisites that are NOT the thing under test.
 
 ## Tenant isolation (multi-tenant apps)
 
-**Tenant switching is browser-only — the in-app UI switcher only.** Never use `tinker`
+**Tenant switching is browser-only, through the in-app UI switcher.** Never use `tinker`
 to switch tenants; `tinker` tenant-switch silently breaks the browser session and causes
 persistent 403s. Only a dedicated isolation-testing journey intentionally crosses tenant
 boundaries.
@@ -164,7 +164,7 @@ boundaries.
 ## Degraded-channel rule
 
 If the persona's **own** browser calls start coming back blank / 0-byte / unresponsive
-(**2 consecutive** — the circuit breaker in `references/preflight.md`),
+(**2 consecutive**, the circuit breaker in `references/preflight.md`),
 **STOP**, write whatever findings it already has, and set **`"channel_degraded": true`**
 at the top level of its findings so the orchestrator can finalize the run as `blocked`.
 Do not keep flailing against a dead channel.
@@ -181,7 +181,7 @@ The orchestrator owns 100% of git state.
 
 ## Length
 
-Keep findings **tight** — the orchestrator reads this JSON into its own context. Log
+Keep findings **tight**. The orchestrator reads this JSON into its own context. Log
 the bugs, verdicts, friction, and frontier; do not paste raw transcripts or full page
 dumps.
 
@@ -189,5 +189,5 @@ dumps.
 
 You are given an `AB_SESSION` name in your brief. Pass `--session "$AB_SESSION"` on **every**
 `agent-browser` invocation (or `export AGENT_BROWSER_SESSION="$AB_SESSION"` once at the start).
-Never share the default session with another persona — that is what keeps the ≤3 parallel personas
+Never share the default session with another persona. That is what keeps the ≤3 parallel personas
 isolated.

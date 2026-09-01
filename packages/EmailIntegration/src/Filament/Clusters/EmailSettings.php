@@ -22,7 +22,7 @@ final class EmailSettings extends Cluster
 
     /**
      * Reached from the workspace menu (alongside Custom Fields / Import History),
-     * not the main sidebar — keep it out of the sidebar navigation tree.
+     * not the main sidebar, so keep it out of the sidebar navigation tree.
      */
     public static function shouldRegisterNavigation(): bool
     {

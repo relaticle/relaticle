@@ -9,7 +9,7 @@
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 min-w-0 break-words blog-prose">
             <x-ink::post-header :post="$post" />
             <x-ink::post-body :post="$post" />
-            <x-ink::related-posts :posts="$relatedPosts" />
+            <x-blog.related-posts :posts="$relatedPosts" />
         </div>
     </div>
 </x-guest-layout>

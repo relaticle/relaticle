@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     /*
-     * Email domains considered "public" — these are excluded from auto-company matching
+     * Email domains considered "public". These are excluded from auto-company matching
      * during email sync to prevent creating garbage companies like "Gmail Inc".
      * Teams can add further domain exclusions via Settings → Public Email Domains.
      */
@@ -37,7 +37,7 @@ return [
     /*
      * Sender local-parts treated as automated/no-reply. Mail from these addresses
      * (notice@, no-reply@, bounce@, …) does not auto-create a Company or Person
-     * during sync — it's machine-sent, so there is no real contact behind it.
+     * during sync: it's machine-sent, so there is no real contact behind it.
      * Matched as a case-insensitive substring of the local-part (before the @).
      */
     'automated_local_parts' => [
@@ -60,7 +60,7 @@ return [
     ],
 
     /*
-     * Sync settings — override via .env
+     * Sync settings, overridable via .env
      */
     'sync' => [
         // Unset by default so the first import covers the whole mailbox. Set
@@ -85,7 +85,7 @@ return [
 
         /*
          * A SENDING email whose worker died (queue eviction, SIGKILL) before failed()
-         * ran would otherwise stay SENDING forever — never sent, not retryable, and
+         * ran would otherwise stay SENDING forever: never sent, not retryable, and
          * permanently consuming the account's in-flight send capacity. The dispatcher
          * reclaims such rows (no provider_message_id yet) back to QUEUED once they have
          * been SENDING longer than this. Must exceed the worst-case job runtime

@@ -1,5 +1,5 @@
 {{-- The Draft marker and the one control that deletes. Every × on a Draft bar
-     throws the draft away, including a row a previous save already wrote —
+     throws the draft away, including a row a previous save already wrote,
      unlike the window chrome's ×, which puts the draft away and keeps it. --}}
 <div {{ $attributes->class(['flex shrink-0 items-center justify-between gap-2']) }}>
     <span class="text-sm font-medium text-primary-600 dark:text-primary-400">

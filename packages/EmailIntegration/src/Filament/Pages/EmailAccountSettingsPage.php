@@ -50,7 +50,7 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  *
  * Sharing tier and blocklist are stored per user + team (not per account), so the
  * General and Blocklist tabs edit settings that apply to every mailbox this user
- * has connected — the info tooltips say so. Signatures are per account.
+ * has connected, and the info tooltips say so. Signatures are per account.
  *
  * @property-read Schema $form
  */
@@ -197,8 +197,8 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     }
 
     /**
-     * Attio-style radio cards. The tier is stored on the user, not the account —
-     * the leading card hands the decision back to the workspace default.
+     * Attio-style radio cards. The tier is stored on the user, not the account,
+     * and the leading card hands the decision back to the workspace default.
      */
     private function sharingTierField(): ViewField
     {

@@ -24,7 +24,7 @@ final class PrivacyService
             return EmailPrivacyTier::FULL;
         }
 
-        // 1. Protected recipient — hard hidden for everyone except the owner
+        // 1. Protected recipient: hard hidden for everyone except the owner
         if ($this->isProtected($email)) {
             return null;
         }
@@ -65,7 +65,7 @@ final class PrivacyService
 
         // Resolve the team explicitly (instead of $user->currentTeam, whose accessor
         // larastan types as never-null and which can auto-switch teams as a side
-        // effect) so the null case — a user without a current team — is handled.
+        // effect) so the null case, a user without a current team, is handled.
         $team = $user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null;
 
         if ($team === null) {

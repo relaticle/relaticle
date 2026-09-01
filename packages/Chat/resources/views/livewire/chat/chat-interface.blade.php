@@ -1,5 +1,5 @@
 <div
-    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null))"
+    x-data="chatInterface(@js($conversationId), @js(route('chat.send')), @js($initialMessage), @js($messages), @js(auth()->id()), @js($hasMoreMessages), @js($initialModel ?? auth()->user()?->ai_preferences['default_model'] ?? 'auto'), @js($initialPrompt ?? null), @js($turnInFlight))"
     x-on:keydown="onChatRootKeydown($event)"
     x-on:chat:focus-editor.window="if ($event.detail?.context === @js($context ?? 'conversation')) localEditor()?.focus()"
     x-on:chat:editor-arrow-up.window="if ($event.detail?.context === @js($context ?? 'conversation')) maybeEditLastUserMessage()"
@@ -29,7 +29,7 @@
 
 @script
 <script>
-Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt) => ({
+Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt, turnInFlight) => ({
     ...window.ChatModules.transcriptModule({
         messagesUrl: @js(url('/chat/messages')),
         {{-- Templated on the conversation id for the same reason the switcher's
@@ -178,18 +178,18 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),
-    // Alpine re-initialises on SPA navigation, so this resets per record — a dismissal
+    // Alpine re-initialises on SPA navigation, so this resets per record. A dismissal
     // applies to the record you dismissed it on, not to every record afterwards.
     pageContextDismissed: false,
     // The pill behaves like a pre-filled attachment: it attaches to the NEXT message
-    // only, then this flips true and the pill disappears — subsequent messages carry
+    // only, then this flips true and the pill disappears. Subsequent messages carry
     // no page_context until the bound record actually changes. Distinct from
     // pageContextDismissed (explicit "stop referring to this"): chat:context-updated
     // resets both, but only dismissal is a user action.
     pageContextConsumed: false,
 
     // Snapshot of the record this message is bound to, in the same shape
-    // ListConversationMessages returns after a reload — the optimistic bubble
+    // ListConversationMessages returns after a reload. The optimistic bubble
     // and the reloaded one must render identically. `url` isn't resolvable
     // client-side, so the chip falls back to its non-clickable branch until
     // a reload fills it in from the server.
@@ -250,6 +250,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
 
         if (this.conversationId) {
             this.subscribeToConversation(this.conversationId);
+        }
+
+        // A turn is mid-flight server-side (reload during a running turn): show
+        // it as one from the first paint, exactly as the chat:resuming handler
+        // does for a resume this tab never sent. The watchdog bounds a job that
+        // died without broadcasting; stream_end/failure clear it as usual.
+        if (turnInFlight && this.conversationId) {
+            this.isStreaming = true;
+            this.currentToolStatus = null;
+            this.startStreamTimeout();
         }
 
         // Land at the latest message when reopening an existing conversation.
@@ -340,7 +350,12 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         }
 
         this.beforeUnloadHandler = (e) => {
-            if (!this.isStreaming) return;
+            // A streaming turn is reload-safe (TurnPresence restores it), so
+            // only undelivered input warrants the prompt: a send the server
+            // has not accepted yet, or a message queued behind the stream.
+            const undelivered = this.queuedSend
+                || this.messages.some((m) => m.role === 'user' && m.sendState === 'sending');
+            if (!undelivered) return;
             // Browsers show their own generic prompt; custom strings are ignored.
             e.preventDefault();
             e.returnValue = '';

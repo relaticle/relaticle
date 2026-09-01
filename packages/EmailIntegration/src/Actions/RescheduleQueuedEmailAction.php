@@ -20,7 +20,7 @@ final readonly class RescheduleQueuedEmailAction
             $lockedEmail = Email::query()->lockForUpdate()->findOrFail($email->getKey());
 
             if ($lockedEmail->status !== EmailStatus::QUEUED) {
-                throw new RuntimeException("Email cannot be rescheduled — status is {$lockedEmail->status->value}.");
+                throw new RuntimeException("Email cannot be rescheduled. Status is {$lockedEmail->status->value}.");
             }
 
             $lockedEmail->update(['scheduled_for' => Date::instance($newScheduledFor)]);

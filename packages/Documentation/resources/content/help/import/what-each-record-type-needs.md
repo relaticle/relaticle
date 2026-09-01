@@ -6,14 +6,14 @@ updated: "2026-08-13"
 related: [help/import/prepare-your-csv, help/import/update-existing-records]
 ---
 
-Each record type imports separately — one file per type. This page lists what
+Each record type imports separately, one file per type. This page lists what
 each type accepts: its required column, the relationships you can link during
 mapping, and a working example CSV.
 
 ## Companies
 
 - `name` (required)
-- `account_owner_email` — a team member's email, to assign ownership
+- `account_owner_email`: a team member's email, to assign ownership
 - Custom fields with the `custom_fields_` prefix
 
 ```
@@ -21,14 +21,14 @@ name,account_owner_email,custom_fields_industry,custom_fields_domains
 Acme Corporation,owner@yourcompany.com,Technology,acme.com
 ```
 
-Companies match existing records by **domain** or **Record ID** — see
+Companies match existing records by **domain** or **Record ID**. See
 [Update existing records with an import](/help/import/update-existing-records).
 
 ## People
 
 - `name` (required)
 - Custom fields with the `custom_fields_` prefix
-- **Company** relationship — link each person to a company by Record ID,
+- **Company** relationship: link each person to a company by Record ID,
   Domain, or Name
 
 ```
@@ -45,8 +45,8 @@ Name** always creates a new company instead.
 
 - `name` (required)
 - Custom fields (amount, stage, close date, and so on)
-- **Company** relationship — by Record ID, Domain, or Name
-- **Contact** relationship — by Record ID, Email, Phone, or Name
+- **Company** relationship: by Record ID, Domain, or Name
+- **Contact** relationship: by Record ID, Email, Phone, or Name
 
 ```
 name,company,contact,custom_fields_amount,custom_fields_stage
@@ -59,9 +59,9 @@ most reliable linking.
 ## Tasks
 
 - `title` (required)
-- **Companies**, **People**, **Opportunities** relationships — link to one or
+- **Companies**, **People**, **Opportunities** relationships: link to one or
   more records each
-- **Assignees** relationship — assign to team members by email
+- **Assignees** relationship: assign to team members by email
 
 ```
 title,assignee,company,custom_fields_due_date,custom_fields_priority
@@ -80,5 +80,5 @@ title,company
 Meeting Notes,acme.com
 ```
 
-Notes are always created as new records — an import never updates an existing
+Notes are always created as new records. An import never updates an existing
 note, even if you include an `id` column.

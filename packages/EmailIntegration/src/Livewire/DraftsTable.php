@@ -102,7 +102,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                             $user = $this->authUser();
 
                             // Per record through the action, which re-checks ownership
-                            // and clears each draft's stored attachments — a bulk delete
+                            // and clears each draft's stored attachments. A bulk delete
                             // must not become a shortcut around either.
                             $records->each(fn (Email $draft) => resolve(DeleteEmailDraftAction::class)
                                 ->executeIfExists($user, (string) $draft->getKey()));
@@ -136,7 +136,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
 
     /**
      * Drafts are private to their author, so this is scoped to the signed-in
-     * user within the current team — never the whole team.
+     * user within the current team, never the whole team.
      *
      * @return Builder<Email>
      */

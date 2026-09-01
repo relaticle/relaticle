@@ -60,8 +60,8 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     /**
-     * The last crumb. Without this it is the headlined class name — "Company Emails
-     * Page" — which reads as a class, not a place.
+     * The last crumb. Without this it is the headlined class name, "Company Emails
+     * Page", which reads as a class, not a place.
      */
     public function getBreadcrumb(): string
     {
@@ -216,7 +216,7 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     /**
-     * Access requests waiting on the reader — only ever their own mail, since only
+     * Access requests waiting on the reader, only ever their own mail, since only
      * the owner may grant access to it.
      *
      * @return Collection<int, EmailAccessRequest>

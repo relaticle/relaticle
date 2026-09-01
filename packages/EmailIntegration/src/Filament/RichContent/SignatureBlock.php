@@ -12,7 +12,7 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  *
  * Storing the signature as a dedicated `customBlock` node (identified by
  * {@see self::getId()} and configured with a `signature_id`) lets the compose
- * forms deterministically find, replace, or remove the signature in the body —
+ * forms deterministically find, replace, or remove the signature in the body,
  * instead of fragile string surgery around the surrounding HTML.
  */
 final class SignatureBlock extends RichContentCustomBlock

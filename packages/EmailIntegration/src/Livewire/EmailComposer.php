@@ -75,8 +75,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Whole-message cap. Attachment bytes are base64-encoded into the outbound
-     * message (~33% overhead), and Gmail rejects the message past ~25 MB encoded
-     * — by which point the email is already queued and only fails at send time.
+     * message (~33% overhead), and Gmail rejects the message past ~25 MB encoded.
+     * By that point the email is already queued and only fails at send time.
      */
     private const int MAX_ATTACHMENTS_TOTAL_BYTES = 15 * 1024 * 1024;
 
@@ -85,7 +85,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * handles Compose; `inline` is the copy docked under a message being read,
      * which handles replies and forwards only. Both are the same component, so
      * the toolbar, attachments, drafts, templates and signatures behave
-     * identically on either surface — the dock only decides chrome and which
+     * identically on either surface. The dock only decides chrome and which
      * open event the instance answers.
      */
     #[Locked]
@@ -98,7 +98,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public bool $isExpanded = false;
 
     /**
-     * The message this draft was made from — replied to OR forwarded. Drives what is
+     * The message this draft was made from, replied to OR forwarded. Drives what is
      * shown above the draft and survives a save, so reopening resumes the same task.
      */
     public ?string $sourceEmailId = null;
@@ -114,7 +114,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * The message being replied to, quoted into the body at send time. It is
-     * never rendered in the composer — on the inline dock the original is on
+     * never rendered in the composer: on the inline dock the original is on
      * screen directly above it.
      */
     public ?string $quotedBodyHtml = null;
@@ -141,7 +141,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     /**
      * Raw storage for the `bodyHtml` RichEditor field. Filament's RichEditor keeps
      * its bound Livewire property as the internal Tiptap document (an array), not
-     * an HTML string — the HTML string only exists at the field's dehydrated
+     * an HTML string. The HTML string only exists at the field's dehydrated
      * boundary (see {@see self::bodyHtmlValue()} / {@see self::setBodyHtml()}).
      * Do not read/write this property directly.
      */
@@ -161,7 +161,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Attachments already persisted against the open draft, as
-     * `{id, filename, size}` — the chip row renders these alongside the pending
+     * `{id, filename, size}`. The chip row renders these alongside the pending
      * uploads, which expose the same three facts through a different API.
      *
      * @var list<array{id: string, filename: string, size: int}>
@@ -175,7 +175,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * Laravel's container method-call binding), and this applies uniformly
      * whether the event came from a PHP-side `$this->dispatch('composer:open',
      * draftId: $id)` / the test helper, or a JS-side `$wire.dispatch('composer:open',
-     * { draftId: id })` — the browser CustomEvent's `detail` object is decoded
+     * { draftId: id })`. The browser CustomEvent's `detail` object is decoded
      * into the exact same string-keyed shape server-side, it is NOT positional.
      * A same-named `$payload['draftId']` entry is never populated by either
      * caller; only a literal `draftId` parameter is.
@@ -192,7 +192,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         // A second `composer:open` while a draft is already in progress (e.g. the `c`
         // shortcut firing after a click landed on a button, not an input) must not
-        // wipe what the user has typed — just bring the composer back into view.
+        // wipe what the user has typed. Just bring the composer back into view.
         if ($this->isOpen) {
             $this->isMinimized = false;
 
@@ -224,7 +224,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->isOpen = true;
         $this->isMinimized = false;
         // Composing and opening a saved draft are the same task and now present the
-        // same way — fit to the screen, like the reader. A forwarded message that was
+        // same way: fit to the screen, like the reader. A forwarded message that was
         // parked as a draft used to come back in the small corner window while the
         // message it answers opened full size, which read as two different features.
         $this->isExpanded = true;
@@ -232,7 +232,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Open the docked composer as a reply, reply-all or forward of `$emailId`.
-     * Only the inline instance answers — the floating window stays free for a
+     * Only the inline instance answers, so the floating window stays free for a
      * separate compose draft.
      */
     #[On('composer:reply')]
@@ -294,8 +294,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Close the docked composer because the reader moved to a different message —
-     * the draft answers the email that was on screen, so it must not stay attached
+     * Close the docked composer because the reader moved to a different message.
+     * The draft answers the email that was on screen, so it must not stay attached
      * under a different one. Anything typed is saved as a draft on the way out.
      */
     #[On('composer:dismiss-inline')]
@@ -352,14 +352,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->isOpen = true;
         $this->isMinimized = false;
 
-        // Nothing was clicked here — the draft came back on its own — so the reader
+        // Nothing was clicked here. The draft came back on its own, so the reader
         // has to be told to scroll down to it, the way the reply buttons do.
         $this->dispatch('composer:opened-inline');
     }
 
     /**
      * The message this draft answers or forwards, for display above it. Only the
-     * fitted window shows it — the inline dock already sits under the real thing.
+     * fitted window shows it, because the inline dock already sits under the real thing.
      */
     #[Computed]
     public function sourceEmail(): ?Email
@@ -403,7 +403,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
         // holds a structural `<p></p>` doc), so `required` can never catch a blank
-        // message — check the dehydrated text instead. A signature-only email (no
+        // message. Check the dehydrated text instead. A signature-only email (no
         // free text, just the signature block) is legitimate and must still send.
         if (trim(strip_tags($bodyHtml)) === '' && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')) {
             $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
@@ -431,7 +431,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
             'batch_id' => null,
             // Interactive sends from the composer keep the undo-send window (matches
-            // the surface being replaced — HasEmailComposeActions::buildSendData()).
+            // the surface being replaced, HasEmailComposeActions::buildSendData()).
             'priority' => EmailPriority::PRIORITY,
             'attachments' => $attachmentPaths,
             'attachment_file_names' => $attachmentNames,
@@ -440,7 +440,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         if ($this->draftId !== null) {
             // Best-effort: two tabs open on the same draft, or a retried request,
             // can mean the draft row is already gone by now. SendEmailAction has
-            // already committed the queued email above — a 403 here must never
+            // already committed the queued email above, so a 403 here must never
             // abort this method (it would leave the composer open and populated
             // with no feedback, inviting the user to press Send again and queue
             // a duplicate). executeIfExists() is a no-op when the draft is gone.
@@ -470,8 +470,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Append the original message to a reply or forward. The composer never shows
-     * this — the message is on screen above the dock — but the recipient's client
-     * needs it for the conversation to read as a thread.
+     * this, because the message is on screen above the dock. The recipient's
+     * client needs it for the conversation to read as a thread.
      */
     private function withQuotedBody(string $bodyHtml): string
     {
@@ -503,8 +503,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Put the draft away and keep it. Used when the composer is dismissed by
-     * something other than the user rejecting it — minimizing, or the reader moving
-     * to another message — where losing what was typed would be a surprise.
+     * something other than the user rejecting it: minimizing, or the reader moving
+     * to another message, where losing what was typed would be a surprise.
      */
     public function close(): void
     {
@@ -540,8 +540,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Enforce the size caps as files arrive, dropping (and deleting) anything
-     * over them rather than reporting an error and leaving the file in state —
-     * an invalid attachment left in `$attachments` would still be stored and
+     * over them rather than reporting an error and leaving the file in state.
+     * An invalid attachment left in `$attachments` would still be stored and
      * sent by {@see self::send()}, which does not re-check.
      */
     public function updatedAttachments(): void
@@ -648,7 +648,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         /** @var list<string> */
         return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier) — without this, a
+            // Drafts are private (never-sent, PRIVATE tier). Without this, a
             // teammate's still-unsent draft leaks its to/cc/bcc addresses into
             // everyone else's recipient autocomplete via this team-wide query.
             ->whereHas('email', fn (Builder $q): Builder => $q
@@ -862,7 +862,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Avatar for the "From" row, generated from the sending account's own name —
+     * Avatar for the "From" row, generated from the sending account's own name,
      * not the signed-in user's profile photo, which would be misleading on a
      * shared or delegated mailbox.
      */
@@ -1112,7 +1112,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * `accountId` is a plain public Livewire property, so a client can post any
      * ULID. Reject anything that isn't one of this user's own active accounts so
      * every downstream read (signature options, the default signature, `send()`)
-     * inherits ownership instead of re-deriving it — see {@see self::ownedAccountId()}.
+     * inherits ownership instead of re-deriving it. See {@see self::ownedAccountId()}.
      */
     public function updatedAccountId(?string $value): void
     {
@@ -1255,8 +1255,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * rejected by {@see self::ownedAccountId()} (nothing safe to save under).
      * Reusing this on both `minimize()` and `close()` means a user who clears
      * out an already-saved draft and closes leaves that draft row untouched
-     * rather than wiping it — {@see SaveEmailDraftAction} never runs in that
-     * case, so nothing to reconcile.
+     * rather than wiping it: {@see SaveEmailDraftAction} never runs in that
+     * case, so there is nothing to reconcile.
      */
     private function persistDraft(): void
     {
@@ -1334,7 +1334,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     /**
      * `$draftId` arrives from the same client-controlled `composer:open` event
      * payload as any other `open()` argument (see {@see self::open()}), so it
-     * must be re-verified here rather than trusted — scope the lookup to this
+     * must be re-verified here rather than trusted. Scope the lookup to this
      * user's own DRAFT rows *within their current team* (a multi-team user has
      * one `user_id` but no cross-team access; Email has no team global scope)
      * so a foreign or cross-team id can never leak draft content into the
@@ -1362,7 +1362,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         } else {
             // The account this draft was composed from was disconnected since
             // it was saved. `open()` already selected a default active account
-            // above — keep that rather than loading a stale, unowned account id
+            // above, so keep that rather than loading a stale, unowned account id
             // that would crash `send()` inside SendEmailAction's ownedBy()
             // lookup with an unhandled ModelNotFoundException.
             Notification::make()
@@ -1389,7 +1389,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * Put a reply draft back into reply mode. The link survives as the original's RFC
-     * message id on the draft row, so it is resolved back to the email here — which is
+     * message id on the draft row, so it is resolved back to the email here. That is
      * what lets the composer show what is being answered and thread the sent message.
      */
     private function restoreReplyContext(Email $draft): void
@@ -1475,7 +1475,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * `$this->accountId` only ever reaches here as trusted after
-     * {@see self::updatedAccountId()} has rejected anything foreign — but that hook
+     * {@see self::updatedAccountId()} has rejected anything foreign. But that hook
      * firing depends on Livewire's per-property update order, which a hand-crafted
      * payload controls. Re-verify ownership inline so every reader is safe on its
      * own, regardless of hook ordering.

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
 
             $table->string('provider', 50);                   // gmail | microsoft
-            $table->string('provider_account_id')->nullable(); // Google sub / MS oid — prevents duplicate connections
+            $table->string('provider_account_id')->nullable(); // Google sub / MS oid, prevents duplicate connections
             $table->string('email_address');
             $table->string('display_name')->nullable();
 

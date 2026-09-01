@@ -1,4 +1,4 @@
-# Stage 6 — Fix mode (find → fix → cold re-verify → re-gate)
+# Stage 6: Fix mode (find → fix → cold re-verify → re-gate)
 
 The loop the user actually runs ("go ahead fix all issues, reverify, post review") made
 first-class. Reviewer independence is preserved by **re-verification rigor**, not by
@@ -15,10 +15,10 @@ refusing to touch code.
 1. **Work order** = the finding's "Findings to act on" entry (file:line, repro,
    suggested action). Fix at the right layer; respect project rules (actions classes,
    tenant scoping, pint/phpstan gates before claiming done).
-2. **Cold re-verify against the ORIGINAL repro, verbatim** — fresh browser session,
+2. **Cold re-verify against the ORIGINAL repro, verbatim**, in a fresh browser session,
    the finding's recorded `repro[]` steps followed literally (the bug that "stayed
    fixed" for three weeks until a customer re-reported it was never re-walked from its
-   original repro — this step exists because of that). If the diff was authored in this
+   original repro, which is why this step exists). If the diff was authored in this
    session, the re-verification runs in a **fresh verifier subagent**; on capacity
    failure, say so and downgrade the claim to "fixed, not independently re-verified."
 3. Artifact: `_fix-verify/<finding-id>.png` (or deterministic evidence) per fix.
@@ -28,14 +28,14 @@ refusing to touch code.
    artifact → status).
 5. **Ledger update** (`regression-ledger.md`): every confirmed-then-fixed finding whose
    class could recur becomes an entry in the machine-local ledger
-   (`~/.claude/business-review/relaticle/regressions.json` — never commit it to the
-   repo). This is mandatory — findings must compound.
+   (`~/.claude/business-review/relaticle/regressions.json`, never committing it to the
+   repo). This is mandatory: findings must compound.
 
 ## Hard rules
 
-- The original repro is the acceptance test for the fix — "should work now" claims are
+- The original repro is the acceptance test for the fix. "Should work now" claims are
   forbidden; show the re-walked repro passing.
-- A fix that changes the diff under review invalidates the prior verdict — the updated
+- A fix that changes the diff under review invalidates the prior verdict. The updated
   REVIEW.md states the new head SHA and which journeys were re-judged.
 - Fix-mode never edits this skill's gates/scripts to make a run pass, and never weakens
   a ledger entry to dodge a sweep.

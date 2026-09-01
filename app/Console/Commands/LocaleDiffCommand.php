@@ -15,9 +15,9 @@ use Symfony\Component\Finder\Finder;
  * Reports translation key drift between `lang/en/` and `lang/<locale>/`.
  *
  * Three diff kinds:
- *   - missing  — key in en, not in locale
- *   - orphaned — key in locale, not in en
- *   - stale    — key in both, but the en value's hash has drifted since
+ *   - missing:  key in en, not in locale
+ *   - orphaned: key in locale, not in en
+ *   - stale:    key in both, but the en value's hash has drifted since
  *                the translator last ran `--update-snapshot`
  *
  * Covers both PHP array files and the top-level JSON file (e.g. `lang/en.json`).
@@ -325,7 +325,7 @@ final class LocaleDiffCommand extends Command
         }
 
         if ($this->isEmpty($diff)) {
-            $this->info("Locale {$locale} matches en — no missing, orphaned, or stale keys.");
+            $this->info("Locale {$locale} matches en. No missing, orphaned, or stale keys.");
         }
     }
 

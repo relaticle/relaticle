@@ -34,7 +34,7 @@ final class GetCrmSummaryTool implements Tool
         $team = $user->currentTeam;
 
         /**
-         * "This week" is the user's week, not the server's — bounded on UTC the counts
+         * "This week" is the user's week, not the server's. Bounded on UTC, the counts
          * shift by a day for anyone far enough east or west.
          */
         $startOfWeek = Date::now($user->effectiveTimezone())

@@ -7,10 +7,10 @@ declare(strict_types=1);
  *
  * Single source of truth for every public competitor claim (press page,
  * comparison pages). Every field that carries a number or price has its own
- * `*_verified` date, and the whole entry has a `verified` date — both are
+ * `*_verified` date, and the whole entry has a `verified` date. Both are
  * read by `php artisan gtm:stale-facts` to flag claims older than 90 days.
  *
- * `stars` is 0 for closed-source products with no public repository — that
+ * `stars` is 0 for closed-source products with no public repository. That
  * is the verified fact, not a placeholder. `contributors` is `'n/a'` for the
  * same reason (Attio, HubSpot) rather than a number, since there is no public
  * repository to count contributors on. Where a public repository exists,
@@ -70,14 +70,14 @@ return [
         'pricing_verified' => '2026-08-13',
         'stack' => 'Node/NestJS + Redis + Postgres + background workers',
         'self_host' => 'Self-hostable core; enterprise-tagged files are license-restricted',
-        'ai' => 'First-party MCP server marketed for Cloud workspaces',
-        'extensibility' => 'MIT-licensed apps SDK (twenty-sdk, create-twenty-app) for building custom objects, server logic, and UI components as TypeScript packages, per docs.twenty.com/developers — the core CRM repo itself stays AGPL-3.0 + Twenty Application Exception',
+        'ai' => 'First-party MCP server with OAuth, documented for both Cloud and self-hosted deployments (docs.twenty.com)',
+        'extensibility' => 'MIT-licensed apps SDK (twenty-sdk, create-twenty-app) for building custom objects, server logic, and UI components as TypeScript packages, per docs.twenty.com/developers; the core CRM repo itself stays AGPL-3.0 + Twenty Application Exception',
         'source_urls' => [
             'website' => 'https://twenty.com',
             'pricing' => 'https://twenty.com/pricing',
             'repository' => 'https://github.com/twentyhq/twenty',
         ],
-        'verified' => '2026-08-13',
+        'verified' => '2026-08-30',
     ],
     'espocrm' => [
         'name' => 'EspoCRM',
@@ -90,14 +90,14 @@ return [
         'pricing_verified' => '2026-08-13',
         'stack' => 'PHP',
         'self_host' => 'Free self-hosted core; paid extensions for self-hosters',
-        'ai' => 'No first-party AI or MCP tooling',
-        'extensibility' => 'No official first-party app store; paid extensions come from third-party marketplaces (e.g. OSOM, devcrm.it)',
+        'ai' => 'Official paid AI add-on (Intelligence: OpenAI, Gemini, Claude providers); no first-party MCP tooling',
+        'extensibility' => 'First-party paid extension store at espocrm.com/extensions (Advanced Pack, Sales Pack, Intelligence); no MCP/agent surface',
         'source_urls' => [
             'website' => 'https://www.espocrm.com',
             'pricing' => 'https://www.espocrm.com/pricing/',
             'repository' => 'https://github.com/espocrm/espocrm',
         ],
-        'verified' => '2026-08-13',
+        'verified' => '2026-08-30',
     ],
     'attio' => [
         'name' => 'Attio',
@@ -106,7 +106,7 @@ return [
         'stars_verified' => '2026-08-13',
         'contributors' => 'n/a',
         'contributors_verified' => '2026-08-13',
-        'pricing' => 'Free (up to 3 seats), Plus $35/user/mo, Pro $79/user/mo (billed yearly; $44/$99 monthly), Enterprise custom — see attio.com/pricing',
+        'pricing' => 'Free (up to 3 seats), Plus $35/user/mo, Pro $79/user/mo (billed yearly; $44/$99 monthly), Enterprise custom; see attio.com/pricing',
         'pricing_verified' => '2026-08-13',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'No self-hosting option',
@@ -125,7 +125,7 @@ return [
         'stars_verified' => '2026-08-13',
         'contributors' => 'n/a',
         'contributors_verified' => '2026-08-13',
-        'pricing' => 'Free CRM (up to 2 users), paid Hubs from $20/seat/mo (Starter) — see hubspot.com/pricing',
+        'pricing' => 'Free CRM (up to 2 users), paid Hubs from $20/seat/mo (Starter); see hubspot.com/pricing',
         'pricing_verified' => '2026-08-13',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'No self-hosting option',

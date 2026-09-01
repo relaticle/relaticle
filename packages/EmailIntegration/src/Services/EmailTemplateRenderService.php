@@ -172,7 +172,7 @@ final readonly class EmailTemplateRenderService
     /**
      * Replace both legacy `{name}` and Filament v5 `{{ name }}` merge tags.
      *
-     * When $escapeHtml is true the substituted values are HTML-escaped — required
+     * When $escapeHtml is true the substituted values are HTML-escaped, which is required
      * whenever the result is HTML (body), so a merge value can never inject markup.
      * Substitution happens in a single pass (callback for `{{ }}`, then strtr for the
      * legacy `{ }` form) so an injected value is never re-scanned for further tags.

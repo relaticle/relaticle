@@ -5,8 +5,8 @@
 
 Relaticle is a modular monolith: the CRM core lives in `app/`, and self-contained
 subsystems live in `packages/<Name>/` with the `Relaticle\<Name>` namespace
-(autoloaded from `packages/<Name>/src` via the root composer.json — packages have
-no composer.json of their own). Service providers are registered in
+(autoloaded from `packages/<Name>/src` via the root composer.json). Packages have
+no composer.json of their own. Service providers are registered in
 `bootstrap/providers.php`.
 
 | Location | Owns |
@@ -20,7 +20,7 @@ no composer.json of their own). Service providers are registered in
 | `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
-routes, or lifecycle — not for a new CRM entity (those go in `app/`). Package
+routes, or lifecycle. A new CRM entity is not one of those; it goes in `app/`. Package
 anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 `database/`.
 
@@ -28,21 +28,21 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 
 - `App` must not depend on `Relaticle\SystemAdmin`; `Relaticle\SystemAdmin` may
   only reach back into `App\Models`, `App\Enums`, `App\Rules`
-- Never use the custom-fields package models directly — use the `App\Models\CustomField*`
+- Never use the custom-fields package models directly. Use the `App\Models\CustomField*`
   subclasses (runtime model swapping is configured in `AppServiceProvider`)
-- `packages/SystemAdmin` is excluded from PHPStan — when adding or removing enum
+- `packages/SystemAdmin` is excluded from PHPStan. When adding or removing enum
   cases, manually sweep SystemAdmin for `match` expressions over that enum (this
   exclusion already caused a production `UnhandledMatchError`)
 
 ## Actions (the write path)
 
 All write operations (create, update, delete) go through action classes in
-`app/Actions/<Domain>/` — never inline business logic in controllers, MCP tools,
+`app/Actions/<Domain>/`. Never inline business logic in controllers, MCP tools,
 Livewire components, or Filament resources. Actions are the single source of
 truth for business logic and side effects (notifications, syncs, etc.).
 
-The canonical shape — `final readonly`, a single `execute()` method, authorization
-and tenant-ownership checks inside the action itself:
+The canonical shape is `final readonly`, with a single `execute()` method and
+authorization plus tenant-ownership checks inside the action itself:
 
 ```php
 final readonly class CreateOpportunity
@@ -60,15 +60,15 @@ final readonly class CreateOpportunity
 - Enforced by `EloquentWriteOutsideActionRule` (PHPStan): Eloquent writes in
   controllers, MCP tools, Livewire components, Filament classes, or chat tools
   fail analysis. Pre-existing violations are grandfathered per-file in
-  `phpstan.neon` — when you refactor one, remove its ignore entry
+  `phpstan.neon`. When you refactor one, remove its ignore entry
 - Filament CRUD may use native `CreateAction`/`EditAction` when the operation is a
-  plain `Model::create()`/`->update()` with no extra logic — but side effects
+  plain `Model::create()`/`->update()` with no extra logic. Side effects
   (e.g., notifications) must still be triggered via `->after()` hooks calling the
   appropriate action
 - When reviewing or refactoring code, extract inline business logic into action classes
 - Use `App\Data` (spatie/laravel-data) objects for structured payloads where they
   already exist; don't introduce new patterns
-- Name domain concepts plainly (`Plan`, not `AiPlan`) — context comes from the
+- Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace. Never store the same fact in two places; pick one source of truth
 
 ## i18n enforcement
@@ -77,7 +77,7 @@ Two custom PHPStan rules (`app/PHPStan/Rules/`) forbid hardcoded user-facing
 strings: `HardcodedUserFacingStringRule` (guarded methods like `label()`,
 `heading()`, `title()`) and `HardcodedStaticPropertyRule` (guarded static
 properties like `$navigationLabel`). Wrap user-facing strings in `__()`.
-Some paths are deferred via explicit ignores in `phpstan.neon` — don't add new
+Some paths are deferred via explicit ignores in `phpstan.neon`. Don't add new
 ignores without approval.
 
 === .ai/chat rules ===
@@ -95,14 +95,14 @@ production: message ordering, approval races, duplicate proposals.
 - When a production chat transcript is given as a bug report, enumerate every
   defective turn as a separate defect (ordering, duplicate/stale proposal cards,
   rate-limit UX, wrong success messages), reproduce each locally, and track them
-  as a checklist — never fix only the most visible one.
+  as a checklist. Never fix only the most visible one.
 - When one chat tool has a bug, sweep its sibling Create/Update/Delete tools for
   the same class of bug before closing.
 
 ## Tool design
 
 - Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
-  tenant data into the system prompt — add prompt-context injection only when a
+  tenant data into the system prompt. Add prompt-context injection only when a
   tool round-trip is demonstrably too costly.
 - Every write tool takes batch input: `records[]` on create and update,
   `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
@@ -134,7 +134,7 @@ production: message ordering, approval races, duplicate proposals.
 
 ## Chat tools + custom fields
 
-Chat tools (`packages/Chat/src/Tools/*/Create*Tool.php` and `Update*Tool.php`) automatically support **every** active custom field for their entity. Adding a new field to `app/Enums/CustomFields/*Field.php` (or via the Custom Fields admin UI) is enough — do NOT add per-field schema slots, value coercion, or display rows to the chat tool. The bridge services in `packages/Chat/src/Services/Tools/` handle:
+Chat tools (`packages/Chat/src/Tools/*/Create*Tool.php` and `Update*Tool.php`) automatically support **every** active custom field for their entity. Adding a new field to `app/Enums/CustomFields/*Field.php` (or via the Custom Fields admin UI) is enough. Do NOT add per-field schema slots, value coercion, or display rows to the chat tool. The bridge services in `packages/Chat/src/Services/Tools/` handle:
 
 - Inlining a per-tenant `custom_fields` schema description so the LLM knows the valid codes and option labels.
 - Translating option labels back to option IDs at validation time.
@@ -157,36 +157,36 @@ Treat every change like it's going through senior code review:
 
 ## Database
 
-- This project uses **PostgreSQL exclusively** — do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
-- Migrations must only have `up()` methods — do not write `down()` methods
+- This project uses **PostgreSQL exclusively**. Do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
+- Migrations must only have `up()` methods. Never write a `down()` method
 - Every datetime column is `timestamp without time zone` holding **UTC**. Never write one from
-  the database clock — no `DB::raw('now()')`, `CURRENT_TIMESTAMP`, or `->useCurrent()` /
+  the database clock. That rules out `DB::raw('now()')`, `CURRENT_TIMESTAMP`, and `->useCurrent()` /
   `->useCurrentOnUpdate()` column defaults. Those resolve against the *session* timezone and
   write local wall-clock into a UTC column. Pass a PHP-side `now()` instead:
   `->update(['used_at' => now()])`. The pgsql connection pins `'timezone' => 'UTC'` so the two
-  agree today; do not rely on that — it is the safety net, not the contract.
+  agree today. Do not rely on that. It is the safety net, not the contract.
 
 ## Pre-Commit Quality Checks
 
 Before committing any changes, always run these checks in order:
 
-1. `vendor/bin/pint --dirty --format agent` — fix code style
-2. `vendor/bin/rector --dry-run` — if rector suggests changes, apply them with `vendor/bin/rector`
-3. `vendor/bin/phpstan analyse` — ensure no new static analysis errors
-4. `composer test:type-coverage` — type coverage must stay at 100%
-5. `php artisan test --compact` — run relevant tests (use `--filter` for targeted runs)
+1. `vendor/bin/pint --dirty --format agent`: fix code style
+2. `vendor/bin/rector --dry-run`: if rector suggests changes, apply them with `vendor/bin/rector`
+3. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
+4. `composer test:type-coverage`: type coverage must stay at 100%
+5. `php artisan test --compact`: run relevant tests (use `--filter` for targeted runs)
 
 `--dirty` only covers files with uncommitted changes, so a file you committed
 earlier in the branch stops being checked and its style break surfaces only in
 CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
 --parallel`, whole repo).
 
-Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed — untyped closures/parameters will fail type coverage in CI.
+Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed. Untyped closures and parameters fail type coverage in CI.
 
 ## Fixing & Verification
 
 - Never change production code solely to make a test or CI pass. A failing check
-  means one of: production bug, wrong assertion, or test-state leak — diagnose
+  means one of: production bug, wrong assertion, or test-state leak. Diagnose
   which first, then fix at that layer. A production behavior change must be
   justified on its own merits and covered by its own dedicated test.
 - After any fix, re-run the original failing repro (test, browser flow, query)
@@ -195,45 +195,45 @@ Do not add new PHPStan ignores without approval. All parameters and return types
   verification pass: re-grep all references, re-run the checks, re-walk the repro.
 - Debug production errors by reproducing them locally first (failing test, seeded
   data, or browser repro with the real queue). Production access (Tinkerwell/SSH)
-  is for short read-only queries that capture the failing payload or state —
-  never the iteration loop.
+  is for short read-only queries that capture the failing payload or state.
+  It is never the iteration loop.
 - When a failing operation has a working sibling (approve vs reject, one entity
-  type vs another), diff the two code paths first — it is the fastest localizer.
+  type vs another), diff the two code paths first. It is the fastest localizer.
 
 ## Minimal Change
 
 - Default to the smallest change that satisfies the requirement. Every new file,
-  script, DB column, or abstraction must be justified by an explicit need — when
+  script, DB column, or abstraction must be justified by an explicit need. When
   in doubt, leave it out and propose it instead.
 - Internal contracts (chat tool schemas, action signatures, internal APIs) have
-  no external consumers — when extending one, migrate all callers in the same
+  no external consumers. When extending one, migrate all callers in the same
   change. Never leave deprecated parameters, fallbacks, or dual old/new paths.
-- Environment-specific developer data belongs in `database/seeders/LocalSeeder.php` —
-  never as `app()->environment()` branches inside `app/Actions/` or other
-  production code.
+- Environment-specific developer data belongs in `database/seeders/LocalSeeder.php`.
+  Never put it behind an `app()->environment()` branch inside `app/Actions/` or
+  other production code.
 
 ## Scheduling
 
-- All scheduled commands go in `bootstrap/app.php` via `withSchedule()` — not in `routes/console.php`
+- All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`
 
 === .ai/custom-fields rules ===
 
 # Custom Fields
 
-- Models using the `UsesCustomFields` trait handle `custom_fields` automatically — do NOT manually extract, strip, or call `saveCustomFields()` in actions
-- The trait merges `'custom_fields'` into `$fillable`, intercepts it during `saving`, and persists values during `saved` — just pass `custom_fields` through in the `$data` array to `create()`/`update()`
-- Tenant context for the custom-fields package is set in `SetApiTeamContext` middleware via `TenantContextService::setTenantId()` — actions don't need `withTenant()` wrappers
-- In Filament, the package's own `SetTenantContextMiddleware` handles tenant context — no action-level code needed there either
-- `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()` — this is defensive and correct, don't change it to rely on ambient state
-- Every write path that is NOT a Filament panel request or behind `SetApiTeamContext` (chat action approval, queued jobs, webhooks, commands) must set `TenantContextService::setTenantId()` before saving custom fields — otherwise `saveCustomFields` iterates every tenant (gateway timeouts + cross-tenant writes). Wrap manual calls in try/finally restoring the previous tenant id (mirror `SetApiTeamContext`)
-- Writing null/empty for a custom field is how a value is cleared — never skip or filter out "empty" values on save; only keys absent from the payload are left untouched. Verify any persistence change in both directions (set a value AND clear it), through both the panel form and the chat/API path
+- Models using the `UsesCustomFields` trait handle `custom_fields` automatically. Do NOT manually extract, strip, or call `saveCustomFields()` in actions
+- The trait merges `'custom_fields'` into `$fillable`, intercepts it during `saving`, and persists values during `saved`. Just pass `custom_fields` through in the `$data` array to `create()`/`update()`
+- Tenant context for the custom-fields package is set in `SetApiTeamContext` middleware via `TenantContextService::setTenantId()`. Actions don't need `withTenant()` wrappers
+- In Filament, the package's own `SetTenantContextMiddleware` handles tenant context. No action-level code is needed there either
+- `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()`. This is defensive and correct; don't change it to rely on ambient state
+- Every write path that is NOT a Filament panel request or behind `SetApiTeamContext` (chat action approval, queued jobs, webhooks, commands) must set `TenantContextService::setTenantId()` before saving custom fields. Otherwise `saveCustomFields` iterates every tenant (gateway timeouts + cross-tenant writes). Wrap manual calls in try/finally restoring the previous tenant id (mirror `SetApiTeamContext`)
+- Writing null/empty for a custom field is how a value is cleared. Never skip or filter out "empty" values on save; only keys absent from the payload are left untouched. Verify any persistence change in both directions (set a value AND clear it), through both the panel form and the chat/API path
 
 === .ai/testing rules ===
 
 # Testing
 
 The suite follows the Testing Trophy. Every test file must live inside one of
-these directories — they are the phpunit testsuites, and
+these directories. They are the phpunit testsuites, and
 `tests/Arch/TestSuiteIntegrityTest.php` fails if a `*Test.php` exists anywhere
 else (files outside a declared suite silently never run):
 
@@ -242,28 +242,28 @@ else (files outside a declared suite silently never run):
 | Architecture | `tests/Arch/` | structural rules, module boundaries |
 | PHPStan rules | `tests/PHPStan/` | tests for the custom static-analysis rules |
 | Smoke | `tests/Smoke/` | HTTP-level route smoke |
-| Workflow | `tests/Feature/` | the bulk of the suite — test through real entry points |
+| Workflow | `tests/Feature/` | the bulk of the suite, through real entry points |
 | Browser | `tests/Browser/` | critical paths only |
 
 There is deliberately **no `tests/Unit/` suite**. Do not create new top-level
 test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
-`phpunit.ci.xml` (kept in sync — also enforced by `TestSuiteIntegrityTest`).
+`phpunit.ci.xml`. `TestSuiteIntegrityTest` enforces that the two stay in sync.
 
 ## Rules
 
 - Do not write isolated unit tests for action classes, services, enums, or other
-  internal code — test them through their real entry points (API endpoints,
+  internal code. Test them through their real entry points (API endpoints,
   Filament resources, Livewire components). Isolated unit tests of internals
   create maintenance burden without catching real bugs.
 - Never weaken an assertion, delete a test, or special-case production code just
   to turn the suite green. If a test asserts a stale value, fix the assertion;
-  if state leaks between tests, fix isolation in the test layer — don't push
+  if state leaks between tests, fix isolation in the test layer. Never push
   compensation into production code.
 - Never write tests that assert on source code as text (reading a Blade/PHP file
   and checking it contains a string). They break on refactors and pass on broken
-  behavior — test the rendered/runtime behavior instead.
+  behavior. Test the rendered/runtime behavior instead.
 - `tests/Pest.php` binds `TestCase` + `LazilyRefreshDatabase` for the Feature,
-  Smoke, and Browser suites — don't repeat `uses(...)` per file there.
+  Smoke, and Browser suites. Don't repeat `uses(...)` per file there.
 - Use `mutates(ClassName::class)` in test files to declare which source classes
   each test covers
 - Run mutation testing per-class as a code-review tool (no CI gate):
@@ -294,22 +294,22 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 ## Verifying visual work
 
 - Verify every visual change with an agent-browser screenshot (light + dark, and
-  mobile viewport where relevant) before reporting it done — never make the user
+  mobile viewport where relevant) before reporting it done. Never make the user
   act as the renderer.
 - Any change to a Blade view, Livewire component, or Filament page must be
   clicked through with agent-browser (including empty-state data) before being
-  reported done — tests passing is not sufficient for UI work.
+  reported done. Tests passing is not sufficient for UI work.
 
 ## Marketing & demo surfaces
 
-- Mockups of the product (hero tabs, demos) mirror the real app UI 1:1 —
-  screenshot the actual app first and match sidebar, spacing, and component
+- Mockups of the product (hero tabs, demos) mirror the real app UI 1:1.
+  Screenshot the actual app first and match sidebar, spacing, and component
   placement. External sites (e.g. attio.com) are inspiration for concept only,
   never for visual specifics.
 - Use design tokens from `resources/css/theme.css`; don't introduce ad-hoc pixel
   values or colors without a semantic token.
 - Demo/example content (names, companies, conversations) must read like real CRM
-  data for the buyer persona — no placeholder-looking values.
+  data for the buyer persona. No placeholder-looking values.
 
 ## Icons (Remix Icon)
 
@@ -330,14 +330,14 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 ## Guidelines pipeline
 
-- `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` are compiled artifacts — edit the
+- `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` are compiled artifacts. Edit the
   sources in `.ai/guidelines/relaticle/`, then run `php artisan boost:update`
   and copy `AGENTS.md` to `GEMINI.md` (boost does not write it). Never edit the
   compiled files directly; `tests/Arch/ConventionsTest.php` fails when they drift.
 
 ## Releases
 
-- Merge to main and tag only on explicit instruction — never on your own.
+- Merge to main and tag only on explicit instruction, never on your own.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.
@@ -365,8 +365,53 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - PR/issue comments, Discord replies, and any other outbound text: show the
   draft and wait for an explicit "post" before publishing.
 - Never claim a product capability (in PR bodies, replies, docs) without
-  verifying it works in the current codebase — feature claims must be backed by
+  verifying it works in the current codebase. Feature claims must be backed by
   code or a browser repro.
+
+=== .ai/writing rules ===
+
+# Writing
+
+Everything this repo publishes is product surface: marketing pages, help and
+docs content, blog posts, UI strings, lang files, commit subjects, and PR
+bodies. Buyers read it. Search engines and AI assistants index it.
+
+## No em-dashes
+
+Never use an em-dash (U+2014) in copy, docs, comments, commits, or PRs.
+
+The glyph is half the problem. The tell is the cadence it carries: a short
+clause, the dash, then an appositive restating the clause.
+
+    Bad:  Export anytime — your data is yours.
+    Bad:  Export anytime, your data is yours.
+    Good: Export anytime. Your data is yours.
+
+Swapping the dash for a comma keeps the cadence and fixes nothing. Rewrite the
+sentence. Two sentences usually, or a colon when the second half genuinely
+explains the first. Never run a find-and-replace over the character.
+
+Vary construction. A writer reaches for one rhythm now and then. A page that
+reaches for it fifteen times reads as one template applied over and over,
+whatever punctuation it wears.
+
+`tests/Arch/ConventionsTest.php` enforces this across `app/`, `packages/`,
+`resources/`, `lang/`, `config/`, `database/`, `routes/`, and `bootstrap/`. One
+exception is allowlisted: the standalone `'—'` string literal, used as a data
+glyph for empty values in activity-log and custom-field diffs. Never as prose
+punctuation.
+
+One trap when rewriting: a colon is the natural replacement, but a bare `: `
+inside an unquoted YAML front-matter value in
+`packages/Documentation/resources/content` throws a ParseException that 500s
+every help and docs page, not just that file. Use a period or a comma there.
+
+## House style
+
+- One idea per sentence. 25 words maximum. Active voice.
+- Same term for the same thing every time. Lead with the answer.
+- Cut every word that does no work. Write person to person, not corporate.
+- No emojis in product copy, docs, or commits.
 
 === foundation rules ===
 
@@ -403,7 +448,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `pnpm run build`, `pnpm run dev`, or `composer run dev`. Ask them.
 
 ## Documentation Files
 
@@ -480,6 +525,15 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - The application is served by Laravel Herd at `https?://[kebab-case-project-dir].test`. Use the `get-absolute-url` tool to generate valid URLs. Never run commands to serve the site. It is always available.
 - Use the `herd` CLI to manage services, PHP versions, and sites (e.g. `herd sites`, `herd services:start <service>`, `herd php:list`). Run `herd list` to discover all available commands.
 
+=== tests rules ===
+
+# Test Enforcement
+
+- Test every code change by adding or updating a test.
+- Run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
+
 === laravel/core rules ===
 
 # Do Things the Laravel Way
@@ -494,7 +548,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `pnpm run build` or ask the user to run `pnpm run dev` or `composer run dev`.
 
 === pint/core rules ===
 

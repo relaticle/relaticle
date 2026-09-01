@@ -31,7 +31,7 @@ final class ChatDocument
     }
 
     /**
-     * Empty TipTap document — useful as the `document` JSON for tests
+     * Empty TipTap document, useful as the `document` JSON for tests
      * that directly INSERT into agent_conversation_messages and don't
      * care about the document content.
      */

@@ -46,8 +46,8 @@ it('renders the catalog the app is actually running on', function (): void {
 });
 
 /**
- * A provider with no API key can serve nothing — save() rejects every model under
- * one — so offering it in the picker is offering a dead end. The exception is a
+ * A provider with no API key can serve nothing, because save() rejects every model
+ * under one, so offering it in the picker is offering a dead end. The exception is a
  * provider a stored row already names: dropping it from the options would blank
  * that row on render.
  */
@@ -293,7 +293,7 @@ it('keeps probed capabilities when a save touches only the effort dial', functio
  *
  * A repeater row an operator deletes and adds straight back carries no
  * `capabilities` at all, and the pairing is still stored, so the probe used to be
- * skipped and the entry written back unmeasured — dropping the model out of every
+ * skipped and the entry written back unmeasured, dropping the model out of every
  * picker and off the public pricing page. That is the silent failure this page
  * exists to prevent, arriving through the page itself.
  */

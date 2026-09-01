@@ -11,12 +11,13 @@ use App\ActivityLog\MeetingEventRenderer;
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
-use App\Features\SocialAuth;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
+use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
-use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
@@ -66,11 +67,11 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -82,7 +83,6 @@ use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
-use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 final class AppPanelProvider extends PanelProvider
 {
@@ -182,12 +182,12 @@ final class AppPanelProvider extends PanelProvider
 
     /**
      * Gates the browser timezone detection script below, which posts to an app-panel
-     * route. Panel rendering itself no longer reads this — that resolution is global
+     * route. Panel rendering itself no longer reads this; that resolution is global
      * and lives in AppServiceProvider::configureFilament(), because TimezoneManager
      * holds a single slot and a second writer here would silently win on boot order.
      *
      * The web guard is shared with the sysadmin panel's SystemAdministrator, whose
-     * zone is chosen on its own profile page and never detected — narrow to the
+     * zone is chosen on its own profile page and never detected, so narrow to the
      * customer model rather than assuming.
      */
     private function signedInUser(): ?User
@@ -222,11 +222,10 @@ final class AppPanelProvider extends PanelProvider
                 : view('filament.app.logo'))
             ->brandLogoHeight('2.6rem')
             ->login(Login::class)
-            ->registration(Register::class)
             ->authGuard('web')
             ->authPasswordBroker('users')
-            ->passwordReset()
-            ->emailVerification(isRequired: config('app.require_email_verification'))
+            ->passwordReset(RequestPasswordReset::class, ResetPassword::class)
+            ->emailVerification(EmailVerificationPrompt::class, isRequired: config('app.require_email_verification'))
             ->emailChangeVerification()
             ->strictAuthorization()
             /**
@@ -271,6 +270,8 @@ final class AppPanelProvider extends PanelProvider
             ->sidebarWidth('67')
             ->maxContentWidth(Width::Full)
             ->routes(function (): void {
+                Route::get('/register', fn (): RedirectResponse => redirect()->to(Filament::getLoginUrl()))
+                    ->name('auth.register');
                 Route::get('/scheduled-deletion', ScheduledDeletionInterstitial::class)
                     ->middleware('auth')
                     ->name('scheduled-deletion');
@@ -285,6 +286,10 @@ final class AppPanelProvider extends PanelProvider
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
+            // Navigation icons stay start-aligned so they hold their column
+            // while the sidebar animates. 4.25rem is the width at which that
+            // column is also the centre of the collapsed rail.
+            ->collapsedSidebarWidth('4.25rem')
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
@@ -331,21 +336,33 @@ final class AppPanelProvider extends PanelProvider
                     )),
             ])
             ->renderHook(
+                PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+                fn (): View|Factory => view('filament.auth.developer_login'),
+            )
+            ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                fn (): string => Blade::render('@env(\'local\')<x-login-link email="manuk.minasyan1@gmail.com" redirect-url="'.url()->getAppUrl().'" />@endenv'),
+                fn (): View|Factory => view('filament.auth.login_options'),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_START,
+                fn (): View|Factory => view('filament.auth.header'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
+            )
+            ->renderHook(
+                PanelsRenderHook::SIMPLE_LAYOUT_END,
+                fn (): View|Factory => view('filament.auth.footer'),
+                scopes: [
+                    Login::class,
+                    RequestPasswordReset::class,
+                    ResetPassword::class,
+                    EmailVerificationPrompt::class,
+                ],
             );
-
-        if (Feature::active(SocialAuth::class)) {
-            $panel
-                ->renderHook(
-                    PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                )
-                ->renderHook(
-                    PanelsRenderHook::AUTH_REGISTER_FORM_BEFORE,
-                    fn (): View|Factory => view('filament.auth.social_login_buttons')
-                );
-        }
 
         if (Feature::active(EmailIntegration::class)) {
             $panel
@@ -358,6 +375,16 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            /**
+             * The sidebar collapse toggle is panel chrome, so the panel owns it.
+             * TENANT_MENU_AFTER puts it inside the sidebar, level with the
+             * workspace switcher; `.fi-sidebar-toggle-btn` places it in both the
+             * open and the collapsed rail.
+             */
+            ->renderHook(
+                PanelsRenderHook::TENANT_MENU_AFTER,
+                fn (): View|Factory => view('filament.app.sidebar-toggle')
             )
             /**
              * The activation checklist lives here rather than on the dashboard
@@ -386,24 +413,28 @@ final class AppPanelProvider extends PanelProvider
 
                     return view('filament.app.detect-timezone', ['endpoint' => route('filament.app.timezone.sync')]);
                 },
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): View|Factory => view('filament.scripts.identity-confirmation'),
             );
 
+        // Hidden without a bound tenant: the old panel-root fallback sent these
+        // to the dashboard, silently abandoning the create-workspace wizard.
         $accountMenuItems = [
             Action::make('settings')
                 ->label(__('filament/panel.user_menu.settings'))
                 ->icon('heroicon-m-cog-6-tooth')
-                ->url(fn (): string => $this->shouldRegisterMenuItem()
-                    ? url(Settings::getUrl())
-                    : url($panel->getPath())),
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(Settings::getUrl())),
         ];
 
         if (Features::hasApiFeatures()) {
             $accountMenuItems[] = Action::make('api_tokens')
                 ->label(__('access-tokens.user_menu'))
                 ->icon('heroicon-o-key')
-                ->url(fn (): string => $this->shouldRegisterMenuItem()
-                    ? url(AccessTokens::getUrl())
-                    : url($panel->getPath()));
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(AccessTokens::getUrl()));
         }
 
         $panel->userMenuItems([
@@ -416,23 +447,19 @@ final class AppPanelProvider extends PanelProvider
             ->tenant(Team::class, slugAttribute: 'slug', ownershipRelationship: 'team')
             ->tenantRegistration(CreateTeam::class)
             ->tenantProfile(EditTeam::class)
+            // A negative sort is what puts an item in the group above the
+            // workspace switcher, next to Workspace Settings (sort -2), instead
+            // of stranding it below the workspace list.
             ->tenantMenuItems([
-                Action::make('custom_fields')
-                    ->label(__('filament/panel.tenant_menu.custom_fields'))
-                    ->icon(Heroicon::OutlinedCube)
-                    ->url(fn (): string => CustomFields::getUrl()),
                 Action::make('email_settings')
                     ->label(__('filament/panel.tenant_menu.email_settings'))
                     ->icon(Heroicon::OutlinedEnvelope)
                     ->visible(fn (): bool => EmailSettings::canAccess())
                     ->url(fn (): string => EmailAccountsPage::getUrl()),
-                Action::make('import_history')
-                    ->label(__('filament/panel.tenant_menu.import_history'))
-                    ->icon(Heroicon::OutlinedClock)
-                    ->url(fn (): string => ImportHistory::getUrl()),
                 Action::make('billing')
                     ->label(__('billing.title'))
                     ->icon(Heroicon::OutlinedCreditCard)
+                    ->sort(-1)
                     ->url(fn (): string => Billing::getUrl())
                     ->visible(fn (): bool => Feature::active(BillingFeature::class)),
             ]);
@@ -441,13 +468,13 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
-     * Support entries for the user menu — every support form type that resolves
+     * Support entries for the user menu: every support form type that resolves
      * to a URL, opening its Maxforms form in a new tab. Empty when nothing is
      * configured, so the user menu simply shows no support entries.
      *
      * Everything is resolved lazily: the URL carries the signed-in user and
-     * workspace as prefill, and the feature flag is only decided per request —
-     * neither is known while the panel is being configured.
+     * workspace as prefill, and the feature flag is only decided per request.
+     * Neither is known while the panel is being configured.
      *
      * @return list<Action>
      */

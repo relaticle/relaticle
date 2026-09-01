@@ -73,8 +73,8 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
 
         $team = Team::query()->where('slug', $slug)->first();
 
-        // Non-tenant destinations on our own host — the OAuth consent screen at
-        // /oauth/authorize being the one that matters — carry no workspace to check,
+        // Non-tenant destinations on our own host, the OAuth consent screen at
+        // /oauth/authorize being the one that matters, carry no workspace to check,
         // so the tenant guard below cannot speak to them. Dropping them silently
         // stranded every first-run MCP connector: the user signed in and landed on the
         // dashboard while the authorization request was discarded.
