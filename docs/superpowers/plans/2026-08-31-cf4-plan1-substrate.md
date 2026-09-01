@@ -20,7 +20,9 @@
 - Never write timestamps from the DB clock. Pass PHP `now()` explicitly. No `useCurrent()`.
 - Commit style: conventional, lowercase, subject < 72 chars, present tense. No AI attribution ever.
 - Table/column names always via `config('custom-fields.database.table_names...')` and the config column map, matching existing models.
-- Tenant scoping: new models use `#[ScopedBy([TenantScope::class])]` exactly like `CustomFieldValue`.
+- Tenant scoping: new models use `#[ScopedBy([TenantScope::class])]` exactly like `CustomFieldValue`. TenantScope only FILTERS reads; it never fills tenant_id. Every writer in this plan (definition create, slot fields, link inserts) must stamp tenant_id itself: resolve like `saveCustomFieldValue` does for definitions/fields, copy `definition->tenant_id` onto links.
+- Model access: every reference to the two new models goes through the swap registry (`CustomFields::newRelationshipModel()` / `newLinkModel()`), never the concrete class, mirroring `newCustomFieldModel()`. Hosts (Relaticle) subclass with HasUlids + their own scopes.
+- New migrations are publishable and up-only (no `down()`); ULID/UUID hosts publish and swap key types exactly as they do for the existing tables. `custom_field_links.relationship_id` must match the published key type of the definitions table.
 - New user-facing strings go through `__('custom-fields::custom-fields...')` lang keys (add to `resources/lang/en/custom-fields.php`).
 
 ## Spec refinement (approved deviation, recorded here)
@@ -28,9 +30,9 @@
 Spec 1.2 says cardinality is enforced with per-end partial unique indexes. That is not implementable statically: which end is constrained varies per definition row, and per-definition indexes would be dynamic DDL, which the spec itself forbids. Plan 1 therefore enforces:
 
 1. A static partial unique index preventing duplicate active edges (all cardinalities).
-2. One-end exclusivity inside the LinkWriter transaction using `pg_advisory_xact_lock` (Postgres) or a `lockForUpdate` scan fallback (other drivers), plus the validation layer for friendly errors.
+2. One-end exclusivity inside the LinkWriter transaction via `lockForUpdate` on the DEFINITION ROW (`CustomFieldRelationship::whereKey($id)->lockForUpdate()->first()`), plus the validation layer for friendly errors. The definition row always exists, so this serializes writers per definition uniformly on every driver: no advisory-lock/driver switch, no phantom-insert gap when zero link rows exist. Skip the lock for `many_to_many` definitions, where the unique index alone suffices.
 
-DB-trigger enforcement can be added later without schema change. The spec file gets a matching correction.
+DB-trigger enforcement can be added later without schema change. The spec file carries the matching correction (2026-09-01 architecture review).
 
 ---
 
@@ -166,6 +168,7 @@ git add -A && git commit -m "feat(relationships): add cardinality enum and table
 - Consumes: `RelationshipCardinality` (Task 1).
 - Produces: model `CustomFieldRelationship` with properties `id, tenant_id, code, from_entity_type, to_entity_type, cardinality (cast RelationshipCardinality), from_field_id, to_field_id, is_symmetric (bool cast)`; relations `fromField(): BelongsTo`, `toField(): BelongsTo`; methods `directionFor(CustomField $field): string` returning `'from'|'to'` (throws `InvalidArgumentException` for an unrelated field), `isHeadless(): bool`.
 - Produces: `CustomField::relationshipDefinition(): ?CustomFieldRelationship` helper on the CustomField model (query by from_field_id or to_field_id, cached per instance via `once()`).
+- Produces: swap-registry entries on `CustomFields`: `useRelationshipModel(string $class)`, `newRelationshipModel()`, `relationshipModel()` mirroring the existing `useCustomFieldModel` trio. The helper and every later task resolve the model through the registry.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -260,11 +263,6 @@ return new class extends Migration
 
             $table->unique($uniqueCode);
         });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_field_relationships'));
     }
 };
 ```
@@ -395,6 +393,7 @@ Register the migration name in `CustomFieldsServiceProvider` alongside the exist
 **Interfaces:**
 - Produces: model `CustomFieldLink` with `relationship_id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, sort_order, active_from, active_until, created_by_type, created_by_id, source (string), confidence (?float)`; relations `relationship(): BelongsTo<CustomFieldRelationship>`, `fromEntity(): MorphTo`, `toEntity(): MorphTo`, `createdBy(): MorphTo`; scope `scopeActive(Builder $q)` (`whereNull('active_until')`); method `close(\Illuminate\Support\Carbon $at): void` (sets active_until, saves).
 - Produces: source string constants on the model: `SOURCE_USER = 'user'`, `SOURCE_IMPORT = 'import'`, `SOURCE_MIGRATION = 'migration'`, `SOURCE_AI = 'ai_inferred'`.
+- Produces: swap-registry entries `CustomFields::useLinkModel()`, `newLinkModel()`, `linkModel()` mirroring the existing trios; all later tasks resolve the link model through them.
 - Table has `timestamps()` disabled (`$timestamps = false`) like `CustomFieldValue`; `active_from` is the creation time, set by PHP.
 
 - [ ] **Step 1: Write the failing test**
@@ -504,11 +503,6 @@ return new class extends Migration
             DB::statement("CREATE UNIQUE INDEX cf_links_active_edge_unique ON {$links} (relationship_id, from_entity_type, from_entity_id, to_entity_type, to_entity_id) WHERE active_until IS NULL");
         }
         // MySQL-family: duplicate-active-edge protection is app-level (LinkWriter). Documented caveat.
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists(config('custom-fields.database.table_names.custom_field_links'));
     }
 };
 ```
@@ -646,6 +640,7 @@ Factory defaults: `active_from => now()`, `source => CustomFieldLink::SOURCE_USE
 - Consumes: `CustomFieldRelationship`, `RelationshipCardinality`, existing `CustomField` creation conventions (code, name, entity_type, type `'record'`).
 - Produces: `CreateRelationshipDefinition::execute(RelationshipDefinitionData $data): CustomFieldRelationship`. `RelationshipDefinitionData` (spatie/laravel-data, matching `src/Data` conventions): `code, from_entity_type, to_entity_type, cardinality (RelationshipCardinality), is_symmetric (bool, default false), fromField (?FieldSlotData), toField (?FieldSlotData)` where `FieldSlotData` = `name (string), section_id (?int)`. Symmetric definitions require `from_entity_type === to_entity_type` and reject a `toField` (single slot).
 - Produces: `DeleteRelationshipDefinition::execute(CustomFieldRelationship $definition, bool $deleteFields = false): void` closing nothing (FK cascade removes links), unpairing or deleting slot fields.
+- Tenant: the service resolves the tenant exactly like `saveCustomFieldValue` (explicit arg, Filament tenant, `CustomFields::resolveTenantUsing`) and stamps it on the definition row AND both slot CustomField rows. Add a test that sets `TenantContextService::setTenantId()`, creates a definition, and asserts the definition and its fields are visible through the scoped query and carry the tenant id.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -873,10 +868,11 @@ it('resolves null when unauthenticated', function (): void {
 - Produces: `LinkWriter::apply(Model&HasCustomFields $record, CustomField $field, array $targetIds, string $source = CustomFieldLink::SOURCE_USER): void`. `$targetIds` is the ordered id list from the payload (empty array clears). Emits one `RelationshipLinkCreated` per insert, one `RelationshipLinkClosed` per close; both events carry `public CustomFieldLink $link`.
 - Behavior contract (all inside `DB::transaction`):
   1. Resolve definition + direction; symmetric edges canonicalize so `from_entity_id <= to_entity_id` (string comparison covers ULIDs and ints uniformly).
-  2. Diff `$targetIds` against active links on this record's side. Unchanged: untouched (sort_order updated in place when order changed, no close/reopen).
-  3. Removed: `close(now())`. Added: insert with `active_from = now()`, actor, source, sort_order = payload index.
-  4. Single-target sides (per cardinality + direction) steal: close the displaced record's active edge before inserting.
-  5. Concurrency: on pgsql take `pg_advisory_xact_lock(hash)` over `(relationship_id)` before the diff; elsewhere `lockForUpdate()` the relationship's active links. Catch `UniqueConstraintViolationException`, rethrow as `ValidationException::withMessages([$field->getFieldName() => __('custom-fields::custom-fields.relationships.errors.conflict')])`.
+  2. Validate targets: every id in `$targetIds` must resolve to a row of the target entity type within the current tenant (the target model comes from the morph map). A missing or foreign id throws `ValidationException` (lang key `custom-fields::custom-fields.relationships.errors.unknown_target`); a bad id must never become a stored edge.
+  3. Diff `$targetIds` against active links on this record's side. Unchanged: untouched (sort_order updated in place when order changed, no close/reopen).
+  4. Removed: `close(now())`. Added: insert with `active_from = now()`, actor, source, sort_order = payload index, and `tenant_id` copied from the definition row.
+  5. Single-target sides (per cardinality + direction) steal: close the displaced record's active edge before inserting.
+  6. Concurrency: before the diff, `lockForUpdate()` the DEFINITION ROW (all drivers, no switch); skip the lock when cardinality is `many_to_many`. Catch `UniqueConstraintViolationException`, rethrow as `ValidationException::withMessages([$field->getFieldName() => __('custom-fields::custom-fields.relationships.errors.conflict')])`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1053,7 +1049,7 @@ public function apply(Model $record, CustomField $field, array $targetIds, strin
 }
 ```
 
-Private helpers each a few lines: `lock()` (driver switch, `pg_advisory_xact_lock(hashtext(?))` with `"cf_links:{$definition->id}"`), `activeLinksFor()` (where from/to side matches record, symmetric matches either side), `otherEndId()`, `closeDisplacedSingles()` (per `cardinality->fromSideIsSingle()/toSideIsSingle()` close conflicting active edges on both constrained ends, emitting Closed), `insert()` (canonical order for symmetric), `syncSortOrder()`. Catch `UniqueConstraintViolationException` around the transaction and rethrow as `ValidationException` with lang key `custom-fields::custom-fields.relationships.errors.conflict` (add to lang file: `'conflict' => 'This link conflicts with a concurrent change. Reload and retry.'`).
+Private helpers each a few lines: `lock()` (definition-row `lockForUpdate`, skipped for many_to_many), `assertTargetsExist()` (morph-map resolve + tenant-scoped whereIn count check), `activeLinksFor()` (where from/to side matches record, symmetric matches either side), `otherEndId()`, `closeDisplacedSingles()` (per `cardinality->fromSideIsSingle()/toSideIsSingle()` close conflicting active edges on both constrained ends, emitting Closed), `insert()` (canonical order for symmetric, tenant_id from the definition), `syncSortOrder()`. Test additions: a tenant round-trip (write with tenant context set, read back through the scoped query) and a cross-tenant target id rejected with ValidationException. Catch `UniqueConstraintViolationException` around the transaction and rethrow as `ValidationException` with lang key `custom-fields::custom-fields.relationships.errors.conflict` (add to lang file: `'conflict' => 'This link conflicts with a concurrent change. Reload and retry.'`).
 
 - [ ] **Step 4: Run to verify pass**: full filter run plus `vendor/bin/pest --filter=LinkModelTest` (regression).
 - [ ] **Step 5: Gates + commit**: `git commit -m "feat(relationships): add diff-based link writer with events"`
@@ -1394,16 +1390,20 @@ CustomFieldLink::query()
 
 ---
 
-### Task 12: upgrade-links migration command
+### Task 12: record-links migration step in the existing upgrade framework
+
+The package already ships `custom-fields:upgrade` with an `UpgradeStep`/`UpgradeStepResult` framework, dry-run support, and a `ValidateSchemaStep` gate (`src/Console/Commands/Upgrade/`). Do NOT create a standalone command; add steps to that framework. Model the step class on `MigrateLookupFieldsStep` (including `withoutGlobalScopes()` iteration across tenants).
 
 **Files:**
-- Create: `src/Console/Commands/UpgradeLinksCommand.php` (`custom-fields:upgrade-links {--dry-run}`)
-- Modify: `src/CustomFieldsServiceProvider.php` (register command)
-- Test: `tests/Feature/Commands/UpgradeLinksCommandTest.php` (existing `tests/Feature/Commands` conventions)
+- Create: `src/Console/Commands/Upgrade/Steps/MigrateRecordLinksStep.php`
+- Create: `src/Console/Commands/Upgrade/Steps/PurgeMigratedRecordValuesStep.php` (opt-in, runs only via an explicit flag/prompt)
+- Modify: `src/Console/Commands/UpgradeCommand.php` (register steps), `.../Steps/ValidateSchemaStep.php` (fail with guidance when record-type values still live in json_value)
+- Test: `tests/Feature/Commands/UpgradeLinksStepTest.php` (existing `tests/Feature/Commands` conventions)
 
 **Interfaces:**
 - Consumes: everything above.
-- Produces: for every record-type `CustomField` without a definition: create a one-way definition (`code` = field code, `from_entity_type` = field entity_type, `to_entity_type` = field `lookup_type`, cardinality `ManyToMany` when `settings->allow_multiple` else `ManyToOne`, `from_field_id` = field). Then explode each of its `custom_field_values.json_value` arrays into link rows (`source = migration`, `active_from = now()`, `sort_order` = array index, tenant copied from the value row) and delete those value rows. Idempotent: fields with an existing definition are skipped; a value row already migrated is gone so reruns are no-ops. `--dry-run` prints per-field counts and writes nothing. Output before processing each field (project convention), summary after.
+- Produces (`MigrateRecordLinksStep`): for every record-type `CustomField` without a definition: create a one-way definition (`code` = field code, `from_entity_type` = field entity_type, `to_entity_type` = field `lookup_type`, cardinality `ManyToMany` when `settings->allow_multiple` else `ManyToOne`, `from_field_id` = field, tenant from the field row). Then explode each of its `custom_field_values.json_value` arrays into link rows (`source = migration`, `active_from = now()`, `sort_order` = array index, tenant copied from the value row). The old value rows are KEPT: `PurgeMigratedRecordValuesStep` deletes them in a separate, explicitly invoked pass after the host has verified the migration, so rollback stays trivial at every point.
+- Idempotent: an existing definition is reused, never a skip reason on its own; a value already represented by a matching link (same field, entity, target) is skipped, everything else still migrates. Reruns are no-ops. Dry-run prints per-field counts and writes nothing. Output before processing each field (project convention), summary after.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1421,17 +1421,22 @@ it('migrates json_value arrays into definitions and links', function (): void {
         'custom_field_id' => $field->id, 'json_value' => [$user->getKey()],
     ]);
 
-    $this->artisan('custom-fields:upgrade-links')->assertSuccessful();
+    $this->artisan('custom-fields:upgrade')->assertSuccessful();
 
     expect(CustomFieldRelationship::query()->count())->toBe(1)
         ->and(CustomFieldLink::query()->active()->count())->toBe(1)
-        ->and(CustomFieldValue::query()->where('custom_field_id', $field->id)->count())->toBe(0)
+        ->and(CustomFieldValue::query()->where('custom_field_id', $field->id)->count())->toBe(1)
         ->and($post->refresh()->getCustomFieldValue($field->refresh()))->toBe([$user->getKey()]);
+});
+
+it('purges old value rows only in the explicit purge pass', function (): void {
+    // arrange + migrate as above; then run the purge step and expect the value rows gone
+    // while links and reads stay identical.
 });
 
 it('dry-run reports and writes nothing', function (): void {
     // same arrange; then:
-    $this->artisan('custom-fields:upgrade-links', ['--dry-run' => true])->assertSuccessful();
+    $this->artisan('custom-fields:upgrade', ['--dry-run' => true])->assertSuccessful();
 
     expect(CustomFieldLink::query()->count())->toBe(0)
         ->and(CustomFieldValue::query()->count())->toBe(1);
@@ -1440,12 +1445,17 @@ it('dry-run reports and writes nothing', function (): void {
 it('is idempotent across reruns', function (): void {
     // arrange, run twice, expect counts unchanged after the second run
 });
+
+it('migrates remaining values for a field that already has a definition', function (): void {
+    // arrange a record field WITH a definition but json_value rows still present;
+    // run; expect links created for those values, no duplicate definition.
+});
 ```
 
 - [ ] **Step 2: Run to verify failure**
-- [ ] **Step 3: Implement** the command (chunked value iteration, `DB::transaction` per field, `$this->info("Migrating field {$field->code}...")` before each, summary `$this->comment()` after).
+- [ ] **Step 3: Implement** the steps (chunked value iteration, `DB::transaction` per field, `$command->info("Migrating field {$field->code}...")` before each, `UpgradeStepResult` summary after; `withoutGlobalScopes()` everywhere, tenant copied row by row).
 - [ ] **Step 4: Run to verify pass**, then the ENTIRE suite once: `vendor/bin/pest --parallel`.
-- [ ] **Step 5: Gates + commit**: `git commit -m "feat(relationships): add upgrade-links migration command"`
+- [ ] **Step 5: Gates + commit**: `git commit -m "feat(relationships): add record-links migration step to upgrade command"`
 
 ---
 

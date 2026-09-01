@@ -35,7 +35,7 @@ Key evidence, verified during research:
 
 | Column | Notes |
 |---|---|
-| id, tenant_id | key types host-configurable, as all package tables |
+| id, tenant_id | key types follow the host's published migrations, as all package tables; a database.key_type config honored by the two new tables ends the hand-edit step for ULID/UUID hosts |
 | code | stable machine-readable semantic, e.g. reports_to; agents reason over this |
 | from_entity_type, to_entity_type | may be equal (People to People) |
 | cardinality | one_to_one, one_to_many, many_to_one, many_to_many; oriented from to to |
@@ -59,9 +59,9 @@ owned asymmetrically by one, and headless types would pollute every custom_field
 
 | Column | Notes |
 |---|---|
-| id, tenant_id | |
+| id, tenant_id | tenant_id stamped by the writer (copied from the definition); TenantScope only filters reads |
 | relationship_id | FK to definitions, cascade |
-| from_entity_type, from_id, to_entity_type, to_id | polymorphic ends, key type configurable |
+| from_entity_type, from_entity_id, to_entity_type, to_entity_id | polymorphic ends, key type via published migration |
 | sort_order | preserves list order; parity with jsonb insertion order |
 | active_from, active_until | current edge has null active_until; unlink closes, never deletes |
 | created_by_type, created_by_id | polymorphic actor: user, agent, API token, import |
@@ -76,26 +76,29 @@ Deletion semantics:
 
 Indexes:
 
-- (tenant_id, relationship_id, from_id) and (tenant_id, relationship_id, to_id),
-  partial WHERE active_until IS NULL.
-- (from_entity_type, from_id) and (to_entity_type, to_id) for cascade sweeps.
+- (relationship_id, from_entity_id, active_until) and (relationship_id, to_entity_id,
+  active_until); relationship_id is already tenant-scoped, so tenant_id needs no index prefix.
+- (from_entity_type, from_entity_id) and (to_entity_type, to_entity_id) for cascade sweeps.
 - A static partial unique over active edges on (relationship_id, from, to) prevents duplicate
   edges for every cardinality. Symmetric edges are canonicalized by the writer before insert,
   so the same index covers them.
 - Per-end exclusivity (the one sides of one_to_one, one_to_many, many_to_one) cannot be a static
   index in a shared table: the constrained end varies per definition, and per-definition indexes
-  would be dynamic DDL. It is enforced inside the writer transaction: pg_advisory_xact_lock
-  scoped to the relationship on Postgres, lockForUpdate elsewhere, plus the validation layer.
-  Refined during plan writing; a DB constraint trigger can be added later without schema change.
-- MySQL hosts: app-level enforcement plus a documented generated-column recipe.
-  Postgres gets the database-enforced wall.
+  would be dynamic DDL. It is enforced inside the writer transaction by a lockForUpdate on the
+  definition row, which always exists and serializes writers per definition on every driver.
+  No driver switch; the lock is skipped for many_to_many, where the unique index alone suffices.
+  A DB constraint trigger can be added later without schema change.
+- MySQL hosts get the same row-lock enforcement; the partial unique index (duplicate-edge wall)
+  is Postgres and SQLite only, with a documented generated-column recipe for MySQL.
 
 ### 1.3 Retirement
 
-json_value stops storing record links. The 4.0 migration creates a definition per record-type
-field, explodes each json_value array into link rows (source = migration), then deletes those
-value rows. Record fields flip to sortable and searchable. The single-value filter bug dies
-with the storage that hosted it.
+json_value stops storing record links. The 4.0 migration ships as a step in the existing
+custom-fields:upgrade framework: it creates a definition per record-type field and explodes
+each json_value array into link rows (source = migration). The old value rows are kept until
+a separate purge step runs after verification, so rollback stays trivial at every point.
+Record fields flip to sortable and searchable. The single-value filter bug dies with the
+storage that hosted it.
 
 No sync engine exists anywhere. One row is read from both sides. Inverse drift, loop guards,
 and 1:1 steal-cleanup bugs are structurally impossible.
@@ -108,9 +111,12 @@ The payload contract is unchanged: custom_fields => [code => [ids]] through crea
 Panel, REST API, chat approval, import, and MCP all keep working. Inside the trait,
 record-type fields fork away from the value row:
 
-1. Resolve field to definition and direction.
+1. Resolve field to definition and direction. Every target id must resolve to a row of the
+   target entity type within the current tenant; a bad or foreign id is a validation error,
+   never a stored edge.
 2. Diff payload against active links. Removed: set active_until. Added: insert with
-   sort_order, actor, source. Unchanged links are never touched.
+   sort_order, actor, source, and tenant_id copied from the definition. Unchanged links are
+   never touched.
 3. Null or empty array closes everything. Empty is a real value; it is never skipped.
 4. Symmetric definitions canonicalize (least, greatest) before diffing.
 5. Everything inside the surrounding save transaction.
@@ -135,7 +141,10 @@ old edge auditable in history.
 
 RelationshipLinkCreated and RelationshipLinkClosed carry the full edge payload.
 CreateRelationshipDefinition (and delete/unpair siblings) create a definition plus its
-0 to 2 fields transactionally. The Filament management UI uses the same services.
+0 to 2 fields transactionally, tenant-stamping every row. The Filament management UI uses
+the same services. Both new models join the model-swap registry
+(CustomFields::useRelationshipModel / useLinkModel) so ULID hosts can subclass them exactly
+like the existing four.
 
 Lifecycle rules:
 
@@ -221,7 +230,8 @@ Inferred edges, confidence scoring, graph visualization, multi-hop UI. Gated on 
 4. UI flavor registry config surface.
 5. PHP and Filament floor raised to current versions; legacy shims dropped where they block it.
    MySQL-family support continues with the documented enforcement caveat.
-6. Itemized small-break sweep to be produced during plan writing from a repo audit.
+6. Itemized small-break sweep: produced by the 2026-09-01 architecture review, lives in
+   plan 3 (2026-09-01-cf4-plan3-housekeeping.md).
 
 ### 5.2 Licensing
 
@@ -238,7 +248,9 @@ license itself.
 3. Tag 4.0.0; one Relaticle PR bumps the constraint and carries the surface migration;
    business-review of the full loop on the production-shaped stack (Horizon, Redis, Reverb).
 4. Announce: package changelog, Relaticle release notes, follow-up on #469 once live.
-5. Upgrade guide plus custom-fields:upgrade-links command with dry-run and rollback notes.
+5. Upgrade guide plus a MigrateRecordLinksStep in the existing custom-fields:upgrade
+   framework: dry-run, a ValidateSchemaStep gate that fails the command until the step has
+   run, and a separate post-verification purge step for the old value rows.
 
 ## Testing strategy
 
