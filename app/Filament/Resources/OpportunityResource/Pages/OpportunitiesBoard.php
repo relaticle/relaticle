@@ -165,7 +165,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
-                    ->authorize(fn (?Opportunity $record): bool => $record !== null && Gate::allows('update', $record))
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('update', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ExtraLarge)
@@ -180,7 +180,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                         $record->update($data);
                     }),
                 Action::make('delete')
-                    ->authorize(fn (?Opportunity $record): bool => $record !== null && Gate::allows('delete', $record))
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')

@@ -151,7 +151,7 @@ final class TasksBoard extends BoardResourcePage
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
-                    ->authorize(fn (?Task $record): bool => $record !== null && Gate::allows('update', $record))
+                    ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('update', $record))
                     ->label(__('filament/pages/boards.tasks.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ThreeExtraLarge)
@@ -164,7 +164,7 @@ final class TasksBoard extends BoardResourcePage
                         $record->update($data);
                     }),
                 Action::make('delete')
-                    ->authorize(fn (?Task $record): bool => $record !== null && Gate::allows('delete', $record))
+                    ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
                     ->label(__('filament/pages/boards.tasks.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
