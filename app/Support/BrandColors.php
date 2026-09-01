@@ -5,15 +5,9 @@ declare(strict_types=1);
 namespace App\Support;
 
 /**
- * The product's brand palette, shared by the app panel and by any Filament
- * rendering that happens outside a panel.
- *
- * Filament resolves colors from a per-panel registry, so a view rendered
- * outside panel middleware (the invitation and join interstitials, the
- * scheduled-deletion interstitial) falls back to Filament's own default amber
- * unless the same palette is registered globally. Keeping the single source
- * here is what stops those pages from shipping in a different brand color
- * than the panel they lead into.
+ * Filament resolves colors per panel, so a view rendered outside panel
+ * middleware falls back to its default amber unless the same palette is
+ * registered globally. This is the single source both registrations read.
  */
 final readonly class BrandColors
 {

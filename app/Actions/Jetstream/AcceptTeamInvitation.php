@@ -13,22 +13,10 @@ use Laravel\Jetstream\Contracts\AddsTeamMembers;
 use Laravel\Jetstream\Jetstream;
 
 /**
- * Joins an already-identity-verified user to the invitation's team and
- * removes the invitation. Called from both the accept-flow controller and
- * (Task 9) a Livewire "you've been invited" card, so it takes no request or
- * response and does not touch the view layer.
- *
- * Every caller is expected to have already confirmed the invitation is valid
- * and that the user's email matches it. Those checks stay caller-specific
- * because each surface renders a different UX for a mismatch. Deletion state
- * has no such reason to vary, so both the user's and the team's scheduled-
- * deletion status are enforced here, where every caller inherits them. An
- * invitation that is revoked or expires between the caller's check and this
- * action's lock is refused the same way, so no caller can report a join that
- * did not happen. On a refusal this throws Laravel's HttpException (403 or
- * 410, matching the abort() the accept-flow controller used to perform
- * inline); callers that need a renderable response rather than a raw HTTP
- * error must catch it.
+ * Callers confirm the invitation is valid and the email matches, because each
+ * surface renders a mismatch differently. Deletion state and the revoked-or-
+ * expired race are enforced here so no caller can report a join that did not
+ * happen; both refuse with an HttpException the caller may catch.
  */
 final readonly class AcceptTeamInvitation
 {
@@ -85,20 +73,9 @@ final readonly class AcceptTeamInvitation
     }
 
     /**
-     * Inside a Filament panel request, ApplyTenantScopes globally scopes User to
-     * members of the currently-viewed tenant. $team here is, by definition,
-     * usually a *different* team than the one the caller is currently browsing,
-     * so every User lookup AddsTeamMembers performs internally (the team owner,
-     * hasUserWithEmail(), findUserByEmailOrFail()) would silently miss under that
-     * scope.
-     *
-     * Suspend only that one named scope entry on User for the duration of the
-     * add, then restore that exact entry, a Closure or a Scope instance,
-     * whichever it was. No other scope on User, and no scope on any
-     * other model, is ever read or touched. When the scope was never registered
-     * in the first place (the accept-flow controller, queued jobs, and tests, none
-     * of which run behind the panel's tenant middleware), skip the suspension
-     * entirely rather than registering a scope that didn't exist before.
+     * ApplyTenantScopes scopes User to the tenant being browsed, which is not the
+     * team being joined, so every lookup AddsTeamMembers makes would miss.
+     * Suspends only that one named scope entry and restores exactly what it was.
      */
     private function addMember(User $invitee, Team $team, ?string $role): void
     {

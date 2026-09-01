@@ -97,13 +97,6 @@ test('resending the same invitation twice inside the window is throttled', funct
     Mail::assertQueuedCount(1);
 });
 
-/**
- * There is deliberately no per-invitation copy-link action: the stored token is
- * a SHA-256 hash, so the only way to produce a link for an existing invitation
- * would be to re-mint and silently invalidate the one already in the invitee's
- * inbox. Twenty, Slack, and Notion all omit it for the same reason and point
- * admins at the workspace-wide invite link instead.
- */
 test('no per-invitation copy link action is offered', function (): void {
     $invitation = pendingInvitation($this->team);
 

@@ -18,11 +18,6 @@ beforeEach(function (): void {
     $this->team = Team::factory()->create();
 });
 
-/**
- * Mint and persist a raw token for an existing invitation. issueToken() also
- * renews expires_at, so any test asserting an expiry state must set it after
- * calling this, not before.
- */
 function rawTokenFor(TeamInvitation $invitation): string
 {
     $rawToken = $invitation->issueToken();
@@ -136,7 +131,6 @@ test('invitation with wrong email shows the wrong-account screen, not a 403', fu
 test('every accept-invitation exit link points into the app panel, not the marketing homepage', function (): void {
     $appUrl = url()->getAppUrl();
 
-    // ready state: the "not now" link
     $readyInvitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
     $raw = $readyInvitation->issueToken();
     $readyInvitation->save();
@@ -147,7 +141,6 @@ test('every accept-invitation exit link points into the app panel, not the marke
         ->assertOk()
         ->assertSee($appUrl, false);
 
-    // wrong-account state: the "go to my workspace" link
     $wrongUser = User::factory()->withPersonalTeam()->create(['email' => 'wrong@example.com']);
     $mismatchedInvitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
@@ -159,7 +152,6 @@ test('every accept-invitation exit link points into the app panel, not the marke
         ->assertOk()
         ->assertSee($appUrl, false);
 
-    // expired state: the "go to my workspace" link
     $expiredInvitation = TeamInvitation::factory()->create([
         'team_id' => $this->team->id,
         'email' => $this->user->email,

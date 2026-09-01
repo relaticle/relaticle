@@ -6,6 +6,7 @@ namespace App\Livewire\App\Teams;
 
 use App\Actions\Jetstream\ResendTeamInvitation;
 use App\Actions\Jetstream\RevokeTeamInvitation;
+use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -18,25 +19,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 
 /**
- * The outstanding-invitation worklist: short, unpaginated, and hidden entirely
- * when empty, so every pending invitation is always one glance away. Twenty
- * (`SettingsWorkspaceMembersInviteTab`) and Slack both render it this way; the
- * merged, paginated people table this replaced could bury a pending invitation
- * on page three.
- *
- * There is deliberately no per-invitation "copy link" action. The raw token is
- * only ever held in memory at mint time, because `TeamInvitation::issueToken()`
- * stores a SHA-256 hash, so a copy action could only work by re-minting, which would
- * silently invalidate the link already sitting in the invitee's inbox. Twenty
- * excludes the token from its listing query for the same reason, and Slack and
- * Notion offer no per-invitation link either. Sharing a link out-of-band is
- * what the workspace-wide invite link (TeamMembers::manageInviteLinkAction) is
- * for; re-delivering this specific one is what Resend is for.
+ * No per-invitation copy-link: issueToken() stores only a hash, so copying could
+ * only re-mint and invalidate the link already in the invitee's inbox.
  */
 final class PendingTeamInvitations extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
@@ -78,7 +66,7 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
                         ->badge()
                         ->color('gray')
                         ->grow(false)
-                        ->formatStateUsing(fn (string $state): string => $this->roleLabel($state)),
+                        ->formatStateUsing(fn (string $state): string => TeamRole::label($state)),
                     Tables\Columns\TextColumn::make('expires_at')
                         ->badge()
                         ->grow(false)
@@ -94,22 +82,6 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
                 $this->resendTeamInvitationAction(),
                 $this->revokeTeamInvitationAction(),
             ]);
-    }
-
-    /**
-     * Falls back to the raw role string for a legacy or unregistered role key
-     * rather than throwing. Jetstream::findRole()'s untyped PHPDoc return
-     * makes PHPStan misjudge a plain `?->` chain as never-null here.
-     */
-    private function roleLabel(string $role): string
-    {
-        $registeredRole = Jetstream::findRole($role);
-
-        if ($registeredRole === null) {
-            return $role;
-        }
-
-        return $registeredRole->name;
     }
 
     private function resendTeamInvitationAction(): Action
@@ -157,12 +129,8 @@ final class PendingTeamInvitations extends BaseLivewireComponent implements Tabl
             });
     }
 
-    /**
-     * The table query is already team-scoped, so a foreign key cannot resolve to
-     * a record here. This re-asserts the boundary anyway: the record key arrives
-     * from the client, and PendingTeamInvitationsCrossTenantTest pins a 403
-     * rather than a silent no-op as the contract for a foreign invitation.
-     */
+    // The record key arrives from the client, so the team boundary is re-asserted
+    // here and a foreign invitation is a 403 rather than a silent no-op.
     private function authorizeInvitation(TeamInvitation $invitation, string $ability): void
     {
         Gate::authorize($ability, $this->team);

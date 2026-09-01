@@ -24,27 +24,13 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\Locked;
 
-/**
- * The invite form that opens the members page. It is an inline section rather
- * than a modal so the primary action on the page is visible without a click,
- * matching the other workspace settings sections.
- */
 final class InviteTeamMembers extends BaseLivewireComponent
 {
-    /**
-     * Bounds one invite submission. Generous for real bulk-inviting a team,
-     * but stops a single authorized call from queuing an unbounded number of
-     * Mail sends (the onboarding wizard's invite step caps at 5 for the same
-     * reason; this screen is used long after onboarding, so it allows more).
-     */
+    // Stops one authorized call queuing an unbounded number of mail sends.
     private const int MAX_INVITES_PER_SUBMISSION = 10;
 
-    /**
-     * Bounds cumulative invite volume per actor within the window below,
-     * independent of how many separate submissions it takes to reach it.
-     * `rateLimit()` alone only throttles the number of calls, not the number
-     * of emails each call can queue.
-     */
+    // Bounds cumulative volume per actor, which rateLimit() cannot: it counts
+    // calls, not the emails each call queues.
     private const int MAX_INVITES_PER_WINDOW = 20;
 
     private const int INVITE_WINDOW_SECONDS = 60;
@@ -108,11 +94,8 @@ final class InviteTeamMembers extends BaseLivewireComponent
             ]);
     }
 
-    /**
-     * A plain Livewire method rather than a schema action's closure: actions
-     * nested inside a form schema are not addressable by name from outside it,
-     * so this keeps the invite path callable (and testable) as one entry point.
-     */
+    // A plain method, not a schema action closure: actions nested in a form
+    // schema are not addressable by name from outside it.
     public function invitePeople(): void
     {
         $data = $this->form->getState();
@@ -123,11 +106,7 @@ final class InviteTeamMembers extends BaseLivewireComponent
         );
     }
 
-    /**
-     * Google's share dialog shape: pick the role, then copy the link, and the
-     * role change saves on selection rather than behind a submit. The modal is
-     * a dismiss ("Close"), not a form to fill in and send.
-     */
+    // The role saves on selection, so the modal dismisses rather than submits.
     public function manageInviteLinkAction(): Action
     {
         return Action::make('manageInviteLink')
@@ -184,10 +163,8 @@ final class InviteTeamMembers extends BaseLivewireComponent
     }
 
     /**
-     * Addresses arrive as one blob rather than a row at a time, because most
-     * people paste from a spreadsheet or a mail client, so anything that can
-     * separate addresses in those sources counts: commas, semicolons, and any
-     * whitespace including newlines.
+     * Addresses arrive pasted from a spreadsheet or mail client, so any
+     * separator those produce counts: commas, semicolons, and whitespace.
      *
      * @return list<string>
      */
@@ -210,10 +187,8 @@ final class InviteTeamMembers extends BaseLivewireComponent
             return;
         }
 
-        // Volume-based, not call-based: `rateLimit()` would only throttle how
-        // often this method runs, not how many emails a single run queues.
-        // The submission cap above bounds one submission; this bounds
-        // cumulative volume across submissions from the same actor.
+        // Volume-based, not call-based: the cap above bounds one submission,
+        // this bounds cumulative volume from the same actor.
         $rateLimitKey = 'invite-team-members:'.$this->authUser()->id;
 
         if (RateLimiter::tooManyAttempts($rateLimitKey, self::MAX_INVITES_PER_WINDOW)) {
@@ -259,9 +234,6 @@ final class InviteTeamMembers extends BaseLivewireComponent
     }
 
     /**
-     * Only the owner may grant Admin, so an Admin inviting someone never sees
-     * the role they cannot assign (the action enforces this server-side too).
-     *
      * @return array<string, string>
      */
     private function assignableRoles(): array

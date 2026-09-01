@@ -15,11 +15,8 @@ final readonly class ResendTeamInvitation
         $rawToken = $invitation->issueToken();
         $invitation->save();
 
-        // Queued for the same reason the first send is (see InviteTeamMember):
-        // the resend runs on a click in the members table, so a slow provider
-        // otherwise holds the request open and surfaces its own transport error
-        // to the admin. afterCommit() costs nothing here, where no transaction is
-        // open, and keeps the two invitation mail paths identical if one ever is.
+        // Queued so a slow provider cannot hold the admin's request open, and
+        // deferred to commit so the two invitation mail paths stay identical.
         Mail::to($invitation->email)->queue(new TeamInvitationMail($invitation, $rawToken)->afterCommit());
     }
 }

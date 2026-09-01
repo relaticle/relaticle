@@ -10,36 +10,14 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Laravel's global middleware priority list always runs
- * `Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests` (what `auth`
- * resolves to) before `Illuminate\Routing\Middleware\ThrottleRequests`.
- * The textual order given in a route's middleware array does not decide
- * execution order; `SortedMiddleware` resorts by the priority list
- * regardless. That means a plain `['auth', 'throttle:10,1']` pair never
- * actually throttles unauthenticated requests: Authenticate throws before
- * ThrottleRequests::handle() runs.
+ * SortedMiddleware resorts by the priority list, so a plain ['auth', 'throttle']
+ * pair never throttles guests. This must stay registered in that list itself
+ * (bootstrap/app.php, prependToPriorityList) to run before auth, and must
+ * compose ThrottleRequests rather than extend it, or class_parents() matches it
+ * back to ThrottleRequests' own later slot.
  *
- * Simply placing an unmapped middleware first in the array is NOT enough to
- * fix this: a route also carries the global 'web' group's middleware (which
- * includes SubstituteBindings, itself mapped at a very low priority). When
- * 'auth' gets pulled forward past SubstituteBindings, anything sitting
- * between their original positions, including an unmapped middleware,
- * gets dragged along and displaced to run after auth too. So this class
- * MUST be registered in the priority list itself (see
- * `bootstrap/app.php`'s `prependToPriorityList(before: AuthenticatesRequests::class, ...)`)
- * to reliably run before auth.
- *
- * It delegates to ThrottleRequests by composition, not inheritance. A
- * subclass would still be matched by
- * SortedMiddleware::middlewareNames()'s class_parents() lookup against
- * ThrottleRequests's own (later) priority slot. Composition also means this
- * class's own priority registration only affects routes that use it by
- * name; the plain `throttle` alias (routes/api.php, routes/ai.php) is
- * untouched.
- *
- * ThrottleRequests keys on the user id (or the IP for a guest) and nothing
- * else, so every route sharing this middleware without a distinct $prefix
- * shares one bucket.
+ * ThrottleRequests keys on the user id, or the IP for a guest, and nothing else,
+ * so routes sharing this middleware need a distinct prefix to get their own bucket.
  */
 final readonly class ThrottleBeforeAuthentication
 {

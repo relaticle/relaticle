@@ -18,10 +18,8 @@ use Illuminate\View\View;
 use Laravel\Jetstream\Jetstream;
 
 /**
- * GET always renders a confirm page and never mutates membership; POST is the
- * only action that joins. An invitation resolves solely by the opaque token
- * minted in `TeamInvitation::issueToken()`; the signed-URL-over-ULID shape that
- * predated it is gone, along with the routes that served it.
+ * GET renders a confirm page and never mutates membership; POST is the only
+ * action that joins. Invitations resolve solely by the opaque minted token.
  */
 final readonly class AcceptTeamInvitationController
 {
@@ -102,13 +100,8 @@ final readonly class AcceptTeamInvitationController
         return $user;
     }
 
-    /**
-     * Filament's own home-URL closure (see AppPanelProvider) resolves the
-     * dashboard through the ambient Filament::getTenant(), not the request's
-     * authenticated user, so it must be primed before getHomeUrl() is called
-     * from outside panel middleware. isQuiet skips SwitchTeam, which already
-     * ran (or is irrelevant) by this point.
-     */
+    // getHomeUrl() resolves through the ambient tenant, not the request user, so
+    // it must be primed when called from outside panel middleware.
     private function redirectToTeam(Team $team, string $message): RedirectResponse
     {
         Filament::setTenant($team, isQuiet: true);

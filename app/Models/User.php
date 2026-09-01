@@ -334,13 +334,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return Jetstream::findRole($membershipRole)?->key === $role;
     }
 
-    /**
-     * Whether the user's membership role on the given team is Viewer.
-     *
-     * The owner is never a viewer. Ownership outranks the pivot role, and
-     * `ownedTeams` is checked first so an owner row carrying a stale pivot
-     * value cannot lock them out of their own workspace.
-     */
+    // Ownership outranks the pivot role, so an owner row carrying a stale
+    // viewer value cannot lock them out of their own workspace.
     public function isViewerOnTeamId(?string $teamId): bool
     {
         if ($teamId === null) {

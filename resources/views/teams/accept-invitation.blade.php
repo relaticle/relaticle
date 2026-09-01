@@ -7,13 +7,13 @@
 <x-layouts::filament-standalone :title="$pageTitle">
     <div class="flex min-h-screen items-center justify-center">
         <div class="mx-auto max-w-md px-6 py-12 text-center">
-            @if ($state === 'ready')
+            @if($state === 'ready')
                 <h1 class="text-2xl font-bold text-gray-950 dark:text-white">
                     {{ __('teams.accept.ready.heading', ['team' => $teamName]) }}
                 </h1>
 
                 <p class="mt-4 text-gray-500 dark:text-gray-400">
-                    @if ($inviterName)
+                    @if($inviterName)
                         {{ __('teams.accept.ready.body_with_inviter', ['inviter' => $inviterName, 'team' => $teamName, 'role' => $roleName]) }}
                     @else
                         {{ __('teams.accept.ready.body', ['team' => $teamName, 'role' => $roleName]) }}
@@ -31,7 +31,7 @@
                 <x-filament::link :href="url()->getAppUrl()" color="gray" class="mt-4 inline-block">
                     {{ __('teams.accept.ready.decline') }}
                 </x-filament::link>
-            @elseif ($state === 'wrong-account')
+            @elseif($state === 'wrong-account')
                 <h1 class="text-2xl font-bold text-gray-950 dark:text-white">
                     {{ __('teams.accept.wrong_account.heading') }}
                 </h1>

@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\Mail;
 
 mutates(TeamInvitation::class);
 
-// --- Model: isExpired() ---
-
 test('invitation with future expires_at is not expired', function () {
     $invitation = TeamInvitation::factory()->expiresIn(3)->make();
 
@@ -42,8 +40,6 @@ test('invitation expiring exactly now is expired', function () {
     expect($invitation->isExpired())->toBeTrue();
 });
 
-// --- Pending invitations table ---
-
 test('pending invitations table shows invitations', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
@@ -55,8 +51,6 @@ test('pending invitations table shows invitations', function () {
     livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
         ->assertSee('pending@example.com');
 });
-
-// --- Cleanup command ---
 
 test('cleanup command purges old expired invitations', function () {
     TeamInvitation::factory()->create([
@@ -96,8 +90,6 @@ test('cleanup command handles empty table', function () {
         ->assertExitCode(0);
 });
 
-// --- Revoke invitation (renamed from cancel) ---
-
 test('team owner can revoke a pending invitation', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
@@ -126,8 +118,6 @@ test('old cancel action name is gone', function () {
     livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
         ->assertActionDoesNotExist(TestAction::make('cancelTeamInvitation')->table($invitation->id));
 });
-
-// --- Resend invitation ---
 
 test('resending re-issues the token and extends expiry', function (): void {
     Mail::fake();

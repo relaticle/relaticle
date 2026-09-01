@@ -13,11 +13,6 @@ use Illuminate\Support\Str;
 
 mutates(Login::class);
 
-/**
- * Mint and persist a raw token, then return the guest-facing accept URL. The
- * guest flow reads the invitation back out of `url.intended`, so the URL has to
- * be the real token route.
- */
 function acceptUrlFor(TeamInvitation $invitation): string
 {
     $rawToken = $invitation->issueToken();

@@ -385,12 +385,8 @@ final class AppPanelProvider extends PanelProvider
                 fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
             )
             ->renderHook(
-                // CreateTeam (the /new tenant-registration page every current_team_id=null
-                // user lands on) renders a custom $view that never includes the standard
-                // page component, so PAGE_START above never fires there. It keeps the
-                // default $layout though, which fires SIMPLE_LAYOUT_START unconditionally
-                // -- scoping to CreateTeam::class keeps this off the unauthenticated
-                // login/register pages that also use that layout.
+                // CreateTeam renders a custom view that PAGE_START never fires on.
+                // Scoping to it keeps this off the guest pages sharing that layout.
                 PanelsRenderHook::SIMPLE_LAYOUT_START,
                 fn (): string => Blade::render('@livewire(\App\Livewire\App\Teams\PendingInvitationsForUser::class)'),
                 scopes: CreateTeam::class,

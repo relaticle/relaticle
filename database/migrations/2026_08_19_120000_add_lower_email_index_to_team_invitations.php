@@ -6,10 +6,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
 /**
- * PendingInvitationsForUser matches an invitation to the signed-in user with
- * `whereRaw('lower(email) = ?')`, and that runs on every app-panel page load
- * via the panel render hook. A plain index on `email` cannot serve a call
- * wrapped in `lower()`, so the lookup falls back to a sequential scan.
+ * The pending-invitation lookup runs on every app-panel page load and matches
+ * on lower(email), which a plain index on email cannot serve.
  */
 return new class extends Migration
 {

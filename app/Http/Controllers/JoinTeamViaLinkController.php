@@ -87,13 +87,8 @@ final readonly class JoinTeamViaLinkController
         return $team;
     }
 
-    /**
-     * Filament's own home-URL closure (see AppPanelProvider) resolves the
-     * dashboard through the ambient Filament::getTenant(), not the request's
-     * authenticated user, so it must be primed before getHomeUrl() is called
-     * from outside panel middleware. isQuiet skips SwitchTeam, which already
-     * ran (or is irrelevant) by this point.
-     */
+    // getHomeUrl() resolves through the ambient tenant, not the request user, so
+    // it must be primed when called from outside panel middleware.
     private function redirectToTeam(Team $team, string $message): RedirectResponse
     {
         Filament::setTenant($team, isQuiet: true);

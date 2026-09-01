@@ -16,11 +16,6 @@ use Livewire\Attributes\Computed;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
- * Surfaces invitations for the signed-in user's email, even when they registered
- * independently and never followed the invite link. Consent stays explicit: this
- * never auto-joins, it only lists invitations the user can choose to accept or
- * decline.
- *
  * @property Collection<int, TeamInvitation> $invitations
  */
 final class PendingInvitationsForUser extends BaseLivewireComponent
@@ -60,14 +55,8 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
 
         unset($this->invitations);
 
-        /**
-         * The action already switched current_team_id in the database; Filament's
-         * ambient tenant still reflects whatever team (if any) the current page was
-         * bound to, so getHomeUrl() would otherwise fail to resolve the {tenant}
-         * route parameter (or send the user back to a team they didn't just join).
-         * isQuiet avoids re-triggering the SwitchTeam listener, which already ran
-         * inside the action.
-         */
+        // Filament's ambient tenant still points at the previous page's team, so
+        // getHomeUrl() cannot resolve {tenant} until it is primed.
         Filament::setTenant($team, isQuiet: true);
 
         $this->sendNotification(__('teams.accept.joined', ['team' => $team->name]));
@@ -90,10 +79,7 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
         $this->sendNotification(__('teams.pending_for_user.declined'));
     }
 
-    /**
-     * The client-supplied id is never trusted alone. It is only ever resolved
-     * against the collection already scoped to the signed-in user's email.
-     */
+    // Resolved only against the collection already scoped to the user's email.
     private function ownedInvitation(string $invitationId): ?TeamInvitation
     {
         return $this->invitations->firstWhere('id', $invitationId);

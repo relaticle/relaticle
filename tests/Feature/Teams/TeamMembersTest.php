@@ -141,13 +141,6 @@ test('invitePeople rejects an admin role for a non-owner actor', function (): vo
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
 
-/**
- * Production is missing the team_user foreign keys, so a deleted account can
- * leave an orphaned pivot row behind; the page 500s on it because
- * Filament::getUserAvatarUrl() is typed non-nullable. Selecting through `users`
- * excludes orphans structurally rather than by a whereHas filter — this pins
- * that they stay excluded.
- */
 test('the members list skips a membership row whose user no longer exists', function (): void {
     Schema::table('team_user', function (Blueprint $table): void {
         $table->dropForeign(['user_id']);
@@ -275,9 +268,6 @@ test('a member role must be a role the app actually registers', function (): voi
 test('rotating the invite link changes the token', function (): void {
     $originalToken = $this->team->invite_link_token;
 
-    // rotateInviteLink is an extra footer action nested inside manageInviteLink's
-    // modal, not a standalone action — Filament resolves it relative to the
-    // mounted parent action, so the chain is expressed as an array.
     livewire(InviteTeamMembers::class, ['team' => $this->team])
         ->callAction([
             TestAction::make('manageInviteLink'),

@@ -50,11 +50,8 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             // header row over two fields reads as table chrome around a list.
             ->columns([
                 Tables\Columns\Layout\Split::make([
-                    // State, not a column name: `profile_photo_url` falls back to
-                    // ui-avatars.com, which would send every member's initials to
-                    // a third party. The panel's avatar provider resolves the
-                    // uploaded photo when there is one and the local AvatarService
-                    // SVG when there is not, matching the rest of the app.
+                    // State, not a column: profile_photo_url falls back to a third
+                    // party, which would leak every member's initials off-site.
                     Tables\Columns\ImageColumn::make('avatar')
                         ->circular()
                         ->imageSize(32)
@@ -85,15 +82,9 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     }
 
     /**
-     * Owner and members in one list, without the raw-SQL union the merged table
-     * needed: Jetstream tracks ownership on `teams.user_id` rather than the
-     * `team_user` pivot, so the owner is pulled in by a second `where` leg and
-     * carries a null `team_role`.
-     *
-     * Selecting through `users` also drops orphaned pivot rows structurally.
-     * Production is missing the `team_user` foreign keys, so a deleted account
-     * can leave a row whose user is gone, and `Filament::getUserAvatarUrl()` is
-     * typed non-nullable and 500s on it.
+     * Ownership lives on teams.user_id, not the pivot, so the owner joins by a
+     * second where leg with a null team_role. Selecting through users also drops
+     * orphaned pivot rows, which production can hold and which 500 on render.
      *
      * @return Builder<User>
      */
@@ -123,32 +114,13 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
         return $record->getKey() === $this->team->user_id;
     }
 
-    /**
-     * `team_role` is a per-query select, not a column on `users`, so it is read
-     * through the attribute bag rather than declared on the model. It is null on
-     * the owner row, which has no `team_user` pivot to select from.
-     */
+    // A per-query select rather than a column, so it is read off the attribute
+    // bag. Null on the owner row, which has no pivot to select from.
     private function roleKey(User $record): ?string
     {
         $role = $record->getAttribute('team_role');
 
         return is_string($role) ? $role : null;
-    }
-
-    /**
-     * Falls back to the raw role string for a legacy or unregistered role key
-     * rather than throwing. Jetstream::findRole()'s untyped PHPDoc return
-     * makes PHPStan misjudge a plain `?->` chain as never-null here.
-     */
-    private function roleLabel(string $role): string
-    {
-        $registeredRole = Jetstream::findRole($role);
-
-        if ($registeredRole === null) {
-            return $role;
-        }
-
-        return $registeredRole->name;
     }
 
     private function updateTeamRoleAction(): Action
@@ -157,7 +129,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             // The button reads as the member's current role, so the row shows the
             // role without a column for it and the click target is the thing you
             // would change. This is how the page worked before the rewrite.
-            ->label(fn (User $record): string => $this->roleLabel($this->roleKey($record) ?? ''))
+            ->label(fn (User $record): string => TeamRole::label($this->roleKey($record) ?? ''))
             ->badge()
             ->color('gray')
             ->visible(fn (User $record): bool => ! $this->isOwner($record)

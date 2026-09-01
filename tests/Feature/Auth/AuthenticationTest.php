@@ -114,9 +114,6 @@ test('passkey login is allowed for active users', function (): void {
 });
 
 test('passkey login is allowed for users scheduled for deletion so they reach the cancellation interstitial', function (): void {
-    // Consistent with password and social login: a scheduled-for-deletion user authenticates and
-    // the CheckScheduledDeletion middleware routes them to the interstitial where they can cancel.
-    // Blocking only the passkey path left passwordless users with a confusing dead-end.
     $user = User::factory()->create([
         'scheduled_deletion_at' => now()->subDay(),
     ]);
@@ -511,8 +508,6 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
     Notification::assertNotSentTo($user, VerifyEmail::class);
     Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
 
-    // Accepting is a confirmed two-step flow: the link renders a page, the
-    // POST is what joins.
     $this->get(route('team-invitations.token.accept', ['token' => $rawToken]))->assertOk();
 
     $this->post(route('team-invitations.token.join', ['token' => $rawToken]))

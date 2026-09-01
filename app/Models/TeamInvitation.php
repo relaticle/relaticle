@@ -53,12 +53,8 @@ final class TeamInvitation extends JetstreamTeamInvitation
         return $expiresAt->isPast();
     }
 
-    /**
-     * Mint a fresh raw token, store its hash and a renewed expiry window on the
-     * model (the caller persists), and return the raw token for delivery by mail.
-     * Single source of truth for the token and expiry rules shared by the invite
-     * and resend paths.
-     */
+    // Stores the hash and a renewed expiry, returns the raw token to mail.
+    // Single source of the token rules shared by the invite and resend paths.
     public function issueToken(): string
     {
         $rawToken = Str::random(40);

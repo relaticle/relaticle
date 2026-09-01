@@ -74,11 +74,6 @@ test('the card still renders when the inviter account is gone', function (): voi
 });
 
 test('a teamless invitee sees the card on the tenant-registration page', function (): void {
-    // CreateTeam extends RegisterTenant, which uses a custom onboarding view that
-    // bypasses the standard page component the card's PAGE_START hook fires from.
-    // A user with current_team_id = null lands here (/app/new) first -- exactly
-    // the case this card exists to catch someone before they build a throwaway
-    // personal workspace instead of accepting the invitation waiting for them.
     $team = User::factory()->withTeam()->create()->currentTeam;
     $team->teamInvitations()->create([
         'email' => 'later@example.test',
@@ -130,13 +125,6 @@ test('accepting from the card joins the team', function (): void {
 });
 
 test('accepting still joins a team other than the ambient panel tenant', function (): void {
-    // Regression: inside a real Filament panel request, ApplyTenantScopes
-    // globally scopes the User model to members of whichever team the request
-    // is currently bound to. The team being joined here is a *different* team
-    // by definition, so every User lookup the accept path performs internally
-    // (the inviting team's owner, membership checks) must not be blinded by
-    // that scope. Livewire::test() alone never applies panel middleware, so
-    // the scope is registered here exactly as ApplyTenantScopes would.
     $originalScopes = User::getAllGlobalScopes();
 
     try {
@@ -163,13 +151,6 @@ test('accepting still joins a team other than the ambient panel tenant', functio
 });
 
 test('suspending the User tenancy scope during accept does not affect other models', function (): void {
-    // Regression: the scope suspension inside AcceptTeamInvitation must restore
-    // only the one named scope entry it touched on User, not wipe out a scope
-    // that some other model registered for the first time while it was
-    // suspended (e.g. a lazily-booted #[ScopedBy] model). TeamMemberAdded fires
-    // synchronously from inside AddTeamMember::add() -- squarely inside the
-    // suspended window -- so registering a scope on an unrelated model there
-    // proves the restore is class-scoped to User, not a global snapshot/restore.
     $originalUserScopes = User::getAllGlobalScopes();
     $markerScope = 'regression-marker-'.Str::random(8);
 

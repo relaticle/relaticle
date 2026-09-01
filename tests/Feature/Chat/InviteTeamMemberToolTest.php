@@ -109,7 +109,6 @@ it('keeps the mail transport failure off the card when the invite email cannot b
         ->and($shown)->not->toContain('smtp.internal.test')
         ->and($shown)->not->toContain('postmaster@relaticle');
 
-    // The approve transaction rolls back, so retrying stays safe.
     expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
@@ -240,9 +239,6 @@ it('labels a resolved invitation by its email so the assistant can name it', fun
 
     resolve(PendingActionService::class)->approve($pending->fresh(), $this->user);
 
-    // This is what the next turn re-injects so the assistant can say who it
-    // invited. Without the email fallback in recordLabel() it is null, and the
-    // transcript calls the invitation "the record".
     $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null);
 
     expect($resolved[0]['label'] ?? null)->toBe('alex@example.com');
