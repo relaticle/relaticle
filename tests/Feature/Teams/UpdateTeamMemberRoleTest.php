@@ -86,10 +86,7 @@ test('admin cannot demote another admin', function (): void {
     Filament::setTenant($team);
 
     livewire(TeamMembers::class, ['team' => $team])
-        ->callAction(TestAction::make('updateTeamRole')->table($adminB->id), data: [
-            'role' => TeamRole::Editor->value,
-        ])
-        ->assertHasActionErrors(['role']);
+        ->assertTableActionHidden('updateTeamRole', $adminB->id);
 
     expect($adminB->fresh()->hasTeamRole($team->fresh(), TeamRole::Admin->value))->toBeTrue();
 });

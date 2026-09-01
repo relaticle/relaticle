@@ -359,6 +359,22 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
         return $invitation;
     }
 
+    /**
+     * Only the owner may change or remove another Administrator, so those
+     * actions are hidden on a peer Admin's row rather than offered and then
+     * refused, matching how the owner row hides Leave.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    private function canActOnRole(array $record): bool
+    {
+        if ((string) $record['role'] !== TeamRole::Admin->value) {
+            return true;
+        }
+
+        return Gate::check('promoteToAdmin', $this->team);
+    }
+
     private function updateTeamRoleAction(): Action
     {
         return Action::make('updateTeamRole')
@@ -366,6 +382,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             ->icon('heroicon-m-user-circle')
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
+                && $this->canActOnRole($record)
                 && Gate::check('updateTeamMember', $this->team))
             ->modalHeading(__('teams.actions.update_team_role'))
             ->modalWidth('lg')
@@ -438,6 +455,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
                 && $this->recordKey($record) !== (string) $this->authUser()->getKey()
+                && $this->canActOnRole($record)
                 && Gate::check('removeTeamMember', $this->team))
             ->action(function (?array $record): void {
                 $member = $this->findMember($record);

@@ -96,8 +96,7 @@ test('an admin cannot demote a peer admin', function (): void {
     $this->actingAs($adminA);
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->callAction(TestAction::make('updateTeamRole')->table($adminB->id), ['role' => TeamRole::Editor->value])
-        ->assertHasActionErrors(['role']);
+        ->assertTableActionHidden('updateTeamRole', $adminB->id);
 
     expect($adminB->fresh()->teamRole($this->team)->key)->toBe(TeamRole::Admin->value);
 });
@@ -361,4 +360,38 @@ test('the members list paginates rather than rendering every member at once', fu
 
     expect($page)->toHaveCount(10)
         ->and($page->total())->toBe(13);
+});
+
+test('an admin sees no remove action on another admins row', function (): void {
+    $admin = User::factory()->create();
+    $peer = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $this->team->users()->attach($peer, ['role' => TeamRole::Admin->value]);
+
+    $this->actingAs($admin);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionHidden('removeTeamMember', $peer->id);
+});
+
+test('an admin still manages a non admin member', function (): void {
+    $admin = User::factory()->create();
+    $editor = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $this->team->users()->attach($editor, ['role' => TeamRole::Editor->value]);
+
+    $this->actingAs($admin);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionVisible('updateTeamRole', $editor->id)
+        ->assertTableActionVisible('removeTeamMember', $editor->id);
+});
+
+test('the owner still manages an admin', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertTableActionVisible('updateTeamRole', $admin->id)
+        ->assertTableActionVisible('removeTeamMember', $admin->id);
 });
