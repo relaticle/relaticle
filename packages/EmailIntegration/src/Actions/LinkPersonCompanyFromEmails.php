@@ -64,7 +64,6 @@ final readonly class LinkPersonCompanyFromEmails
         }
 
         $value = $person->getCustomFieldValue($emailField);
-        /** @var list<string> $emails */
         $emails = is_array($value) ? $value : ($value !== null && $value !== '' ? [(string) $value] : []);
 
         foreach ($emails as $email) {
