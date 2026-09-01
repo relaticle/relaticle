@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
+use App\Features\EmailIntegration;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
@@ -17,7 +18,9 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
+use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
@@ -27,6 +30,12 @@ final class ViewOpportunity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('viewEmails')
+                ->label(__('filament/resources/opportunity.pages.view.actions.view_emails.label'))
+                ->icon('heroicon-o-envelope')
+                ->color('gray')
+                ->visible(fn (): bool => Feature::active(EmailIntegration::class))
+                ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
@@ -82,8 +91,36 @@ final class ViewOpportunity extends ViewRecord
                         ->grow(false),
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
-            ])
-                ->columnSpanFull(),
+            ])->columnSpanFull(),
+
+            Section::make('Communication Intelligence')
+                ->icon(Heroicon::ChartBar)
+                ->schema([
+                    TextEntry::make('last_interaction_at')
+                        ->label(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.last_interaction.label'))
+                        ->dateTime()
+                        ->placeholder(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.last_interaction.placeholder')),
+
+                    TextEntry::make('last_email_at')
+                        ->label(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.last_email.label'))
+                        ->dateTime()
+                        ->placeholder(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.last_email.placeholder')),
+
+                    TextEntry::make('days_since_last_email')
+                        ->label(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.days_since_last_email.label'))
+                        ->getStateUsing(fn (Opportunity $record): string => $record->last_email_at
+                            ? __('filament/resources/opportunity.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => (int) now()->diffInDays($record->last_email_at, true)])
+                            : __('filament/resources/opportunity.pages.view.communication_intelligence.fields.days_since_last_email.empty')
+                        ),
+
+                    TextEntry::make('email_count')
+                        ->label(__('filament/resources/opportunity.pages.view.communication_intelligence.fields.email_count.label'))
+                        ->default(0),
+                ])
+                ->columns(2)
+                ->columnSpanFull()
+                ->collapsible()
+                ->collapsed(fn (Opportunity $record): bool => ($record->email_count ?? 0) === 0),
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\RedirectToPrimaryHost;
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use Laravel\Pennant\Feature;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
@@ -161,6 +163,26 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:purge-scheduled-deletions')->daily()->withoutOverlapping()->onOneServer();
         $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('notifications:send-setup-nudge')->hourly()->withoutOverlapping()->onOneServer();
+
+        if (Feature::active(EmailIntegration::class)) {
+            $schedule->command('email:incremental-sync')
+                ->everyFiveMinutes()
+                ->name('email:incremental-sync')
+                ->withoutOverlapping()
+                ->onOneServer();
+
+            $schedule->command('calendar:incremental-sync')
+                ->everyFiveMinutes()
+                ->name('calendar:incremental-sync')
+                ->withoutOverlapping()
+                ->onOneServer();
+
+            $schedule->command('email:dispatch-outbox')
+                ->everyMinute()
+                ->name('email:dispatch-outbox')
+                ->withoutOverlapping()
+                ->onOneServer();
+        }
 
         if (config('app.health_checks_enabled')) {
             $schedule->command(RunHealthChecksCommand::class)->everyMinute();

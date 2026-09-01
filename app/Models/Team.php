@@ -32,6 +32,8 @@ use Laravel\Jetstream\Events\TeamUpdated;
 use Laravel\Jetstream\Team as JetstreamTeam;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\ImportWizard\Models\Import;
 use Spatie\Onboard\Concerns\GetsOnboarded;
 use Spatie\Onboard\Concerns\Onboardable;
@@ -41,6 +43,9 @@ use Spatie\Sluggable\SlugOptions;
 /**
  * @property string $name
  * @property string $slug
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
+ * @property ContactCreationMode $contact_creation_mode
+ * @property bool $auto_create_companies
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?Carbon $invite_link_token_expires_at
@@ -61,6 +66,9 @@ use Spatie\Sluggable\SlugOptions;
     'name',
     'slug',
     'personal_team',
+    'default_email_sharing_tier',
+    'contact_creation_mode',
+    'auto_create_companies',
     'onboarding_use_case',
     'onboarding_context',
     'onboarding_referral_source',
@@ -138,6 +146,9 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 
         // Misc
         'null', 'undefined', 'error', 'test', 'staging', 'preview',
+
+        // Email Integration
+        'email-accounts', 'email-attachments',
     ];
 
     /**
@@ -165,6 +176,9 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     {
         return [
             'personal_team' => 'boolean',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
+            'contact_creation_mode' => ContactCreationMode::class,
+            'auto_create_companies' => 'boolean',
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',

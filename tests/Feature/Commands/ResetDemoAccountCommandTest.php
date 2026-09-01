@@ -225,6 +225,7 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
         ->get()
         ->mapWithKeys(fn (People $person): array => [$person->name => $person->getCustomFieldValue($emailField)])
         ->all();
+    ksort($executiveEmails);
 
     expect($ivan->company_id)->toBe($notion->getKey())
         ->and($notionOpportunity->company_id)->toBe($notion->getKey())

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Opportunity;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -31,6 +32,16 @@ it('can render the view page', function (): void {
 
     livewire(ViewOpportunity::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('registers the meetings relation manager on the opportunity view page', function (): void {
+    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+
+    $managers = livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->instance()
+        ->getRelationManagers();
+
+    expect($managers)->toContain(MeetingsRelationManager::class);
 });
 
 // Column metadata is checked against a single mounted table rather than one

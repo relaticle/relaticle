@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Email;
 
 use App\Enums\SubscriberTagEnum;
+use App\Models\AiSummary;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -49,7 +50,7 @@ final readonly class SubscriberProfileDeriver
             $tags[] = SubscriberTagEnum::HasTeamMembers->value;
         }
 
-        if ($this->hasChatUsage($user)) {
+        if ($this->hasAiUsage($user)) {
             $tags[] = SubscriberTagEnum::HasAiUsage->value;
         }
 
@@ -105,9 +106,25 @@ final readonly class SubscriberProfileDeriver
         return false;
     }
 
-    private function hasChatUsage(User $user): bool
+    /**
+     * The single definition of "this account has used AI": an assistant message
+     * the user sent, or an AI summary generated anywhere in their workspaces.
+     * Trigger paths pass the record they just created as $excluding so they can
+     * ask whether any OTHER one already existed.
+     */
+    public function hasAiUsage(User $user, ?Model $excluding = null): bool
     {
-        return AgentConversationMessage::query()->sentBy($user)->exists();
+        if (AgentConversationMessage::query()->sentBy($user)->exists()) {
+            return true;
+        }
+
+        $summaries = AiSummary::query()->whereIn('team_id', $user->allTeams()->pluck('id'));
+
+        if ($excluding instanceof AiSummary) {
+            $summaries->whereKeyNot($excluding->getKey());
+        }
+
+        return $summaries->exists();
     }
 
     /**

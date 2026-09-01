@@ -9,14 +9,16 @@ use App\Filament\Pages\Team\ActivityLog;
 use App\Filament\Pages\Team\CustomFields;
 use App\Filament\Pages\Team\Members;
 use App\Models\User;
+use App\Providers\Filament\AppPanelProvider;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
-mutates(Members::class, CustomFields::class, ActivityLog::class, ImportHistory::class);
+mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -52,22 +54,27 @@ test('every workspace settings page renders the same tab strip', function (): vo
         __('teams.tabs.general'),
         __('teams.tabs.members'),
         __('teams.tabs.custom_fields'),
+        __('teams.tabs.email'),
         __('teams.tabs.import_history'),
         __('teams.tabs.activity'),
         __('teams.tabs.billing'),
     ];
 
-    foreach ([EditTeam::class, Members::class, CustomFields::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
+    foreach ([EditTeam::class, Members::class, CustomFields::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
         expect(workspaceTabLabels(app($page)))
             ->toBe($expected, "[{$page}] should render the full tab strip");
     }
 });
 
-test('the custom fields tab lives under the team url and the standalone route is gone', function (): void {
+test('workspace settings tabs live under the team url without duplicate standalone routes', function (): void {
     expect(CustomFields::getSlug())->toBe('team/custom-fields')
         ->and(Members::getSlug())->toBe('team/members')
+        ->and(EmailPrivacySettingsPage::getSlug())->toBe('team/email')
+        ->and(ActivityLog::getSlug())->toBe('team/activity')
         ->and(Route::has('filament.app.pages.custom-fields'))->toBeFalse()
-        ->and(Route::has('filament.app.pages.team.custom-fields'))->toBeTrue();
+        ->and(Route::has('filament.app.pages.team.custom-fields'))->toBeTrue()
+        ->and(Route::has('filament.app.email-settings.pages.privacy'))->toBeFalse()
+        ->and(Route::has('filament.app.pages.team.email'))->toBeTrue();
 });
 
 test('billing keeps its own url so the paywall allowlist keeps matching', function (): void {
@@ -80,6 +87,7 @@ test('a workspace admin can open every tab', function (): void {
         EditTeam::getUrl(tenant: $this->team),
         Members::getUrl(tenant: $this->team),
         CustomFields::getUrl(tenant: $this->team),
+        EmailPrivacySettingsPage::getUrl(tenant: $this->team),
         ImportHistory::getUrl(tenant: $this->team),
         ActivityLog::getUrl(tenant: $this->team),
     ] as $url) {
@@ -97,7 +105,7 @@ test('a user outside the workspace cannot open the members tab', function (): vo
         ->assertNotFound();
 });
 
-test('the tab strip hides activity from members without the admin role', function (): void {
+test('the tab strip hides admin-only tabs from members without the admin role', function (): void {
     Feature::define(BillingFeature::class, true);
 
     $editor = User::factory()->create();
@@ -107,10 +115,12 @@ test('the tab strip hides activity from members without the admin role', functio
 
     expect(workspaceTabLabels(app(EditTeam::class)))
         ->not->toContain(__('teams.tabs.activity'))
+        ->not->toContain(__('teams.tabs.email'))
         ->and(workspaceTabLabels(app(ImportHistory::class)))
         ->toContain(__('teams.tabs.import_history'))
         ->toContain(__('teams.tabs.billing'))
-        ->not->toContain(__('teams.tabs.activity'));
+        ->not->toContain(__('teams.tabs.activity'))
+        ->not->toContain(__('teams.tabs.email'));
 });
 
 test('the tab strip drops billing when the feature is off', function (): void {
@@ -127,6 +137,7 @@ test('each page highlights its own tab even when no page route is current', func
         EditTeam::class => __('teams.tabs.general'),
         Members::class => __('teams.tabs.members'),
         CustomFields::class => __('teams.tabs.custom_fields'),
+        EmailPrivacySettingsPage::class => __('teams.tabs.email'),
         ImportHistory::class => __('teams.tabs.import_history'),
         ActivityLog::class => __('teams.tabs.activity'),
         Billing::class => __('teams.tabs.billing'),
@@ -149,6 +160,6 @@ test('the tenant menu lists billing directly under workspace settings', function
         ->keys()
         ->all();
 
-    expect($items)->toBe(['profile', 'billing', 'register'])
+    expect($items)->toBe(['profile', 'billing', 'email_settings', 'register'])
         ->and($panel->getTenantMenuItems()['billing']->getSort())->toBeLessThan(0);
 });

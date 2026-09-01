@@ -7,12 +7,14 @@ use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Models\ActivityLog\Activity;
+use App\Models\Company;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Activity\ListActivityTool;
 
 mutates(ListActivityTool::class);
+mutates(Company::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();

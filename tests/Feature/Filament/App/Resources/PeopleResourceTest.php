@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -30,6 +31,16 @@ it('can render the view page', function (): void {
 
     livewire(ViewPeople::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('registers the meetings relation manager on the person view page', function (): void {
+    $record = People::factory()->recycle([$this->user, $this->team])->create();
+
+    $managers = livewire(ViewPeople::class, ['record' => $record->getKey()])
+        ->instance()
+        ->getRelationManagers();
+
+    expect($managers)->toContain(MeetingsRelationManager::class);
 });
 
 // Column metadata is checked against a single mounted table rather than one

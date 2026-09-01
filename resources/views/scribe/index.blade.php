@@ -6,7 +6,7 @@
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"/>
-    
+
     <script>
         window.relaticleDarkMode = localStorage.getItem('theme') === 'dark'
             || ((!localStorage.getItem('theme') || localStorage.getItem('theme') === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches);

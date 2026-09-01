@@ -17,6 +17,7 @@ use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 /**
@@ -63,6 +64,13 @@ trait HasWorkspaceSettingsNavigation
                 ->url(fn (): string => CustomFields::getUrl())
                 ->isActiveWhen($this->isCurrentPage(CustomFields::class))
                 ->visible(fn (): bool => CustomFields::canAccess()),
+
+            NavigationItem::make()
+                ->label(__('teams.tabs.email'))
+                ->icon(Heroicon::OutlinedEnvelope)
+                ->url(fn (): string => EmailPrivacySettingsPage::getUrl())
+                ->isActiveWhen($this->isCurrentPage(EmailPrivacySettingsPage::class))
+                ->visible(fn (): bool => EmailPrivacySettingsPage::canAccess()),
 
             NavigationItem::make()
                 ->label(__('teams.tabs.import_history'))

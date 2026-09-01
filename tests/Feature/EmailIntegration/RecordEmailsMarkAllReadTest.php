@@ -1,0 +1,136 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Models\People;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
+
+beforeEach(function (): void {
+    $this->owner = User::factory()->withTeam()->create();
+    $this->team = $this->owner->currentTeam;
+
+    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+    ]));
+
+    $this->person = People::factory()->create([
+        'team_id' => $this->team->id,
+        'creator_id' => $this->owner->id,
+    ]);
+
+    $this->newer = Email::factory()->inbound()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'sent_at' => now(),
+    ]);
+    $this->newer->body()->create([
+        'body_text' => 'plain text',
+        'body_html' => '<p>Reader body</p>',
+    ]);
+
+    $this->older = Email::factory()->inbound()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'sent_at' => now()->subHour(),
+    ]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Alex Sender',
+        'email_address' => 'alex@example.test',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $this->newer->getKey(),
+        'name' => 'Taylor Recipient',
+        'email_address' => 'taylor@example.test',
+    ]);
+
+    $this->person->emails()->attach([$this->newer->getKey(), $this->older->getKey()]);
+
+    $this->actingAs($this->owner);
+    Filament::setTenant($this->team);
+});
+
+it('marks all of the record\'s unread emails as read', function (): void {
+    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()]);
+    // Nothing is open on mount, so both attached emails start unread.
+    expect($page->instance()->inboxUnreadCount())->toBe(2);
+
+    $page->call('markAllAsRead');
+
+    expect($page->instance()->inboxUnreadCount())->toBe(0);
+    expect(EmailRead::query()->where('user_id', $this->owner->id)
+        ->whereIn('email_id', [$this->newer->id, $this->older->id])->count())->toBe(2);
+});
+
+it('opens with the list only, and reads an email into the overlay until it is closed', function (): void {
+    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSet('folder', EmailFolder::All)
+        ->assertSet('selectedEmailId', null);
+
+    expect($page->instance()->selectedEmail())->toBeNull();
+
+    $page->call('selectEmail', $this->newer->getKey())
+        ->assertSet('selectedEmailId', $this->newer->getKey());
+
+    expect($page->instance()->selectedEmail()?->getKey())->toBe($this->newer->getKey());
+
+    $page->call('deselectEmail')
+        ->assertSet('selectedEmailId', null);
+
+    expect($page->instance()->selectedEmail())->toBeNull();
+});
+
+it('shows sender and recipient metadata in the email list', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSee('Alex Sender')
+        ->assertSee('Taylor Recipient');
+});
+
+it('fills the reader body while the email iframe is loading', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->call('selectEmail', $this->newer->getKey())
+        ->assertSeeHtml('x-bind:class="ready ? \'shrink-0\' : \'flex min-h-0 flex-1 flex-col\'"')
+        ->assertSeeHtml('x-bind:class="ready ? \'\' : \'min-h-0 flex-1\'"')
+        ->assertDontSeeHtml('max-w-3xl');
+});
+
+it('saves an email privacy tier from the sharing cards', function (): void {
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('manageSharing', data: [
+            'privacy_tier' => EmailPrivacyTier::SUBJECT->value,
+            'shares' => [],
+        ], arguments: ['emailId' => $this->newer->id])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Sharing settings saved.');
+
+    expect($this->newer->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('does not mark emails belonging to other records', function (): void {
+    // An unread email NOT attached to this person.
+    $unrelated = Email::factory()->inbound()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'sent_at' => now()->subDay(),
+    ]);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->call('markAllAsRead');
+
+    expect(EmailRead::query()->where('user_id', $this->owner->id)
+        ->where('email_id', $unrelated->id)->exists())->toBeFalse();
+});

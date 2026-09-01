@@ -76,7 +76,7 @@ it('renders an "All chats" trigger when more than 7 chats exist', function (): v
 
     Livewire::test(ChatSidebarNav::class)
         ->assertSee('All chats')
-        ->assertSeeHtml("dispatchEvent(new CustomEvent('chat:open-all-chats'))");
+        ->assertSeeHtml("dispatchTo('app.chat.chat-all-chats-panel', 'chat:open-all-chats')");
 });
 
 it('hides the "All chats" trigger when 7 or fewer chats exist', function (): void {

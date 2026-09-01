@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -10,6 +11,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Laravel\Pennant\Feature;
 
 mutates(ViewCompany::class, ViewPeople::class, ViewOpportunity::class);
 
@@ -46,3 +48,45 @@ it('no longer exposes the AI summary or ask-about-this actions on an opportunity
         ->assertActionDoesNotExist('askAboutThis')
         ->assertActionExists('edit');
 });
+
+it('hides the emails action on company, person, and opportunity views when email integration is off', function (string $page, Closure $record): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    $owner = $record($this->user, $this->team);
+
+    livewire($page, ['record' => $owner->getKey()])
+        ->assertActionHidden('viewEmails');
+})->with([
+    'company' => [
+        ViewCompany::class,
+        fn (User $user, $team): Company => Company::factory()->recycle([$user, $team])->create(),
+    ],
+    'person' => [
+        ViewPeople::class,
+        fn (User $user, $team): People => People::factory()->recycle([$user, $team])->create(),
+    ],
+    'opportunity' => [
+        ViewOpportunity::class,
+        fn (User $user, $team): Opportunity => Opportunity::factory()->recycle([$user, $team])->create(),
+    ],
+]);
+
+it('shows the emails action on company, person, and opportunity views when email integration is on', function (string $page, Closure $record): void {
+    $owner = $record($this->user, $this->team);
+
+    livewire($page, ['record' => $owner->getKey()])
+        ->assertActionVisible('viewEmails');
+})->with([
+    'company' => [
+        ViewCompany::class,
+        fn (User $user, $team): Company => Company::factory()->recycle([$user, $team])->create(),
+    ],
+    'person' => [
+        ViewPeople::class,
+        fn (User $user, $team): People => People::factory()->recycle([$user, $team])->create(),
+    ],
+    'opportunity' => [
+        ViewOpportunity::class,
+        fn (User $user, $team): Opportunity => Opportunity::factory()->recycle([$user, $team])->create(),
+    ],
+]);

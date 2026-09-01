@@ -152,6 +152,7 @@ it('forces a conscious arch-coverage decision when a package is added', function
         [
             'Relaticle\Chat',
             'Relaticle\Documentation',
+            'Relaticle\EmailIntegration',
             'Relaticle\ImportWizard',
             'Relaticle\OnboardSeed',
             'Relaticle\SystemAdmin',

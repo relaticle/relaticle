@@ -9,7 +9,10 @@ use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager;
+use App\Filament\Resources\OpportunityResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
 use App\Models\Opportunity;
@@ -108,9 +111,11 @@ final class OpportunityResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
-            ActivityLogRelationManager::class,
+            // EmailsRelationManager::class,
+            MeetingsRelationManager::class,
         ];
     }
 
@@ -121,6 +126,7 @@ final class OpportunityResource extends Resource
             'index' => ListOpportunities::route('/'),
             'board' => OpportunitiesBoard::route('/board'),
             'view' => ViewOpportunity::route('/{record}'),
+            'emails' => OpportunityEmailsPage::route('/{record}/emails'),
         ];
     }
 
