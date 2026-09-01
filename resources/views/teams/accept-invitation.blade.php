@@ -40,7 +40,7 @@
                     {{ __('teams.accept.wrong_account.body', ['invited' => $invitedEmail, 'current' => $currentEmail]) }}
                 </p>
 
-                <form method="POST" action="{{ route('logout') }}" class="mt-8">
+                <form method="POST" action="{{ $switchUrl }}" class="mt-8">
                     @csrf
 
                     <x-filament::button type="submit">

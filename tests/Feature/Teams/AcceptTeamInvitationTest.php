@@ -543,3 +543,56 @@ test('accepting re-reads the invitation under a row lock so concurrent accepts s
     expect($locking)->not->toBeEmpty()
         ->and($this->user->fresh()->belongsToTeam($this->team))->toBeTrue();
 });
+
+test('switching account from the wrong-account screen returns to the invitation', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'invited@example.test',
+        'role' => 'editor',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    $this->actingAs($this->user)
+        ->post(route('team-invitations.token.switch', ['token' => $rawToken]))
+        ->assertRedirect(route('team-invitations.token.accept', ['token' => $rawToken]));
+
+    expect(auth()->check())->toBeFalse();
+});
+
+test('the wrong-account screen offers the switch route, not a bare logout', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => 'invited@example.test',
+        'role' => 'editor',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    $this->actingAs($this->user)
+        ->get(route('team-invitations.token.accept', ['token' => $rawToken]))
+        ->assertOk()
+        ->assertViewHas('state', 'wrong-account')
+        ->assertSee(route('team-invitations.token.switch', ['token' => $rawToken]), escape: false);
+});
+
+test('after switching, the invitation link sends a guest to login and back again', function (): void {
+    $invitee = User::factory()->create(['email' => 'invited@example.test']);
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $invitee->email,
+        'role' => 'editor',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+    $acceptUrl = route('team-invitations.token.accept', ['token' => $rawToken]);
+
+    $this->actingAs($this->user)->post(route('team-invitations.token.switch', ['token' => $rawToken]));
+
+    $this->get($acceptUrl)->assertRedirect(route('filament.app.auth.login'));
+
+    expect(session('url.intended'))->toBe($acceptUrl);
+
+    $this->actingAs($invitee)->get($acceptUrl)->assertOk()->assertViewHas('state', 'ready');
+});

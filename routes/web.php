@@ -13,6 +13,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\PrivacyPolicyController;
+use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
@@ -95,6 +96,13 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
         ->name('team-invitations.token.join');
+
+    // Signing out returns here rather than to the marketing home, so the invitee
+    // lands back on the invitation instead of losing it with the session.
+    Route::post('/invitations/{token}/switch-account', SwitchInvitationAccountController::class)
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-switch')
+        ->name('team-invitations.token.switch');
 });
 
 Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])

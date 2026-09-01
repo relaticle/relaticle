@@ -74,6 +74,7 @@ final readonly class AcceptTeamInvitationController
                 'invitedEmail' => $invitation->email,
                 'currentEmail' => $user->email,
                 'teamName' => $invitation->team->name,
+                'switchUrl' => route('team-invitations.token.switch', ['token' => $request->route('token')]),
             ]);
         }
 
