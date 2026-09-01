@@ -21,8 +21,8 @@ final class EmailSettings extends Cluster
     protected static ?string $slug = 'email-settings';
 
     /**
-     * Reached from the workspace menu (alongside Custom Fields / Import History),
-     * not the main sidebar, so keep it out of the sidebar navigation tree.
+     * Reached from the workspace menu (alongside Billing), not the main sidebar,
+     * so keep it out of the sidebar navigation tree.
      */
     public static function shouldRegisterNavigation(): bool
     {
