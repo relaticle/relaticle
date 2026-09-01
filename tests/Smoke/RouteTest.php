@@ -32,7 +32,6 @@ const SMOKE_EXCLUDED_ROUTES = [
     'email-verification/verify/*',
     'filament/exports/*/download',
     'filament/imports/*/failed-rows/download',
-    'team-invitations/*',
     'password-reset/*',
     'reset-password/*',
     'discord',

@@ -79,5 +79,9 @@ final class JetstreamServiceProvider extends ServiceProvider
             'create',
             'update',
         ])->description(__('teams.roles.editor.description'));
+
+        Jetstream::role(TeamRole::Viewer->value, 'Viewer', [
+            'read',
+        ])->description(__('teams.roles.viewer.description'));
     }
 }

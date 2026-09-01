@@ -64,6 +64,24 @@ test('user cannot schedule deletion when owning team with other members', functi
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
+test('the deletion blocker names an action the app supports', function (): void {
+    Notification::fake();
+
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $team->users()->attach(User::factory()->create(), ['role' => 'editor']);
+
+    try {
+        resolve(ScheduleUserDeletion::class)->schedule($owner);
+        $this->fail('Expected a validation exception.');
+    } catch (ValidationException $exception) {
+        $message = $exception->validator->errors()->first('team');
+
+        expect($message)->not->toContain('Transfer ownership')
+            ->and($message)->toContain($team->name);
+    }
+});
+
 test('user can cancel scheduled deletion', function () {
     Notification::fake();
 

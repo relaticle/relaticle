@@ -324,7 +324,6 @@ it('keeps Eloquent models off the client-callable surface of Livewire components
     // Verified safe (2026-08-25): each passes the client-supplied team straight to an
     // action that authorizes the ACTING user against THAT team, and returns void.
     $grandfathered = [
-        'App\Livewire\App\Teams\AddTeamMember::addTeamMember',
         'App\Livewire\App\Teams\DeleteTeam::cancelTeamDeletion',
         'App\Livewire\App\Teams\DeleteTeam::deleteTeam',
         'App\Livewire\App\Teams\TeamMembers::leaveTeam',

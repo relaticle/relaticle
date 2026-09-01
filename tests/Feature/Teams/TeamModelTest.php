@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\TeamRole;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -220,6 +223,58 @@ test('auto-generated slug from reserved name gets suffixed', function () {
 
     expect($team->slug)->not->toBe('admin')
         ->and($team->slug)->toStartWith('admin-');
+});
+
+test('issueToken stores a hash and returns the raw secret', function (): void {
+    $team = User::factory()->withTeam()->create()->currentTeam;
+
+    $invitation = $team->teamInvitations()->make(['email' => 'x@example.test', 'role' => 'editor']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    expect($raw)->toHaveLength(40)
+        ->and($invitation->token)->toBe(hash('sha256', $raw))
+        ->and($invitation->token)->not->toBe($raw)
+        ->and($invitation->expires_at->isFuture())->toBeTrue();
+
+    expect(TeamInvitation::findByRawToken($raw)?->id)->toBe($invitation->id);
+    expect(TeamInvitation::findByRawToken('wrong'))->toBeNull();
+});
+
+test('teams default their join link to the editor role', function (): void {
+    $team = User::factory()->withTeam()->create()->currentTeam;
+
+    expect($team->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
+test('team invitation belongs to its inviter', function (): void {
+    $team = User::factory()->withTeam()->create()->currentTeam;
+    $inviter = User::factory()->create();
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'inviter_id' => $inviter->id,
+    ]);
+
+    expect($invitation->inviter_id)->toBe($inviter->id)
+        ->and($invitation->inviter->is($inviter))->toBeTrue();
+});
+
+test('team invitation inviter is nullable', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'inviter_id' => null,
+    ]);
+
+    expect($invitation->inviter_id)->toBeNull()
+        ->and($invitation->inviter)->toBeNull();
+});
+
+test('team invitation token is unique', function (): void {
+    $rawToken = '';
+    TeamInvitation::factory()->withToken($rawToken)->create();
+
+    expect(fn () => TeamInvitation::factory()->create(['token' => hash('sha256', $rawToken)]))
+        ->toThrow(QueryException::class);
 });
 
 test('reserved slugs cover all top-level route segments', function () {

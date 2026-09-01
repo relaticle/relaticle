@@ -11,12 +11,20 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Laravel\Jetstream\TeamInvitation as JetstreamTeamInvitation;
 
+/**
+ * @property ?Carbon $expires_at
+ * @property ?string $token
+ * @property ?string $inviter_id
+ */
 #[Fillable([
     'email',
     'role',
     'expires_at',
+    'inviter_id',
+    'token',
 ])]
 final class TeamInvitation extends JetstreamTeamInvitation
 {
@@ -43,6 +51,31 @@ final class TeamInvitation extends JetstreamTeamInvitation
         $expiresAt = $this->expires_at;
 
         return $expiresAt->isPast();
+    }
+
+    // Stores the hash and a renewed expiry, returns the raw token to mail.
+    // Single source of the token rules shared by the invite and resend paths.
+    public function issueToken(): string
+    {
+        $rawToken = Str::random(40);
+
+        $this->token = hash('sha256', $rawToken);
+        $this->expires_at = now()->addDays((int) config('jetstream.invitation_expiry_days', 7));
+
+        return $rawToken;
+    }
+
+    public static function findByRawToken(string $rawToken): ?self
+    {
+        return self::query()->where('token', hash('sha256', $rawToken))->first();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function inviter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'inviter_id');
     }
 
     /**

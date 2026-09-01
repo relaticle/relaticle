@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\TeamRole;
-use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,10 +30,17 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return $this->redirectToTeam($team, __('teams.join.already_member.title'));
+            return $this->redirectToTeam($team, __('teams.accept.already_member', ['team' => $team->name]));
         }
 
-        return view('teams.join-via-link', ['team' => $team, 'token' => $token]);
+        return view('teams.join-via-link', [
+            'team' => $team,
+            'token' => $token,
+            'user' => $user,
+            'roleName' => TeamRole::label($team->invite_link_default_role),
+            'roleDescription' => TeamRole::description($team->invite_link_default_role),
+            'memberCount' => $team->users()->count() + 1,
+        ]);
     }
 
     public function store(Request $request, string $token, AddsTeamMembers $adder): RedirectResponse|View
@@ -50,7 +57,7 @@ final readonly class JoinTeamViaLinkController
         if ($user->belongsToTeam($team)) {
             $user->switchTeam($team);
 
-            return $this->redirectToTeam($team, __('teams.join.already_member.title'));
+            return $this->redirectToTeam($team, __('teams.accept.already_member', ['team' => $team->name]));
         }
 
         /** @var User $owner */
@@ -60,28 +67,13 @@ final readonly class JoinTeamViaLinkController
             $owner,
             $team,
             $user->email,
-            TeamRole::Editor->value,
+            $team->invite_link_default_role,
         );
 
         $user->unsetRelation('teams');
         $user->switchTeam($team);
 
-        return $this->redirectToTeam(
-            $team,
-            __('teams.join.joined.title'),
-            __('teams.join.joined.body', ['team' => $team->name]),
-        );
-    }
-
-    private function redirectToTeam(Team $team, string $title, ?string $body = null): RedirectResponse
-    {
-        Notification::make()
-            ->title($title)
-            ->body($body)
-            ->success()
-            ->send();
-
-        return redirect()->to(Dashboard::getUrl(['tenant' => $team]));
+        return $this->redirectToTeam($team, __('teams.accept.joined', ['team' => $team->name]));
     }
 
     private function resolveTeam(string $token): Team|View
@@ -101,5 +93,19 @@ final readonly class JoinTeamViaLinkController
         abort_if($user instanceof User && $user->isScheduledForDeletion(), 403, __('You cannot join teams while your account is scheduled for deletion.'));
 
         return $team;
+    }
+
+    // getHomeUrl() resolves through the ambient tenant, not the request user, so
+    // it must be primed when called from outside panel middleware.
+    private function redirectToTeam(Team $team, string $message): RedirectResponse
+    {
+        Filament::setTenant($team, isQuiet: true);
+
+        Notification::make()
+            ->title($message)
+            ->success()
+            ->send();
+
+        return redirect(Filament::getHomeUrl() ?? url()->getAppUrl());
     }
 }

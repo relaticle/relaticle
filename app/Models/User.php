@@ -8,6 +8,7 @@ use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
@@ -331,5 +332,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         }
 
         return Jetstream::findRole($membershipRole)?->key === $role;
+    }
+
+    // Ownership outranks the pivot role, so an owner row carrying a stale
+    // viewer value cannot lock them out of their own workspace.
+    public function isViewerOnTeamId(?string $teamId): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return false;
+        }
+
+        return $this->hasTeamRoleForTeamId($teamId, TeamRole::Viewer->value);
     }
 }

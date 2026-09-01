@@ -8,6 +8,7 @@ use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<TeamInvitation>
@@ -48,5 +49,14 @@ final class TeamInvitationFactory extends Factory
         return $this->state([
             'expires_at' => null,
         ]);
+    }
+
+    public function withToken(string &$rawToken = ''): static
+    {
+        return $this->state(function (array $attributes) use (&$rawToken): array {
+            $rawToken = Str::random(40);
+
+            return ['token' => hash('sha256', $rawToken)];
+        });
     }
 }
