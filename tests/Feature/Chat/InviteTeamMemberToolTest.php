@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Team\CreateTeamInvitation;
 use App\Enums\TeamRole;
 use App\Filament\Pages\Team\Members;
+use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -13,7 +14,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
-use Laravel\Jetstream\Mail\TeamInvitation as TeamInvitationMail;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
@@ -109,7 +109,6 @@ it('keeps the mail transport failure off the card when the invite email cannot b
         ->and($shown)->not->toContain('smtp.internal.test')
         ->and($shown)->not->toContain('postmaster@relaticle');
 
-    // The approve transaction rolls back, so retrying stays safe.
     expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
@@ -134,7 +133,7 @@ it('approving an email that already belongs to a team member surfaces the valida
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
-it('rejects a role outside editor|admin before proposing', function (): void {
+it('rejects a role outside editor|viewer|admin before proposing', function (): void {
     $tool = app(InviteTeamMemberTool::class);
 
     $result = $tool->handle(new Request([
@@ -145,8 +144,37 @@ it('rejects a role outside editor|admin before proposing', function (): void {
 
     $decoded = json_decode($result, true);
 
-    expect($decoded['error'])->toContain('Role must be "editor" or "admin"')
+    expect($decoded['error'])->toContain('Role must be "editor", "viewer", or "admin"')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('proposes a viewer invitation, the role the members form also offers', function (): void {
+    $tool = app(InviteTeamMemberTool::class);
+
+    $result = $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => TeamRole::Viewer->value],
+        ],
+    ]));
+
+    expect(json_decode($result, true))->not->toHaveKey('error');
+
+    expect(pendingActionForTeam($this->user)->action_data['role'])->toBe(TeamRole::Viewer->value);
+});
+
+it('creates a viewer membership when a viewer invitation is approved and accepted', function (): void {
+    $tool = app(InviteTeamMemberTool::class);
+
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => TeamRole::Viewer->value],
+        ],
+    ]));
+
+    resolve(PendingActionService::class)->approve(pendingActionForTeam($this->user), $this->user);
+
+    expect(TeamInvitation::query()->where('email', 'read-only@example.com')->sole()->role)
+        ->toBe(TeamRole::Viewer->value);
 });
 
 it('rejects a batch over the configured max batch size', function (): void {
@@ -177,7 +205,7 @@ it('refuses to propose an invitation for a member who does not own the workspace
         'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
     ]));
 
-    expect($result)->toContain('Only the workspace owner can invite teammates')
+    expect($result)->toContain('Only workspace owners and administrators can invite teammates')
         ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0)
         ->and(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });
@@ -194,13 +222,11 @@ it('never links the non-owner refusal to a page that would 403 for them', functi
         'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
     ]));
 
-    // Members::canAccess() is `can('update', $tenant)`, the exact complement of the
-    // guard above, so every user who reaches this refusal is barred from that page.
     $membersUrl = resolve(DestinationResolver::class)->resolve('team_members', $this->team);
 
     expect(Members::canAccess())->toBeFalse()
-        ->and($result)->toContain('Only the workspace owner can invite teammates')
-        ->and($result)->toContain('ask an owner')
+        ->and($result)->toContain('Only workspace owners and administrators can invite teammates')
+        ->and($result)->toContain('ask one')
         ->and($result)->not->toContain($membersUrl)
         ->and($result)->not->toContain('http');
 });
@@ -242,9 +268,6 @@ it('labels a resolved invitation by its email so the assistant can name it', fun
 
     resolve(PendingActionService::class)->approve($pending->fresh(), $this->user);
 
-    // This is what the next turn re-injects so the assistant can say who it
-    // invited. Without the email fallback in recordLabel() it is null, and the
-    // transcript calls the invitation "the record".
     $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null);
 
     expect($resolved[0]['label'] ?? null)->toBe('alex@example.com');
@@ -291,4 +314,36 @@ it('keeps the mail transport failure off the card on the batch path too', functi
         ->and($shown)->not->toContain('587');
 
     expect(TeamInvitation::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('lets an administrator propose an invitation', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $admin->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Editor->value]],
+    ]));
+
+    expect($result)->not->toContain('Only the workspace owner can invite teammates')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(1);
+});
+
+it('refuses an administrator proposing another administrator', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+    $admin->forceFill(['current_team_id' => $this->team->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->team);
+
+    $result = (new InviteTeamMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => TeamRole::Admin->value]],
+    ]));
+
+    expect($result)->toContain('Only the workspace owner')
+        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
 });

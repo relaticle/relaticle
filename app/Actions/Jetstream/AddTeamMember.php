@@ -13,6 +13,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Laravel\Jetstream\Contracts\AddsTeamMembers;
 use Laravel\Jetstream\Events\AddingTeamMember;
 use Laravel\Jetstream\Events\TeamMemberAdded;
@@ -37,9 +38,15 @@ final readonly class AddTeamMember implements AddsTeamMembers
         event(new AddingTeamMember($team, $newTeamMember));
 
         try {
-            DB::transaction(fn () => $team->users()->attach(
-                $newTeamMember, ['role' => $role]
-            ));
+            DB::transaction(function () use ($team, $newTeamMember, $role, $email): void {
+                $team->users()->attach($newTeamMember, ['role' => $role]);
+
+                // However they got here, any invitation to this team for the same
+                // address is spent; leaving it strands a banner on every page.
+                $team->teamInvitations()
+                    ->whereRaw('lower(email) = ?', [Str::lower($email)])
+                    ->delete();
+            });
         } catch (UniqueConstraintViolationException) {
             // A concurrent request already attached this member and fired the event.
             return;
@@ -86,7 +93,7 @@ final readonly class AddTeamMember implements AddsTeamMembers
             $validator->errors()->addIf(
                 $team->hasUserWithEmail($email),
                 'email',
-                __('This user already belongs to the team.')
+                __('teams.validation.email_already_member')
             );
         };
     }

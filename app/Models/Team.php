@@ -8,6 +8,7 @@ use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Enums\TeamRole;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
@@ -54,6 +55,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property Carbon|null $trial_ends_at
  * @property Carbon|null $pro_trial_used_at
  * @property Carbon|null $hosted_free_grandfathered_at
+ * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way
  */
@@ -64,6 +66,7 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_use_case',
     'onboarding_context',
     'onboarding_referral_source',
+    'invite_link_default_role',
 ])]
 #[Hidden([
     'invite_link_token',
@@ -157,6 +160,15 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     ];
 
     /**
+     * The model's default attribute values.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'invite_link_default_role' => TeamRole::Editor->value,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -195,6 +207,24 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
             'invite_link_token' => Str::random(40),
             'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
         ])->save();
+    }
+
+    /**
+     * Clearing the token is what turns the link off: every lookup matches on the
+     * column, and no request token can equal null, so the link stops resolving
+     * without a second flag that could disagree with it.
+     */
+    public function disableInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => null,
+            'invite_link_token_expires_at' => null,
+        ])->save();
+    }
+
+    public function hasInviteLink(): bool
+    {
+        return $this->invite_link_token !== null;
     }
 
     public function isInviteLinkTokenExpired(): bool

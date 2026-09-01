@@ -59,7 +59,7 @@ it('the join controller returns the expired view when the token is past its expi
     $this->actingAs($joiner)
         ->get(route('teams.join', ['token' => $team->invite_link_token]))
         ->assertOk()
-        ->assertSee('Invite Link Expired')
+        ->assertSee(__('teams.invite_link.expired.heading'))
         ->assertSee('This invite link has expired');
 
     expect($team->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();

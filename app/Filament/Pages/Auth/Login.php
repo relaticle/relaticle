@@ -158,7 +158,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $invitation = $this->getTeamInvitationFromSession();
 
-        if ($invitation && $invitation->email === $email && $user->markEmailAsVerified()) {
+        if ($invitation && ! $invitation->isExpired() && $invitation->email === $email && $user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 

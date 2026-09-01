@@ -1,13 +1,17 @@
 @component('mail::message')
-{{ __('You\'ve been invited to join the :workspace workspace on Relaticle.', ['workspace' => $invitation->team->name]) }}
+@if($inviterName)
+{{ __('teams.mail.invitation.line_with_inviter', ['inviter' => $inviterName, 'team' => $teamName, 'role' => $roleName]) }}
+@else
+{{ __('teams.mail.invitation.line', ['team' => $teamName, 'role' => $roleName]) }}
+@endif
 
 @component('mail::button', ['url' => $acceptUrl])
-{{ __('Accept Invitation') }}
+{{ __('teams.mail.invitation.action') }}
 @endcomponent
 
 @if($invitation->expires_at)
-{{ __('This invitation expires :expiry.', ['expiry' => $invitation->expires_at->diffForHumans()]) }}
+{{ __('teams.mail.invitation.expiry', ['expiry' => $invitation->expires_at->diffForHumans()]) }}
 @endif
 
-{{ __('If you weren\'t expecting this, you can safely ignore this email.') }}
+{{ __('teams.mail.invitation.ignore') }}
 @endcomponent
