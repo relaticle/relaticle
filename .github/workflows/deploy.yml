@@ -37,8 +37,8 @@ jobs:
 
     # A webhook that accepts the connection and then stalls hangs an attempt with no
     # ceiling, so the retry never gets its turn and the job runs until GitHub kills
-    # it at six hours with the release stuck in flight. Five retries at 60 seconds
-    # each plus 15 second delays is a touch over six minutes in the worst case.
+    # it at six hours with the release stuck in flight. --retry 5 means six attempts,
+    # so the worst case is 6 x 60 seconds plus 5 x 15 second delays, or 7m15s.
     timeout-minutes: 10
 
     steps:
