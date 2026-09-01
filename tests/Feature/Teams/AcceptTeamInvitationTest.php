@@ -469,3 +469,41 @@ test('viewing the invitation page does not spend the allowance the join POST nee
 
     expect($this->user->fresh()->belongsToTeam($this->team))->toBeTrue();
 });
+
+test('an invitation carrying an unregistered role joins on the team default instead of dead-ending', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+        'role' => 'legacy-role-that-no-longer-exists',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    $this->actingAs($this->user);
+
+    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
+
+    expect($this->user->fresh()->belongsToTeam($this->team))->toBeTrue()
+        ->and($this->team->fresh()->users()->find($this->user->id)->membership->role)
+        ->toBe($this->team->invite_link_default_role)
+        ->and(TeamInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
+});
+
+test('an invitation carrying no role joins on the team default', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+        'role' => null,
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    $this->actingAs($this->user);
+
+    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
+
+    expect($this->team->fresh()->users()->find($this->user->id)->membership->role)
+        ->toBe($this->team->invite_link_default_role);
+});

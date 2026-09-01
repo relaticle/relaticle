@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Contracts\AddsTeamMembers;
+use Laravel\Jetstream\Jetstream;
 
 /**
  * Joins an already-identity-verified user to the invitation's team and
@@ -56,7 +57,7 @@ final readonly class AcceptTeamInvitation
             }
 
             if (! $user->belongsToTeam($team)) {
-                $this->addMember($user, $team, $locked->role);
+                $this->addMember($user, $team, $this->registeredRole($team, $locked->role));
             }
 
             $locked->delete();
@@ -70,6 +71,17 @@ final readonly class AcceptTeamInvitation
         $user->switchTeam($team);
 
         return $team;
+    }
+
+    // An unregistered or absent role key fails AddTeamMember's validation from
+    // inside the transaction, dead-ending the invitee on a page that never completes.
+    private function registeredRole(Team $team, ?string $role): string
+    {
+        if ($role !== null && Jetstream::findRole($role) !== null) {
+            return $role;
+        }
+
+        return $team->invite_link_default_role;
     }
 
     /**
