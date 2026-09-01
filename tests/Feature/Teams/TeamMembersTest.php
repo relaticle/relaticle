@@ -286,3 +286,32 @@ test('rotating the invite link changes the token', function (): void {
 
     expect($this->team->fresh()->invite_link_token)->not->toBe($originalToken);
 });
+
+test('the members list is searchable by name and by email', function (): void {
+    $needle = User::factory()->create(['name' => 'Zoltan Searchme', 'email' => 'searchme@example.test']);
+    $this->team->users()->attach($needle, ['role' => TeamRole::Editor->value]);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertCanSeeTableRecords([$needle, $this->owner])
+        ->searchTable('Zoltan')
+        ->assertCanSeeTableRecords([$needle])
+        ->assertCanNotSeeTableRecords([$this->owner])
+        ->searchTable('searchme@example.test')
+        ->assertCanSeeTableRecords([$needle])
+        ->assertCanNotSeeTableRecords([$this->owner]);
+});
+
+test('the members list paginates rather than rendering every member at once', function (): void {
+    $members = User::factory()->count(12)->create();
+
+    foreach ($members as $member) {
+        $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+    }
+
+    $page = livewire(TeamMembers::class, ['team' => $this->team])
+        ->instance()
+        ->getTableRecords();
+
+    expect($page)->toHaveCount(10)
+        ->and($page->total())->toBe(13);
+});

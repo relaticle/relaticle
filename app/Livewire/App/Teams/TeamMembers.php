@@ -26,22 +26,12 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\Locked;
 
-/**
- * The workspace's people directory. Inviting lives in InviteTeamMembers and
- * pending invitations in PendingTeamInvitations, three sections down the page,
- * so the roster stays a roster and the actionable sets are not buried inside
- * it. Merging them into one paginated table hid pending invites behind
- * pagination, which is why Twenty and Slack keep them apart too.
- */
 final class TeamMembers extends BaseLivewireComponent implements Tables\Contracts\HasTable
 {
     use Tables\Concerns\InteractsWithTable;
 
-    // table() filters memberships on $this->team->id alone and never consults
-    // Filament::getTenant(), and Membership carries no global scope, so this
-    // property is the only thing keeping the roster inside one workspace.
-    // Livewire's model synth already refuses a client-swapped key; #[Locked] says
-    // so out loud and keeps holding if this ever becomes a plain string id.
+    // table() scopes on $this->team->id alone and Membership carries no global
+    // scope, so this property is what keeps the roster inside one workspace.
     #[Locked]
     public Team $team;
 
@@ -54,7 +44,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
     {
         return $table
             ->query($this->membersQuery(...))
-            ->paginated(false)
+            ->paginated([10, 25, 50, 'all'])
             ->defaultSort('name')
             // Split rather than discrete columns: this is a short roster, and a
             // header row over two fields reads as table chrome around a list.
@@ -71,6 +61,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
                         ->state(fn (User $record): string => Filament::getUserAvatarUrl($record))
                         ->grow(false),
                     Tables\Columns\TextColumn::make('name')
+                        ->searchable(['name', 'email'])
                         ->description(fn (User $record): string => $record->email),
                     // Every other row wears its role on the updateTeamRole button,
                     // which the owner never gets. This keeps their row labelled
@@ -116,10 +107,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
         return User::query()
             ->select('users.*')
-            ->addSelect([
-                'team_role' => $pivot('role'),
-                'joined_at' => $pivot('created_at'),
-            ])
+            ->addSelect(['team_role' => $pivot('role')])
             ->where(function (Builder $query): void {
                 $query
                     ->whereKey($this->team->user_id)
@@ -265,7 +253,7 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
             ->modalDescription(__('teams.modals.leave_team.notice'))
             ->requiresConfirmation()
             // Hidden on the owner row: RemoveTeamMember always rejects the owner,
-            // so showing it could only ever produce an error (defect A8).
+            // so showing it could only ever produce an error.
             ->visible(fn (User $record): bool => ! $this->isOwner($record)
                 && $record->getKey() === $this->authUser()->getKey())
             ->action(function (): void {
