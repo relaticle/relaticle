@@ -49,6 +49,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
@@ -213,6 +214,23 @@ final class AppServiceProvider extends ServiceProvider
 
         $this->configureActivityLog();
         $this->configureBlog();
+        $this->configureDevCommands();
+    }
+
+    /**
+     * Horizon is the queue worker this app actually runs. The default
+     * queue:listen process would compete with it, so it is excluded.
+     */
+    private function configureDevCommands(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        DevCommands::except('queue');
+        DevCommands::artisan('horizon', 'horizon')->purple();
+        DevCommands::artisan('reverb:start --debug', 'reverb')->green();
+        DevCommands::artisan('schedule:work', 'scheduler')->yellow();
     }
 
     /**
