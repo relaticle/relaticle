@@ -33,6 +33,16 @@
                         <x-ri-linkedin-box-fill class="h-5 w-5" />
                     </a>
                 </div>
+
+                <a href="https://www.producthunt.com/products/relaticle?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-relaticle"
+                   target="_blank" rel="noopener noreferrer" class="inline-flex w-fit">
+                    <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1238864&amp;theme=light"
+                         alt="Relaticle - Open-source CRM with approval-gated AI writes | Product Hunt"
+                         width="250" height="54" loading="lazy" class="dark:hidden" />
+                    <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1238864&amp;theme=dark"
+                         alt="Relaticle - Open-source CRM with approval-gated AI writes | Product Hunt"
+                         width="250" height="54" loading="lazy" class="hidden dark:block" />
+                </a>
             </div>
 
             @php($columns = app(\App\Support\MarketingNavigation::class)->footer())
