@@ -13,12 +13,15 @@ use App\Rules\RegistrableEmail;
 use App\Support\EmailAddress;
 use Closure;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
@@ -55,7 +58,18 @@ final readonly class InviteTeamMember implements InvitesTeamMembers
 
         /** @var TeamInvitationModel $invitation */
         $rawToken = $invitation->issueToken();
-        $invitation->save();
+
+        // The unique rule above is a check-then-write, so a concurrent invite to
+        // the same address reaches the constraint instead of the validator. The
+        // transaction makes that a savepoint, so a caller holding one (the chat
+        // approval path) survives the rollback.
+        try {
+            DB::transaction(fn () => $invitation->save());
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'email' => __('teams.validation.email_already_invited'),
+            ])->errorBag('addTeamMember');
+        }
 
         // Queued, and deferred to after the transaction commits. The chat
         // approval path runs this inside PendingActionService::approve()'s

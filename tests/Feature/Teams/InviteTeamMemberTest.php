@@ -17,6 +17,7 @@ use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 mutates(User::class, InviteTeamMember::class, CreateTeamInvitation::class);
@@ -362,4 +363,29 @@ test('invitation email accept URL resolves to the token route and carries the ra
             && $resolved->is($invitation)
             && str_contains($mail->render(), $expectedUrl);
     });
+});
+
+test('an invite that loses a race to an identical concurrent invite reports it as already invited', function (): void {
+    $email = 'raced@example.com';
+
+    TeamInvitation::creating(function (TeamInvitation $invitation) use ($email): void {
+        DB::table('team_invitations')->insert([
+            'id' => (string) Str::ulid(),
+            'team_id' => $invitation->team_id,
+            'inviter_id' => $invitation->inviter_id,
+            'email' => $email,
+            'role' => TeamRole::Editor->value,
+            'token' => hash('sha256', Str::random(40)),
+            'expires_at' => now()->addDays(7),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    expect(fn (): TeamInvitation => resolve(InviteTeamMember::class)
+        ->invite($this->user, $this->team, $email, TeamRole::Editor->value))
+        ->toThrow(
+            ValidationException::class,
+            __('teams.validation.email_already_invited'),
+        );
 });
