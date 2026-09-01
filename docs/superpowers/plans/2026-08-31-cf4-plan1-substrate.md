@@ -1462,5 +1462,5 @@ it('migrates remaining values for a field that already has a definition', functi
 ## Plan self-review notes
 
 - Spec coverage, sections 1 and 2: definitions (T2, T4), ledger (T3), write path and contract (T6, T7), actor (T5), read path (T8), table surfaces + filter-bug death (T9), validation wall (T10), deletion semantics (T11), migration (T12). Spec 1.2 index enforcement carries the documented refinement (advisory-lock strategy) at the top of this plan.
-- Deliberately out of Plan 1: definitions management UI, creation modal, flavor registry (Plan 2); housekeeping majors, lookup_type column drop (Plan 3, after the command in T12 has migrated data); Relaticle bindings, timeline listener, GetRelatedRecordsTool, path-repo wiring (Plan 4).
+- Deliberately out of Plan 1: substrate-independent housekeeping runs BEFORE this plan (Plan 0); definitions management UI, creation modal, flavor registry (Plan 2); lookup_type retirement and the reflection-helper deletion (Plan 3, after T12 has migrated data and Plan 2 has replaced FieldForm's record path); Relaticle bindings, timeline listener, GetRelatedRecordsTool, path-repo wiring (Plan 4).
 - Executor instruction: when reality contradicts a code sketch here (property names, fixture classes), the codebase wins; verify with a search before renaming anything in tests.

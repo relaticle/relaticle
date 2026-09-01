@@ -1,0 +1,29 @@
+# Custom Fields 4.0, Plan 3: lookup_type Retirement
+
+> **For agentic workers:** REQUIRED SUB-SKILL: sdd-lean, task-by-task. Runs on the `4.x` branch AFTER Plan 1 (substrate, including the record-links migration step) and Plan 2 (UI, which replaces the record path of FieldForm with the relationship creation flow). The substrate-independent housekeeping lives in Plan 0 and ran first. Every task ends with the package quality gate.
+
+**Goal:** Remove the last traces of the old record storage: the `lookup_type` column, the settings keys it implied, and the code that only existed to serve json-array links.
+
+**Ordering constraints (why this plan is last on the package side):**
+- The column can only drop after `MigrateRecordLinksStep` (Plan 1, Task 12) has a definition for every record field; the step itself reads `lookup_type` to build them.
+- The reflection helper dies here, not in Plan 0: its two callers (`RecordFilter`, `RecordSelectInputComponent`) are rewritten by Plan 1 Task 9 first.
+- `FieldForm`'s record configuration is replaced by Plan 2's creation flow; this plan deletes what remains.
+
+### Task 1: Sweep every lookup_type consumer onto definitions
+
+- The 18 referencing files (models `CustomField`/`CustomFieldSection`, `FieldSchema`, `RecordFilter`, `RecordColumn`, `RecordEntry`, `RecordSelectComponent`, `MultiChoiceEntry`, `ImportColumnConfigurator`, `ConfiguresBadgeColors`, `FieldForm`, `LookupResolver`, `LookupCache`, `LookupAttributeResolver`, `LookupPreloader`, `BackendVisibilityService`, upgrade steps) read the target entity type from the field's relationship definition instead.
+- `requiresLookupType()` on `FieldSchema` becomes definition-driven.
+- Verify: full suite; grep proves the only remaining `lookup_type` reads live inside `MigrateRecordLinksStep` (which translates the legacy column) and the drop migration.
+
+### Task 2: Drop the column, collapse the settings
+
+- New publishable migration dropping `lookup_type` from custom_fields. Gate: `ValidateSchemaStep` fails while record-type values still live in json_value.
+- `allow_multiple`/`max_values` are ignored for type record (cardinality owns this since Plan 1); remove their record-field surfaces from settings handling and the management form.
+- Rename config key `selects.record_lookup` to match the record vocabulary.
+- Verify: full suite; upgrade guide section updated with the column drop and the settings collapse.
+
+### Task 3: Delete the reflection helper
+
+- `Utils::invokeMethodByReflection` (`src/Support/Utils.php:65`) called Filament's private `applyGlobalSearchAttributeConstraints`; Plan 1 Task 9 rewrote both callers onto link queries.
+- Confirm no caller survives, delete the helper. If any caller remains, replace with a public Filament API and fail loudly on absence.
+- Verify: grep for `invokeMethodByReflection` returns nothing; record filter/search browser paths pass.

@@ -230,8 +230,10 @@ Inferred edges, confidence scoring, graph visualization, multi-hop UI. Gated on 
 4. UI flavor registry config surface.
 5. PHP and Filament floor raised to current versions; legacy shims dropped where they block it.
    MySQL-family support continues with the documented enforcement caveat.
-6. Itemized small-break sweep: produced by the 2026-09-01 architecture review, lives in
-   plan 3 (2026-09-01-cf4-plan3-housekeeping.md).
+6. Itemized small-break sweep: produced by the 2026-09-01 architecture review. Substrate-
+   independent items run first (2026-09-01-cf4-plan0-pre-substrate-housekeeping.md);
+   substrate-dependent retirement runs last on the package side
+   (2026-09-01-cf4-plan3-lookup-type-retirement.md).
 
 ### 5.2 Licensing
 
