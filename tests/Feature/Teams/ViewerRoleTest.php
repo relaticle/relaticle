@@ -10,6 +10,8 @@ use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
@@ -139,4 +141,18 @@ test('viewer is not offered write actions on the task board', function (): void 
         ->assertActionHidden('edit')
         ->assertActionHidden('delete')
         ->assertActionHidden('create');
+});
+
+test('viewer is read-only through an MCP tool too', function (): void {
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(CreateCompanyTool::class, ['name' => 'Blocked Co'])
+        ->assertHasErrors();
+
+    expect(Company::query()->where('name', 'Blocked Co')->exists())->toBeFalse();
+});
+
+test('editor is not blocked through the same MCP tool', function (): void {
+    RelaticleServer::actingAs($this->editor)
+        ->tool(CreateCompanyTool::class, ['name' => 'Allowed Co'])
+        ->assertOk();
 });
