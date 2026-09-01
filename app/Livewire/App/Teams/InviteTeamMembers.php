@@ -13,9 +13,10 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use Filament\Infolists\Components\TextEntry;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -35,95 +36,121 @@ final class InviteTeamMembers extends BaseLivewireComponent
 
     private const int INVITE_WINDOW_SECONDS = 60;
 
-    /** @var array<string, mixed>|null */
-    public ?array $data = [];
-
     #[Locked]
     public Team $team;
 
     public function mount(Team $team): void
     {
         $this->team = $team;
-
-        $this->form->fill(['role' => TeamRole::Editor->value]);
     }
 
     public function form(Schema $schema): Schema
     {
-        return $schema
-            ->statePath('data')
-            ->schema([
-                Section::make(__('teams.sections.add_team_member.title'))
-                    ->aside()
-                    ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
-                    ->description(__('teams.sections.add_team_member.description'))
-                    ->schema([
-                        Textarea::make('emails')
-                            ->label(__('teams.form.emails.label'))
-                            ->placeholder(__('teams.form.emails.placeholder'))
-                            ->helperText(__('teams.form.emails.helper'))
-                            ->rows(3)
-                            ->required()
-                            ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                                $emails = $this->parseEmails(is_string($value) ? $value : '');
-
-                                if ($emails === []) {
-                                    $fail(__('teams.validation.no_valid_emails'));
-
-                                    return;
-                                }
-
-                                if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
-                                    $fail(__('teams.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
-                                }
-                            }),
-                        Select::make('role')
-                            ->label(__('teams.form.invite_as.label'))
-                            ->options(fn (): array => $this->assignableRoles())
-                            ->in(fn (): array => array_keys($this->assignableRoles()))
-                            ->default(TeamRole::Editor->value)
-                            ->selectablePlaceholder(false)
-                            ->required(),
-                        Actions::make([
-                            Action::make('invitePeople')
-                                ->label(__('teams.actions.send_invitations'))
-                                ->action(fn () => $this->invitePeople()),
-                            $this->manageInviteLinkAction(),
-                        ])->alignEnd(),
+        return $schema->schema([
+            Section::make(__('teams.sections.add_team_member.title'))
+                ->aside()
+                ->visible(fn (): bool => Gate::check('addTeamMember', $this->team))
+                ->description(__('teams.sections.add_team_member.description'))
+                ->schema([
+                    Actions::make([
+                        $this->invitePeopleAction(),
+                        $this->manageInviteLinkAction(),
                     ]),
-            ]);
+                ]),
+        ]);
     }
 
-    // A plain method, not a schema action closure: actions nested in a form
-    // schema are not addressable by name from outside it.
-    public function invitePeople(): void
+    // The addresses and the role live in the modal rather than on the page: the
+    // page is a roster, and the form only has anything to say while inviting.
+    public function invitePeopleAction(): Action
     {
-        $data = $this->form->getState();
+        return Action::make('invitePeople')
+            ->label(__('teams.actions.invite_people'))
+            ->icon('heroicon-m-user-plus')
+            ->button()
+            ->modalHeading(__('teams.actions.invite_people'))
+            ->modalWidth('lg')
+            ->modalSubmitActionLabel(__('teams.actions.send_invitations'))
+            ->schema([
+                Textarea::make('emails')
+                    ->label(__('teams.form.emails.label'))
+                    ->placeholder(__('teams.form.emails.placeholder'))
+                    ->helperText(__('teams.form.emails.helper'))
+                    ->rows(3)
+                    ->autofocus()
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        $emails = $this->parseEmails(is_string($value) ? $value : '');
 
-        $this->sendInvitations(
-            $this->parseEmails((string) $data['emails']),
-            (string) $data['role'],
-        );
+                        if ($emails === []) {
+                            $fail(__('teams.validation.no_valid_emails'));
+
+                            return;
+                        }
+
+                        if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
+                            $fail(__('teams.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
+                        }
+                    }),
+                Select::make('role')
+                    ->label(__('teams.form.invite_as.label'))
+                    ->options(fn (): array => $this->assignableRoles())
+                    ->in(fn (): array => array_keys($this->assignableRoles()))
+                    ->default(TeamRole::Editor->value)
+                    ->selectablePlaceholder(false)
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                $this->sendInvitations(
+                    $this->parseEmails((string) $data['emails']),
+                    (string) $data['role'],
+                );
+            });
     }
 
-    // The role saves on selection, so the modal dismisses rather than submits.
     public function manageInviteLinkAction(): Action
     {
         return Action::make('manageInviteLink')
             ->label(__('teams.actions.invite_link'))
             ->icon('heroicon-m-link')
             ->color('gray')
-            ->link()
+            ->button()
+            ->outlined()
             ->modalHeading(__('teams.invite_link.heading'))
+            ->modalDescription(__('teams.invite_link.description'))
+            ->modalIcon('heroicon-o-link')
             ->modalWidth('lg')
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('teams.actions.close'))
+            // No footer confirm: every control in here saves on use, so the only
+            // way out is the close icon.
+            ->modalCancelAction(false)
+            ->fillForm(fn (): array => [
+                'invite_link_default_role' => $this->team->invite_link_default_role,
+                'invite_link_url' => $this->inviteLinkUrl(),
+            ])
             ->schema([
+                // Read-only rather than an entry: an input with a copy button is
+                // the shape people already know a shareable link by.
+                TextInput::make('invite_link_url')
+                    ->label(__('teams.invite_link.url'))
+                    ->readOnly()
+                    ->dehydrated(false)
+                    ->visible(fn (): bool => $this->team->hasInviteLink())
+                    ->prefixIcon('heroicon-m-link')
+                    // Selecting on focus makes a manual copy one keystroke, but
+                    // the caret lands at the tail and scrolls the host out of
+                    // view, so the field is wound back to the start.
+                    ->extraInputAttributes([
+                        'class' => 'font-mono text-sm',
+                        'onfocus' => 'this.select(); this.scrollLeft = 0',
+                    ])
+                    ->copyable(copyMessage: __('teams.invite_link.copied')),
                 Select::make('invite_link_default_role')
                     ->label(__('teams.invite_link.default_role'))
+                    ->helperText(__('teams.invite_link.default_role_helper'))
+                    ->visible(fn (): bool => $this->team->hasInviteLink())
                     ->options(fn (): array => $this->inviteLinkRoles())
                     ->in(fn (): array => array_keys($this->inviteLinkRoles()))
-                    ->default(fn (): string => $this->team->invite_link_default_role)
                     ->selectablePlaceholder(false)
                     ->required()
                     ->live()
@@ -138,23 +165,96 @@ final class InviteTeamMembers extends BaseLivewireComponent
                             'role' => $this->assignableRoles()[$state] ?? $state,
                         ]));
                     }),
-                TextEntry::make('url')
-                    ->label(__('teams.invite_link.url'))
-                    ->state(fn (): string => route('teams.join', ['token' => $this->team->invite_link_token]))
-                    ->copyable(),
+                Text::make(__('teams.invite_link.disabled_notice'))
+                    ->visible(fn (): bool => ! $this->team->hasInviteLink()),
             ])
             ->extraModalFooterActions([
-                Action::make('rotateInviteLink')
-                    ->label(__('teams.actions.rotate_invite_link'))
-                    ->color('danger')
-                    ->link()
-                    ->requiresConfirmation()
-                    ->action(function (): void {
-                        resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->team);
-
-                        $this->sendNotification(__('teams.notifications.invite_link_rotated.success'));
-                    }),
+                $this->enableInviteLinkAction(),
+                $this->rotateInviteLinkAction(),
+                $this->disableInviteLinkAction(),
             ]);
+    }
+
+    // Rotation invalidates a link that may already be circulating, so the modal
+    // says what breaks before it happens, not after.
+    private function rotateInviteLinkAction(): Action
+    {
+        return Action::make('rotateInviteLink')
+            ->label(__('teams.actions.rotate_invite_link'))
+            ->icon('heroicon-m-arrow-path')
+            ->color('gray')
+            ->link()
+            ->visible(fn (): bool => $this->team->hasInviteLink())
+            ->requiresConfirmation()
+            ->modalIcon('heroicon-o-exclamation-triangle')
+            ->modalHeading(__('teams.modals.rotate_invite_link.heading'))
+            ->modalDescription(__('teams.modals.rotate_invite_link.notice'))
+            ->modalSubmitActionLabel(__('teams.actions.rotate_invite_link'))
+            ->action(function (): void {
+                resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->team);
+
+                $this->sendNotification(__('teams.notifications.invite_link_rotated.success'));
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    private function disableInviteLinkAction(): Action
+    {
+        return Action::make('disableInviteLink')
+            ->label(__('teams.actions.disable_invite_link'))
+            ->icon('heroicon-m-no-symbol')
+            ->color('danger')
+            ->link()
+            ->visible(fn (): bool => $this->team->hasInviteLink())
+            ->requiresConfirmation()
+            ->modalIcon('heroicon-o-no-symbol')
+            ->modalHeading(__('teams.modals.disable_invite_link.heading'))
+            ->modalDescription(__('teams.modals.disable_invite_link.notice'))
+            ->modalSubmitActionLabel(__('teams.actions.disable_invite_link'))
+            ->action(function (): void {
+                resolve(UpdateInviteLinkSettings::class)->disable($this->authUser(), $this->team);
+
+                $this->sendNotification(__('teams.notifications.invite_link_disabled.success'));
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    // Turning the link back on mints a fresh token, so a link disabled after a
+    // leak cannot be revived by re-enabling it.
+    private function enableInviteLinkAction(): Action
+    {
+        return Action::make('enableInviteLink')
+            ->label(__('teams.actions.enable_invite_link'))
+            ->icon('heroicon-m-link')
+            ->button()
+            ->visible(fn (): bool => ! $this->team->hasInviteLink())
+            ->action(function (): void {
+                resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->team);
+
+                $this->sendNotification(__('teams.notifications.invite_link_enabled.success'));
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    /**
+     * The modal's fields are filled once at mount, so a token minted or cleared
+     * by a footer action would leave a stale URL on screen. Remounting refills
+     * the form against the team as it now stands.
+     */
+    private function remountInviteLinkModal(): void
+    {
+        $this->team->refresh();
+
+        $this->replaceMountedAction('manageInviteLink');
+    }
+
+    private function inviteLinkUrl(): ?string
+    {
+        if (! $this->team->hasInviteLink()) {
+            return null;
+        }
+
+        return route('teams.join', ['token' => $this->team->invite_link_token]);
     }
 
     public function render(): View
@@ -220,7 +320,6 @@ final class InviteTeamMembers extends BaseLivewireComponent
 
         if ($sent > 0) {
             $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
-            $this->form->fill(['role' => $role]);
             $this->dispatch('teamInvitationSent');
         }
 

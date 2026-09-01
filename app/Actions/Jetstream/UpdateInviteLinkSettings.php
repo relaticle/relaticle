@@ -35,4 +35,11 @@ final readonly class UpdateInviteLinkSettings
 
         $team->rotateInviteLink();
     }
+
+    public function disable(User $user, Team $team): void
+    {
+        Gate::forUser($user)->authorize('addTeamMember', $team);
+
+        $team->disableInviteLink();
+    }
 }

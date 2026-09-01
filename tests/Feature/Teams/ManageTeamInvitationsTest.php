@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Console\Commands\CleanupExpiredInvitationsCommand;
-use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Livewire\App\Teams\TeamMembers;
 use App\Mail\TeamInvitationMail;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -48,7 +48,7 @@ test('pending invitations table shows invitations', function () {
         'email' => 'pending@example.com',
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
+    livewire(TeamMembers::class, ['team' => $user->currentTeam])
         ->assertSee('pending@example.com');
 });
 
@@ -97,7 +97,7 @@ test('team owner can revoke a pending invitation', function () {
         'team_id' => $user->currentTeam->id,
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
+    livewire(TeamMembers::class, ['team' => $user->currentTeam])
         ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_revoked.success'));
 
@@ -115,7 +115,7 @@ test('old cancel action name is gone', function () {
         'team_id' => $user->currentTeam->id,
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $user->currentTeam])
+    livewire(TeamMembers::class, ['team' => $user->currentTeam])
         ->assertActionDoesNotExist(TestAction::make('cancelTeamInvitation')->table($invitation->id));
 });
 
@@ -133,7 +133,7 @@ test('resending re-issues the token and extends expiry', function (): void {
 
     expect($invitation->token)->toBeNull();
 
-    livewire(PendingTeamInvitations::class, ['team' => $team])
+    livewire(TeamMembers::class, ['team' => $team])
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id));
 
     $invitation->refresh();
@@ -154,7 +154,7 @@ test('resending delivers the new invitation mailable with a working raw token', 
         'expires_at' => now()->addDay(),
     ]);
 
-    livewire(PendingTeamInvitations::class, ['team' => $team])
+    livewire(TeamMembers::class, ['team' => $team])
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id));
 
     $invitation->refresh();

@@ -209,6 +209,24 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         ])->save();
     }
 
+    /**
+     * Clearing the token is what turns the link off: every lookup matches on the
+     * column, and no request token can equal null, so the link stops resolving
+     * without a second flag that could disagree with it.
+     */
+    public function disableInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => null,
+            'invite_link_token_expires_at' => null,
+        ])->save();
+    }
+
+    public function hasInviteLink(): bool
+    {
+        return $this->invite_link_token !== null;
+    }
+
     public function isInviteLinkTokenExpired(): bool
     {
         if ($this->invite_link_token_expires_at === null) {

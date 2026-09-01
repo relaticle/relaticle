@@ -6,7 +6,6 @@ namespace App\Filament\Pages\Team;
 
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Livewire\App\Teams\InviteTeamMembers;
-use App\Livewire\App\Teams\PendingTeamInvitations;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Models\Team;
 use BackedEnum;
@@ -66,8 +65,6 @@ final class Members extends Page
 
         return $schema->components([
             Livewire::make(InviteTeamMembers::class)
-                ->data(['team' => $tenant]),
-            Livewire::make(PendingTeamInvitations::class)
                 ->data(['team' => $tenant]),
             Livewire::make(TeamMembers::class)
                 ->data(['team' => $tenant]),

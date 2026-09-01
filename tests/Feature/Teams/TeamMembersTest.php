@@ -32,7 +32,7 @@ test('the owner appears in the members list even though they have no pivot row',
         ->assertSee(__('teams.roles.owner.label'));
 });
 
-test('pending invitations are not listed in the members table', function (): void {
+test('a pending invitation shares the roster with the joined members', function (): void {
     $this->team->teamInvitations()->create([
         'email' => 'pending@example.test',
         'role' => 'editor',
@@ -40,7 +40,9 @@ test('pending invitations are not listed in the members table', function (): voi
     ]);
 
     livewire(TeamMembers::class, ['team' => $this->team])
-        ->assertDontSee('pending@example.test');
+        ->assertSee('pending@example.test')
+        ->assertSee(__('teams.table.invite_pending'))
+        ->assertSee($this->owner->email);
 });
 
 test('the owner row offers no leave action', function (): void {
@@ -115,11 +117,10 @@ test('multiple people can be invited in one submission', function (): void {
     Mail::fake();
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm([
+        ->callAction('invitePeople', [
             'emails' => "one@example.test\ntwo@example.test",
             'role' => TeamRole::Editor->value,
-        ])
-        ->call('invitePeople');
+        ]);
 
     expect($this->team->fresh()->teamInvitations->pluck('email')->all())
         ->toEqualCanonicalizing(['one@example.test', 'two@example.test']);
@@ -131,11 +132,10 @@ test('invitePeople rejects an admin role for a non-owner actor', function (): vo
     $this->actingAs($admin);
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm([
+        ->callAction('invitePeople', [
             'emails' => 'nope@example.test',
             'role' => TeamRole::Admin->value,
         ])
-        ->call('invitePeople')
         ->assertHasActionErrors();
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
@@ -166,9 +166,8 @@ test('a crafted payload above the batch cap is rejected server-side', function (
     $emails = collect(range(1, 11))->map(fn (int $i): string => "batch{$i}@example.test")->implode("\n");
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm(['emails' => $emails, 'role' => TeamRole::Editor->value])
-        ->call('invitePeople')
-        ->assertHasErrors('data.emails');
+        ->callAction('invitePeople', ['emails' => $emails, 'role' => TeamRole::Editor->value])
+        ->assertHasActionErrors(['emails']);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(0);
 });
@@ -179,9 +178,8 @@ test('a submission exactly at the batch cap succeeds', function (): void {
     $emails = collect(range(1, 10))->map(fn (int $i): string => "atcap{$i}@example.test")->implode("\n");
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm(['emails' => $emails, 'role' => TeamRole::Editor->value])
-        ->call('invitePeople')
-        ->assertHasNoErrors();
+        ->callAction('invitePeople', ['emails' => $emails, 'role' => TeamRole::Editor->value])
+        ->assertHasNoActionErrors();
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(10);
 });
@@ -193,21 +191,18 @@ test('cumulative invite volume beyond the window cap is throttled, not just the 
     $secondBatch = collect(range(1, 10))->map(fn (int $i): string => "second{$i}@example.test")->implode("\n");
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm(['emails' => $firstBatch, 'role' => TeamRole::Editor->value])
-        ->call('invitePeople');
+        ->callAction('invitePeople', ['emails' => $firstBatch, 'role' => TeamRole::Editor->value]);
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm(['emails' => $secondBatch, 'role' => TeamRole::Editor->value])
-        ->call('invitePeople');
+        ->callAction('invitePeople', ['emails' => $secondBatch, 'role' => TeamRole::Editor->value]);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
 
     livewire(InviteTeamMembers::class, ['team' => $this->team])
-        ->fillForm([
+        ->callAction('invitePeople', [
             'emails' => 'onemore@example.test',
             'role' => TeamRole::Editor->value,
-        ])
-        ->call('invitePeople');
+        ]);
 
     expect($this->team->fresh()->teamInvitations)->toHaveCount(20);
 });
@@ -277,6 +272,48 @@ test('rotating the invite link changes the token', function (): void {
     expect($this->team->fresh()->invite_link_token)->not->toBe($originalToken);
 });
 
+test('turning the workspace link off clears the token', function (): void {
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->callAction([
+            TestAction::make('manageInviteLink'),
+            TestAction::make('disableInviteLink'),
+        ]);
+
+    expect($this->team->fresh()->invite_link_token)->toBeNull()
+        ->and($this->team->fresh()->invite_link_token_expires_at)->toBeNull();
+});
+
+test('turning the link back on issues a different token, never the disabled one', function (): void {
+    $originalToken = $this->team->invite_link_token;
+
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->callAction([
+            TestAction::make('manageInviteLink'),
+            TestAction::make('disableInviteLink'),
+        ]);
+
+    livewire(InviteTeamMembers::class, ['team' => $this->team->fresh()])
+        ->callAction([
+            TestAction::make('manageInviteLink'),
+            TestAction::make('enableInviteLink'),
+        ]);
+
+    expect($this->team->fresh()->invite_link_token)
+        ->toBeString()
+        ->toHaveLength(40)
+        ->not->toBe($originalToken);
+});
+
+test('a workspace with the link off offers no rotate or disable action', function (): void {
+    $this->team->disableInviteLink();
+
+    livewire(InviteTeamMembers::class, ['team' => $this->team->fresh()])
+        ->mountAction('manageInviteLink')
+        ->assertActionHidden('rotateInviteLink')
+        ->assertActionHidden('disableInviteLink')
+        ->assertActionVisible('enableInviteLink');
+});
+
 test('the members list is searchable by name and by email', function (): void {
     $needle = User::factory()->create(['name' => 'Zoltan Searchme', 'email' => 'searchme@example.test']);
     $this->team->users()->attach($needle, ['role' => TeamRole::Editor->value]);
@@ -289,6 +326,26 @@ test('the members list is searchable by name and by email', function (): void {
         ->searchTable('searchme@example.test')
         ->assertCanSeeTableRecords([$needle])
         ->assertCanNotSeeTableRecords([$this->owner]);
+});
+
+test('a search term containing SQL wildcards is matched literally', function (): void {
+    $literal = User::factory()->create(['name' => 'Ann_Lee', 'email' => 'ann-underscore@example.test']);
+    $decoy = User::factory()->create(['name' => 'AnnXLee', 'email' => 'ann-decoy@example.test']);
+
+    $this->team->users()->attach($literal, ['role' => TeamRole::Editor->value]);
+    $this->team->users()->attach($decoy, ['role' => TeamRole::Editor->value]);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->searchTable('Ann_Lee')
+        ->assertCanSeeTableRecords([$literal])
+        ->assertCanNotSeeTableRecords([$decoy]);
+});
+
+test('a search that matches nobody explains itself instead of showing a blank table', function (): void {
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->searchTable('nobody-by-that-name')
+        ->assertSee(__('teams.table.no_results.heading'))
+        ->assertDontSee($this->owner->email);
 });
 
 test('the members list paginates rather than rendering every member at once', function (): void {

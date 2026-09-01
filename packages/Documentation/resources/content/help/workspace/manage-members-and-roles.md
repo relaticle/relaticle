@@ -8,9 +8,9 @@ related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete
 
 Membership is managed on **Workspace Settings**. Click your workspace name
 at the top of the sidebar to reach it, then click the **Members** tab.
-Invitations, roles, and removals all live there, in three sections: **Invite
-people** to send invites, **Pending invitations** for people who have not
-joined yet, and **Members** for everyone who has.
+Invitations, roles, and removals all live there. **Invite people** sends the
+invites. **Members** below it lists everyone with access, whether they have
+joined or not.
 
 ## A recent change to Administrator access
 
@@ -39,27 +39,45 @@ be removed.
 
 ## Invitations
 
-The **Invite people** section sends up to 10 invites at once. Paste the
-email addresses separated by a comma, a space, or a new line, then pick the
-role they all join with. Until an invitation is accepted it sits in
-**Pending invitations** with the role and how long it has left, where you
-can:
+Click **Invite team members** to send up to 10 invites at once. Paste the
+email addresses separated by a comma, a space, or a new line, pick the role
+they all join with, then send.
+
+An invited person joins the **Members** list straight away, above everyone
+who has accepted, marked **Invite pending** with the role they will get and
+how long the invite has left. Its actions menu offers:
 
 - **Resend** the email.
 - **Revoke** the invitation.
 
-![The Pending invitations list showing an invited email with its role, expiry, and Resend and Revoke actions](/help-assets/workspace/manage-members-and-roles-1.png)
+An invite lasts 7 days. After that the row reads **Invite expired**, and
+**Resend** issues a fresh one.
 
-There's also a workspace **join link**, managed from **Invite link** next to
-**Send invitations**: copy it to share directly, generate a new one if it
-leaks, and set the role people get when they join with it, Editor by
-default. The link stays valid for 7 days. It can grant Editor or Viewer.
-Administrators are invited by email, so the person is always named.
+![The Members list showing an invited email marked Invite pending above the people who have joined](/help-assets/workspace/manage-members-and-roles-1.png)
+
+## The workspace link
+
+**Invite link**, next to **Invite team members**, holds a single link anyone
+can join with. Copy it to share directly, and set the role people get when
+they join with it, Editor by default. The role saves as soon as you pick it.
+The link lasts 7 days and can grant Editor or Viewer. Administrators are
+invited by email, so the person is always named.
+
+Two controls sit under it:
+
+- **Generate a new link** replaces the link if the current one leaked. The
+  old one stops working right away.
+- **Turn off the link** removes it entirely, leaving email invitations as
+  the only way in. Turning it back on issues a different link, so the one
+  you turned off stays dead.
 
 ## Changing and removing members
 
-In the **Members** list, each person's current role is the button next to
-their name. Click it to switch them between Administrator, Editor, and
-Viewer. **Remove** takes a member out of the workspace: their records stay,
-they lose access. Any member but the owner can **Leave** the workspace
-themselves; the owner has no **Leave** action.
+Each person's role sits next to their name, and the actions menu at the end
+of the row changes it. **Change role** switches them between Administrator,
+Editor, and Viewer. **Remove** takes a member out of the workspace: their
+records stay, they lose access. Any member but the owner can **Leave** the
+workspace themselves; the owner has no **Leave** action.
+
+The list is searchable by name or email address, so a long roster stays
+workable.

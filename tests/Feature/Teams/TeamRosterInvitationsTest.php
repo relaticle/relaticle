@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TeamRole;
-use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Livewire\App\Teams\TeamMembers;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -12,7 +12,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Mail;
 
-mutates(PendingTeamInvitations::class);
+mutates(TeamMembers::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -36,20 +36,20 @@ function pendingInvitation(Team $team, string $email = 'pending@example.test', ?
 test('a pending invitation is listed', function (): void {
     pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->assertSee('pending@example.test');
 });
 
-test('the card renders nothing when there are no pending invitations', function (): void {
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertDontSee(__('teams.sections.pending_team_invitations.title'));
+test('the roster carries no invite badge when nobody is invited', function (): void {
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertDontSee(__('teams.table.invite_pending'));
 });
 
-test('the card appears once an invitation exists', function (): void {
+test('an invitation row is badged as pending', function (): void {
     pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertSee(__('teams.sections.pending_team_invitations.title'));
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertSee(__('teams.table.invite_pending'));
 });
 
 test('an invitation row shows its expiry', function (): void {
@@ -57,25 +57,36 @@ test('an invitation row shows its expiry', function (): void {
 
     $invitation = pendingInvitation($this->team, expiresAt: now()->addDays(3));
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet(
-            'expires_at',
-            __('teams.table.expires_in', ['time' => $invitation->expires_at->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE)]),
-            $invitation->id,
-        );
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertSee(__('teams.table.expires_in', [
+            'time' => $invitation->expires_at->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE),
+        ]));
 });
 
-test('an already-expired invitation shows an expired label, not a raw past date', function (): void {
-    $invitation = pendingInvitation($this->team, 'expired@example.test', now()->subDay());
+test('an already-expired invitation is badged as expired, not shown as a raw past date', function (): void {
+    pendingInvitation($this->team, 'expired@example.test', now()->subDay());
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
-        ->assertTableColumnFormattedStateSet('expires_at', __('teams.table.expired'), $invitation->id);
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertSee(__('teams.table.invite_expired'))
+        ->assertDontSee(__('teams.table.invite_pending'));
+});
+
+test('an expired invitation dates the lapse rather than promising a future expiry', function (): void {
+    $this->travelTo(now());
+
+    $invitation = pendingInvitation($this->team, 'expired@example.test', now()->subDays(3));
+
+    $elapsed = $invitation->expires_at->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE);
+
+    livewire(TeamMembers::class, ['team' => $this->team])
+        ->assertSee(__('teams.table.expired_ago', ['time' => $elapsed]))
+        ->assertDontSee(__('teams.table.expires_in', ['time' => $elapsed]));
 });
 
 test('a pending invitation can be revoked', function (): void {
     $invitation = pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('revokeTeamInvitation')->table($invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_revoked.success'));
 
@@ -87,11 +98,11 @@ test('resending the same invitation twice inside the window is throttled', funct
 
     $invitation = pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id))
         ->assertNotified(__('teams.notifications.team_invitation_sent.success'));
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->callAction(TestAction::make('resendTeamInvitation')->table($invitation->id));
 
     Mail::assertQueuedCount(1);
@@ -100,7 +111,7 @@ test('resending the same invitation twice inside the window is throttled', funct
 test('no per-invitation copy link action is offered', function (): void {
     $invitation = pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->assertActionDoesNotExist(TestAction::make('copyInviteLink')->table($invitation->id));
 });
 
@@ -111,7 +122,7 @@ test('a viewer cannot resend or revoke an invitation', function (): void {
 
     $invitation = pendingInvitation($this->team);
 
-    livewire(PendingTeamInvitations::class, ['team' => $this->team])
+    livewire(TeamMembers::class, ['team' => $this->team])
         ->assertTableActionHidden('resendTeamInvitation', $invitation->id)
         ->assertTableActionHidden('revokeTeamInvitation', $invitation->id);
 });
