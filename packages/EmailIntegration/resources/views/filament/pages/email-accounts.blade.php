@@ -10,22 +10,15 @@
 
     <x-filament::section
         :heading="__('filament/pages/email-accounts.sections.connected.heading')"
-        :description="new \Illuminate\Support\HtmlString(__('filament/pages/email-accounts.sections.connected.description', ['url' => route('policy.show')]))"
+        :description="$this->connectedSectionDescription()"
     >
         <div
             class="space-y-3"
-            @if ($this->connectedAccounts->contains(fn ($account): bool => $account->isImportingHistory()))
+            @if ($this->isImportingAnyAccount())
                 wire:poll.5s="refreshAccounts"
             @endif
         >
             @foreach ($this->connectedAccounts as $account)
-                @php
-                    $capabilities = collect([
-                        $account->hasEmail() ? __('filament/pages/email-accounts.capabilities.email') : null,
-                        $account->hasCalendar() ? __('filament/pages/email-accounts.capabilities.calendar') : null,
-                    ])->filter()->join(', ');
-                @endphp
-
                 <div wire:key="email-account-{{ $account->getKey() }}" class="flex flex-col gap-3 rounded-lg border border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
                     <div class="flex min-w-0 flex-1 items-center gap-3">
                         <x-filament::icon :icon="$account->provider->getIcon()" class="h-5 w-5 shrink-0 text-gray-400" />
@@ -40,63 +33,29 @@
                                 @endif
                             </div>
                             <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-                                {{ $capabilities ?: $account->provider->getLabel() }}
+                                {{ $this->accountCapabilities($account) }}
                             </p>
                         </div>
                     </div>
 
-                    <div @class([
-                        'flex items-center gap-3',
-                        'w-full sm:w-auto' => $account->isImportingHistory(),
-                        'shrink-0' => ! $account->isImportingHistory(),
-                    ])>
+                    <div class="flex shrink-0 items-center gap-3">
                         @if ($account->isImportingHistory())
-                            @php
-                                $imported = $account->initial_sync_imported;
-                                $estimated = $account->initial_sync_estimated;
-                                $percent = $account->initialSyncProgressPercent();
-                            @endphp
-
-                            <div class="min-w-0 flex-1 sm:w-52 sm:flex-none">
-                                <div class="flex items-baseline justify-between gap-2">
-                                    <p class="text-xs font-medium text-gray-600 dark:text-gray-300">
-                                        {{ __('filament/pages/email-accounts.importing') }}
-                                    </p>
-
-                                    @if ($percent !== null)
-                                        <p class="text-xs font-semibold tabular-nums text-gray-950 dark:text-white">
-                                            {{ __('filament/pages/email-accounts.importing_percent', ['percent' => $percent]) }}
-                                        </p>
-                                    @endif
-                                </div>
-
-                                @if ($percent !== null)
-                                    <div
-                                        class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/15"
-                                        role="progressbar"
-                                        aria-busy="true"
-                                        aria-valuemin="0"
-                                        aria-valuemax="{{ $estimated }}"
-                                        aria-valuenow="{{ min($imported, $estimated) }}"
-                                        aria-valuetext="{{ __('filament/pages/email-accounts.importing_percent', ['percent' => $percent]) }}"
-                                        aria-label="{{ __('filament/pages/email-accounts.importing') }}"
-                                    >
-                                        <div
-                                            class="h-full w-full origin-left rounded-full bg-primary-600 motion-reduce:transition-none motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out dark:bg-primary-400"
-                                            style="transform: scaleX({{ $percent / 100 }})"
-                                        ></div>
-                                    </div>
-                                @else
-                                    <div
-                                        class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/15"
-                                        role="progressbar"
-                                        aria-busy="true"
-                                        aria-label="{{ __('filament/pages/email-accounts.importing') }}"
-                                    >
-                                        <div class="ei-import-indeterminate h-full rounded-full bg-primary-600 dark:bg-primary-400"></div>
-                                    </div>
-                                @endif
-                            </div>
+                            <x-filament::badge
+                                color="info"
+                                size="sm"
+                                :icon="$this->syncingIcon()"
+                                class="whitespace-nowrap"
+                                role="progressbar"
+                                aria-busy="true"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-valuenow="{{ $account->initialSyncProgressPercent() }}"
+                                aria-valuetext="{{ __('filament/pages/email-accounts.importing_percent', ['percent' => $account->initialSyncProgressPercent()]) }}"
+                                aria-label="{{ __('filament/pages/email-accounts.importing') }}"
+                            >
+                                {{ __('filament/pages/email-accounts.importing') }}
+                                {{ __('filament/pages/email-accounts.importing_percent', ['percent' => $account->initialSyncProgressPercent()]) }}
+                            </x-filament::badge>
                         @else
                             <x-filament::badge
                                 :color="$account->status->getColor()"

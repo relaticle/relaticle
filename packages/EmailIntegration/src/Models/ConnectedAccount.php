@@ -236,15 +236,15 @@ final class ConnectedAccount extends Model
     }
 
     /**
-     * Percent of the first mailbox import, or null when the provider has not
-     * given a size estimate yet (indeterminate).
+     * Percent of the first mailbox import. Starts at 0 until the provider
+     * gives a size estimate and imported rows start landing.
      */
-    public function initialSyncProgressPercent(): ?int
+    public function initialSyncProgressPercent(): int
     {
         $estimated = $this->initial_sync_estimated;
 
         if ($estimated === null || $estimated <= 0) {
-            return null;
+            return 0;
         }
 
         return min(100, (int) round(($this->initial_sync_imported / $estimated) * 100));

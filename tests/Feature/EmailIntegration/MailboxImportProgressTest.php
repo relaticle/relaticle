@@ -26,9 +26,9 @@ it('shows import progress while the mailbox cursor has not been written', functi
         ->assertSee(__('filament/pages/email-accounts.importing'))
         ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 30]))
         ->assertSee('role="progressbar"', false)
-        ->assertSee('aria-valuenow="12"', false)
-        ->assertSee('aria-valuemax="40"', false)
-        ->assertSee('scaleX(0.3)', false);
+        ->assertSee('aria-valuenow="30"', false)
+        ->assertSee('aria-valuemax="100"', false)
+        ->assertSee('motion-safe:animate-spin', false);
 });
 
 it('shows in sync after the mailbox cursor is written', function (): void {
@@ -68,10 +68,10 @@ it('picks up a new imported count when the accounts list refreshes', function ()
 
     $page->call('refreshAccounts')
         ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 6]))
-        ->assertSee('aria-valuenow="24"', false);
+        ->assertSee('aria-valuenow="6"', false);
 });
 
-it('shows an indeterminate import bar when the mailbox size is unknown', function (): void {
+it('shows 0% until the mailbox size estimate is known', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentTeam);
@@ -86,7 +86,9 @@ it('shows an indeterminate import bar when the mailbox size is unknown', functio
 
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.importing'))
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 0]))
         ->assertDontSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 8]))
         ->assertSee('role="progressbar"', false)
-        ->assertDontSee('aria-valuenow', false);
+        ->assertSee('aria-valuenow="0"', false)
+        ->assertSee('motion-safe:animate-spin', false);
 });

@@ -79,7 +79,7 @@ return [
     ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
-    'importing' => 'Importing',
+    'importing' => 'Syncing',
     'importing_percent' => ':percent%',
     'capabilities' => [
         'email' => 'Email',
