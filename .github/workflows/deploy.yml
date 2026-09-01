@@ -22,14 +22,24 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Forge
     needs: [verify]
-    # always() is required because `verify` is skipped when a dispatch asks to skip
-    # it, and a skipped dependency would otherwise skip this job too. Prereleases
-    # never deploy; a manual dispatch always may.
+
+    # A status check function is required here because `verify` is skipped when a
+    # dispatch asks to skip it, and a skipped dependency would otherwise skip this
+    # job too. It has to be !cancelled() and not always(): always() fires even on a
+    # cancelled run, which would leave Cancel unable to stop a release once the
+    # verify jobs had gone green. Prereleases never deploy; a manual dispatch always
+    # may.
     if: >-
-      ${{ always()
+      ${{ !cancelled()
           && needs.verify.result != 'failure'
           && needs.verify.result != 'cancelled'
           && (github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false) }}
+
+    # A webhook that accepts the connection and then stalls hangs an attempt with no
+    # ceiling, so the retry never gets its turn and the job runs until GitHub kills
+    # it at six hours with the release stuck in flight. Five retries at 60 seconds
+    # each plus 15 second delays is a touch over six minutes in the worst case.
+    timeout-minutes: 10
 
     steps:
       # Forge's webhook returned a proxy-level 502 on the v3.5.5 release while the
@@ -39,5 +49,6 @@ jobs:
       - name: Trigger Forge Deploy
         run: |
           curl --fail --silent --show-error --location \
-            --retry 5 --retry-all-errors --retry-delay 15 --connect-timeout 10 \
+            --retry 5 --retry-all-errors --retry-delay 15 \
+            --connect-timeout 10 --max-time 60 \
             "${{ secrets.FORGE_DEPLOY_WEBHOOK }}"
