@@ -499,3 +499,47 @@ test('an invitation carrying no role joins on the team default', function (): vo
     expect($this->team->fresh()->users()->find($this->user->id)->membership->role)
         ->toBe($this->team->invite_link_default_role);
 });
+
+test('an invitation whose stored email kept its original case still matches the invitee', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+        'role' => 'editor',
+    ]);
+
+    $rawToken = rawTokenFor($invitation);
+
+    DB::table('team_invitations')
+        ->where('id', $invitation->id)
+        ->update(['email' => Str::upper($this->user->email)]);
+
+    $this->actingAs($this->user);
+
+    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->team]));
+
+    expect($this->user->fresh()->belongsToTeam($this->team))->toBeTrue();
+});
+
+test('accepting re-reads the invitation under a row lock so concurrent accepts serialise', function (): void {
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $this->team->id,
+        'email' => $this->user->email,
+        'role' => 'editor',
+    ]);
+
+    $statements = [];
+    DB::listen(function ($query) use (&$statements): void {
+        $statements[] = $query->sql;
+    });
+
+    resolve(AcceptTeamInvitation::class)->execute($this->user, $invitation);
+
+    $locking = array_filter(
+        $statements,
+        fn (string $sql): bool => str_contains($sql, 'team_invitations') && str_contains(mb_strtolower($sql), 'for update'),
+    );
+
+    expect($locking)->not->toBeEmpty()
+        ->and($this->user->fresh()->belongsToTeam($this->team))->toBeTrue();
+});
