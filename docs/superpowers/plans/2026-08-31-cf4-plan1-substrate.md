@@ -12,6 +12,8 @@
 
 **Repo:** work happens in a NEW worktree of ~/Herd/custom-fields on branch `4.x` (Task 1 creates it). Never work on the existing checkout's branch.
 
+**Branch reality (verified 2026-09-01):** there is NO `main` branch; the default branch is `3.x` (latest tag v3.9.0). STALE `origin/4.x` and `origin/5.x` branches exist from the March 2026 Filament transition (0 and 2 commits ahead, 190+ behind 3.x, never tagged). Before any work: delete both stale remote branches (they poison `4.x-dev` resolution on Packagist), then create the new `4.x` from `origin/3.x`.
+
 ## Global Constraints
 
 - PHP `^8.3`, `filament/filament ^5.0` (composer.json as-is).
@@ -52,9 +54,15 @@ DB-trigger enforcement can be added later without schema change. The spec file c
 
 ```bash
 cd ~/Herd/custom-fields
-git fetch origin && git worktree add ../custom-fields-4x -b 4.x origin/main
+git fetch origin --prune
+# stale March-2026 branches; confirm nothing unique, then remove (needs user-approved push)
+git log --oneline origin/3.x..origin/4.x && git log --oneline origin/3.x..origin/5.x
+git push origin --delete 4.x 5.x
+git worktree add ../custom-fields-4x -b 4.x origin/3.x
 cd ../custom-fields-4x && composer install
 ```
+
+Plan 0 runs in this same worktree first; if it already exists, skip creation.
 
 - [ ] **Step 2: Write the failing test**
 
