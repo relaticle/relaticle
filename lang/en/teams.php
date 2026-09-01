@@ -103,6 +103,7 @@ return [
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'email_already_member' => 'This user already belongs to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
+        'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Administrator role. Invite administrators by email instead.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
         'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :teams',

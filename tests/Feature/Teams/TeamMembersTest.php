@@ -240,6 +240,21 @@ test('an admin cannot set the invite link default role to admin', function (): v
     expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
 });
 
+test('not even the owner can point the invite link at the admin role', function (): void {
+    expect(fn () => resolve(UpdateInviteLinkSettings::class)->update($this->owner, $this->team, TeamRole::Admin->value))
+        ->toThrow(ValidationException::class);
+
+    expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
+test('the owner setting the invite link to admin through the modal changes nothing', function (): void {
+    livewire(InviteTeamMembers::class, ['team' => $this->team])
+        ->mountAction('manageInviteLink')
+        ->setActionData(['invite_link_default_role' => TeamRole::Admin->value]);
+
+    expect($this->team->fresh()->invite_link_default_role)->toBe(TeamRole::Editor->value);
+});
+
 test('the invite link default role must be a role the app actually registers', function (): void {
     expect(fn () => resolve(UpdateInviteLinkSettings::class)->update($this->owner, $this->team, 'superuser'))
         ->toThrow(ValidationException::class);

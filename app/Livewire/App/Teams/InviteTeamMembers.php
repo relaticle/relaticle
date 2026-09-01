@@ -142,8 +142,8 @@ final class InviteTeamMembers extends BaseLivewireComponent
             ->schema([
                 Select::make('invite_link_default_role')
                     ->label(__('teams.invite_link.default_role'))
-                    ->options(fn (): array => $this->assignableRoles())
-                    ->in(fn (): array => array_keys($this->assignableRoles()))
+                    ->options(fn (): array => $this->inviteLinkRoles())
+                    ->in(fn (): array => array_keys($this->inviteLinkRoles()))
                     ->default(fn (): string => $this->team->invite_link_default_role)
                     ->selectablePlaceholder(false)
                     ->required()
@@ -273,5 +273,13 @@ final class InviteTeamMembers extends BaseLivewireComponent
         }
 
         return $roles->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function inviteLinkRoles(): array
+    {
+        return collect($this->assignableRoles())->except(TeamRole::Admin->value)->all();
     }
 }
