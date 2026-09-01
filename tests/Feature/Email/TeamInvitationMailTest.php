@@ -6,6 +6,8 @@ use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 mutates(TeamInvitationMail::class);
@@ -131,4 +133,22 @@ it('falls back to team-only subject and body copy when the invitation has no inv
         ->and($mail->render())->toContain(
             __('teams.mail.invitation.line', ['team' => 'Acme Co', 'role' => 'Editor'])
         );
+});
+
+it('keeps the raw token out of the queued payload at rest', function (): void {
+    config(['queue.default' => 'database']);
+
+    $owner = User::factory()->create();
+    $team = Team::factory()->create(['user_id' => $owner->id]);
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'guest@example.com',
+        'role' => 'editor',
+    ]);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    Mail::to($invitation->email)->queue(new TeamInvitationMail($invitation, $rawToken));
+
+    expect(DB::table('jobs')->value('payload'))->not->toContain($rawToken);
 });

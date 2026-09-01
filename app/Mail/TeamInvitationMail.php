@@ -6,6 +6,7 @@ namespace App\Mail;
 
 use App\Models\TeamInvitation;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -13,7 +14,12 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Laravel\Jetstream\Jetstream;
 
-final class TeamInvitationMail extends Mailable implements ShouldQueue
+/**
+ * Encrypted on the queue: the accept token is a bearer credential and is stored
+ * only as a hash, so it must not sit in clear text in the payload or in a
+ * failed_jobs row that outlives the invitation.
+ */
+final class TeamInvitationMail extends Mailable implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable, SerializesModels;
 
