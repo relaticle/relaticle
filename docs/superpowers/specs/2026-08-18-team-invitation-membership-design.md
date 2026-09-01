@@ -57,15 +57,23 @@ components (`AddTeamMember`, `PendingTeamInvitations`, `TeamMembers`) collapse
 into one component with one table.
 
 Members and pending invitations become rows in the **same list**, which is what
-**Superseded during implementation.** The unified table shipped, then came back
-out: with 16 members and 6 invitations at a page size of 10, an outstanding
-invitation could land on page three, and a single row shape forced a STATUS
-column that only repeated ROLE plus an EXPIRES column null on every member row.
-Twenty and Slack keep the two surfaces apart for the same reason. The page is
-now a `PendingTeamInvitations` card (unpaginated, hidden when empty) above a
-`TeamMembers` card (searchable, paginated), and `TeamPerson` is deleted — the
-owner is pulled into a plain `User` query by a second `where` leg instead. The
-union design below is kept as the record of what was tried and why it lost.
+**Revised twice during implementation; the unified table is what shipped.** It
+was split apart first, on the grounds that with 16 members and 6 invitations at
+a page size of 10 an outstanding invitation could land on page three, and that a
+single row shape forced a STATUS column repeating ROLE plus an EXPIRES column
+null on every member row. That split was then reverted: one roster reads as one
+list of everyone with access, and the STATUS column earns its place by carrying
+the pending and expired states that only invitation rows have.
+
+What shipped is a single `TeamMembers` table over a `fromSub()` union, searchable
+and paginated, invitations sorted ahead of members. `TeamPerson` was dropped
+along the way: the owner is pulled into the union by a second `where` leg on a
+plain `users` query instead, which also skips orphaned pivot rows. The row shape
+below is therefore current, not superseded; only the `TeamPerson` model it
+describes is gone.
+
+The paging concern that motivated the split is real and unresolved: enough
+outstanding invitations still push members onto page two. Revisit if it bites.
 
 This needed a common row shape, so the table queried a `fromSub()` union:
 
