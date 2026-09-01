@@ -33,10 +33,7 @@ final class SubscriptionsRelationManager extends RelationManager
                     ->formatStateUsing(SubscriptionResource::planLabel(...))
                     ->color('primary')
                     ->url(fn (Subscription $record): string => SubscriptionResource::getUrl('view', ['record' => $record])),
-                TextColumn::make('stripe_status')
-                    ->label('Status')
-                    ->badge()
-                    ->color(SubscriptionResource::statusColor(...)),
+                SubscriptionResource::statusColumn(),
                 TextColumn::make('ends_at')
                     ->label('Ends')
                     ->dateTime()

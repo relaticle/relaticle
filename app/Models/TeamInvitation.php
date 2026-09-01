@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCanonicalEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -50,6 +51,7 @@ final class TeamInvitation extends JetstreamTeamInvitation
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'expires_at' => 'datetime',
         ];
     }

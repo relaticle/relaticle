@@ -34,7 +34,7 @@ final class PersonalAccessTokenPolicy
 
     /**
      * `create()` cannot see which administrator record the token would be minted
-     * for (Filament resolves it before the model exists), so it stays role-only —
+     * for (Filament resolves it before the model exists), so it stays role-only.
      * the relation manager's mint action enforces self-only ownership directly.
      */
     private function ownsToken(SystemAdministrator $admin, PersonalAccessToken $token): bool

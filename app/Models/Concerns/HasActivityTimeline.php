@@ -52,7 +52,7 @@ trait HasActivityTimeline
                         new VisibleEmailScope($viewer),
                     ));
                 } else {
-                    // No authenticated viewer — never expose email content unscoped.
+                    // No authenticated viewer, so never expose email content unscoped.
                     // VisibleEmailScope isn't a default scope on Email, so without this
                     // the relation would load every email regardless of privacy.
                     $source->using(fn (Builder|Relation $query) => $query->whereRaw('1 = 0'));

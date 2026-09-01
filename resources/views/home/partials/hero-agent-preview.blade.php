@@ -6,7 +6,7 @@
         -webkit-user-select: none;
         -webkit-user-drag: none;
     }
-    /* Hide scrollbar — panel reads as a video preview, scrollbar would break the illusion */
+    /* Hide scrollbar: the panel reads as a video preview, and a scrollbar breaks the illusion */
     .hero-agent-preview .overflow-y-auto {
         scrollbar-width: none;
         -ms-overflow-style: none;
@@ -20,7 +20,7 @@
     }
     /* Conversation title starts hidden so the entry overlay reads as the
        only foreground surface; the transition fades it in. The sidebar is
-       always visible — it mirrors the real dashboard's persistent shell. */
+       always visible, mirroring the real dashboard's persistent shell. */
     .hero-agent-preview .hero-agent-title { opacity: 0; }
 </style>
 
@@ -38,7 +38,7 @@
     @include('home.partials.hero-agent-shell')
 
     {{-- Main pane (chat column). Relative so the entry overlay can absolutely
-         position itself within this column instead of the whole panel — that
+         position itself within this column instead of the whole panel, which
          keeps the sidebar visible during the entry phase too. --}}
     <div class="relative flex-1 flex flex-col min-w-0">
 
@@ -55,7 +55,7 @@
             <div class="hero-agent-title min-w-0 flex-1">
                 <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">Overdue tasks this week</h2>
             </div>
-            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-pico font-bold text-white">MR</span>
+            <img src="{{ resolve(\App\Services\AvatarService::class)->generateAuto('Marcus Reid', 64) }}" alt="" class="h-6 w-6 shrink-0 rounded-full">
         </div>
 
         {{-- Messages --}}
@@ -67,7 +67,7 @@
 
         @include('home.partials.hero-agent-composer')
 
-        {{-- Entry overlay — covers the chat column only, leaving the sidebar
+        {{-- Entry overlay, covering the chat column only and leaving the sidebar
              visible. Driven by heroChat phase state. --}}
         @include('home.partials.hero-agent-entry')
 
@@ -88,7 +88,7 @@
                 { text: 'Mark the Kovra demo as done.', charMs: 38 },
                 { text: "Add Sarah Chen as a contact at @Kovra Systems. She's VP of Engineering.", charMs: 28 }
             ],
-            // Entry phase budget — first prompt is typed into the centered
+            // Entry phase budget. The first prompt is typed into the centered
             // dashboard composer (mirrors app /), then the screen transitions
             // into the conversation view where exchanges 2 and 3 continue.
             entryHoldMs: 600,
@@ -105,8 +105,8 @@
                 });
                 // Conversation title has its own CSS opacity:0 rule so it
                 // doesn't ghost in before the transition. Clear inline styles
-                // so the CSS default re-applies. Sidebar is always visible —
-                // mirrors the real dashboard — so it's not touched here.
+                // so the CSS default re-applies. The sidebar is always visible,
+                // mirroring the real dashboard, so it's not touched here.
                 this.$root.querySelectorAll('.hero-agent-title').forEach(function(el) {
                     el.style.opacity = '';
                     el.style.transform = '';
@@ -458,7 +458,7 @@
                 // Prep the entry view for a fresh intro but leave any existing
                 // conversation on screen. runCycle() raises the entry "curtain"
                 // over the previous conversation (a cross-fade) and clears it
-                // underneath once covered — so the loop never hard-cuts to a
+                // underneath once covered, so the loop never hard-cuts to a
                 // blank panel. On first load there's nothing behind the curtain,
                 // so it simply fades in from the empty shell.
                 this.resetEntryOnly();
@@ -488,8 +488,8 @@
 
                 // Loop restart: the entry curtain (above) has now faded in over
                 // the previous conversation. Clear that conversation underneath
-                // once the curtain is opaque so the next cycle starts clean — no
-                // blank-panel flash — and flip the shell chrome back to its
+                // once the curtain is opaque so the next cycle starts clean with
+                // no blank-panel flash, and flip the shell chrome back to its
                 // dashboard state at the same "navigation" moment. No-op on
                 // first load.
                 this.pendingTimers.push(setTimeout(function() { self.resetConversationOnly(); self.restoreShellToDashboard(); }, 420));
@@ -517,7 +517,7 @@
                 animate(root.querySelector('.mcp-label-1'),  { opacity: [0, 1] }, { delay: (conversationStart + 300) / 1000, duration: 0.25, ease: ease });
                 animate(root.querySelector('.mcp-tool-1'),   { opacity: [0, 1], transform: ['translateY(4px)', 'translateY(0px)'] }, { delay: (conversationStart + 300) / 1000, duration: 0.25, ease: ease });
                 // The tool "runs" for a beat, then its done badge lands and the
-                // answer streams — so the call reads as work, not an instant result.
+                // answer streams, so the call reads as work, not an instant result.
                 animate(root.querySelector('.mcp-tool-1 .mcp-tool-done'), { opacity: [0, 1] }, { delay: (conversationStart + 600) / 1000, duration: 0.2, ease: ease });
                 this.pendingTimers.push(setTimeout(function() { self.streamText('.mcp-text-1', 95); }, conversationStart + 700));
                 animate(root.querySelector('.mcp-tasks-table'), { opacity: [0, 1] }, { delay: (conversationStart + 950) / 1000, duration: 0.25, ease: ease });
@@ -530,8 +530,8 @@
 
                 // ── Exchange 2: a write gated by review ──
                 // The composer types while the view stays on exchange 1. The
-                // response then docks a proposal where the composer was — the
-                // same swap the real chat performs — and after a beat the "Save
+                // response then docks a proposal where the composer was, the
+                // same swap the real chat performs. After a beat the "Save
                 // changes" press resolves it into the transcript audit card,
                 // with the agent's confirming reply under it.
                 var p2 = this.prompts[1];
@@ -548,7 +548,7 @@
 
                 // The proposal docks at the composer. The dock is taller than
                 // the composer it replaces, so re-anchor the scroll once the
-                // swap lands — otherwise the assistant bubble gets clipped.
+                // swap lands. Otherwise the assistant bubble gets clipped.
                 var dockAt = send2At + 850;
                 this.pendingTimers.push(setTimeout(function() { self.showDock(); }, dockAt));
                 this.pendingTimers.push(setTimeout(function() { self.scrollToShow('.mcp-avatar-2'); }, dockAt + 580));

@@ -41,7 +41,7 @@ final class ReportStaleCompetitorFactsCommand extends Command
         }
 
         $this->table(['slug', 'name', 'verified', 'age'], $stale);
-        $this->comment(count($stale).' stale fact(s) — re-verify and bump `verified` in resources/data/competitor-facts.php.');
+        $this->comment(count($stale).' stale fact(s). Re-verify and bump `verified` in resources/data/competitor-facts.php.');
 
         return self::SUCCESS;
     }

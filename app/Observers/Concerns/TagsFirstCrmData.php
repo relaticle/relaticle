@@ -4,27 +4,25 @@ declare(strict_types=1);
 
 namespace App\Observers\Concerns;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
-use App\Models\Company;
-use App\Models\Opportunity;
-use App\Models\People;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
+use App\Support\Email\SubscriberProfileDeriver;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Tags the authenticated user's Mailcoach subscriber with "has-crm-data" when
- * the first CRM entity (Company, People, or Opportunity) is created.
+ * Syncs the authenticated user's Mailcoach profile when the first CRM entity
+ * (Company, People, or Opportunity) is created, so has-crm-data lands
+ * immediately instead of waiting for the nightly reconcile sweep.
  *
- * Intentionally relies on auth()->user() — tagging only applies to interactive
- * sessions. Entities created via queue workers, console commands, or seeders
- * are excluded by design.
+ * Intentionally relies on auth()->user(): the fast path only covers
+ * interactive sessions. Entities created via queue workers, console commands,
+ * or seeders are picked up by the sweep instead.
  */
 trait TagsFirstCrmData
 {
     protected function tagFirstCrmDataIfNeeded(Model $createdModel): void
     {
+        // Guarded here too so the request path skips the exists-probes below.
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
@@ -32,30 +30,14 @@ trait TagsFirstCrmData
         /** @var User|null $user */
         $user = auth()->user();
 
-        if (! $user instanceof User || ! $user->mailcoach_subscriber_uuid) {
+        if (! $user instanceof User) {
             return;
         }
 
-        $teamIds = $user->allTeams()->pluck('id');
-
-        $hasCrmData = Company::query()->whereIn('team_id', $teamIds)
-            ->when($createdModel instanceof Company, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-            ->exists()
-            || People::query()->whereIn('team_id', $teamIds)
-                ->when($createdModel instanceof People, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-                ->exists()
-            || Opportunity::query()->whereIn('team_id', $teamIds)
-                ->when($createdModel instanceof Opportunity, fn ($q) => $q->whereKeyNot($createdModel->getKey()))
-                ->exists();
-
-        if ($hasCrmData) {
+        if (resolve(SubscriberProfileDeriver::class)->hasCrmData($user, $createdModel)) {
             return;
         }
 
-        dispatch(new ModifySubscriberTagsJob(
-            (string) $user->id,
-            [SubscriberTagEnum::HasCrmData->value],
-            TagAction::Add,
-        ))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }

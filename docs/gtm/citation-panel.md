@@ -2,8 +2,8 @@
 
 Monthly tracker for whether AI answer engines mention or cite Relaticle in
 response to a fixed set of prompts. Re-run the same 10 prompts, verbatim,
-against the same 3 engines every month and append a new dated block of rows —
-never edit past rows.
+against the same 3 engines every month and append a new dated block of rows.
+Never edit past rows.
 
 ## Prompts (fixed, reused every month)
 
@@ -26,7 +26,7 @@ never edit past rows.
   answer's listed sources (whether or not the source is a clickable link).
 - **Linked**: a clickable hyperlink to `relaticle.com` or
   `github.com/relaticle` appears in the rendered answer.
-- Each prompt is run **fresh** for each engine — a new conversation/search
+- Each prompt is run **fresh** for each engine, in a new conversation or search
   with no prior context, never a follow-up turn.
 - If an engine cannot be reached (no login session, blocked by a bot check,
   etc.), the row is recorded as `n/a` for mentioned/cited/linked with the
@@ -39,39 +39,39 @@ never edit past rows.
 | 2026-08-13 | best open source CRM | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable: no logged-in session on this machine, and the automated browser is blocked at a Cloudflare bot-check page before any UI loads. Per task constraints, login was not attempted. |
 | 2026-08-13 | best open source CRM | Claude | n/a | n/a | n/a | claude.ai not reachable: no logged-in session on this machine, and the automated browser is blocked at a Cloudflare bot-check page before any UI loads. Per task constraints, login was not attempted. |
 | 2026-08-13 | best open source CRM | Perplexity | n/a | n/a | n/a | perplexity.ai blocked the automated browser at a Cloudflare Turnstile challenge ("Verify you are human") on every attempt, including after clicking the checkbox and retrying across two fresh sessions; a one-shot curl fallback also returned the same Cloudflare challenge (HTTP 403). No answer was ever rendered. |
-| 2026-08-13 | self-hosted CRM | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | self-hosted CRM | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | self-hosted CRM | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | open source Attio alternative | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | open source Attio alternative | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | open source Attio alternative | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | CRM with MCP server | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | CRM with MCP server | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | CRM with MCP server | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | connect Claude to CRM | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | connect Claude to CRM | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | connect Claude to CRM | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | AI agent CRM | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | AI agent CRM | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | AI agent CRM | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | self-hosted CRM with AI | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | self-hosted CRM with AI | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | self-hosted CRM with AI | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | Laravel CRM | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | Laravel CRM | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | Laravel CRM | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | flat-price CRM unlimited users | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | flat-price CRM unlimited users | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | flat-price CRM unlimited users | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
-| 2026-08-13 | Twenty alternatives | ChatGPT | n/a | n/a | n/a | Same reachability issue as above — chatgpt.com not reachable on this machine. |
-| 2026-08-13 | Twenty alternatives | Claude | n/a | n/a | n/a | Same reachability issue as above — claude.ai not reachable on this machine. |
-| 2026-08-13 | Twenty alternatives | Perplexity | n/a | n/a | n/a | Same reachability issue as above — perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl. |
+| 2026-08-13 | self-hosted CRM | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | self-hosted CRM | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | self-hosted CRM | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | open source Attio alternative | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | open source Attio alternative | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | open source Attio alternative | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | CRM with MCP server | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | CRM with MCP server | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | CRM with MCP server | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | connect Claude to CRM | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | connect Claude to CRM | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | connect Claude to CRM | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | AI agent CRM | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | AI agent CRM | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | AI agent CRM | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | self-hosted CRM with AI | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | self-hosted CRM with AI | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | self-hosted CRM with AI | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | Laravel CRM | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | Laravel CRM | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | Laravel CRM | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | flat-price CRM unlimited users | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | flat-price CRM unlimited users | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | flat-price CRM unlimited users | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
+| 2026-08-13 | Twenty alternatives | ChatGPT | n/a | n/a | n/a | chatgpt.com not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | Twenty alternatives | Claude | n/a | n/a | n/a | claude.ai not reachable on this machine (same reachability issue as above). |
+| 2026-08-13 | Twenty alternatives | Perplexity | n/a | n/a | n/a | perplexity.ai blocked by Cloudflare Turnstile for both agent-browser and curl (same reachability issue as above). |
 
 ## Infrastructure log
 
 | date | item | status |
 |---|---|---|
-| 2026-08-17 | awesome-selfhosted submission — PR [#2918](https://github.com/awesome-selfhosted/awesome-selfhosted-data/pull/2918) (`software/relaticle.yml`) | **Closed without comment** by maintainer `Rabenherz112` at 17:21Z, 5h36m after opening. No review body, no canned reply, no CI (the repo runs no checks on PRs). Every published criterion is met: first release v1.0.0 2025-04-26 (>4 months), 78 tags, repo pushed same day, AGPL-3.0 in `licenses.yml`, tag name matches `tags/customer-relationship-management-crm.yml`, platforms `PHP`/`Docker` both exist, description 128 chars (<250), `relaticle.com/developers/self-hosting` serves working Docker Compose instructions. Not an additions freeze — external `Add X` PRs merged on 2026-08-16/17. Reason unknown. Reply asking for the reason and a reopen posted 2026-08-17T18:30Z ([comment](https://github.com/awesome-selfhosted/awesome-selfhosted-data/pull/2918#issuecomment-5318642851)), awaiting response. If no reply by ~2026-08-24, open an addition *issue* (their canned replies confirm issues are never closed, only tagged) — do not open a second PR. |
+| 2026-08-17 | awesome-selfhosted submission, PR [#2918](https://github.com/awesome-selfhosted/awesome-selfhosted-data/pull/2918) (`software/relaticle.yml`) | **Closed without comment** by maintainer `Rabenherz112` at 17:21Z, 5h36m after opening. No review body, no canned reply, no CI (the repo runs no checks on PRs). Every published criterion is met: first release v1.0.0 2025-04-26 (>4 months), 78 tags, repo pushed same day, AGPL-3.0 in `licenses.yml`, tag name matches `tags/customer-relationship-management-crm.yml`, platforms `PHP`/`Docker` both exist, description 128 chars (<250), `relaticle.com/developers/self-hosting` serves working Docker Compose instructions. This was not an additions freeze: external `Add X` PRs merged on 2026-08-16/17. Reason unknown. Reply asking for the reason and a reopen posted 2026-08-17T18:30Z ([comment](https://github.com/awesome-selfhosted/awesome-selfhosted-data/pull/2918#issuecomment-5318642851)), awaiting response. If no reply by ~2026-08-24, open an addition *issue* (their canned replies confirm issues are never closed, only tagged). Do not open a second PR. |
 
 ## Reachability notes for next run
 

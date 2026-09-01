@@ -26,10 +26,12 @@
         "knuckleswtf/scribe": "^5.8",
         "laravel/ai": "~0.11.0",
         "laravel/cashier": "^16.5",
+        "laravel/fortify": "^1.37",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
         "laravel/mcp": "^0.9.1",
+        "laravel/passkeys": "^0.2",
         "laravel/passport": "^13",
         "laravel/pennant": "^1.23",
         "laravel/reverb": "^1.10",
@@ -47,6 +49,7 @@
         "relaticle/ink": "^2.3",
         "scalar/laravel": "^0.2.0",
         "sentry/sentry-laravel": "^4.13",
+        "socialiteproviders/microsoft": "^4.10",
         "socialiteproviders/microsoft-azure": "^5.2",
         "spatie/cpu-load-health-check": "^1.0",
         "spatie/eloquent-sortable": "^5.0",
@@ -139,7 +142,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
+            "pnpm dlx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"bash bin/workspace-queue.sh\" \"php artisan pail --timeout=0\" \"pnpm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "lint": [
             "rector",

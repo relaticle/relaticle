@@ -390,18 +390,20 @@ return [
             ],
         ],
 
+        // Horizon merges `defaults` into every environment, so a supervisor is
+        // switched off with maxProcesses 0 and never by omission.
         'local' => [
             'supervisor-1' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 2,
             ],
             'supervisor-2' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 0,
             ],
             'supervisor-3' => [
-                'maxProcesses' => 3,
+                'maxProcesses' => 0,
             ],
             'supervisor-imports' => [
-                'maxProcesses' => 5,
+                'maxProcesses' => 2,
             ],
             'supervisor-emails-sync' => [
                 'maxProcesses' => 5,

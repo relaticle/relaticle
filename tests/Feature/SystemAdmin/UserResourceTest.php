@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\SubscriberTagEnum;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -216,4 +218,37 @@ it('deletes users in bulk through the Jetstream deleter so their workspaces are 
 
     expect(User::query()->whereKey([$first->getKey(), $second->getKey()])->count())->toBe(0)
         ->and(Team::query()->whereKey($teamIds)->count())->toBe(0);
+});
+
+it('renders the engagement badge derived from the last login timestamp', function (): void {
+    $this->travelTo(Carbon::parse('2026-08-30 12:00:00'));
+
+    $active = User::factory()->create(['last_login_at' => now()->subDays(3)]);
+    $dormant = User::factory()->create(['last_login_at' => now()->subDays(90)]);
+    $never = User::factory()->create(['last_login_at' => null]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('engagement', SubscriberTagEnum::Active7d->value, record: $active)
+        ->assertTableColumnStateSet('engagement', SubscriberTagEnum::Dormant->value, record: $dormant)
+        ->assertTableColumnStateSet('engagement', null, record: $never);
+});
+
+it('lists exactly the users whose engagement badge matches the selected filter', function (): void {
+    $this->travelTo(Carbon::parse('2026-08-30 12:00:00'));
+
+    $users = collect([3.0, 7.5, 20.0, 30.5, 45.0, 61.0, 90.0])
+        ->map(fn (float $daysAgo): User => User::factory()->create([
+            'last_login_at' => now()->subMinutes((int) round($daysAgo * 1440)),
+        ]));
+
+    foreach ([SubscriberTagEnum::Active7d, SubscriberTagEnum::Active30d, SubscriberTagEnum::Dormant] as $bucket) {
+        $matching = $users->filter(
+            fn (User $user): bool => SubscriberTagEnum::recencyBucketFor($user->last_login_at) === $bucket,
+        );
+
+        livewire(ListUsers::class)
+            ->filterTable('engagement', $bucket->value)
+            ->assertCanSeeTableRecords($matching->values())
+            ->assertCanNotSeeTableRecords($users->diff($matching)->values());
+    }
 });

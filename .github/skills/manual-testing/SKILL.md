@@ -1,12 +1,12 @@
 ---
 name: manual-testing
-description: "Use immediately after finishing any code change in Relaticle — implementation, fix, refactor, migration — before reporting work as complete. The skill itself decides whether to run; do not skip on 'small' changes. Triggers an adversarial post-task QA pass: reads the diff, scores risk, generates an SBTM charter, drives a real browser through a pairwise-reduced test matrix across Filament/Livewire/REST/MCP surfaces, classifies findings by severity, auto-fixes High findings within strict guardrails, and promotes High+ findings to permanent Pest browser regression tests. Reports land in .context/testing/reports/. Skip with [skip-qa] in the user message or MANUAL_TESTING_SKIP=1."
+description: "Use immediately after finishing any code change in Relaticle (implementation, fix, refactor, migration) before reporting work as complete. The skill itself decides whether to run; do not skip on 'small' changes. Triggers an adversarial post-task QA pass: reads the diff, scores risk, generates an SBTM charter, drives a real browser through a pairwise-reduced test matrix across Filament/Livewire/REST/MCP surfaces, classifies findings by severity, auto-fixes High findings within strict guardrails, and promotes High+ findings to permanent Pest browser regression tests. Reports land in .context/testing/reports/. Skip with [skip-qa] in the user message or MANUAL_TESTING_SKIP=1."
 license: MIT
 metadata:
   author: relaticle
 ---
 
-# Manual Testing — Relaticle
+# Manual Testing for Relaticle
 
 Adversarial post-task QA. Pretend 1000s of users in production are about to exercise this change from every angle. Find what they would find. Fix what's safe to fix. Report what isn't.
 
@@ -20,10 +20,10 @@ Run `.github/skills/manual-testing/bin/should-skip.sh` first. If it exits 0, exi
 
 Skip rules (encoded in the script):
 
-1. `MANUAL_TESTING_SKIP=1` env var — hard override.
+1. `MANUAL_TESTING_SKIP=1` env var, a hard override.
 2. Branch is `main`, `master`, or `release/*`.
 3. Diff is empty.
-4. Every path in the diff matches a trivial pattern: `*.md`, `*.txt`, `*.lock`, `*.gitignore`, `composer.lock`, `package-lock.json`, `yarn.lock`, `tests/**`.
+4. Every path in the diff matches a trivial pattern: `*.md`, `*.txt`, `*.lock`, `*.gitignore`, `composer.lock`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `tests/**`.
 
 Additionally, **the skill itself** (not the script) must check the user's message in the current turn for `[skip-qa]`, `skip qa`, `no test`, or `dont test` BEFORE invoking the script. If found, exit with `SKIP user-request:<phrase>` logged to `.context/testing/reports/skipped.log`. The script handles env-var, branch, empty-diff, and trivial-path cases; the user-message gate is the skill's responsibility because the script has no access to chat context.
 
@@ -38,7 +38,7 @@ Run `.github/skills/manual-testing/bin/should-skip.sh`. If exit 0, exit the skil
 Load `references/risk-rubric.md`. Score Likelihood and Impact against the diff:
 
 1. **Likelihood**: pick the anchor (1-5) that best matches the most-impactful change in the diff. When in doubt, round up.
-2. **Impact**: start with the rubric anchor. Then grep the diff for the high-impact tag patterns. Any match forces Impact = 5 — record which pattern fired.
+2. **Impact**: start with the rubric anchor. Then grep the diff for the high-impact tag patterns. Any match forces Impact = 5. Record which pattern fired.
 3. **Total**: `L × I`, classify into smoke/light/medium/deep tier.
 4. **Surfaces**: walk the surface scoping table; any matching path adds its surfaces to the matrix.
 
@@ -65,7 +65,7 @@ Use `templates/charter.md` as the structural starting point and fill in all `<pl
 
 **Time budgets per tier:** smoke 2 min, light 5 min, medium 10 min, deep up to 60 min.
 
-If the charter has fewer than 3 DoD items, regenerate — DoD is what prevents the LLM from declaring success on incomplete work.
+If the charter has fewer than 3 DoD items, regenerate. DoD is what prevents the LLM from declaring success on incomplete work.
 
 ### 4. PLAN
 
@@ -86,7 +86,7 @@ Target matrix sizes:
 | medium | 15-25 |
 | deep | 30-50 + multi-tenant checklist |
 
-**On smoke-tier cell count:** the rubric's "1 persona, single surface, happy path + 1 negative" is the *baseline*. The 3-5 target comes from boundary-state expansion (typical / empty / error) within that single persona+surface combination. So a smoke run is genuinely lightweight — it just rotates one cell through 3-5 data states.
+**On smoke-tier cell count:** the rubric's "1 persona, single surface, happy path + 1 negative" is the *baseline*. The 3-5 target comes from boundary-state expansion (typical / empty / error) within that single persona+surface combination. So a smoke run is genuinely lightweight: it rotates one cell through 3-5 data states.
 
 Print the matrix as a table at the top of the report (one row per cell). Each cell will be filled with an outcome during EXECUTE.
 
@@ -101,19 +101,19 @@ agent-browser get title
 
 If unreachable, exit the skill with `BLOCKED: dev server unreachable at https://calm-lemur.test`. Suggest: check Herd status, run `herd start`, verify `.env` `APP_URL`.
 
-If two teams aren't present (required by the multi-tenant checklist when applicable), seed a second team — see `references/multi-tenant-checklist.md` setup section.
+If two teams aren't present (required by the multi-tenant checklist when applicable), seed a second team. See the setup section of `references/multi-tenant-checklist.md`.
 
 Gather login-link URLs for every persona in the matrix. Cache them in `.context/testing/state/login-urls.json`.
 
 ### 6. EXECUTE
 
-For each cell in the matrix (in order — multi-tenant checklist runs **first** when present, so a leak halts execution before further cells run):
+For each cell in the matrix (in order; the multi-tenant checklist runs **first** when present, so a leak halts execution before further cells run):
 
 1. Load `references/surfaces.md` for the relevant surface playbook.
 2. Log in as the persona via login-link.
 3. Drive the surface through the tour's steps.
 4. Apply the data-nasty payload (if the cell is a boundary-value cell).
-5. **Visual sweep (Filament UI / Livewire surfaces only):** if the cell's tour is Supermodel — or if any browser-touching cell hasn't yet been visually swept — run the probes from `references/visual-probes.md` (P1–P8) at the viewports listed there, plus the state-explosion checklist. Take an annotated screenshot per state and per viewport. Then answer the Image-oracle rubric in `references/oracles.md` against the captured screenshots.
+5. **Visual sweep (Filament UI / Livewire surfaces only):** if the cell's tour is Supermodel, or if any browser-touching cell has not yet been visually swept, run the probes from `references/visual-probes.md` (P1–P8) at the viewports listed there, plus the state-explosion checklist. Take an annotated screenshot per state and per viewport. Then answer the Image-oracle rubric in `references/oracles.md` against the captured screenshots.
 6. Observe.
 7. Cite an oracle (`references/oracles.md`) if anything went wrong. If no oracle applies, log a "neutral note" and move on.
 8. Capture: screenshot, console output, page errors, network 4xx/5xx, DB state if mutation was attempted.
@@ -126,14 +126,14 @@ If a Critical finding surfaces (multi-tenant leak, auth bypass, data loss, execu
 
 For each finding produced in EXECUTE, run RIMGEA in this order. If a step fails, the finding is downgraded:
 
-1. **R**eplicate — verify the bug reproduces 3/3 in fresh sessions. If <3/3 → demote to "flaky observation" (logged but not reported).
-2. **I**solate — reduce to the smallest reproducible action sequence.
-3. **M**aximize — actively try to make the impact worse (more data, more users, longer-running). Discovered escalations re-classify severity.
-4. **G**eneralize — re-run the probe against sibling resources (Companies/People/Opportunities/Tasks/Notes). Each affected sibling gets its own finding entry, marked as related.
-5. **E**xternalize — write the impact in real-user language ("A salesperson rushing through a customer call would..."). Forces UX-honest framing.
-6. **A**rticulate — single paragraph + numbered repro steps + screenshot path + console snippet.
+1. **R**eplicate: verify the bug reproduces 3/3 in fresh sessions. If <3/3 → demote to "flaky observation" (logged but not reported).
+2. **I**solate: reduce to the smallest reproducible action sequence.
+3. **M**aximize: actively try to make the impact worse (more data, more users, longer-running). Discovered escalations re-classify severity.
+4. **G**eneralize: re-run the probe against sibling resources (Companies/People/Opportunities/Tasks/Notes). Each affected sibling gets its own finding entry, marked as related.
+5. **E**xternalize: write the impact in real-user language ("A salesperson rushing through a customer call would..."). Forces UX-honest framing.
+6. **A**rticulate: single paragraph + numbered repro steps + screenshot path + console snippet.
 
-Then classify severity (hardcoded — no LLM judgment):
+Then classify severity (hardcoded, no LLM judgment):
 
 | Severity | Examples |
 |---|---|
@@ -142,7 +142,7 @@ Then classify severity (hardcoded — no LLM judgment):
 | **Medium** | Validation message wrong/missing · loading state stuck on error · inconsistent UI · slow but not broken |
 | **Low** | Typos · spacing · icon size · missing tooltip · cosmetic only |
 
-The Critical/High line: if a fix in this code area could itself introduce a security regression, it's Critical. Auth, tenancy, migrations, encryption — never auto-fix.
+The Critical/High line: if a fix in this code area could itself introduce a security regression, it's Critical. Never auto-fix auth, tenancy, migrations, or encryption.
 
 ### 8. ACT
 
@@ -172,11 +172,11 @@ Every attempt's hypothesis, diff, and outcome is logged in the report's "Auto-fi
 
 When a High finding is fixed and the matrix is clean (re-run produced no regressions), write a Pest browser test capturing the bug's repro.
 
-**Test placement (decide at runtime — match existing convention):**
+**Test placement (decide at runtime, matching existing convention):**
 
 1. Search recursively for related test files: `find tests -iname '*<resource>*' -type f` and `find tests -path '*<feature-keyword>*' -type f`. Real Relaticle layout puts Filament tests under `tests/Feature/Filament/...` and `tests/Browser/CRM/...` (subdirectories), not flat.
 2. Default to a **Pest Livewire feature test** for Filament/Livewire validation/action bugs (uses `livewire()` helper). Use a **Pest browser test** only when the bug genuinely requires a real browser (JS, CSS, multi-page).
-3. Examples (verify at runtime — paths are illustrative):
+3. Examples (paths are illustrative, so verify at runtime):
    - Bug in a Filament Resource form-field validation → likely target: `tests/Feature/Filament/App/Resources/<Name>ResourceTest.php`
    - Bug in MCP tool → likely target: `tests/Feature/Mcp/<Name>Test.php`
    - Bug requiring real browser → likely target: `tests/Browser/CRM/<Name>BrowserTest.php`
@@ -205,7 +205,7 @@ it('regresses <bug-slug>: <one-line summary>', function () {
 **Promotion gates** (all must pass):
 
 1. RIMGEA-Generalize was run. If sibling resources had the same bug, **one test per affected resource**.
-2. De-duplication: `grep -r "regresses <bug-slug>"` against `tests/`. If found, skip — already locked in.
+2. De-duplication: `grep -r "regresses <bug-slug>"` against `tests/`. If found, skip it; that regression is already locked in.
 3. Test runs and **passes**: `php artisan test --compact --filter="regresses <bug-slug>"`. A test that doesn't actually run is worse than no test.
 
 **Tests are staged but not committed.** They show up in `git status` for the user to review and commit alongside the fix. Respects the "don't commit unless asked" rule.
@@ -228,7 +228,7 @@ Update `.context/testing/state.json` with:
 }
 ```
 
-(Increment running totals — read prior state, add this run's counts. If `.context/testing/state.json` does not exist on first run, initialize all running totals to 0 before adding this run's counts.)
+(Increment running totals: read prior state, then add this run's counts. If `.context/testing/state.json` does not exist on first run, initialize all running totals to 0 before adding this run's counts.)
 
 Update `.context/testing/last-run.json` with the current turn id (for the Stop hook to skip):
 
@@ -236,31 +236,31 @@ Update `.context/testing/last-run.json` with the current turn id (for the Stop h
 {"turn_id": "<CLAUDE_TURN_ID or session id>", "ran_at": "<ISO timestamp>"}
 ```
 
-In Claude's chat reply: a **tight summary** — severity counts, fixed/deferred breakdown, regression tests written, link to the full report. No more.
+In Claude's chat reply: a **tight summary** covering severity counts, the fixed and deferred breakdown, regression tests written, and a link to the full report. No more.
 
 Example chat-reply summary:
 
-> Manual-testing run complete (deep tier, 14 min, 22/25 cells). 1 Critical (multi-tenant leak in TaskPolicy — BLOCKED, awaiting your triage), 2 High (both auto-fixed, 1 regression test written), 4 Medium, 1 Low. Full report: `.context/testing/reports/2026-05-05-1432-task-policy-refactor.md`.
+> Manual-testing run complete (deep tier, 14 min, 22/25 cells). 1 Critical (multi-tenant leak in TaskPolicy, BLOCKED awaiting your triage), 2 High (both auto-fixed, 1 regression test written), 4 Medium, 1 Low. Full report: `.context/testing/reports/2026-05-05-1432-task-policy-refactor.md`.
 
 ## References
 
 The skill loads references conditionally based on the current charter. The full set:
 
-- `references/risk-rubric.md` — Likelihood × Impact scoring + high-impact tag list + score → action gates + surface scoping
-- `references/personas.md` — 8 personas (Default + 7 archetypes) and tier → persona-set mapping
-- `references/oracles.md` — FEW HICCUPPS oracle catalogue + Image-oracle 12-item rubric
-- `references/tours.md` — 8 Whittaker-style exploration tours and surface → tour mapping; Supermodel is mandatory on browser surfaces and uncapped by tier
-- `references/surfaces.md` — Filament UI / Livewire / REST API / MCP playbooks
-- `references/visual-probes.md` — 8 deterministic `agent-browser eval` probes (overflow, clipping, tap-target, stuck-loading, image hygiene, focus, contrast, layout shift) + viewport sweep + state-explosion checklist (loaded in EXECUTE on browser surfaces)
-- `references/multi-tenant-checklist.md` — Cross-Tenant Spy 5-check protocol (non-negotiable when policy/model/scope path touched)
-- `references/data-nasties.md` — boundary/garbage payload library, including 22-custom-field-type sub-sections
+- `references/risk-rubric.md`: Likelihood × Impact scoring + high-impact tag list + score → action gates + surface scoping
+- `references/personas.md`: 8 personas (Default + 7 archetypes) and tier → persona-set mapping
+- `references/oracles.md`: FEW HICCUPPS oracle catalogue + Image-oracle 12-item rubric
+- `references/tours.md`: 8 Whittaker-style exploration tours and surface → tour mapping; Supermodel is mandatory on browser surfaces and uncapped by tier
+- `references/surfaces.md`: Filament UI / Livewire / REST API / MCP playbooks
+- `references/visual-probes.md`: 8 deterministic `agent-browser eval` probes (overflow, clipping, tap-target, stuck-loading, image hygiene, focus, contrast, layout shift) + viewport sweep + state-explosion checklist (loaded in EXECUTE on browser surfaces)
+- `references/multi-tenant-checklist.md`: Cross-Tenant Spy 5-check protocol (non-negotiable when policy/model/scope path touched)
+- `references/data-nasties.md`: boundary/garbage payload library, including 22-custom-field-type sub-sections
 
 Templates:
 
-- `templates/charter.md` — SBTM charter template (loaded at CHARTER phase)
-- `templates/report.md` — PROOF debrief + RIMGEA finding template (loaded at REPORT phase)
-- `templates/regression-test.php.stub` — Pest 4 regression test stub with Livewire/Browser dual-template (loaded at PROMOTE phase)
+- `templates/charter.md`: SBTM charter template (loaded at CHARTER phase)
+- `templates/report.md`: PROOF debrief + RIMGEA finding template (loaded at REPORT phase)
+- `templates/regression-test.php.stub`: Pest 4 regression test stub with Livewire/Browser dual-template (loaded at PROMOTE phase)
 
 Helper script:
 
-- `bin/should-skip.sh` — diff-testability gate (called at DETECT phase and by the Stop hook)
+- `bin/should-skip.sh`: diff-testability gate (called at DETECT phase and by the Stop hook)

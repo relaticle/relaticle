@@ -17,18 +17,6 @@ it('renders the team-name banner on login when intended url is a join link', fun
         ->assertSee('Acme Co');
 });
 
-it('renders the team-name banner on register when intended url is a join link', function (): void {
-    $owner = User::factory()->create();
-    $team = Team::factory()->create(['name' => 'Acme Co', 'user_id' => $owner->id]);
-
-    session(['url.intended' => route('teams.join', ['token' => $team->invite_link_token])]);
-
-    $this->get('/app/register')
-        ->assertOk()
-        ->assertSee("You've been invited to join", false)
-        ->assertSee('Acme Co');
-});
-
 it('does not render the banner when the join token has expired', function (): void {
     $owner = User::factory()->create();
     $team = Team::factory()->create(['name' => 'Stale Team', 'user_id' => $owner->id]);

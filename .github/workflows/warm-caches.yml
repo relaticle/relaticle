@@ -1,0 +1,45 @@
+name: Warm Caches
+
+# Tag-triggered release runs can only restore caches created on the default branch,
+# and only pull_request workflows saved composer caches, so every release ran cold.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - composer.lock
+      - .github/workflows/warm-caches.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composer:
+    runs-on: ubuntu-latest
+    name: Warm Composer Cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader

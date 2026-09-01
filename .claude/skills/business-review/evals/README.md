@@ -1,4 +1,4 @@
-# Evals — failure-mode regression locks
+# Evals: failure-mode regression locks
 
 Each fixture freezes a NAMED historical failure so the deterministic spine can never
 regress to it silently:
@@ -20,7 +20,7 @@ python3 scripts/classify_diff.py --test && python3 scripts/compute_tier.py --tes
   && python3 scripts/validate_plan.py --test && python3 scripts/aggregate_verdicts.py --test
 ```
 
-All must pass after ANY skill edit (not quarterly — per edit). Promote interesting real
+All must pass after ANY skill edit, per edit rather than quarterly. Promote interesting real
 runs to fixtures with `scripts/promote_to_fixture.py`. The LLM drift-check
 (`scripts/run_drift_check.py` + `grader-rubric.json` + `agents/grader.md`) grades REVIEW.md
-prose quality — run it after substantive report-shape changes.
+prose quality, so run it after substantive report-shape changes.

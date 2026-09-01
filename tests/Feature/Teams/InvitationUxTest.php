@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\SubscriberTagEnum;
-use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Auth\Login;
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -12,37 +11,31 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 
-test('guest with no account clicking invitation link is redirected to register page', function () {
+mutates(Login::class);
+
+test('guest clicking a team invitation link is redirected to the login page', function (bool $accountExists): void {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
+    $email = $accountExists ? 'existing@example.com' : 'newuser@example.com';
+
+    if ($accountExists) {
+        User::factory()->create(['email' => $email]);
+    }
 
     $invitation = TeamInvitation::factory()->create([
         'team_id' => $team->id,
-        'email' => 'newuser@example.com',
-    ]);
-
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-
-    $this->get($acceptUrl)
-        ->assertRedirect(Filament::getRegistrationUrl());
-});
-
-test('guest with existing account clicking invitation link is redirected to login page', function () {
-    $team = Team::factory()->create(['name' => 'Acme Corp']);
-
-    User::factory()->create(['email' => 'existing@example.com']);
-
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $team->id,
-        'email' => 'existing@example.com',
+        'email' => $email,
     ]);
 
     $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
 
     $this->get($acceptUrl)
         ->assertRedirect(Filament::getLoginUrl());
-});
+})->with([
+    'no existing account' => false,
+    'existing account' => true,
+]);
 
-test('guest clicking invitation link sees team name and sign-up link on login page', function () {
+test('guest clicking invitation link sees the team name banner on the login page', function () {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
 
     $invitation = TeamInvitation::factory()->create([
@@ -55,86 +48,15 @@ test('guest clicking invitation link sees team name and sign-up link on login pa
     $this->get($acceptUrl);
 
     $this->get(route('filament.app.auth.login'))
-        ->assertSee('Acme Corp')
-        ->assertSee('sign up', escape: false);
+        ->assertSee('Acme Corp');
 });
 
-test('login page without invitation shows default subheading unchanged', function () {
+test('login page without an invitation shows no invitation banner', function () {
     $this->get(route('filament.app.auth.login'))
-        ->assertSee('sign up', escape: false)
         ->assertDontSee('invited to join');
 });
 
-test('guest clicking invitation link sees team name and sign-in link on register page', function () {
-    $team = Team::factory()->create(['name' => 'Acme Corp']);
-
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $team->id,
-        'email' => 'newuser@example.com',
-    ]);
-
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-
-    $this->get($acceptUrl)
-        ->assertRedirect(Filament::getRegistrationUrl());
-
-    $this->get(route('filament.app.auth.register'))
-        ->assertSee('Acme Corp')
-        ->assertSee('sign in', escape: false);
-});
-
-test('register page without invitation shows default subheading unchanged', function () {
-    $this->get(route('filament.app.auth.register'))
-        ->assertSee('sign in', escape: false)
-        ->assertDontSee('invited to join');
-});
-
-test('user registering via invitation link gets auto-verified email', function () {
-    $team = Team::factory()->create();
-
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $team->id,
-        'email' => 'newuser@gmail.com',
-    ]);
-
-    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
-
-    // Simulate guest hitting invite link (sets url.intended in session)
-    $this->get($acceptUrl);
-
-    // Register via Filament's Livewire component
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'New User',
-            'email' => 'newuser@gmail.com',
-            'password' => 'password',
-            'passwordConfirmation' => 'password',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    $user = User::where('email', 'newuser@gmail.com')->first();
-    expect($user)->not->toBeNull();
-    expect($user->hasVerifiedEmail())->toBeTrue();
-});
-
-test('user registering without invitation link does not get auto-verified', function () {
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Normal User',
-            'email' => 'normaluser@gmail.com',
-            'password' => 'password',
-            'passwordConfirmation' => 'password',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    $user = User::where('email', 'normaluser@gmail.com')->first();
-    expect($user)->not->toBeNull();
-    expect($user->hasVerifiedEmail())->toBeFalse();
-});
-
-test('user registering with different email than invitation does not get auto-verified', function () {
+test('signing up with a different email than the invitation does not get auto-verified', function () {
     $team = Team::factory()->create();
 
     $invitation = TeamInvitation::factory()->create([
@@ -146,22 +68,47 @@ test('user registering with different email than invitation does not get auto-ve
 
     $this->get($acceptUrl);
 
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Different User',
-            'email' => 'different@gmail.com',
-            'password' => 'password',
-            'passwordConfirmation' => 'password',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    livewire(Login::class)
+        ->fillForm(['email' => 'different@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
 
     $user = User::where('email', 'different@gmail.com')->first();
     expect($user)->not->toBeNull();
     expect($user->hasVerifiedEmail())->toBeFalse();
 });
 
-test('user registering via invitation link gets mailcoach subscriber synced', function (): void {
+test('a mixed-case invitation still auto-verifies the signup for that mailbox', function (): void {
+    $team = Team::factory()->create();
+
+    $invitation = TeamInvitation::factory()->create([
+        'team_id' => $team->id,
+        'email' => 'Invited-Case@Gmail.com',
+    ]);
+
+    expect($invitation->refresh()->email)->toBe('invited-case@gmail.com');
+
+    $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
+
+    $this->get($acceptUrl);
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'INVITED-CASE@GMAIL.COM'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', 'invited-case@gmail.com')->first();
+    expect($user)->not->toBeNull();
+    expect($user->hasVerifiedEmail())->toBeTrue();
+});
+
+test('signing up via an invitation link gets a mailcoach subscriber synced', function (): void {
     Queue::fake([SyncSubscriberJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
     config()->set('mailcoach-sdk.subscribers_list_id', 'test-list-id');
@@ -177,44 +124,33 @@ test('user registering via invitation link gets mailcoach subscriber synced', fu
 
     $this->get($acceptUrl);
 
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Invited User',
-            'email' => 'invited@gmail.com',
-            'password' => 'password',
-            'passwordConfirmation' => 'password',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    livewire(Login::class)
+        ->fillForm(['email' => 'invited@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
 
     $user = User::where('email', 'invited@gmail.com')->first();
     expect($user)->not->toBeNull();
     expect($user->hasVerifiedEmail())->toBeTrue();
 
-    Queue::assertPushed(SyncSubscriberJob::class, function (SyncSubscriberJob $job) use ($user): bool {
-        $data = invade($job)->data;
-
-        return $data->email === $user->email
-            && in_array(SubscriberTagEnum::Verified->value, $data->tags, true)
-            && in_array(SubscriberTagEnum::SignupSourceOrganic->value, $data->tags, true)
-            && $data->user_id === (string) $user->id;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
-test('user registering without invitation does not trigger subscriber sync', function (): void {
+test('signing up without an invitation does not trigger subscriber sync', function (): void {
     Queue::fake([SyncSubscriberJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
     config()->set('mailcoach-sdk.subscribers_list_id', 'test-list-id');
 
-    livewire(Register::class)
-        ->fillForm([
-            'name' => 'Normal User',
-            'email' => 'noninvited@gmail.com',
-            'password' => 'password',
-            'passwordConfirmation' => 'password',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    livewire(Login::class)
+        ->fillForm(['email' => 'noninvited@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoErrors();
 
     $user = User::where('email', 'noninvited@gmail.com')->first();
     expect($user)->not->toBeNull();
@@ -223,7 +159,7 @@ test('user registering without invitation does not trigger subscriber sync', fun
     Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('register page prefills the invited email address', function (): void {
+test('login page prefills the invited email address', function (): void {
     $team = Team::factory()->create(['name' => 'Acme Corp']);
 
     $invitation = TeamInvitation::factory()->create([
@@ -233,15 +169,15 @@ test('register page prefills the invited email address', function (): void {
 
     $acceptUrl = URL::signedRoute('team-invitations.accept', ['invitation' => $invitation]);
 
-    $this->get($acceptUrl)->assertRedirect(Filament::getRegistrationUrl());
+    $this->get($acceptUrl)->assertRedirect(Filament::getLoginUrl());
 
-    livewire(Register::class)
+    livewire(Login::class)
         ->assertSuccessful()
         ->assertFormSet(['email' => 'invited.person@example.com']);
 });
 
-test('register page without an invitation leaves the email blank', function (): void {
-    livewire(Register::class)
+test('login page without an invitation leaves the email blank', function (): void {
+    livewire(Login::class)
         ->assertSuccessful()
         ->assertFormSet(['email' => null]);
 });

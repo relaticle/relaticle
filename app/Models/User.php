@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
@@ -33,6 +34,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Jetstream\Jetstream;
@@ -51,7 +54,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
- * @property string|null $subscriber_recency_bucket
+ * @property string|null $subscriber_profile_hash
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
@@ -79,10 +82,10 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
     'two_factor_recovery_codes',
     'two_factor_secret',
     'mailcoach_subscriber_uuid',
-    'subscriber_recency_bucket',
+    'subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -93,6 +96,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use HasTeams;
     use HasUlids;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
     /**
@@ -103,6 +107,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
@@ -124,7 +129,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * The zone this user's calendar is expressed in. `timezone` is nullable: a user
      * who never chose one and whose browser was never detected falls back to the app
      * default, so every caller that turns a stored UTC value into a wall clock reads
      * it from here rather than repeating the fallback.
@@ -147,6 +152,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->password !== null;
     }
 
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
+    }
+
     public function isScheduledForDeletion(): bool
     {
         return $this->scheduled_deletion_at !== null;
@@ -164,7 +174,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Members of a workspace: the `team_user` pivot plus the owner, who has no
-     * pivot row — the same two sources App\Support\TenantFkValidator checks.
+     * pivot row: the same two sources App\Support\TenantFkValidator checks.
      *
      * Deliberately not `current_team_id`: that column is only a user's *active*
      * workspace, so a member who is currently working in another one would drop
@@ -225,7 +235,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
-     * verified — every framework, Filament, and policy check that reads
+     * verified, so every framework, Filament, and policy check that reads
      * hasVerifiedEmail() honors the flag uniformly through this single override.
      */
     public function hasVerifiedEmail(): bool
@@ -292,7 +302,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * The ids of every team the user can reach, owned or joined.
      *
      * Authorization runs once per table row, so resolving a record's `team`
-     * relation inside a policy costs a query per row — and throws once a query
+     * relation inside a policy costs a query per row, and throws once a query
      * hydrates more than one row, because that is when Eloquent arms its strict
      * lazy-loading guard. Matching the record's foreign key against this set
      * keeps authorization off the record's relations entirely.

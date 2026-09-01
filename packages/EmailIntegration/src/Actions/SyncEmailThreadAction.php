@@ -40,7 +40,7 @@ final readonly class SyncEmailThreadAction
         // Atomic upsert (INSERT ... ON CONFLICT DO UPDATE) rather than updateOrCreate:
         // StoreEmailJob runs one job per message, so parallel workers can sync the same
         // thread concurrently. A SELECT-then-INSERT would race on the unique
-        // (connected_account_id, thread_id) index — and the resulting violation would
+        // (connected_account_id, thread_id) index, and the resulting violation would
         // abort StoreEmailAction's surrounding transaction. A single statement avoids both.
         EmailThread::query()->upsert(
             [[

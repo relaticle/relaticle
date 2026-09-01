@@ -1,6 +1,6 @@
 @props(['email'])
 
-{{-- Rendered inline inside the email header action cluster — no chrome of its own. --}}
+{{-- Rendered inline inside the email header action cluster, with no chrome of its own. --}}
 @php
     $authUser         = auth()->user();
     $isOwner          = $email->user_id === $authUser->getKey();

@@ -49,12 +49,12 @@ abstract class TestCase extends BaseTestCase
         // InstallCommand shells out to composer, npm and vite. Running those for
         // real cost ~110s and rewrote public/build on every suite run, so any new
         // stray process should fail loudly rather than quietly slow the suite.
-        // Only covers the Process facade — vendor code using Symfony's Process
+        // Only covers the Process facade. Vendor code using Symfony's Process
         // directly (e.g. Shiki) is not intercepted.
         Process::preventStrayProcesses();
 
         // TeamFactory creates personal teams, which fire CreateTeamCustomFields
-        // and seed a full demo workspace — ~91 extra rows per team, the majority
+        // and seed a full demo workspace, ~91 extra rows per team, the majority
         // of every insert this suite performs. Tests that exercise onboarding or
         // read demo data re-enable it explicitly.
         Feature::define(OnboardSeed::class, false);

@@ -122,7 +122,7 @@ return [
     | off to keep the truncated message as the permanent title.
     |
     | The title runs on the cheapest model of whichever provider served the
-    | turn — override that per provider with
+    | turn. Override that per provider with
     | `ai.providers.<name>.models.text.cheapest`.
     */
 
@@ -169,7 +169,7 @@ return [
     |
     | Maximum number of custom fields per entity type (across all entities of
     | that type for a tenant) and maximum options per choice field. Enforced
-    | server-side in the action layer — never via prompt text only.
+    | server-side in the action layer, never via prompt text only.
     */
 
     'max_custom_fields_per_entity' => (int) env('CHAT_MAX_CUSTOM_FIELDS_PER_ENTITY', 50),
@@ -186,9 +186,9 @@ return [
     | self-hosted ones are merged in from SELF_HOSTED_AI_* / OLLAMA_* env at read
     | time, so `.env` stays their single source of truth.
     |
-    | Per entry: `model` is the provider's own tag AND the entry's identity — the
+    | Per entry: `model` is the provider's own tag AND the entry's identity: the
     | value the picker stores, `?model=` carries and `ai_credit_transactions.model`
-    | already records — so it is unique across the catalog and retagging a row makes
+    | already records. It is unique across the catalog, and retagging a row makes
     | it a different model. `auto` plus list order is the Auto failover chain, so it
     | cannot name a model nobody offers. `capabilities` is measured by ModelProbe
     | against a real request, never typed. A disabled entry stays only to price

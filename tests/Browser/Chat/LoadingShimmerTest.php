@@ -10,10 +10,7 @@ it('renders a single shimmer indicator with default label when streaming starts 
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -50,10 +47,7 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
@@ -92,10 +86,7 @@ it('removes the shimmer once content arrives in the latest assistant message', f
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');

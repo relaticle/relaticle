@@ -20,7 +20,7 @@ parameters:
             identifier: argument.type
             path: app/Http/Middleware/ValidateSignature.php
 
-        # i18n: Console output is dev/internal-facing — not user-facing UI strings
+        # i18n: Console output is dev/internal-facing, not user-facing UI strings
         -
             identifier: app.i18n.hardcodedUserFacingString
             path: app/Console/*
@@ -81,11 +81,8 @@ parameters:
             reportUnmatched: false
 
         # Writes outside actions: grandfathered violations (32 as of 2026-06-12).
-        # Move each file's writes into app/Actions, then remove its entry —
+        # Move each file's writes into app/Actions, then remove its entry.
         # PHPStan fails on unmatched ignores, so stale entries can't linger.
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Filament/Pages/Auth/Register.php
         -
             identifier: app.architecture.eloquentWriteOutsideAction
             path: app/Filament/Pages/CreateTeam.php
@@ -126,7 +123,7 @@ parameters:
         - routes
 
     excludePaths:
-        # Deferred (measured 2026-06-12: 306 errors — 213 i18n, by design: the
+        # Deferred (measured 2026-06-12: 306 errors, of which 213 i18n, by design: the
         # internal sysadmin panel is English-only; 92 type issues, 67 of them one
         # identical.alwaysTrue cluster). Re-include when SystemAdmin gets dev time.
         - packages/SystemAdmin

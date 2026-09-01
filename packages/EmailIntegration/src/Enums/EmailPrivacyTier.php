@@ -29,7 +29,7 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
     public function getDescription(): string
     {
         return match ($this) {
-            self::PRIVATE => 'Nothing is shared — these emails stay visible to you alone',
+            self::PRIVATE => 'Nothing is shared. These emails stay visible to you alone',
             self::METADATA_ONLY => 'The email participants and timestamp will be visible to anyone in your workspace',
             self::SUBJECT => "We'll share the subject, participants and timestamp with anyone in your workspace",
             self::FULL => 'Everything is shared with your workspace (including the body, subject line, attachments)',

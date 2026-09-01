@@ -109,12 +109,12 @@ it('draws a distinct icon for every name the navigation declares', function (): 
         ->unique()
         ->values();
 
-    // An unknown name falls back to the `features` glyph rather than blowing up,
-    // so a rename would silently draw the wrong figure. Distinct output is what
-    // proves each declared name still has its own drawing.
+    // Every declared name has to resolve to its own `icons.*` component:
+    // rendering throws on a missing one, and distinct output is what proves
+    // two names don't share a drawing.
     $drawings = $icons->map(fn (string $name): string => Blade::render(
-        '<x-brand.nav-icon :name="$name"/>',
-        ['name' => $name],
+        '<x-dynamic-component :component="$component"/>',
+        ['component' => 'icons.'.$name],
     ));
 
     expect($icons)->not->toBeEmpty()

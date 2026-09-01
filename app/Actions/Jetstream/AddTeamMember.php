@@ -6,6 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Support\EmailAddress;
 use Closure;
 use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -26,6 +27,8 @@ final readonly class AddTeamMember implements AddsTeamMembers
     public function add(User $user, Team $team, string $email, ?string $role = null): void
     {
         Gate::forUser($user)->authorize('addTeamMember', $team);
+
+        $email = EmailAddress::canonicalize($email);
 
         $this->validate($team, $email, $role);
 

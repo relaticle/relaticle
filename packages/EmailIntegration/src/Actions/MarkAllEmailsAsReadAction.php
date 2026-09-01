@@ -25,7 +25,7 @@ final readonly class MarkAllEmailsAsReadAction
      * folders) resolve to zero matches and the action is a no-op there.
      *
      * When $record is given (a Company/People/Opportunity record page), only that
-     * record's emails are marked — not the user's whole team inbox.
+     * record's emails are marked, not the user's whole team inbox.
      */
     public function execute(User $user, EmailFolder $folder, Company|Opportunity|People|null $record = null): int
     {
@@ -39,7 +39,7 @@ final readonly class MarkAllEmailsAsReadAction
             $query->inbox();
         }
 
-        // Qualify the column — the record-scoped path joins through `emailables`,
+        // Qualify the column: the record-scoped path joins through `emailables`,
         // where a bare "id" is ambiguous.
         $emailIds = $query->pluck('emails.id');
 
@@ -50,7 +50,7 @@ final readonly class MarkAllEmailsAsReadAction
         $now = now();
 
         // Every matched id is guaranteed absent from email_reads (unreadFor filters
-        // on that), so a single bulk insert is safe — no conflict handling needed.
+        // on that), so a single bulk insert is safe with no conflict handling.
         EmailRead::query()->insert($emailIds->map(fn (string $emailId): array => [
             'id' => (string) Str::ulid(),
             'email_id' => $emailId,

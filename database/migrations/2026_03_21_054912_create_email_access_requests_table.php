@@ -22,7 +22,7 @@ return new class extends Migration
                 ->constrained('emails')
                 ->nullOnDelete();
 
-            // Record-level request (nullable) — e.g. "all emails on this Person"
+            // Record-level request (nullable), e.g. "all emails on this Person"
             $table->string('emailable_type')->nullable();
             $table->ulid('emailable_id')->nullable();
 

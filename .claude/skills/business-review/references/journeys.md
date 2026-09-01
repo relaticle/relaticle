@@ -1,4 +1,4 @@
-# Journeys — synthesized from the diff, anchored by Relaticle CRM priors
+# Journeys: synthesized from the diff, anchored by Relaticle CRM priors
 
 The unit of review is a **journey**: a user-facing value arc the diff affects. The
 `journey-synthesizer` agent derives this run's journeys from (1) the diff's touched
@@ -21,19 +21,19 @@ and skip priors the diff doesn't touch.
 | J9 | Sysadmin panel: login → resource lists render → record visibility | sysadmin | non-sysadmin denied, new enum cases render in tables (REG-001), minimal depth (internal panel) |
 | J10 | Notifications/real-time: action → toast/broadcast received | team-owner | Reverb connected, toast content, auto-dismiss, stacking |
 
-## Synthesis rules (same engine as universal — full schema in `agents/journey-synthesizer.md`)
+## Synthesis rules (same engine as universal; full schema in `agents/journey-synthesizer.md`)
 
 1. **Start from touched surfaces**; group surfaces in the same value arc (form +
    controller/action + result view = ONE arc).
 2. **Name the value via the profile** ("a team-owner imports companies and sees them in
    the list", not "ImportWizard changed").
-3. **Happy path first, then sad paths** — ≥1 sad path per journey (≥2 at Tier 3),
+3. **Happy path first, then sad paths**, with ≥1 sad path per journey (≥2 at Tier 3),
    anchored on the **seam** (the hand-off where two surfaces meet under an unusual
    condition). Always include the unhappy branch of any NEW conditional in the diff.
 4. **Assign personas + subsystem tokens**; mark `synthesized: true` (validator then skips
    catalog-id resolution; a prior-based journey may keep its J-id).
 5. **Author → persist → consume**: when the diff touches an authoring surface (a form,
-   wizard, composer), the happy path MUST drive the real save and confirm persistence —
+   wizard, composer), the happy path MUST drive the real save and confirm persistence,
    never substitute a pre-seeded record for the thing under test. Consumption-only
    coverage of an authoring change is the dodge `validate_plan` exists to reject.
 6. **Regression checks ride journeys**: every matched `regression-checks.json` entry is
@@ -43,12 +43,12 @@ and skip priors the diff doesn't touch.
 ## Generic sad-path heuristics (apply whichever fit; the seam decides)
 
 empty/invalid/oversized input · steps out of order · destructive-then-recreate ·
-permission/tenant boundary crossing (mandatory — multi-tenant app) · duplicate/
+permission/tenant boundary crossing (mandatory in a multi-tenant app) · duplicate/
 double-submit · abandon-and-return mid-flow · the unhappy branch of every new conditional.
 
 ## Hard rules
 
-- Every journey's `surfaces` must contain ≥1 real touched file/route from the diff —
+- Every journey's `surfaces` must contain ≥1 real touched file/route from the diff,
   no faked breadth. Don't synthesize arcs the product doesn't have.
 - Infra-only diff (no user-facing surface): synthesize none, emit `no_surface_reason`,
   verdict path is an honest `ai-needs-human` (no test-suite fallback exists).
@@ -57,7 +57,7 @@ double-submit · abandon-and-return mid-flow · the unhappy branch of every new 
 Output: `$REVIEW_DIR/journey-map.json`, folded into plan frontmatter, validated by
 `scripts/validate_plan.py` before the fleet launches.
 
-## Plan-frontmatter schema (canonical — write it right the first time)
+## Plan-frontmatter schema (canonical, so write it right the first time)
 
 The exact field names `validate_plan.py` + `aggregate_verdicts.py` consume (guessing
 them cost the 2026-06-12 run three validation round-trips):

@@ -15,7 +15,7 @@ use PHPStan\Rules\RuleErrorBuilder;
  * Flags hardcoded user-facing strings used as the default value of
  * static class properties (e.g. Filament's $navigationLabel,
  * $navigationGroup). Static properties are evaluated at class load
- * before locale resolution, so __() doesn't work in them — the
+ * before locale resolution, so __() doesn't work in them. The
  * property must be null and the matching getter must override with __().
  *
  * @implements Rule<Property>

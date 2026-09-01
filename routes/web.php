@@ -17,6 +17,7 @@ use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Response;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
@@ -47,10 +48,24 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 
-    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('register')))->name('register');
+    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
 
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
 });
+
+Route::get('/.well-known/security.txt', function (): Response {
+    $lines = [
+        'Contact: mailto:security@relaticle.com',
+        'Expires: '.now()->addMonths(6)->toIso8601ZuluString(),
+        'Preferred-Languages: en',
+        'Canonical: '.url('/.well-known/security.txt'),
+    ];
+
+    return response(implode("\n", $lines)."\n", Response::HTTP_OK, [
+        'Content-Type' => 'text/plain; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->name('securityTxt');
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);

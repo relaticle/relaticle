@@ -1,27 +1,28 @@
 <x-documentation::shell
-    :title="$page->title . ' - ' . config('app.name')"
+    :title="__(':title - :brand Help Centre', ['title' => $page->title, 'brand' => config('app.name')])"
     :description="$page->description"
+    og-type="article"
     :nav="$nav"
     :current-path="$currentPath">
-    <x-slot:breadcrumbs>
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help Centre') }}</a></li>
-            @if($category)
-                <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
-                <li><a href="{{ route('help.category', ['category' => $page->category]) }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ $category->title }}</a></li>
-            @endif
-            <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
-            <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
-        </ol>
-    </x-slot:breadcrumbs>
-
     <x-documentation::article
         :page="$page"
         :body="$body"
         :headings="$headings"
         :related="$related"
         :eyebrow="$category?->title"
-        :eyebrow-url="$category ? route('help.category', ['category' => $page->category]) : null" />
+        :eyebrow-url="$category ? route('help.category', ['category' => $page->category]) : null">
+        <x-slot:breadcrumbs>
+            <ol class="flex flex-wrap items-center gap-2">
+                <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help Centre') }}</a></li>
+                @if($category)
+                    <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
+                    <li><a href="{{ route('help.category', ['category' => $page->category]) }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ $category->title }}</a></li>
+                @endif
+                <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
+                <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
+            </ol>
+        </x-slot:breadcrumbs>
+    </x-documentation::article>
 
     @php
         $breadcrumbTrail = [

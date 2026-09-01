@@ -190,7 +190,7 @@ it('ignores zero-token settlement rows instead of listing them as unpriced model
     app()->forgetInstance(ModelRegistry::class);
 
     // settleReservedMinimum() books cancelled and timed-out turns under this
-    // synthetic model with zero tokens — they cost nothing to serve.
+    // synthetic model with zero tokens; they cost nothing to serve.
     AiCreditTransaction::factory()->create([
         'type' => AiCreditType::Chat,
         'model' => 'incomplete',

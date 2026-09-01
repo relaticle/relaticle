@@ -75,7 +75,7 @@ it('anchors the reset period to the subscription anniversary, not the calendar m
         'credits_remaining' => 0,
         'credits_used' => 100,
         'period_starts_at' => now()->subMonth()->subDays(5),
-        'period_ends_at' => now()->subDays(5), // ended 2026-06-20 — sweep must fire
+        'period_ends_at' => now()->subDays(5), // ended 2026-06-20, so the sweep must fire
     ]);
 
     $this->artisan('chat:reset-credits')->assertSuccessful();
@@ -112,7 +112,7 @@ it('clamps anniversary cycles for month-end anchors without drifting', function 
     $this->artisan('chat:reset-credits')->assertSuccessful();
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
-    // Cycle containing Mar 5: [Feb 28 10:00, Mar 31 10:00) — both computed from the Jan 31 anchor.
+    // Cycle containing Mar 5: [Feb 28 10:00, Mar 31 10:00), both computed from the Jan 31 anchor.
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-02-28 10:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-03-31 10:00:00');
 });

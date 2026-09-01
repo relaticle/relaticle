@@ -2,22 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
 
 beforeEach(function (): void {
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
     config()->set('mailcoach-sdk.enabled_subscribers_sync', true);
 });
 
-test('creating the first company dispatches has-crm-data tag job', function (): void {
-    $user = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-123',
-    ]);
+test('creating the first company dispatches a profile sync', function (): void {
+    $user = User::factory()->withTeam()->create();
 
     $this->actingAs($user);
 
@@ -26,17 +22,11 @@ test('creating the first company dispatches has-crm-data tag job', function (): 
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
-        return invade($job)->userId === (string) $user->id
-            && invade($job)->tags === [SubscriberTagEnum::HasCrmData->value]
-            && invade($job)->action === TagAction::Add;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
-test('creating a second company does not dispatch the tag job again', function (): void {
-    $user = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-123',
-    ]);
+test('creating a second company does not dispatch a sync again', function (): void {
+    $user = User::factory()->withTeam()->create();
 
     $this->actingAs($user);
 
@@ -45,17 +35,17 @@ test('creating a second company does not dispatch the tag job again', function (
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
 
     Company::factory()->create([
         'team_id' => $user->currentTeam->id,
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('user without mailcoach uuid does not dispatch tag job', function (): void {
+test('dispatches even when the user has no mailcoach uuid yet', function (): void {
     $user = User::factory()->withTeam()->create([
         'mailcoach_subscriber_uuid' => null,
     ]);
@@ -67,15 +57,13 @@ test('user without mailcoach uuid does not dispatch tag job', function (): void 
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
-test('creating company when sync is disabled does not dispatch tag job', function (): void {
+test('creating company when sync is disabled does not dispatch', function (): void {
     config()->set('mailcoach-sdk.enabled_subscribers_sync', false);
 
-    $user = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-123',
-    ]);
+    $user = User::factory()->withTeam()->create();
 
     $this->actingAs($user);
 
@@ -84,33 +72,25 @@ test('creating company when sync is disabled does not dispatch tag job', functio
         'account_owner_id' => $user->id,
     ]);
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });
 
-test('creating first personal access token dispatches has-api-token tag job', function (): void {
-    $user = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-456',
-    ]);
+test('creating the first personal access token dispatches a profile sync', function (): void {
+    $user = User::factory()->withTeam()->create();
 
     $user->createToken('test-token', ['*']);
 
-    Queue::assertPushed(ModifySubscriberTagsJob::class, function (ModifySubscriberTagsJob $job) use ($user): bool {
-        return invade($job)->userId === (string) $user->id
-            && invade($job)->tags === [SubscriberTagEnum::HasApiToken->value]
-            && invade($job)->action === TagAction::Add;
-    });
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
-test('creating a second personal access token does not dispatch tag job again', function (): void {
-    $user = User::factory()->withTeam()->create([
-        'mailcoach_subscriber_uuid' => 'mc-uuid-456',
-    ]);
+test('creating a second personal access token does not dispatch again', function (): void {
+    $user = User::factory()->withTeam()->create();
 
     $user->createToken('first-token', ['*']);
 
-    Queue::fake([ModifySubscriberTagsJob::class]);
+    Queue::fake([SyncSubscriberJob::class]);
 
     $user->createToken('second-token', ['*']);
 
-    Queue::assertNotPushed(ModifySubscriberTagsJob::class);
+    Queue::assertNotPushed(SyncSubscriberJob::class);
 });

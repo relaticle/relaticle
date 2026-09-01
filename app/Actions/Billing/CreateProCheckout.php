@@ -15,7 +15,7 @@ final readonly class CreateProCheckout
 
     /**
      * Create the hosted Stripe Checkout session and return its redirect URL.
-     * Stripe round-trip — covered by the staging E2E checklist, not unit tests.
+     * Stripe round-trip, covered by the staging E2E checklist, not unit tests.
      */
     public function execute(Team $team, string $interval): string
     {
@@ -29,7 +29,7 @@ final readonly class CreateProCheckout
 
     private function priceId(string $interval): string
     {
-        // $interval arrives from the browser — pin it to the known intervals so
+        // $interval arrives from the browser, so pin it to the known intervals and
         // an arbitrary string never reaches a config lookup.
         throw_unless(in_array($interval, self::INTERVALS, true), InvalidArgumentException::class, "Unsupported billing interval [{$interval}].");
 

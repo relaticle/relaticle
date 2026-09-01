@@ -45,8 +45,8 @@ jobs:
           assert profile['role_credentials'], 'profile role_credentials empty'
           # The regression ledger is machine-local (~/.claude/business-review/relaticle/)
           # because it records production incident history and this repo is public.
-          # Committing it again is a leak — check_regressions.py --test covers its schema.
+          # Committing it again is a leak. check_regressions.py --test covers its schema.
           assert not pathlib.Path('regressions.json').exists(), \
-              'regressions.json must NOT be committed — the ledger is machine-local (see references/regression-ledger.md)'
+              'regressions.json must NOT be committed; the ledger is machine-local (see references/regression-ledger.md)'
           print('profile OK; ledger correctly absent from the repo')
           EOF

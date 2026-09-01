@@ -32,7 +32,7 @@ final readonly class GoogleClientFactory
 
         if ($client->isAccessTokenExpired()) {
             if (! $account->refresh_token) {
-                // No refresh token to recover with — surface as an auth error so the
+                // No refresh token to recover with, so surface an auth error and let the
                 // sync job flips the account to REAUTH_REQUIRED.
                 throw new RuntimeException("invalid_grant: missing refresh token for account {$account->getKey()}");
             }

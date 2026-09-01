@@ -6,7 +6,7 @@ namespace Relaticle\EmailIntegration\Support;
 
 /**
  * Resolves the registrable (organisational) label of a host using the Mozilla
- * Public Suffix List — the same data CRMs use to turn an email domain into a
+ * Public Suffix List, the same data CRMs use to turn an email domain into a
  * company identity. Implements the ICANN-section matching algorithm
  * (https://publicsuffix.org/list/): exception rules, wildcards, and the implicit
  * "*" default, so every TLD shape resolves correctly:
@@ -18,7 +18,7 @@ namespace Relaticle\EmailIntegration\Support;
  * Bind as a singleton: the list is parsed once per process from the bundled
  * snapshot in resources/public_suffix_list.dat.
  *
- * ponytail: ASCII/punycode hosts only — IDN U-label rules in the list aren't
+ * ponytail: ASCII/punycode hosts only. IDN U-label rules in the list aren't
  * normalised to match A-label email domains. B2B senders are ASCII; add an IDN
  * (idn_to_ascii) pass if internationalised domains ever appear.
  */
@@ -39,8 +39,8 @@ final class PublicSuffixList
     }
 
     /**
-     * The label immediately to the left of the public suffix — the part a company
-     * registered — or null when the host is itself a public suffix or has no
+     * The label immediately to the left of the public suffix, the part a company
+     * registered. Null when the host is itself a public suffix or has no
      * registrable label.
      */
     public function registrableLabel(string $host): ?string
@@ -90,7 +90,7 @@ final class PublicSuffixList
             return;
         }
 
-        // Only the ICANN section — private suffixes (github.io, blogspot.com) would
+        // Only the ICANN section: private suffixes (github.io, blogspot.com) would
         // wrongly split a real company domain into a "public suffix".
         $icann = strstr($contents, '// ===END ICANN DOMAINS===', true) ?: $contents;
 

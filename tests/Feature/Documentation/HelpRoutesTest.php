@@ -31,6 +31,17 @@ it('renders an article with its rendered body', function (): void {
         ->assertSee('Create your first company', false);
 });
 
+it('offers a direct contact path from the hub and the article footer', function (): void {
+    $this->get('/help')
+        ->assertOk()
+        ->assertSee(route('contact'), false);
+
+    $this->get('/help/getting-started/create-your-first-company')
+        ->assertOk()
+        ->assertSee(route('contact'), false)
+        ->assertSee('Contact support', false);
+});
+
 it('404s an unknown category and an unknown article', function (): void {
     $this->get('/help/no-such-category')->assertNotFound();
     $this->get('/help/getting-started/no-such-article')->assertNotFound();

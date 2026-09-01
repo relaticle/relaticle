@@ -107,7 +107,7 @@ final class MassSendBulkAction extends BulkAction
                 $user = auth()->user();
 
                 // Resolve each selected person's send-to address from the People EMAILS
-                // custom field — the canonical source LinkEmailAction matches participants
+                // custom field, the canonical source LinkEmailAction matches participants
                 // against. Resolving from participant rows alone would silently drop people
                 // you have never emailed (those rows are a side effect of past exchange).
                 $emailsField = CustomField::query()
@@ -121,7 +121,7 @@ final class MassSendBulkAction extends BulkAction
                 $recipients = [];
                 $skipped = 0;
 
-                // ponytail: getCustomFieldValue lazy-loads per person (N+1) — fine for a
+                // ponytail: getCustomFieldValue lazy-loads per person (N+1), fine for a
                 // manual bulk selection; eager-load customFieldValues if selections grow huge.
                 foreach ($records as $person) {
                     if (! $person instanceof People) {

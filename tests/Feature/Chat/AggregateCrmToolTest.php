@@ -63,7 +63,7 @@ it('groups opportunities by stage with correct count and total_amount', function
     $stage2Option = $stageOptions->skip(1)->first();
 
     // Create 2 opportunities in stage 1 (amounts: 1000 + 2500 = 3500)
-    // Pass option ID (ULID) directly — CreateOpportunity stores the raw string_value
+    // Pass option ID (ULID) directly; CreateOpportunity stores the raw string_value
     $createOpportunity->execute($this->user, [
         'name' => 'Deal Alpha',
         'custom_fields' => [

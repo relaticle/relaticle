@@ -9,7 +9,7 @@ namespace Relaticle\EmailIntegration\Support;
  * doesn't auto-create a Company or Person for mail with no real contact behind it.
  *
  * The local-part (before the @) is matched as a case-insensitive substring against
- * the configured list. Existing-record matching/linking is unaffected — this only
+ * the configured list. Existing-record matching/linking is unaffected: this only
  * gates *creation*.
  */
 final readonly class AutomatedSenderMatcher

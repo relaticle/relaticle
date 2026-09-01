@@ -262,11 +262,11 @@ final class OpportunitiesBoard extends BoardResourcePage
 
     /**
      * "Today" and "tomorrow" are questions about the viewer's calendar, so the boundary
-     * moves into their zone — but the close date itself must not. Unlike the tasks
+     * moves into their zone, but the close date itself must not. Unlike the tasks
      * board's due date, this is a plain calendar date the package stores at midnight
      * UTC: converting it into a negative-offset zone walks it back past midnight and
      * the card reads a day early. Move only the "today" it is measured against, and
-     * compare the two as dates rather than instants — midnight UTC and midnight in
+     * compare the two as dates rather than instants. Midnight UTC and midnight in
      * Los Angeles are the same calendar day but seven hours apart, so an instant
      * comparison would call a date closing today overdue.
      */

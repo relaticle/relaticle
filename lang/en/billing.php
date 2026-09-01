@@ -25,9 +25,9 @@ return [
     ],
     'packs' => [
         'buy' => 'Buy :credits credits',
-        'balance_split' => 'Includes :purchased purchased credits — they never expire',
+        'balance_split' => 'Includes :purchased purchased credits that never expire',
         'buy_more' => 'Buy more credits',
-        'fulfilling_title' => 'Payment received — credits are on their way',
+        'fulfilling_title' => 'Payment received. Credits are on their way',
         'fulfilling_body' => 'It can take a minute for your new credits to appear. Refresh this page if the balance below still looks unchanged shortly.',
     ],
     'sidebar' => [
@@ -35,13 +35,15 @@ return [
         'keep_pro' => 'Keep Pro',
         'paused' => 'Your workspace is paused',
         'subscribe' => 'Subscribe',
+        'past_due' => 'Payment failed',
+        'fix' => 'Fix',
     ],
 
     'trial' => [
-        'start_button' => 'Start 14-day Pro trial — no card needed',
+        'start_button' => 'Start 14-day Pro trial, no card needed',
         'active_title' => 'Pro trial active',
         'days_left' => ':days day left|:days days left',
-        'started' => 'Your Pro trial is active — enjoy!',
+        'started' => 'Your Pro trial is active. Enjoy!',
         'not_available' => 'This workspace is not eligible for another trial.',
     ],
     'legacy_free' => [
@@ -76,7 +78,7 @@ return [
         'button' => 'Upgrade to Pro',
         'unlock' => 'Unlock workspace with Pro',
         'now' => 'Upgrade now instead',
-        'activating' => 'Payment received — activating Pro…',
+        'activating' => 'Payment received. Activating Pro…',
         'activation_delayed_title' => 'Activation is taking longer than usual',
         'activation_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if Pro still is not active.',
         'confirm_title' => 'Confirm your workspace',
@@ -92,11 +94,17 @@ return [
         'body' => 'Update your payment method, download invoices, or change your plan in the billing portal.',
         'button' => 'Manage subscription',
         'auto_renews' => 'Renews automatically',
+        'past_due_tagline' => 'Renewal failed. Stripe is retrying.',
         'cancel_scheduled_title' => 'Cancellation scheduled',
         'cancel_scheduled_body' => 'Cloud Pro stays active until :date. After that, workspace access pauses.',
         'cancel_scheduled_legacy_body' => 'Cloud Pro stays active until :date. Then this workspace returns to its grandfathered Free plan.',
         'past_due_title' => 'Payment issue',
         'past_due_body' => 'Your last payment failed. Update your payment method to keep Pro.',
+    ],
+    'payment_failed' => [
+        'notification_title' => 'Payment failed for :workspace',
+        'notification_body' => 'Update your payment method to keep Pro. Stripe will retry the charge.',
+        'notification_action' => 'Fix payment',
     ],
     'enterprise' => [
         'title' => 'Enterprise plan',
@@ -112,5 +120,5 @@ return [
         'paused_api' => 'This workspace is paused. Subscribe to Cloud Pro to restore access.',
         'paused_chat' => 'This workspace is paused because its Cloud trial or subscription ended. Subscribe to Cloud Pro to continue.',
     ],
-    'deletion_notice' => 'Any active Pro subscription is canceled — Pro stays until the end of the paid period.',
+    'deletion_notice' => 'Any active Pro subscription is canceled. Pro stays until the end of the paid period.',
 ];

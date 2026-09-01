@@ -3,6 +3,7 @@
     'description',
     'ogTitle' => null,
     'ogDescription' => null,
+    'ogType' => 'website',
     'nav' => [],
     'currentPath' => null,
 ])
@@ -14,7 +15,8 @@
         :title="$title"
         :description="$description"
         :og-title="$ogTitle ?? $title"
-        :og-description="$ogDescription ?? $description" />
+        :og-description="$ogDescription ?? $description"
+        :og-type="$ogType" />
 
     {{-- documentation.js before app.js on purpose: app.js calls Alpine.start()
          as it executes, and the shell's x-data reaches for window.RelaticleDocs
@@ -103,7 +105,7 @@
     </nav>
 
     <header class="sticky top-0 z-40 border-b border-gray-200/70 bg-white/85 backdrop-blur-md dark:border-white/[0.06] dark:bg-gray-950/85">
-        <div class="flex h-14 items-center gap-3 px-4 sm:px-6">
+        <div class="mx-auto flex h-14 w-full max-w-[90rem] items-center gap-3 px-4 sm:px-6">
             <button type="button"
                     x-on:click="sidebarOpen = true"
                     class="-ml-1.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
@@ -146,7 +148,7 @@
                    class="hidden rounded-lg px-2 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:text-gray-900 sm:block dark:text-gray-400 dark:hover:text-white">
                     {{ __('Sign in') }}
                 </a>
-                <x-marketing.button size="sm" href="{{ route('register') }}" class="whitespace-nowrap">
+                <x-marketing.button size="sm" href="{{ route('login') }}" class="whitespace-nowrap">
                     {{ __('Start for free') }}
                 </x-marketing.button>
             </div>
@@ -178,7 +180,7 @@
         </nav>
     </div>
 
-    <div class="mx-auto flex w-full max-w-[100rem]">
+    <div class="mx-auto flex w-full max-w-[90rem]">
         <aside class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 border-r border-gray-200/70 lg:block dark:border-white/[0.06]">
             <nav aria-label="{{ __('Documentation navigation') }}" class="docs-scroll h-full overflow-y-auto px-6 py-9">
                 <x-documentation::sidebar-nav :nav="$nav" :current-path="$currentPath" />
@@ -187,12 +189,6 @@
 
         <div class="min-w-0 flex-1">
             <main id="docs-content" tabindex="-1" class="px-5 py-9 sm:px-8 lg:px-12 lg:py-12">
-                @isset($breadcrumbs)
-                    <nav aria-label="{{ __('Breadcrumb') }}" class="mb-7 text-[13px] text-gray-500 dark:text-gray-400">
-                        {{ $breadcrumbs }}
-                    </nav>
-                @endisset
-
                 {{ $slot }}
             </main>
 

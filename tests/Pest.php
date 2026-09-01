@@ -19,6 +19,7 @@ use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
@@ -73,7 +74,7 @@ function chatChannelAuth(User $user, string $conversationId): bool
 /**
  * Invoke the App.Models.User.{id} broadcast channel authorization callback.
  *
- * Mirrors chatChannelAuth — retrieves the registered closure via reflection
+ * Mirrors chatChannelAuth. Retrieves the registered closure via reflection
  * and invokes it directly, so tests exercise the real production callback.
  */
 function userChannelAuth(User $user, string $id): bool
@@ -93,4 +94,17 @@ function userChannelAuth(User $user, string $id): bool
     }
 
     return (bool) $callback($user, $id);
+}
+
+/**
+ * Log in through the real two-step login form: type the email and submit to
+ * reveal the password field, then type the password and submit again.
+ */
+function loginViaBrowser(User $user): AwaitableWebpage
+{
+    return test()->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
+        ->type('[id="form.password"]', 'password')
+        ->click('button[type="submit"]');
 }

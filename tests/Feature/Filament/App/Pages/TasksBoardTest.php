@@ -158,7 +158,7 @@ it('opens the edit action when a card is clicked', function (): void {
 /**
  * The badge answers "is this due today?", which is a question about the viewer's
  * calendar. Bounded on the server clock instead, a task lands in the wrong bucket for
- * every user far enough east or west — the board is the primary planning view, so the
+ * every user far enough east or west. The board is the primary planning view, so the
  * wrong bucket is the wrong plan for the day.
  */
 it('buckets the due-date badge against the user calendar, not the server clock', function (): void {

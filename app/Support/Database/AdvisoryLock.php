@@ -21,7 +21,7 @@ final readonly class AdvisoryLock
      *
      * The lock is acquired inside a transaction and released automatically on
      * commit/rollback, so a concurrent caller using the same key blocks until
-     * this one's writes are committed and visible — making a check-then-write
+     * this one's writes are committed and visible, making a check-then-write
      * sequence atomic across parallel processes (e.g. queue workers).
      *
      * @template TReturn

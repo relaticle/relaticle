@@ -10,6 +10,7 @@ use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
+use App\Support\LikePattern;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -74,7 +75,7 @@ final class SearchTool extends Tool
         ]);
 
         $limit = (int) ($validated['limit'] ?? 5);
-        $query = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $validated['query']);
+        $query = LikePattern::escape($validated['query']);
         $team = $user->currentTeam;
 
         if (! $team instanceof Team) {

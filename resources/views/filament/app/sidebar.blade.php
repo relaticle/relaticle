@@ -1,9 +1,10 @@
 {{--
     The app panel's sidebar (rendered by App\Livewire\App\AppSidebar).
 
-    This is Filament's `filament-panels::livewire.sidebar` with one change: global
+    This is Filament's `filament-panels::livewire.sidebar` with two changes: global
     search and the notifications trigger share a single row above the navigation,
-    instead of search sitting in its own block and notifications in the footer.
+    instead of search sitting in its own block and notifications in the footer; and
+    the search field fades with the sidebar collapse rather than popping.
     Everything else is kept verbatim so it stays diffable against the vendor view.
 --}}
 <div>
@@ -125,6 +126,12 @@
                     <div
                         @if ($isCollapsible)
                             x-show="$store.sidebar.isOpen"
+                            x-transition:enter="fi-transition-enter"
+                            x-transition:enter-start="fi-transition-enter-start"
+                            x-transition:enter-end="fi-transition-enter-end"
+                            x-transition:leave="fi-transition-leave"
+                            x-transition:leave-start="fi-transition-leave-start"
+                            x-transition:leave-end="fi-transition-leave-end"
                         @endif
                         class="fi-sidebar-search"
                     >

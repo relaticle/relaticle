@@ -20,7 +20,7 @@ trait DetectsAuthErrors
      * @var list<string>
      */
     protected array $authErrorTokens = [
-        // RFC 6749 OAuth2 error codes — apply to any OAuth2 provider.
+        // RFC 6749 OAuth2 error codes, which apply to any OAuth2 provider.
         'invalid_grant',
         'invalid_client',
         'invalid_token',

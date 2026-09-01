@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
 
     /*
-     * Email domains considered "public" — these are excluded from auto-company matching
+     * Email domains considered "public". These are excluded from auto-company matching
      * during email sync to prevent creating garbage companies like "Gmail Inc".
      * Teams can add further domain exclusions via Settings → Public Email Domains.
      */

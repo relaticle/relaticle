@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\TurnPresence;
 
 /**
  * Resumes the assistant after the user decides a proposal.
@@ -91,6 +92,8 @@ final readonly class TurnContinuationService
 
             return false;
         }
+
+        TurnPresence::begin($conversationId, turnId: $turnId, message: '', isContinuation: true);
 
         dispatch(new ProcessChatMessage(
             user: $user,

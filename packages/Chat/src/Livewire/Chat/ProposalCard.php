@@ -95,9 +95,29 @@ final class ProposalCard extends BaseLivewireComponent
     /** @var array<string, mixed> */
     public array $data = [];
 
-    public function mount(string $context = 'conversation'): void
+    /**
+     * $initialPendingActionId lets the dock render its card in the same request
+     * that renders the page, instead of empty-until-set-active: the client's
+     * init dispatch of proposal:set-active still runs and re-anchors moments
+     * later, so a stale or wrong id self-corrects. loadStep() scopes it to the
+     * authed user, so the value can only ever name a proposal of their own.
+     */
+    public function mount(string $context = 'conversation', ?string $initialPendingActionId = null): void
     {
         $this->context = $context;
+
+        if ($initialPendingActionId === null) {
+            return;
+        }
+
+        $pendingAction = $this->loadStep($initialPendingActionId);
+
+        if (! $pendingAction instanceof PendingAction) {
+            return;
+        }
+
+        $this->pendingActionId = (string) $pendingAction->getKey();
+        $this->focusFirstPendingStep($pendingAction);
     }
 
     public function form(Schema $schema): Schema
@@ -168,7 +188,7 @@ final class ProposalCard extends BaseLivewireComponent
     /**
      * Flatten the scoped edit form state to `{code => value}` for ProposalEditor.
      * A custom field is nested under `custom_fields.<code>`; lift those to the
-     * top level keyed by code. Core fields are already top-level — keep them.
+     * top level keyed by code. Core fields are already top-level, so keep them.
      *
      * @param  array<string, mixed>  $state
      * @return array<string, mixed>
@@ -690,7 +710,7 @@ final class ProposalCard extends BaseLivewireComponent
     }
 
     /**
-     * Record indices not yet resolved — the only items the dock presents. A decided
+     * Record indices not yet resolved, the only items the dock presents. A decided
      * item leaves this list, so focus can never land back on it.
      *
      * @return list<int>
@@ -1062,7 +1082,7 @@ final class ProposalCard extends BaseLivewireComponent
             $resolved = $service->approve($pendingAction, $this->authUser(), $this->excludedFields);
             $record = $this->recordReferenceFor($resolved);
         } catch (QueryException $exception) {
-            // Must precede the RuntimeException arm — QueryException extends
+            // Must precede the RuntimeException arm. QueryException extends
             // PDOException extends RuntimeException, so it would otherwise be caught
             // there and its getMessage() put the failing SQL, the row's values and
             // the connection host straight onto the card and into the transcript.
@@ -1498,7 +1518,7 @@ final class ProposalCard extends BaseLivewireComponent
     /**
      * Report a failed resolve on the card itself AND to the transcript. The
      * dispatched event alone is not user-visible, so the message is also bound to
-     * the `resolve` error bag which the dock renders — a proposal that cannot be
+     * the `resolve` error bag which the dock renders. A proposal that cannot be
      * resolved must say so rather than leave the button dead.
      */
     /**
@@ -1506,8 +1526,8 @@ final class ProposalCard extends BaseLivewireComponent
      * statement, its bindings and the connection details. The operator still needs
      * the real thing, so it goes to the log instead.
      *
-     * A unique violation here means something got past the actions' re-validation —
-     * in practice a second approval landing in the same instant — so it is reported
+     * A unique violation here means something got past the actions' re-validation,
+     * in practice a second approval landing in the same instant, so it is reported
      * as a race the user can retry, not as a generic failure.
      */
     private function reportDatabaseFailure(PendingAction $pendingAction, QueryException $exception): void
@@ -1622,7 +1642,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         // Only Create proposals are inline-editable, so only they need the rebuild that
         // re-derives each owned row from action_data to attach an editable `code`. For
-        // update/delete, action_data holds diffs/record ids — not display values — so the
+        // update/delete, action_data holds diffs/record ids rather than display values, so the
         // stored display rows are authoritative; rebuilding would blank them out.
         if ($pendingAction->operation !== PendingActionOperation::Create) {
             return $existingFields;
@@ -1656,7 +1676,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        // Only Create proposals are editable — never offer edit pencils on delete/update.
+        // Only Create proposals are editable. Never offer edit pencils on delete/update.
         if ($pendingAction->operation !== PendingActionOperation::Create) {
             return [];
         }

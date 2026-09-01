@@ -6,7 +6,7 @@
         data-inline-composer
     @endif
     {{-- Inline: the draft is appended to the reading pane's scroll region, so it is
-         simply as tall as its message — the region does the scrolling. --}}
+         simply as tall as its message; the region does the scrolling. --}}
     @class(['shrink-0' => $dock === 'inline'])
     x-data="{
         insertVariable(id) {
@@ -29,7 +29,7 @@
 >
     @php
         // Composing and editing a saved draft both open fitted to the screen, so a
-        // draft looks the same wherever it came from — and the same as the reader it
+        // draft looks the same wherever it came from, and the same as the reader it
         // sits alongside. Shrinking drops back to the corner window.
         $isModal = $dock === 'floating' && $isExpanded && ! $isMinimized;
         $isFloating = $dock === 'floating';
@@ -60,7 +60,7 @@
             ])
         >
             {{-- Title bar. The inline dock sits inside the message it answers, so it
-                 needs no window chrome — just the Draft bar, whose × discards. --}}
+                 needs no window chrome, just the Draft bar, whose × discards. --}}
             @if ($dock === 'inline')
                 <x-emails.composer-draft-bar class="sticky top-0 z-10 h-10 border-t-2 border-dashed border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6" />
             @else
@@ -121,7 +121,7 @@
 
             @unless ($isMinimized)
                 {{-- The message being answered or forwarded, above the draft and split
-                     off by the same dashed rule the inline dock uses — so a reply looks
+                     off by the same dashed rule the inline dock uses, so a reply looks
                      the same whether it is being written under the original or reopened
                      later from Drafts. The dock never shows this: there, the real
                      message is already on screen right above it. --}}

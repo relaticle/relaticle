@@ -77,7 +77,7 @@ def derive_label(channel: str, tier: int, journey_verdicts: dict[str, str],
     unreached_surfaces = unreached_surfaces or []
     unreached_primary = unreached_primary or []
     if channel == "degraded":
-        return "blocked", "browser channel degraded — no trustworthy verdict possible"
+        return "blocked", "browser channel degraded, no trustworthy verdict possible"
     if confirmed_blockers:
         ids = ", ".join(str(b.get("id")) for b in confirmed_blockers)
         return "ai-rejected", f"{len(confirmed_blockers)} confirmed blocker(s): {ids}"
@@ -85,15 +85,15 @@ def derive_label(channel: str, tier: int, journey_verdicts: dict[str, str],
     # (both checked above). So "no journeys" here means a genuinely surface-less
     # diff, never a confirmed-bug-without-journeys case.
     if not has_journeys:
-        return "ai-needs-human", "no user-facing surface — deferred to CI + code-review"
-    # Move C (max-strict) — if the PRIMARY changed surface (the point of the diff) went
+        return "ai-needs-human", "no user-facing surface, deferred to CI + code-review"
+    # Move C (max-strict): if the PRIMARY changed surface (the point of the diff) went
     # unreached, the review never exercised the feature it exists to verify. That is not
     # a "needs a human's eye" call; it is the absence of a review, same class as a dead
-    # channel — so it is `blocked` even on a healthy channel (channel stays "healthy" in
+    # channel, so it is `blocked` even on a healthy channel (channel stays "healthy" in
     # the output, which discriminates this from a degraded-channel block).
     if unreached_primary:
         joined = ", ".join(str(s) for s in unreached_primary)
-        return "blocked", f"primary changed surface(s) never exercised — no review of the feature under review: {joined}"
+        return "blocked", f"primary changed surface(s) never exercised, so no review of the feature under review: {joined}"
     # A non-primary changed surface left unreached still bars approval, but a human can
     # make the call (the main feature WAS exercised). "A feature you did not reach is a
     # feature you did not review."
@@ -173,9 +173,9 @@ def aggregate(review_dir: Path) -> dict:
     coverage_frontier = sorted({fs["item"] for fs in frontier_structured})
     journey_verdicts = {jid: worst_verdict(vs) for jid, vs in per_journey.items()}
 
-    # Move C — which changed user-reachable surfaces did the run fail to reach?
+    # Move C: which changed user-reachable surfaces did the run fail to reach?
     # Two sources, unioned: (1) the coverage-critic's explicit attestation, and
-    # (2) a derived backstop — a reachable changed surface is "reached" only if at
+    # (2) a derived backstop. A reachable changed surface is "reached" only if at
     # least one journey that covers it was actually delivered. A surface covered on
     # paper but whose covering journey ended partial/failed/unwalked stays unreached.
     unreached_surfaces: set[str] = set(
@@ -202,7 +202,7 @@ def aggregate(review_dir: Path) -> dict:
         if not any(journey_verdicts.get(jid) == "delivered" for jid in covering):
             unreached_surfaces.add(sid)
     unreached_sorted = sorted(unreached_surfaces)
-    # The primary surface(s) of the diff that went unreached — these escalate to `blocked`.
+    # The primary surface(s) of the diff that went unreached. These escalate to `blocked`.
     unreached_primary = sorted(unreached_surfaces & primary_surface_ids)
 
     confirmed_blockers = []
@@ -314,7 +314,7 @@ def run_tests() -> int:
               isinstance(v.get("decision_needed"), str) and bool(v["decision_needed"]),
               f"got {v.get('decision_needed')!r}")
 
-    # covered_by as a bare string must behave exactly like a one-element list —
+    # covered_by as a bare string must behave exactly like a one-element list,
     # not iterate into characters (PR 336 latent bug, 2026-06-12)
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
@@ -363,7 +363,7 @@ def run_tests() -> int:
     lbl, _ = derive_label("healthy", 2, {"J3": "partial"}, [], True, True)
     check("T-label-partial-needs-human", lbl == "ai-needs-human", f"got {lbl}")
 
-    # Move C — unreached changed surface caps an otherwise-clean run at needs-human
+    # Move C: an unreached changed surface caps an otherwise-clean run at needs-human
     lbl, rat = derive_label("healthy", 2, {"J11": "delivered", "J12": "delivered"}, [], True, True,
                             unreached_surfaces=["builder:create-booking-field"])
     check("T-label-unreached-surface-needs-human",
@@ -379,7 +379,7 @@ def run_tests() -> int:
                           unreached_surfaces=["x"])
     check("T-label-degraded-outranks-unreached", lbl == "blocked", f"got {lbl}")
 
-    # Move C (max-strict) — an unreached PRIMARY surface escalates to blocked on a healthy channel
+    # Move C (max-strict): an unreached PRIMARY surface escalates to blocked on a healthy channel
     lbl, rat = derive_label("healthy", 3, {"J11": "delivered"}, [], True, True,
                             unreached_surfaces=["builder:create-booking-field"],
                             unreached_primary=["builder:create-booking-field"])
@@ -468,7 +468,7 @@ def run_tests() -> int:
             '<!--json\n{"tier": 2, "channel": "degraded", '
             '"journeys": [{"id": "J2", "personas": ["caseworker"], '
             '"happy_path": ["move-in wizard"], "sad_paths": ["no supporting grant 500"], "acs": [1]}]}\n-->\n'
-            'Degraded channel with a confirmed blocker — blocked must win.')
+            'Degraded channel with a confirmed blocker: blocked must win.')
         pdir = d / "persona-caseworker"
         pdir.mkdir()
         (pdir / "findings.json").write_text(json.dumps({

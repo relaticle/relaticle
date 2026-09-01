@@ -1,12 +1,12 @@
 ---
 title: Fix import errors
-description: What to do when an upload, mapping, or validation step fails — and how ambiguous dates are handled.
+description: What to do when an upload, mapping, or validation step fails, and how ambiguous dates are handled.
 order: 4
 updated: "2026-08-13"
 related: [help/import/prepare-your-csv, help/import/update-existing-records]
 ---
 
-Most import problems are one of four kinds — the file won't upload, a column
+Most import problems are one of four kinds: the file won't upload, a column
 won't map, values fail validation, or the import itself misbehaves. Find the
 symptom below; each fix is something you can do yourself.
 
@@ -36,7 +36,7 @@ symptom below; each fix is something you can do yourself.
 | Unknown select option | Use the exact option label from the field's settings |
 
 In the review step you can also **Fix** a value once to correct it across
-every row that has it, or **Skip** a value — the rows still import, with that
+every row that has it, or **Skip** a value. The rows still import, with that
 one field left empty.
 
 ## Ambiguous dates
@@ -49,9 +49,9 @@ The wizard reads three date formats and detects which one a column uses:
 | European | DD/MM/YYYY | `15/05/2024` |
 | American | MM/DD/YYYY | `05/15/2024` |
 
-When a day value is greater than 12 the format is unambiguous —
+When a day value is greater than 12 the format is unambiguous, so
 `31/01/2024` can only be European. When both positions are 12 or less
-(`01/02/2024` — January 2 or February 1?), the wizard shows a warning and a
+(`01/02/2024`, January 2 or February 1?), the wizard shows a warning and a
 format dropdown on that column: pick **European** or **American** to say
 which reading is correct. ISO dates are never ambiguous, which is why they're
 the safest format to export from other tools.
@@ -60,9 +60,9 @@ the safest format to export from other tools.
 
 | Problem | Fix |
 |---------|----------|
-| Stuck at "Processing" | Large imports run in the background — check back in a few minutes |
+| Stuck at "Processing" | Large imports run in the background; check back in a few minutes |
 | Some rows failed | Download the failed rows, fix them, re-import just those |
-| Unexpected duplicates | Map a unique column (email, domain, or ID) — see [Update existing records](/help/import/update-existing-records) |
+| Unexpected duplicates | Map a unique column (email, domain, or ID); see [Update existing records](/help/import/update-existing-records) |
 
 ## Good to know
 

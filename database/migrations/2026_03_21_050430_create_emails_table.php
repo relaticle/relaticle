@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();    // explicit owner (survives account deletion)
             $table->foreignUlid('connected_account_id')->constrained('connected_accounts')->cascadeOnDelete();
 
-            // Provider identifiers — two different IDs
+            // Provider identifiers: two different IDs
             $table->string('rfc_message_id')->nullable();        // RFC 2822 Message-ID header (threading)
             $table->string('provider_message_id')->nullable();   // Gmail msg ID / MS Graph msg ID (API ops)
             $table->string('thread_id')->nullable();             // Provider's thread/conversation ID
@@ -30,16 +30,16 @@ return new class extends Migration
             $table->string('direction', 20);                     // inbound | outbound
             $table->string('folder', 30)->nullable();            // inbox | sent | drafts | archive
 
-            // Status — add now (default synced) to avoid costly migration when Phase 2 ships
+            // Status, added now (default synced) to avoid a costly migration when Phase 2 ships
             $table->string('status', 30)->default('synced');     // synced | draft | queued | sending | sent | failed | cancelled
             $table->text('last_error')->nullable();
             $table->unsignedTinyInteger('attempts')->default(0);
             $table->string('priority', 10)->default('bulk');
 
-            // Privacy — owner-set default for team visibility (no shared_with_team boolean)
+            // Privacy: owner-set default for team visibility (no shared_with_team boolean)
             $table->string('privacy_tier', 30)->default('metadata_only'); // private | metadata_only | subject | full
 
-            // Computed flags — set during sync
+            // Computed flags, set during sync
             $table->boolean('has_attachments')->default(false);
             $table->boolean('is_internal')->default(false);      // true when all participants are workspace members
 

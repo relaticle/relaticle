@@ -42,7 +42,7 @@ final readonly class VisibleEmailScope implements Scope
                                 ->where('privacy_tier', '!=', EmailPrivacyTier::PRIVATE->value);
 
                             // Protected-recipient emails are hard-hidden from everyone but the
-                            // owner — mirror PrivacyService::effectiveTier() so the list/lookup
+                            // owner. Mirror PrivacyService::effectiveTier() so the list/lookup
                             // SQL gate and the policy agree. Without this, a protected email at
                             // a non-PRIVATE tier (e.g. METADATA_ONLY) would leak into teammates'
                             // inbox lists even though the policy hides it.

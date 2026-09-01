@@ -13,6 +13,8 @@ export default defineConfig({
                 // Echo (Reverb WebSocket client)
                 'resources/js/echo.js',
                 'resources/js/motion.js',
+                // Passkeys client (loaded on demand by Blade components)
+                'resources/js/passkeys.js',
                 // Chat
                 'packages/Chat/resources/js/chat.js',
                 // Filament

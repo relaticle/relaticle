@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 
@@ -14,29 +12,21 @@ final readonly class PersonalAccessTokenObserver
 {
     public function created(PersonalAccessToken $token): void
     {
+        // Guarded here too so the request path skips the exists-probe below.
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
 
         $user = $token->tokenable;
 
-        if (! $user instanceof User || ! $user->mailcoach_subscriber_uuid) {
+        if (! $user instanceof User) {
             return;
         }
 
-        $existingTokenCount = PersonalAccessToken::query()
-            ->where('tokenable_type', 'user')
-            ->where('tokenable_id', $user->id)
-            ->count();
-
-        if ($existingTokenCount > 1) {
+        if ($user->tokens()->whereKeyNot($token->getKey())->exists()) {
             return;
         }
 
-        dispatch(new ModifySubscriberTagsJob(
-            (string) $user->id,
-            [SubscriberTagEnum::HasApiToken->value],
-            TagAction::Add,
-        ))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }

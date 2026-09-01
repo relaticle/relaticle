@@ -27,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  * fails) validate through here, which keeps the two from drifting.
  *
  * Uniqueness runs on the query builder rather than Eloquent so deactivated fields
- * count as taken — the activable global scope would otherwise hide them and let a
+ * count as taken. The activable global scope would otherwise hide them and let a
  * duplicate through.
  */
 final readonly class CustomFieldDefinitionValidator
@@ -51,7 +51,7 @@ final readonly class CustomFieldDefinitionValidator
             'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
                 $tenantId,
                 $entityType,
-                fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name, or update the existing field instead.",
+                fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name, or update the existing field instead.",
             )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
             'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
@@ -66,7 +66,7 @@ final readonly class CustomFieldDefinitionValidator
             'code.unique' => "A field with code \":input\" already exists on {$entityType}. Omit the code to auto-generate a unique one, or pick a different code.",
             'options.required' => "Field type \"{$type}\" requires at least one option.",
             'options.prohibited' => "Field type \"{$type}\" does not support options.",
-            'options.max' => "Too many options — at most {$maxOptions} per field.",
+            'options.max' => "Too many options. At most {$maxOptions} per field.",
         ] + self::optionNameMessages())->validate();
     }
 
@@ -86,7 +86,7 @@ final readonly class CustomFieldDefinitionValidator
                 self::uniqueNameIgnoringCase(
                     $user->currentTeam->getKey(),
                     $entityType,
-                    fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity — pick a different name.",
+                    fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name.",
                     $field->getKey(),
                 ),
             ],

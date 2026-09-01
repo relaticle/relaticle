@@ -45,7 +45,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
         return [
             'name' => $schema->string()->description('The new company name.'),
             'account_owner_id' => $schema->string()->description(
-                'Set the account owner — the team member responsible for this company.'
+                'Set the account owner, the team member responsible for this company.'
                 .' MUST be a user id from the list team members tool (contacts/people are not valid).'
                 .' Pass null to unassign the owner.',
             ),

@@ -122,7 +122,7 @@
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="#demo">
@@ -447,7 +447,7 @@
                 {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
             </p>
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="{{ route('pricing') }}">

@@ -1,4 +1,4 @@
-{{-- Hero entry phase — mirrors the real /abcd dashboard: centered greeting,
+{{-- Hero entry phase, mirroring the real /abcd dashboard: centered greeting,
      centered composer, recent-chat link, example chips. Lives as an
      absolutely-positioned overlay above the conversation pane and fades
      out during the entry → conversation transition.
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        {{-- Composer twin — identical to hero-agent-composer.blade.php but
+        {{-- Composer twin, identical to hero-agent-composer.blade.php but
              with entry-scoped IDs so the JS factory can target it independently. --}}
         <div class="mcp-el mcp-entry-composer mt-8 sm:mt-10">
             <div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">

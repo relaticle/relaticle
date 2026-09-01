@@ -7,19 +7,19 @@
     $copy = [
         'attio' => [
             'badge' => __('Alternative'),
-            'opening' => __('Attio is a well-regarded closed-source SaaS CRM with strong data-model flexibility — but there\'s no self-hosting option, and its AI is a proprietary, Cloud-only feature. If you want to own your data and self-host the same AI and MCP tooling your team uses in production, Relaticle is the alternative. If you specifically need Attio\'s enrichment and research features today, they\'re more mature there than anywhere Relaticle currently offers.'),
+            'opening' => __('Attio is a well-regarded closed-source SaaS CRM with strong data-model flexibility. There is no self-hosting option, though, and its AI is a proprietary, Cloud-only feature. If you want to own your data and self-host the same AI and MCP tooling your team uses in production, Relaticle is the alternative. If you specifically need Attio\'s enrichment and research features today, they\'re more mature there than anywhere Relaticle currently offers.'),
             'sections' => [
                 [
                     'heading' => __('License & pricing'),
-                    'body' => __('Attio is closed-source (:attioPricing). Relaticle is AGPL-3.0 — self-host free forever, or pay a flat :relaticlePricing on the hosted plan.', ['attioPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                    'body' => __('Attio is closed-source (:attioPricing). Relaticle is AGPL-3.0: self-host free forever, or pay a flat :relaticlePricing on the hosted plan.', ['attioPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
                 ],
                 [
                     'heading' => __('AI capabilities'),
-                    'body' => __('Attio\'s AI: :attioAi — available only on their SaaS. Relaticle\'s AI: :relaticleAi.', ['attioAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                    'body' => __('Attio\'s AI: :attioAi, available only on their SaaS. Relaticle\'s AI: :relaticleAi.', ['attioAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
                 ],
                 [
                     'heading' => __('Data ownership & deployment'),
-                    'body' => __('Attio: :attioSelfHost — your data lives on their infrastructure. Relaticle: :relaticleStack. :relaticleSelfHost.', ['attioSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                    'body' => __('Attio: :attioSelfHost, so your data lives on their infrastructure. Relaticle: :relaticleStack. :relaticleSelfHost.', ['attioSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
                 ],
                 [
                     'heading' => __('Extensibility'),
@@ -29,11 +29,11 @@
         ],
         'hubspot' => [
             'badge' => __('Alternative'),
-            'opening' => __('HubSpot\'s free CRM works for very small teams, and its paid Hubs bundle marketing, sales, and service automation well beyond core CRM — that breadth is real, and if you need an integrated marketing or service suite today, HubSpot\'s is more mature. If you want a self-hosted, open-source CRM with built-in AI and flat pricing that doesn\'t grow with every seat you add, Relaticle is the alternative.'),
+            'opening' => __('HubSpot\'s free CRM works for very small teams, and its paid Hubs bundle marketing, sales, and service automation well beyond core CRM. That breadth is real, and if you need an integrated marketing or service suite today, HubSpot\'s is more mature. If you want a self-hosted, open-source CRM with built-in AI and flat pricing that doesn\'t grow with every seat you add, Relaticle is the alternative.'),
             'sections' => [
                 [
                     'heading' => __('License & pricing'),
-                    'body' => __('HubSpot is closed-source (:hubspotPricing) — cost climbs fast once you add paid Hubs and seats. Relaticle is AGPL-3.0, with a flat :relaticlePricing on the hosted plan and no per-Hub upsells.', ['hubspotPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                    'body' => __('HubSpot is closed-source (:hubspotPricing), and cost climbs fast once you add paid Hubs and seats. Relaticle is AGPL-3.0, with a flat :relaticlePricing on the hosted plan and no per-Hub upsells.', ['hubspotPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
                 ],
                 [
                     'heading' => __('AI capabilities'),
@@ -140,11 +140,11 @@
                     {{ __('Migrating from :name', ['name' => $competitor['name']]) }}
                 </h2>
                 <p class="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
-                    {{ __('Export your companies, people, and deals from :name as CSV, then bring them into Relaticle with the built-in import wizard — map columns, preview matched records, and fix errors before anything is created.', ['name' => $competitor['name']]) }}
+                    {{ __('Export your companies, people, and deals from :name as CSV, then bring them into Relaticle with the built-in import wizard. Map columns, preview matched records, and fix errors before anything is created.', ['name' => $competitor['name']]) }}
                 </p>
                 <ul class="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-disc pl-5">
                     <li>{{ __('Export each record type to CSV from :name.', ['name' => $competitor['name']]) }}</li>
-                    <li>{{ __('Import the CSV with Relaticle\'s import wizard — no third-party migration tool needed.') }}</li>
+                    <li>{{ __('Import the CSV with Relaticle\'s import wizard. No third-party migration tool needed.') }}</li>
                     <li>{{ __('Need programmatic access instead? Relaticle\'s REST API and MCP server can create and update records directly.') }}</li>
                 </ul>
                 <a href="{{ url('/help/import') }}" class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
@@ -154,7 +154,7 @@
             </div>
 
             <p class="text-xs text-gray-400 dark:text-gray-500 mb-16">
-                {{ __('Facts verified :date. Sources are dated in the underlying facts file — see :repo.', ['date' => $factsVerifiedAt, 'repo' => 'github.com/relaticle/relaticle']) }}
+                {{ __('Facts verified :date. Sources are dated in the underlying facts file. See :repo.', ['date' => $factsVerifiedAt, 'repo' => 'github.com/relaticle/relaticle']) }}
             </p>
 
             {{-- CTA --}}
@@ -163,10 +163,10 @@
                     {{ __('Try Relaticle yourself') }}
                 </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 max-w-md mx-auto">
-                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan — both run the same open-source codebase.') }}
+                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source codebase.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <x-marketing.button href="{{ route('register') }}">
+                    <x-marketing.button href="{{ route('login') }}">
                         {{ __('Start for free') }}
                     </x-marketing.button>
                     <x-marketing.button variant="secondary" href="{{ route('contact') }}">

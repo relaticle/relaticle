@@ -8,6 +8,7 @@ use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\Team;
 use App\Models\User;
+use Closure;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
@@ -93,6 +94,76 @@ final class ActivityResource extends Resource
         ];
     }
 
+    /**
+     * A custom-field edit is logged under its own event name, but to an
+     * administrator it is the same act as any other edit.
+     */
+    public static function eventLabel(?string $state): string
+    {
+        return match ($state) {
+            null => '—',
+            'custom_field_changes' => 'Updated',
+            default => Str::headline($state),
+        };
+    }
+
+    /**
+     * The filters that read the same wherever activity is listed: what kind of
+     * record moved, what happened to it, and when.
+     *
+     * @return list<Filter|SelectFilter>
+     */
+    public static function commonFilters(): array
+    {
+        return [
+            SelectFilter::make('subject_type')
+                ->label('Subject')
+                ->options([
+                    'company' => 'Company',
+                    'people' => 'People',
+                    'opportunity' => 'Opportunity',
+                    'task' => 'Task',
+                    'note' => 'Note',
+                ]),
+            SelectFilter::make('event')
+                ->options([
+                    'created' => 'Created',
+                    'updated' => 'Updated',
+                    'deleted' => 'Deleted',
+                ]),
+            Filter::make('created_at')
+                ->schema([
+                    DatePicker::make('from')->label('From'),
+                    DatePicker::make('until')->label('Until'),
+                ])
+                /**
+                 * The picked dates are days on the administrator's calendar,
+                 * which is what the table renders too, so they widen to that
+                 * day's UTC bounds rather than being compared with whereDate.
+                 */
+                ->query(fn (Builder $query, array $data): Builder => $query
+                    ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '>=', ViewerTime::startOfDayUtc((string) $data['from'])))
+                    ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '<=', ViewerTime::endOfDayUtc((string) $data['until'])))),
+        ];
+    }
+
+    /**
+     * Only users cause activity, so the filter matches on the user morph rather
+     * than the key alone. Which users are worth listing depends on the caller.
+     *
+     * @param  Closure(): array<string, string>  $options
+     */
+    public static function causerFilter(Closure $options): SelectFilter
+    {
+        return SelectFilter::make('causer')
+            ->label('User')
+            ->options($options)
+            ->searchable()
+            ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                ? $query->where('causer_type', 'user')->where('causer_id', $data['value'])
+                : $query);
+    }
+
     #[Override]
     public static function table(Table $table): Table
     {
@@ -134,7 +205,8 @@ final class ActivityResource extends Resource
                         'created' => 'success',
                         'deleted' => 'danger',
                         default => 'gray',
-                    }),
+                    })
+                    ->formatStateUsing(self::eventLabel(...)),
                 TextColumn::make('description')
                     ->limit(60)
                     ->wrap(),
@@ -144,41 +216,8 @@ final class ActivityResource extends Resource
                     ->label('Team')
                     ->options(fn (): array => Team::query()->orderBy('name')->pluck('name', 'id')->all())
                     ->searchable(),
-                SelectFilter::make('subject_type')
-                    ->label('Subject')
-                    ->options([
-                        'company' => 'Company',
-                        'people' => 'People',
-                        'opportunity' => 'Opportunity',
-                        'task' => 'Task',
-                        'note' => 'Note',
-                    ]),
-                SelectFilter::make('event')
-                    ->options([
-                        'created' => 'Created',
-                        'updated' => 'Updated',
-                        'deleted' => 'Deleted',
-                    ]),
-                SelectFilter::make('causer')
-                    ->label('User')
-                    ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
-                    ->searchable()
-                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
-                        ? $query->where('causer_type', 'user')->where('causer_id', $data['value'])
-                        : $query),
-                Filter::make('created_at')
-                    ->schema([
-                        DatePicker::make('from')->label('From'),
-                        DatePicker::make('until')->label('Until'),
-                    ])
-                    /**
-                     * The picked dates are days on the administrator's calendar,
-                     * which is what the table renders too, so they widen to that
-                     * day's UTC bounds rather than being compared with whereDate.
-                     */
-                    ->query(fn (Builder $query, array $data): Builder => $query
-                        ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '>=', ViewerTime::startOfDayUtc((string) $data['from'])))
-                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->where('activity_log.created_at', '<=', ViewerTime::endOfDayUtc((string) $data['until'])))),
+                self::causerFilter(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all()),
+                ...self::commonFilters(),
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -207,7 +246,8 @@ final class ActivityResource extends Resource
                             'created' => 'success',
                             'deleted' => 'danger',
                             default => 'gray',
-                        }),
+                        })
+                        ->formatStateUsing(self::eventLabel(...)),
                     TextEntry::make('team.name')
                         ->label('Team')
                         ->placeholder('—')
@@ -304,7 +344,7 @@ final class ActivityResource extends Resource
             return collect($new)
                 ->map(fn (mixed $value, string $key): string => sprintf(
                     '%s: %s → %s',
-                    $key,
+                    Str::headline($key),
                     self::stringifyValue($old[$key] ?? null),
                     self::stringifyValue($value),
                 ))
@@ -319,7 +359,7 @@ final class ActivityResource extends Resource
             return collect($old)
                 ->map(fn (mixed $value, string $key): string => sprintf(
                     '%s: %s → %s',
-                    $key,
+                    Str::headline($key),
                     self::stringifyValue($value),
                     self::stringifyValue(null),
                 ))
@@ -328,7 +368,7 @@ final class ActivityResource extends Resource
         }
 
         return collect($properties)
-            ->map(fn (mixed $value, string $key): string => "{$key}: ".self::stringifyValue($value))
+            ->map(fn (mixed $value, string $key): string => Str::headline($key).': '.self::stringifyValue($value))
             ->values()
             ->all();
     }

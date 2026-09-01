@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\Billing\CreditPackCatalog;
+use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
@@ -36,11 +37,11 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ConversationTitleGate;
-use Relaticle\Chat\Support\LikePattern;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TranscriptScope;
+use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class ChatController
 {
@@ -147,16 +148,19 @@ final readonly class ChatController
 
             $isFree = $team->plan === Plan::Free;
             $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
+            // Not $team->plan->credits(): a past-due workspace refills at the
+            // Free allowance, so the plan's figure would name credits it never got.
+            $allowance = $this->creditService->allowanceFor($team);
 
             return response()->json([
                 'error' => 'credits_exhausted',
-                'message' => "You have used all {$team->plan->credits()} credits for this {$team->plan->getLabel()} plan period.",
+                'message' => "You have used all {$allowance} credits for this {$team->plan->getLabel()} plan period.",
                 'plan' => $team->plan->value,
-                'allowance' => $team->plan->credits(),
+                'allowance' => $allowance,
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
                 'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
-                // A top-up is only offered when a pack can actually be bought —
+                // A top-up is only offered when a pack can actually be bought;
                 // otherwise the CTA lands on a billing page with nothing to buy.
                 'top_up_available' => $canTopUp,
                 'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
@@ -193,6 +197,15 @@ final readonly class ChatController
 
         $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
 
+        TurnPresence::begin(
+            $conversation,
+            turnId: $turnId,
+            message: $parsed['text'],
+            document: $validated['document'],
+            mentions: $parsed['mentions'],
+            pageContext: $pageContext,
+        );
+
         dispatch(new ProcessChatMessage(
             user: $user,
             team: $team,
@@ -213,7 +226,7 @@ final readonly class ChatController
 
     /**
      * Title the conversation from the message that just arrived, racing the turn
-     * rather than waiting for it — a chat that streams for a minute should not sit
+     * rather than waiting for it. A chat that streams for a minute should not sit
      * in the sidebar under a truncated sentence for that whole minute.
      *
      * ConversationTitleGate decides whether there is anything to do: it returns
@@ -362,13 +375,13 @@ final readonly class ChatController
     }
 
     /**
-     * Mark a turn (and everything after it) superseded — the server-truth side
+     * Mark a turn (and everything after it) superseded. This is the server-truth side
      * of Regenerate/Edit. Without this the client splice is a lie: reload
      * resurrects the replaced turns and the model keeps them in its history.
      *
      * anchor_id targets a persisted user message; when the client only has an
      * optimistic (not yet persisted) message it sends anchor_content instead,
-     * which must match the latest user row — a mismatch means that row belongs
+     * which must match the latest user row. A mismatch means that row belongs
      * to an OLDER turn (the optimistic one never persisted), and superseding it
      * would hide a good turn, so we refuse and supersede nothing.
      */

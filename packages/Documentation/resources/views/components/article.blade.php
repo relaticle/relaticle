@@ -16,7 +16,14 @@
 @endphp
 
 <div class="flex gap-12">
-    <div class="min-w-0 max-w-[45rem] flex-1">
+    <div class="min-w-0 flex-1">
+    <div class="mx-auto w-full max-w-[45rem]">
+        @isset($breadcrumbs)
+            <nav aria-label="{{ __('Breadcrumb') }}" class="mb-7 text-[13px] text-gray-500 dark:text-gray-400">
+                {{ $breadcrumbs }}
+            </nav>
+        @endisset
+
         <div class="flex items-start justify-between gap-6">
             <div class="min-w-0">
                 @if($eyebrow)
@@ -181,11 +188,19 @@
                 <x-ri-discord-fill class="h-4 w-4" />
                 {{ __('Ask a question in Discord') }}
             </a>
+            <a href="{{ route('contact') }}"
+               class="inline-flex items-center gap-2 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+                <x-ri-mail-line class="h-4 w-4" />
+                {{ __('Contact support') }}
+            </a>
         </div>
     </div>
+    </div>
 
-    @if($hasToc)
-        <aside class="hidden w-56 shrink-0 xl:block">
+    {{-- Rendered even without headings so the content column sits at the same
+         x-position on every page. --}}
+    <aside class="hidden w-56 shrink-0 xl:block">
+        @if($hasToc)
             <nav aria-label="{{ __('On this page') }}" class="sticky top-[4.5rem] text-[13px]">
                 <h2 class="text-pico font-semibold tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">{{ __('On this page') }}</h2>
                 <ul id="docs-toc" class="mt-3 space-y-0.5 border-l border-gray-200 dark:border-white/10">
@@ -198,6 +213,6 @@
                     @endforeach
                 </ul>
             </nav>
-        </aside>
-    @endif
+        @endif
+    </aside>
 </div>

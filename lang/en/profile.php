@@ -29,6 +29,7 @@ return [
         ],
         'password' => [
             'label' => 'Password',
+            'throttled' => 'Too many attempts. Please try again in :seconds seconds.',
         ],
     ],
 
@@ -59,6 +60,33 @@ return [
             'title' => 'Delete Account',
             'description' => 'Permanently delete your account after a 30-day grace period.',
             'notice' => 'Your profile and sign-in account will be permanently deleted after 30 days. Workspaces that only you belong to, including their CRM data, will also be deleted. Records in shared workspaces will remain without your profile. Sign in before the deletion date to cancel.',
+            'confirm_email_label' => 'Type your account email to confirm',
+            'confirm_email_mismatch' => 'That does not match your account email.',
+        ],
+        'passkeys' => [
+            'title' => 'Passkeys',
+            'description' => 'Manage your passkeys for passwordless sign-in.',
+            'unsupported' => 'Passkeys are not supported in this browser.',
+            'empty' => 'No passkeys yet. Add one to sign in without a password.',
+            'added' => 'Added :time',
+            'last_used' => 'Last used :time',
+            'add_passkey' => 'Add passkey',
+            'add_description' => 'Register a new passkey for this device to sign in without a password.',
+            'name_label' => 'Passkey name',
+            'name_placeholder' => 'e.g., MacBook Pro, iPhone',
+            'default_name' => 'Passkey',
+            'rename' => 'Rename',
+            'save' => 'Save',
+            'use_password' => 'Use your password instead',
+            'method_hint' => "You'll confirm with Face ID, Touch ID, or your passkey.",
+            'confirmed' => 'Confirmed',
+            'register' => 'Register passkey',
+            'registering' => 'Registering...',
+            'waiting' => 'Waiting for passkey…',
+            'cancel' => 'Cancel',
+            'remove' => 'Remove',
+            'remove_confirm_title' => 'Remove passkey',
+            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
         ],
     ],
 
@@ -81,17 +109,30 @@ return [
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',
         ],
+        'passkey_removed' => [
+            'success' => 'Passkey removed.',
+        ],
+        'passkey_renamed' => [
+            'success' => 'Passkey renamed.',
+        ],
+        'passkey_registration_failed' => [
+            'title' => 'Could not add passkey. Please try again.',
+        ],
+        'passkey_confirmation_failed' => [
+            'title' => 'Passkey verification failed. Please try again.',
+        ],
+        'identity_confirmation_failed' => [
+            'title' => 'Identity confirmation failed. Please try again.',
+        ],
     ],
 
     'modals' => [
         'delete_account' => [
-            'notice' => 'Your profile and sign-in account will be deleted after 30 days. Workspaces that only you belong to will also be deleted. Shared workspace records will remain. Sign in before the deletion date to cancel. Enter your password to confirm.',
-            'notice_no_password' => 'Your profile and sign-in account will be deleted after 30 days. Workspaces that only you belong to will also be deleted. Shared workspace records will remain. Sign in before the deletion date to cancel.',
+            'notice' => 'Your profile and sign-in account will be deleted after 30 days. Workspaces that only you belong to will also be deleted. Shared workspace records will remain. Sign in before the deletion date to cancel.',
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
-            'description' => 'Enter your password to confirm you would like to log out of your other browser sessions across all of your devices.',
-            'description_no_password' => 'Are you sure you would like to log out of your other browser sessions across all of your devices?',
+            'description' => 'Confirm it\'s you to log out of your other browser sessions across all of your devices.',
         ],
     ],
 

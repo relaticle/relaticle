@@ -8,7 +8,7 @@ namespace Relaticle\SystemAdmin\Enums;
  * The only abilities ink's BlogTool::tokenAbility() checks (verified against
  * vendor/relaticle/ink/src/Mcp/Tools/*.php). This is the single source of
  * truth for both the token-creation UI and the server-side allowlist that
- * abilities are intersected against before a token is minted — the two must
+ * abilities are intersected against before a token is minted. The two must
  * never drift.
  */
 enum BlogTokenAbility: string

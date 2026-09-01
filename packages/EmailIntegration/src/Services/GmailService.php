@@ -352,9 +352,9 @@ final readonly class GmailService implements MailServiceInterface
      * vocabulary so we skip a paid LLM call for the high-volume noise buckets.
      *
      * Only high-confidence consumer categories are mapped. CATEGORY_UPDATES
-     * (receipts, statements, confirmations) is deliberately left unmapped — it
-     * frequently hides Invoice/Scheduling/Support mail that only AI resolves —
-     * as is an inbox-only message with no category at all.
+     * (receipts, statements, confirmations) is deliberately left unmapped,
+     * because it frequently hides Invoice/Scheduling/Support mail that only AI
+     * resolves, as is an inbox-only message with no category at all.
      *
      * @param  array<int, string>  $labelIds
      */

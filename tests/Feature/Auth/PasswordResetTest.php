@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Filament\Pages\Auth\RequestPasswordReset;
+use App\Filament\Pages\Auth\ResetPassword;
 use App\Models\User;
 use Filament\Auth\Notifications\ResetPassword as ResetPasswordNotification;
-use Filament\Auth\Pages\PasswordReset\RequestPasswordReset;
-use Filament\Auth\Pages\PasswordReset\ResetPassword;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -44,6 +44,40 @@ test('reset password link is not sent for non-existent email', function () {
         ->call('request');
 
     Notification::assertNothingSent();
+});
+
+test('an unknown email answers with the same sent notification as a known one', function () {
+    Notification::fake();
+
+    livewire(RequestPasswordReset::class)
+        ->fillForm([
+            'email' => 'nonexistent-'.uniqid().'@example.com',
+        ])
+        ->call('request')
+        ->assertNotified(__(Password::RESET_LINK_SENT))
+        ->assertSet('data.email', null);
+
+    Notification::assertNothingSent();
+});
+
+test('a mixed-case typed email still reaches the account that owns the mailbox', function () {
+    Notification::fake();
+
+    $user = User::factory()->withTeam()->create(['email' => 'reset-case-'.uniqid().'@example.com']);
+
+    livewire(RequestPasswordReset::class)
+        ->fillForm([
+            'email' => mb_strtoupper($user->email),
+        ])
+        ->call('request')
+        ->assertNotified(__(Password::RESET_LINK_SENT));
+
+    Notification::assertSentTo($user, ResetPasswordNotification::class);
+});
+
+test('the fortify forgot-password endpoint is not exposed', function () {
+    $this->post('/forgot-password', ['email' => 'nonexistent@example.com'])
+        ->assertStatus(405);
 });
 
 test('password can be reset with valid token', function () {

@@ -8,7 +8,7 @@ namespace Relaticle\Chat\Support;
  * Single source of truth for which keys are "core" (first-class entity columns,
  * not custom fields) on a chat create-proposal record, per entity type. Both the
  * server-side editor (ProposalEditor) and the docked card (ProposalCard) split
- * core from custom fields the same way — keep that knowledge here so the two
+ * core from custom fields the same way, so keep that knowledge here and the two
  * sites can never drift.
  */
 final readonly class ProposalCoreFields

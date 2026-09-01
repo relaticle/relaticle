@@ -75,7 +75,7 @@ final readonly class StoreMeetingAction
             $this->linkMeeting->execute($meeting);
 
             // Logged here (not in MeetingObserver::created) because the attendee_count is
-            // only correct after attendees are inserted above — the observer fires on the
+            // only correct after attendees are inserted above. The observer fires on the
             // bare Meeting::create() before any attendee exists, recording 0.
             if ($isNewMeeting) {
                 activity()

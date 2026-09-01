@@ -11,7 +11,7 @@ use Relaticle\CustomFields\Models\CustomField;
 
 /**
  * The package entry falls back to a literal `Y-m-d H:i:s` when the package has no display
- * format configured, which it never does here — so a record's view page printed
+ * format configured, which it never does here, so a record's view page printed
  * `2026-08-19 08:30:00` for the same field the table beside it rendered as
  * `Aug 19, 2026 08:30`.
  *

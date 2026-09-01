@@ -101,7 +101,7 @@ final readonly class LinkEmailAction
 
         foreach ($participants as $participant) {
             // Machine-sent senders (no-reply@, notice@, bounce@) still link to existing
-            // records but must never spawn a new Company/Person — there's no real
+            // records but must never spawn a new Company/Person: there's no real
             // contact behind them.
             $isAutomatedSender = $this->automatedSender->matches($participant->email_address);
 
@@ -196,7 +196,7 @@ final readonly class LinkEmailAction
     /**
      * True when any connected mailbox on this team has an outbound email involving
      * the address. The email currently being linked already exists in the table,
-     * so the first send is enough — a reply is not required.
+     * so the first send is enough, and a reply is not required.
      */
     private function hasTeamOutboundHistory(Team $team, string $emailAddress): bool
     {
@@ -256,7 +256,7 @@ final readonly class LinkEmailAction
 
     /**
      * Increment the shared email-interaction counters on a linked CRM record
-     * (People, Company, or Opportunity — all expose the same metric columns).
+     * (People, Company, or Opportunity, all of which expose the same metric columns).
      *
      * Counters use atomic SQL increments so concurrent StoreEmailJob workers
      * don't lose updates. The timestamps use GREATEST so an older email linked

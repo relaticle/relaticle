@@ -11,7 +11,7 @@ record at once, or use the search and filter controls on any list to narrow
 down what's already in front of you.
 
 1. Click the search box at the top of the sidebar, or press **⌘K**.
-2. Type any part of a name. Results appear grouped by record type —
+2. Type any part of a name. Results appear grouped by record type:
    **Companies**, **Opportunities**, and more.
 3. Click a result to open it.
 
@@ -19,14 +19,14 @@ down what's already in front of you.
 
 ## Search within a list
 
-Every list — Companies, People, Opportunities, Tasks, Notes — has its own
+Every list (Companies, People, Opportunities, Tasks, Notes) has its own
 **Search** box above the table. Typing there filters just that list, and
 shows what you searched for as a removable chip under **Active filters**.
 
 ## Filter a list
 
 1. Click the **Filter** icon above the table.
-2. Set any of the filters shown — built-in ones like **Creation Source** and
+2. Set any of the filters shown: built-in ones like **Creation Source** and
    **Deleted records**, plus any searchable custom fields for that entity.
 3. Click **Reset** to clear them all.
 

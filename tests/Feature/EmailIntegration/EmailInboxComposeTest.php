@@ -33,6 +33,19 @@ it('prompts to configure a mailbox when no account is connected', function (): v
 
 it('shows the inbox instead of the prompt once an account is connected', function (): void {
     livewire(EmailInboxPage::class)
-        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
-        ->assertActionDoesNotExist('composeEmail');
+        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'));
+});
+
+it('opens the floating composer from the page header compose action', function (): void {
+    livewire(EmailInboxPage::class)
+        ->assertActionVisible('composeEmail')
+        ->callAction('composeEmail')
+        ->assertDispatched('composer:open');
+});
+
+it('hides the compose action when no account is connected', function (): void {
+    $this->account->forceDelete();
+
+    livewire(EmailInboxPage::class)
+        ->assertActionHidden('composeEmail');
 });

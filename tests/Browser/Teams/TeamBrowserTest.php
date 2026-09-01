@@ -12,10 +12,7 @@ it('can create a new team through the browser', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate('/app/new')
         ->assertSee('Create your workspace')

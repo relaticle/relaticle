@@ -13,7 +13,7 @@ return new class extends Migration
         // Per-viewer read state. A row's existence means "this user has read this
         // email"; read_at records when. Read state is per (email, user) so the
         // owner's provider-synced state and each teammate's in-app reads stay
-        // independent — the single emails.read_at column could not express that.
+        // independent, and the single emails.read_at column could not express that.
         Schema::create('email_reads', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->foreignUlid('email_id')->constrained('emails')->cascadeOnDelete();

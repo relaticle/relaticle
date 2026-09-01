@@ -15,6 +15,8 @@ it('can navigate to forgot password from login and request a reset link', functi
     $user = User::factory()->withTeam()->create();
 
     $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
         ->click('a[href*="password-reset"]')
         ->assertPathContains('/password-reset/request')
         ->assertSee('Forgot password?')

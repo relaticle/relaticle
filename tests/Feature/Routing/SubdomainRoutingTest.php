@@ -90,7 +90,7 @@ describe('MCP routing - subdomain mode', function () {
      * SubdomainRootResponse middleware is exercised against the real endpoint.
      *
      * routes/ai.php is registered ahead of routes/web.php, so in production the
-     * MCP endpoint — not the domainless "/" home route — owns the root of the
+     * MCP endpoint, not the domainless "/" home route, owns the root of the
      * MCP domain. Routes added mid-test instead land in the dynamic tail of a
      * compiled collection, where the home route matches first; rehydrating a
      * plain collection restores the domain-first matching production has.

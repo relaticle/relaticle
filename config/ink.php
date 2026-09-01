@@ -28,7 +28,7 @@ return [
     /*
      * Our own marketing views render through ink's controllers, so we get the
      * package's listing SEO, search and pagination without duplicating it. These
-     * are app views, not published copies of ink's — nothing to drift.
+     * are app views, not published copies of ink's, so nothing can drift.
      */
     'views' => [
         'index' => 'blog.index',

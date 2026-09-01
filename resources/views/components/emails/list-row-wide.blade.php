@@ -1,7 +1,7 @@
 @props(['email', 'folder', 'ownAddresses' => []])
 
 {{-- The full-width row: one line per email, the way a mail list is meant to scan.
-     Used by every mail list — the inbox board and the record pages. --}}
+     Used by every mail list: the inbox board and the record pages. --}}
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -57,7 +57,7 @@
     $subject = $decode($email->subject);
 
     // Provider snippets open with preheader text, most often the recipient's own
-    // address — so the preview began by telling the reader their own email instead
+    // address, so the preview began by telling the reader their own email instead
     // of the first words of the message.
     $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($email->snippet)) ?? '');
 

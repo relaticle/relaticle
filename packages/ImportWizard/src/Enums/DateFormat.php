@@ -103,7 +103,7 @@ enum DateFormat: string implements HasLabel
      * Attempts multiple format variations to handle real-world CSV data.
      *
      * A CSV carries no offset, so a naive datetime means the wall clock where the person
-     * who exported it lives — the same thing it means when they type it into the form,
+     * who exported it lives, the same thing it means when they type it into the form,
      * which converts out of their zone before storing. `$timezone` is that zone; parsing
      * in it keeps the two paths on the same instant. Null keeps the PHP default, for
      * callers with no user in scope.

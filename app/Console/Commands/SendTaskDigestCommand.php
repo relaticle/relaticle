@@ -44,7 +44,7 @@ final class SendTaskDigestCommand extends Command
     /**
      * Users whose local time is currently at the given hour, filtered in the
      * database (indexed on `timezone`) so the hourly run never loads the whole
-     * user table — only the ~1/24th of users currently in the 08:00 band.
+     * user table, only the ~1/24th of users currently in the 08:00 band.
      *
      * @return Builder<User>
      */

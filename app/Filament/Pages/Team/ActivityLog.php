@@ -4,25 +4,31 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Team;
 
+use App\Enums\CrmEntity;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
-use App\Filament\Resources\CompanyResource;
-use App\Filament\Resources\OpportunityResource;
-use App\Filament\Resources\PeopleResource;
 use App\Models\ActivityLog\Activity;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\ActivityLog\ActivityChangeSummary;
+use App\Support\ActivityLog\ActivityValue;
+use App\Support\CanonicalRecordUrl;
+use App\Support\LikePattern;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
+use Filament\Support\Enums\FontWeight;
+use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\Indicator;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -30,6 +36,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Override;
@@ -38,7 +45,7 @@ use Override;
  * The workspace audit trail: who changed or deleted which record, and when.
  *
  * A record's own timeline disappears with the record on a permanent delete, so
- * this page reads the activity rows directly — they outlive their subject, and
+ * this page reads the activity rows directly. They outlive their subject, and
  * the name captured in the delete payload still identifies what was destroyed.
  */
 final class ActivityLog extends Page implements HasTable
@@ -47,18 +54,8 @@ final class ActivityLog extends Page implements HasTable
     use InteractsWithTable;
 
     /**
-     * Only the record types with a view page can be linked to; tasks and notes
-     * are managed from their list screens and have no record route.
-     */
-    private const array SUBJECT_RESOURCES = [
-        'company' => CompanyResource::class,
-        'people' => PeopleResource::class,
-        'opportunity' => OpportunityResource::class,
-    ];
-
-    /**
      * Custom-field edits are logged under their own event name rather than the
-     * trait's `updated`, but to an admin they are the same act — so they share a
+     * trait's `updated`, but to an admin they are the same act, so they share a
      * label, and filtering on it has to match both.
      */
     private const array EVENT_ALIASES = [
@@ -67,7 +64,11 @@ final class ActivityLog extends Page implements HasTable
 
     private const string CUSTOM_FIELD_EVENT = 'custom_field_changes';
 
-    private const string NOTHING = '—';
+    /** Characters of each side of a diff the table shows before the title takes over. */
+    private const int VALUE_LENGTH = 60;
+
+    /** Characters of the full sentence the title carries before it, too, is clipped. */
+    private const int TITLE_LENGTH = 240;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
@@ -125,17 +126,28 @@ final class ActivityLog extends Page implements HasTable
         return __('teams.tabs.activity');
     }
 
-    public function getSubheading(): string
+    /**
+     * The search term belongs in the URL for the same reason the filters do, but
+     * it cannot get there the same way: Filament's table trait declares
+     * `$tableSearch` untyped, so redeclaring it here to carry a `#[Url]` is a
+     * fatal property-composition conflict. Livewire's query-string map attaches
+     * the same binding without touching the property.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    protected function queryString(): array
     {
-        return __('teams.activity.description');
+        return [
+            'tableSearch' => ['as' => 'search', 'except' => ''],
+        ];
     }
 
     /**
      * One save writes the trait's own event plus one `custom_field_changes` row
      * per custom field that moved, all sharing a `batch_uuid`. Reporting them
      * all put a phantom update next to every create, so they collapse onto a
-     * single surviving row — the native event when there is one, otherwise the
-     * first custom-field row — which carries every sibling payload with it.
+     * single surviving row: the native event when there is one, otherwise the
+     * first custom-field row, whichever carries every sibling payload with it.
      */
     public function table(Table $table): Table
     {
@@ -158,21 +170,43 @@ final class ActivityLog extends Page implements HasTable
                     ->with('causer')
             )
             ->defaultSort('created_at', 'desc')
+            ->stackedOnMobile()
             ->recordUrl($this->subjectUrl(...))
-            ->emptyStateHeading(__('teams.activity.empty.heading'))
-            ->emptyStateDescription(__('teams.activity.empty.description'))
-            ->emptyStateIcon(Heroicon::OutlinedClock)
+            ->defaultPaginationPageOption(25)
+            ->paginationPageOptions([25, 50, 100])
+            ->searchPlaceholder(__('teams.activity.search_placeholder'))
+            ->emptyStateIcon(fn (): Heroicon => $this->isFiltered() ? Heroicon::OutlinedMagnifyingGlass : Heroicon::OutlinedClock)
+            ->emptyStateHeading(fn (): string => $this->isFiltered()
+                ? __('teams.activity.no_results.heading')
+                : __('teams.activity.empty.heading'))
+            ->emptyStateDescription(fn (): string => $this->isFiltered()
+                ? __('teams.activity.no_results.description')
+                : __('teams.activity.empty.description'))
+            ->emptyStateActions([
+                Action::make('clearFilters')
+                    ->label(__('teams.activity.no_results.action'))
+                    ->icon(Heroicon::OutlinedXMark)
+                    ->color('gray')
+                    ->visible(fn (): bool => $this->isFiltered())
+                    ->action(function (): void {
+                        $this->resetTableSearch();
+                        $this->removeTableFilters();
+                    }),
+            ])
             ->columns([
                 TextColumn::make('created_at')
                     ->label(__('teams.activity.columns.created_at'))
-                    ->dateTime()
+                    ->since()
+                    ->dateTimeTooltip()
                     ->sortable(),
                 TextColumn::make('causer.name')
                     ->label(__('teams.activity.columns.causer'))
+                    ->weight(FontWeight::Medium)
                     ->placeholder(__('teams.activity.system')),
                 TextColumn::make('event')
                     ->label(__('teams.activity.columns.event'))
                     ->badge()
+                    ->icon($this->eventIcon(...))
                     ->color(fn (?string $state): string => match ($state) {
                         'created' => 'success',
                         'deleted' => 'danger',
@@ -182,21 +216,25 @@ final class ActivityLog extends Page implements HasTable
                     ->formatStateUsing($this->eventLabel(...)),
                 TextColumn::make('subject_type')
                     ->label(__('teams.activity.columns.subject_type'))
-                    ->badge()
                     ->color('gray')
+                    ->icon($this->typeIcon(...))
                     ->formatStateUsing($this->typeLabel(...)),
                 TextColumn::make('subject_id')
                     ->label(__('teams.activity.columns.record'))
                     ->state($this->recordName(...))
+                    ->weight(FontWeight::Medium)
+                    ->color(fn (Activity $record): ?string => $this->liveSubject($record) instanceof Model ? null : 'gray')
+                    ->tooltip($this->destroyedNotice(...))
+                    ->searchable(query: $this->searchByRecordName(...))
                     ->wrap(),
                 TextColumn::make('batch_uuid')
                     ->label(__('teams.activity.columns.changes'))
                     ->state(ActivityChangeSummary::for(...))
+                    ->formatStateUsing($this->changeLine(...))
                     ->listWithLineBreaks()
-                    ->limitList(2)
-                    ->expandableLimitedList()
-                    ->placeholder(self::NOTHING)
-                    ->wrap(),
+                    ->limitList(1)
+                    ->placeholder(ActivityValue::EMPTY)
+                    ->action($this->viewChangesAction()),
             ])
             ->filters([
                 SelectFilter::make('event')
@@ -222,14 +260,53 @@ final class ActivityLog extends Page implements HasTable
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query
                         ->when(filled($data['from'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '>=', $data['from']))
-                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '<=', $data['until']))),
+                        ->when(filled($data['until'] ?? null), fn (Builder $q): Builder => $q->whereDate('activity_log.created_at', '<=', $data['until'])))
+                    ->indicateUsing($this->dateIndicators(...)),
             ]);
     }
 
     /**
+     * A save that moved one field is the common case and reads inline. Anything
+     * longer would stretch the row and truncate the values that make it worth
+     * reading, so the rest opens in a slide-over where the whole diff fits.
+     */
+    private function viewChangesAction(): Action
+    {
+        return Action::make('viewChanges')
+            ->label(__('teams.activity.changes_modal.trigger'))
+            ->slideOver()
+            ->modalHeading(fn (Activity $record): string => $this->recordName($record))
+            ->modalDescription($this->changesDescription(...))
+            ->modalIcon(fn (Activity $record): Heroicon => $this->eventIcon($record->event))
+            ->modalContent(fn (Activity $record): View => view('filament.pages.team.activity-changes', [
+                'rows' => ActivityChangeSummary::for($record),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('teams.activity.changes_modal.close'))
+            ->visible(fn (Activity $record): bool => count(ActivityChangeSummary::for($record)) > 1);
+    }
+
+    /**
+     * The row's own timestamp is converted for the reader by the column, which
+     * reads `FilamentTimezone` itself. Nothing does that for a string built by
+     * hand, so the same instant printed here has to be converted here too.
+     */
+    private function changesDescription(Activity $record): string
+    {
+        $causer = $record->causer?->getAttribute('name');
+
+        return implode(' · ', [
+            $this->typeLabel($record->subject_type),
+            $this->eventLabel($record->event),
+            is_string($causer) && $causer !== '' ? $causer : __('teams.activity.system'),
+            $record->created_at?->copy()->setTimezone(FilamentTimezone::get())->toDayDateTimeString() ?? ActivityValue::EMPTY,
+        ]);
+    }
+
+    /**
      * Rows written for one record inside one request. The batch is stamped per
-     * request, not per save, so a request touching several records shares it —
-     * the subject columns are what keep one record's payload off another's row.
+     * request, not per save, so a request touching several records shares it.
+     * The subject columns are what keep one record's payload off another's row.
      *
      * Only ever used to fold a `custom_field_changes` row into its native
      * sibling. Collapsing the batch itself would swallow a genuine event, since
@@ -246,8 +323,45 @@ final class ActivityLog extends Page implements HasTable
     }
 
     /**
+     * A destroyed record survives only in its own payload, and a record whose
+     * name never moved was never written into one, so neither source alone can
+     * answer "show me every row about Acme". Both are searched.
+     *
+     * @param  Builder<Activity>  $query
+     * @return Builder<Activity>
+     */
+    private function searchByRecordName(Builder $query, string $search): Builder
+    {
+        $term = '%'.LikePattern::escape($search).'%';
+
+        $query->where(fn (Builder $logged): Builder => $logged
+            ->whereRaw("activity_log.attribute_changes #>> '{attributes,name}' ilike ?", [$term])
+            ->orWhereRaw("activity_log.attribute_changes #>> '{attributes,title}' ilike ?", [$term])
+            ->orWhereRaw("activity_log.attribute_changes #>> '{old,name}' ilike ?", [$term])
+            ->orWhereRaw("activity_log.attribute_changes #>> '{old,title}' ilike ?", [$term]));
+
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Team) {
+            return $query;
+        }
+
+        foreach (CrmEntity::cases() as $entity) {
+            $query->orWhere(fn (Builder $live): Builder => $live
+                ->where('activity_log.subject_type', $entity->value)
+                ->whereIn('activity_log.subject_id', fn (QueryBuilder $records): QueryBuilder => $records
+                    ->select('id')
+                    ->from($entity->table())
+                    ->where('team_id', $tenant->getKey())
+                    ->where($entity->titleColumn(), 'ilike', $term)));
+        }
+
+        return $query;
+    }
+
+    /**
      * The name the record carried at the time of the event wins. Reading the
-     * live record instead would rewrite history on every rename — and there is
+     * live record instead would rewrite history on every rename, and there is
      * no live record left to read once it has been destroyed.
      */
     private function recordName(Activity $record): string
@@ -281,21 +395,40 @@ final class ActivityLog extends Page implements HasTable
         return '#'.$record->subject_id;
     }
 
-    private function subjectUrl(Activity $record): ?string
+    private function destroyedNotice(Activity $record): ?string
     {
-        $resource = self::SUBJECT_RESOURCES[$record->subject_type] ?? null;
-
-        if ($resource === null || ! $this->liveSubject($record) instanceof Model) {
+        if ($this->liveSubject($record) instanceof Model) {
             return null;
         }
 
-        return $resource::getUrl('view', ['record' => $record->subject_id]);
+        return __('teams.activity.record_destroyed');
+    }
+
+    /**
+     * Tasks and notes have no record page of their own, so their canonical URL
+     * is the index deep link that opens the edit modal, the same URL the search
+     * tools and digest emails publish, built by the same class.
+     */
+    private function subjectUrl(Activity $record): ?string
+    {
+        $entity = CrmEntity::tryFrom((string) $record->subject_type);
+        $tenant = Filament::getTenant();
+
+        if (! $entity instanceof CrmEntity || ! $tenant instanceof Team) {
+            return null;
+        }
+
+        if (! $this->liveSubject($record) instanceof Model) {
+            return null;
+        }
+
+        return (new CanonicalRecordUrl)->build($entity, (string) $record->subject_id, $tenant);
     }
 
     /**
      * Resolved for the whole page at once rather than through `subject`, because
-     * a morph alias whose model has since been removed from the codebase — a
-     * stale row from a retired feature — makes eager loading the relation throw
+     * a morph alias whose model has since been removed from the codebase (a
+     * stale row from a retired feature) makes eager loading the relation throw
      * and takes the entire audit log down with it. Unknown aliases simply have
      * no live record; the row still renders from its own payload.
      */
@@ -345,26 +478,101 @@ final class ActivityLog extends Page implements HasTable
         return $resolved;
     }
 
+    /**
+     * Reads as one sentence (field, what it was, what it became) with the
+     * before struck through so the after is what the eye lands on. The title
+     * carries the same sentence in plain text, which is what a reader gets back
+     * when a long value wraps or is clipped. It is capped too: a rich-editor
+     * body arrives here stripped but not shortened, and uncapped it would ship
+     * the whole note into the title of every row on the page.
+     *
+     * @param  array{label: string, old: string, new: string}  $state
+     */
+    private function changeLine(array $state): HtmlString
+    {
+        return new HtmlString(view('filament.pages.team.activity-line', [
+            'label' => $state['label'],
+            'old' => Str::limit($state['old'], self::VALUE_LENGTH),
+            'new' => Str::limit($state['new'], self::VALUE_LENGTH),
+            'title' => Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH),
+        ])->render());
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<Indicator>
+     */
+    private function dateIndicators(array $data): array
+    {
+        $indicators = [];
+
+        foreach (['from', 'until'] as $field) {
+            $value = $data[$field] ?? null;
+
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+
+            $indicators[] = Indicator::make(__('teams.activity.filters.'.$field).': '.$value)
+                ->removeField($field);
+        }
+
+        return $indicators;
+    }
+
+    /**
+     * The indicator bar is already the answer to "is anything narrowing this
+     * table": it unions the search term, the per-column searches and every
+     * filter's own indicators, so the empty state cannot disagree with the
+     * chips the reader can see above it.
+     */
+    private function isFiltered(): bool
+    {
+        return $this->getTable()->getFilterIndicators() !== [];
+    }
+
     private function eventLabel(?string $state): string
     {
         if ($state === null) {
-            return '—';
+            return ActivityValue::EMPTY;
         }
 
-        if ($state === 'custom_field_changes') {
+        if ($state === self::CUSTOM_FIELD_EVENT) {
             return __('teams.activity.events.updated');
         }
 
         return $this->eventOptions()[$state] ?? Str::headline(str_replace('.', ' ', $state));
     }
 
+    private function eventIcon(?string $state): Heroicon
+    {
+        return match ($state) {
+            'created' => Heroicon::PlusCircle,
+            'deleted' => Heroicon::Trash,
+            'restored' => Heroicon::ArrowUturnLeft,
+            default => Heroicon::PencilSquare,
+        };
+    }
+
     private function typeLabel(?string $state): string
     {
         if ($state === null) {
-            return '—';
+            return ActivityValue::EMPTY;
         }
 
         return $this->typeOptions()[$state] ?? Str::headline($state);
+    }
+
+    private function typeIcon(?string $state): ?Heroicon
+    {
+        return match (CrmEntity::tryFrom((string) $state)) {
+            CrmEntity::Company => Heroicon::BuildingOffice,
+            CrmEntity::People => Heroicon::User,
+            CrmEntity::Opportunity => Heroicon::CurrencyDollar,
+            CrmEntity::Task => Heroicon::ClipboardDocumentCheck,
+            CrmEntity::Note => Heroicon::DocumentText,
+            null => null,
+        };
     }
 
     /**
@@ -381,17 +589,19 @@ final class ActivityLog extends Page implements HasTable
     }
 
     /**
+     * Keyed by morph alias, which is what `subject_type` holds.
+     *
      * @return array<string, string>
      */
     private function typeOptions(): array
     {
-        return [
-            'company' => __('teams.activity.types.company'),
-            'people' => __('teams.activity.types.people'),
-            'opportunity' => __('teams.activity.types.opportunity'),
-            'task' => __('teams.activity.types.task'),
-            'note' => __('teams.activity.types.note'),
-        ];
+        $labels = [];
+
+        foreach (CrmEntity::cases() as $entity) {
+            $labels[$entity->value] = __('teams.activity.types.'.$entity->value);
+        }
+
+        return $labels;
     }
 
     /**

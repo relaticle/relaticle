@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Guards the test-suite architecture itself.
  *
  * In March 2026 the Unit suite was removed from phpunit.xml while tests/Unit
- * stayed on disk — 141 tests silently stopped running for three months. These
+ * stayed on disk, and 141 tests silently stopped running for three months. These
  * checks make that class of failure (and phpunit.xml / phpunit.ci.xml drift)
  * impossible to reintroduce.
  */
@@ -108,7 +108,7 @@ it('keeps every phpunit.xml env key present in phpunit.ci.xml', function (): voi
 
     expect($missing)->toBe(
         [],
-        'phpunit.ci.xml is the CI overlay of phpunit.xml — it may override values and add CI-only keys, but must never lack a local key: '.implode(', ', $missing),
+        'phpunit.ci.xml is the CI overlay of phpunit.xml. It may override values and add CI-only keys, but must never lack a local key: '.implode(', ', $missing),
     );
 });
 

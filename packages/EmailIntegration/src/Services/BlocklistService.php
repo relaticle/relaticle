@@ -28,7 +28,7 @@ final readonly class BlocklistService
 
         foreach ($email->participants as $participant) {
             $address = strtolower((string) $participant->email_address);
-            // Host after the LAST '@', matching PrivacyService::isProtected — explode[1]
+            // Host after the LAST '@', matching PrivacyService::isProtected. explode[1]
             // grabs the wrong segment for addresses with more than one '@'.
             $domain = str_contains($address, '@') ? Str::afterLast($address, '@') : '';
 

@@ -20,7 +20,7 @@ final readonly class MarketingNavigation
                 new NavItem(
                     (string) config('chat.assistant_name'),
                     route('ai'),
-                    icon: 'assistant',
+                    icon: 'rela',
                     description: __('The AI teammate that proposes every change'),
                 ),
                 new NavItem(

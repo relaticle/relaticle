@@ -55,7 +55,7 @@ it('resolves every internal link -- including anchored and query-qualified ones 
             $path = ltrim($url, '/');
             $target = $repo->find($path);
 
-            // A one-segment-deep /help link is a category page — valid as
+            // A one-segment-deep /help link is a category page, valid as
             // long as the category exists and no fragment points into it.
             if (! $target instanceof DocPage && $fragment === '' && $repo->findCategory($path) !== null) {
                 return [];

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a4dd62e41756c452acb9537af1fcea3c",
+    "content-hash": "8c99f32ed08d6cbbb1e2d2d51e99b007",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -2818,16 +2818,16 @@
         },
         {
             "name": "google/apiclient-services",
-            "version": "v0.453.0",
+            "version": "v0.457.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/googleapis/google-api-php-client-services.git",
-                "reference": "9eeab572613c0b533f8268e5df0954a63100061d"
+                "reference": "d6ad056c8d6683c035a5d4e2c6dd77247150ccc1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/googleapis/google-api-php-client-services/zipball/9eeab572613c0b533f8268e5df0954a63100061d",
-                "reference": "9eeab572613c0b533f8268e5df0954a63100061d",
+                "url": "https://api.github.com/repos/googleapis/google-api-php-client-services/zipball/d6ad056c8d6683c035a5d4e2c6dd77247150ccc1",
+                "reference": "d6ad056c8d6683c035a5d4e2c6dd77247150ccc1",
                 "shasum": ""
             },
             "require": {
@@ -2856,9 +2856,9 @@
             ],
             "support": {
                 "issues": "https://github.com/googleapis/google-api-php-client-services/issues",
-                "source": "https://github.com/googleapis/google-api-php-client-services/tree/v0.453.0"
+                "source": "https://github.com/googleapis/google-api-php-client-services/tree/v0.457.0"
             },
-            "time": "2026-08-03T01:20:25+00:00"
+            "time": "2026-08-31T01:26:27+00:00"
         },
         {
             "name": "google/auth",
@@ -10973,26 +10973,26 @@
         },
         {
             "name": "socialiteproviders/manager",
-            "version": "4.9.2",
+            "version": "4.10.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/SocialiteProviders/Manager.git",
-                "reference": "35372dc62787e61e91cfec73f45fd5d5ae0f8891"
+                "reference": "65ad770276875682e246e5435566146bf0baebf2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SocialiteProviders/Manager/zipball/35372dc62787e61e91cfec73f45fd5d5ae0f8891",
-                "reference": "35372dc62787e61e91cfec73f45fd5d5ae0f8891",
+                "url": "https://api.github.com/repos/SocialiteProviders/Manager/zipball/65ad770276875682e246e5435566146bf0baebf2",
+                "reference": "65ad770276875682e246e5435566146bf0baebf2",
                 "shasum": ""
             },
             "require": {
-                "illuminate/support": "^11.0 || ^12.0 || ^13.0",
-                "laravel/socialite": "^5.5",
-                "php": "^8.2"
+                "illuminate/support": "^12.0 || ^13.0",
+                "laravel/socialite": "^5.29",
+                "php": "^8.3"
             },
             "require-dev": {
-                "mockery/mockery": "^1.2",
-                "phpunit/phpunit": "^9.0"
+                "mockery/mockery": "^1.6",
+                "phpunit/phpunit": "^12.5"
             },
             "type": "library",
             "extra": {
@@ -11043,24 +11043,73 @@
                 "issues": "https://github.com/socialiteproviders/manager/issues",
                 "source": "https://github.com/socialiteproviders/manager"
             },
-            "time": "2026-03-18T22:13:24+00:00"
+            "time": "2026-08-16T00:16:22+00:00"
         },
         {
-            "name": "socialiteproviders/microsoft-azure",
-            "version": "5.2.0",
+            "name": "socialiteproviders/microsoft",
+            "version": "4.10.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/SocialiteProviders/Microsoft-Azure.git",
-                "reference": "453d62c9d7e3b3b76e94c913fb46e68a33347b16"
+                "url": "https://github.com/SocialiteProviders/Microsoft.git",
+                "reference": "e86ad86734df16a54d869b21103b9e2ec3842000"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/SocialiteProviders/Microsoft-Azure/zipball/453d62c9d7e3b3b76e94c913fb46e68a33347b16",
-                "reference": "453d62c9d7e3b3b76e94c913fb46e68a33347b16",
+                "url": "https://api.github.com/repos/SocialiteProviders/Microsoft/zipball/e86ad86734df16a54d869b21103b9e2ec3842000",
+                "reference": "e86ad86734df16a54d869b21103b9e2ec3842000",
                 "shasum": ""
             },
             "require": {
-                "ext-json": "*",
+                "firebase/php-jwt": "^7.0",
+                "php": "^8.0",
+                "socialiteproviders/manager": "^4.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SocialiteProviders\\Microsoft\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Brian Faust",
+                    "email": "hello@brianfaust.de"
+                }
+            ],
+            "description": "Microsoft OAuth2 Provider for Laravel Socialite",
+            "keywords": [
+                "laravel",
+                "microsoft",
+                "oauth",
+                "provider",
+                "socialite"
+            ],
+            "support": {
+                "docs": "https://socialiteproviders.com/microsoft",
+                "issues": "https://github.com/socialiteproviders/providers/issues",
+                "source": "https://github.com/socialiteproviders/providers"
+            },
+            "time": "2026-07-21T22:20:53+00:00"
+        },
+        {
+            "name": "socialiteproviders/microsoft-azure",
+            "version": "5.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SocialiteProviders/Microsoft-Azure.git",
+                "reference": "d70ea3c60b09cc113a14350761a0618815bfa11c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SocialiteProviders/Microsoft-Azure/zipball/d70ea3c60b09cc113a14350761a0618815bfa11c",
+                "reference": "d70ea3c60b09cc113a14350761a0618815bfa11c",
+                "shasum": ""
+            },
+            "require": {
                 "php": "^8.0",
                 "socialiteproviders/manager": "^4.4"
             },
@@ -11094,7 +11143,7 @@
                 "issues": "https://github.com/socialiteproviders/providers/issues",
                 "source": "https://github.com/socialiteproviders/providers"
             },
-            "time": "2024-03-15T03:02:10+00:00"
+            "time": "2026-08-23T02:40:58+00:00"
         },
         {
             "name": "spatie/commonmark-shiki-highlighter",
@@ -14768,16 +14817,16 @@
         },
         {
             "name": "symfony/html-sanitizer",
-            "version": "v8.1.1",
+            "version": "v8.1.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/html-sanitizer.git",
-                "reference": "09e1f2f9a3c8dcdca072587dc71999c1921c07cb"
+                "reference": "f8bbdb0704e6b6e9a3412481c1a87886a0633199"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/html-sanitizer/zipball/09e1f2f9a3c8dcdca072587dc71999c1921c07cb",
-                "reference": "09e1f2f9a3c8dcdca072587dc71999c1921c07cb",
+                "url": "https://api.github.com/repos/symfony/html-sanitizer/zipball/f8bbdb0704e6b6e9a3412481c1a87886a0633199",
+                "reference": "f8bbdb0704e6b6e9a3412481c1a87886a0633199",
                 "shasum": ""
             },
             "require": {
@@ -14816,7 +14865,7 @@
                 "sanitizer"
             ],
             "support": {
-                "source": "https://github.com/symfony/html-sanitizer/tree/v8.1.1"
+                "source": "https://github.com/symfony/html-sanitizer/tree/v8.1.6"
             },
             "funding": [
                 {
@@ -14836,7 +14885,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-06-06T11:11:44+00:00"
+            "time": "2026-08-30T01:03:44+00:00"
         },
         {
             "name": "symfony/http-client",

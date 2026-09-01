@@ -9,7 +9,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 final class MeetingObserver
 {
     // meeting.created is logged from StoreMeetingAction once attendees are inserted, so the
-    // attendee_count is accurate — the observer's created() fired too early (count was 0).
+    // attendee_count is accurate. The observer's created() fired too early (count was 0).
 
     public function deleted(Meeting $meeting): void
     {

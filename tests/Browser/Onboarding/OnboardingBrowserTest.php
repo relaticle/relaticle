@@ -10,10 +10,7 @@ mutates(CreateTeam::class);
 it('new user without teams is directed to onboarding wizard', function (): void {
     $user = User::factory()->create();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
@@ -43,10 +40,7 @@ it('new user without teams is directed to onboarding wizard', function (): void 
 it('completes the wizard when Copy invite link is clicked before Send invites', function (): void {
     $user = User::factory()->create();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
@@ -76,10 +70,7 @@ it('persists slug edits made after Copy invite link was clicked', function (): v
     // Back navigation makes this reachable: the workspace already exists from Copy
     // invite link, and the user returns to step 1 to rename it. Without the reconcile
     // in CreateTeam::handleRegistration the edit would be silently discarded.
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
@@ -121,10 +112,7 @@ it('offers the invite skip only while there is an invite to skip', function (): 
 
     // With the fields empty, "Skip for now" would submit exactly what the primary
     // button submits, so it stays hidden until an address is entered.
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
@@ -152,10 +140,7 @@ it('keeps the leave-wizard link off the invite step for a first-run user', funct
     // tracks the wizard step only mounts once "Copy invite link" creates a workspace.
     // It still has to know the wizard is on the last step, or the footer ends up with
     // two competing calls to action.
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')

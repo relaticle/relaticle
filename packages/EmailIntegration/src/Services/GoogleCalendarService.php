@@ -24,7 +24,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
     public static function forAccount(ConnectedAccount $account): self
     {
         // Reuse the shared client factory so calendar and mail refresh tokens exactly
-        // the same way — including surfacing a revoked/absent grant as an auth error
+        // the same way, including surfacing a revoked/absent grant as an auth error
         // (which flips the account to REAUTH_REQUIRED) instead of persisting a null token.
         return new self($account, new Calendar((new GoogleClientFactory)->make($account)));
     }

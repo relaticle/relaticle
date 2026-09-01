@@ -20,6 +20,11 @@
     // Mirrors a nav item's geometry so the footer reads as part of the same
     // list rather than a stack bolted underneath it.
     $rowClasses = 'mx-4 flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/5';
+
+    // A failure gets a solid button; an offer keeps the quieter outlined pill.
+    $actionClasses = $billing !== null && $billing['urgent']
+        ? 'border-transparent bg-danger-600 px-2 py-1 text-white group-hover:bg-danger-500'
+        : 'border-gray-200 px-1.5 py-0.5 text-gray-600 group-hover:border-gray-300 group-hover:text-gray-900 dark:border-white/10 dark:text-gray-300 dark:group-hover:text-white';
 @endphp
 
 @if($canManage)
@@ -52,7 +57,7 @@
 
                     <span class="flex-1 truncate">{{ $billing['label'] }}</span>
 
-                    <span class="flex-shrink-0 rounded-md border border-gray-200 px-1.5 py-0.5 text-xs font-medium text-gray-600 transition group-hover:border-gray-300 group-hover:text-gray-900 dark:border-white/10 dark:text-gray-300 dark:group-hover:text-white">
+                    <span class="flex-shrink-0 rounded-md border text-xs font-medium transition {{ $actionClasses }}">
                         {{ $billing['action'] }}
                     </span>
                 </a>

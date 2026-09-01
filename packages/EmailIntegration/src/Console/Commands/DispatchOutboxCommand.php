@@ -44,7 +44,7 @@ final class DispatchOutboxCommand extends Command
     /**
      * Return emails stuck in SENDING (their worker died before failed() ran) back to
      * QUEUED so they can be re-dispatched. Only rows with no provider_message_id are
-     * touched — once the provider has accepted, the message is delivered and must not
+     * touched: once the provider has accepted, the message is delivered and must not
      * be re-sent. `attempts` is left intact so EmailSendingService's reconciliation
      * lookup still fires and catches any send that completed but never persisted.
      */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Billing\GrantPurchasedCredits;
+use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncTeamPlanFromSubscription;
 use App\Enums\Plan;
@@ -23,6 +24,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 mutates(SyncTeamPlanFromSubscription::class);
 mutates(SyncPlanOnStripeSubscriptionChange::class);
 mutates(GrantPurchasedCredits::class);
+mutates(NotifyWorkspaceOfPaymentFailure::class);
 
 beforeEach(function (): void {
     config()->set('cashier.webhook.secret', 'whsec_test_secret');
@@ -237,7 +239,7 @@ it('never double-grants across a mid-trial conversion', function (): void {
     app(StartProTrial::class)->execute($team->owner, $team);
 
     // Convert mid-trial. The plan is already Pro, so SyncTeamPlanFromSubscription
-    // short-circuits: NO new grant at conversion — the trial allowance keeps running.
+    // short-circuits: NO new grant at conversion, and the trial allowance keeps running.
     test()->travelTo(new DateTimeImmutable('2026-07-01 12:00:00', new DateTimeZone('UTC')));
     sendStripeWebhook(stripeSubscriptionEvent($team->refresh(), 'created'))->assertSuccessful();
 
@@ -256,7 +258,7 @@ it('never double-grants across a mid-trial conversion', function (): void {
     $balance->refresh();
     expect($balance->period_starts_at->toDateTimeString())->toBe('2026-07-01 12:00:00')
         ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00')
-        ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle — never a third
+        ->and($grantsQuery->count())->toBe(2); // trial start + first anniversary cycle, never a third
 });
 
 /** @return array<string, mixed> */
@@ -397,10 +399,105 @@ it('logs and grants nothing when a payment-mode session is missing pack metadata
         );
 });
 
+/**
+ * Shaped after a real event off the sandbox (API 2026-05-27.dahlia): that
+ * version carries the subscription at parent.subscription_details and has no
+ * top-level `subscription` key at all.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function invoicePaymentFailedEvent(Team $team, array $overrides = []): array
+{
+    return [
+        'type' => 'invoice.payment_failed',
+        'data' => [
+            'object' => array_merge([
+                'id' => 'in_'.Str::ulid(),
+                'object' => 'invoice',
+                'customer' => $team->stripe_id,
+                'billing_reason' => 'subscription_cycle',
+                'attempt_count' => 1,
+                'parent' => [
+                    'type' => 'subscription_details',
+                    'subscription_details' => ['subscription' => 'sub_test_1'],
+                ],
+            ], $overrides),
+        ],
+    ];
+}
+
+it('notifies the workspace owner when a renewal charge fails', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team))->assertOk();
+
+    $notification = $team->owner->notifications()->sole();
+
+    expect($notification->data['title'])->toContain($team->name)
+        ->and($notification->data['body'])->toBe(__('billing.payment_failed.notification_body'));
+});
+
+it('notifies once per invoice, not once per Stripe retry attempt', function (): void {
+    $team = stripeBillingTeam();
+
+    foreach ([1, 2, 3] as $attempt) {
+        sendStripeWebhook(invoicePaymentFailedEvent($team, [
+            'id' => 'in_test_retried',
+            'attempt_count' => $attempt,
+        ]))->assertOk();
+    }
+
+    expect($team->owner->notifications()->count())->toBe(1);
+});
+
+it('alarms on a plan change that failed to bill', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        'billing_reason' => 'subscription_update',
+    ]))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(1);
+});
+
+it('stays quiet when the very first subscription charge fails', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        'billing_reason' => 'subscription_create',
+    ]))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(0);
+});
+
+it('raises no subscription alarm for a one-off invoice', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        'billing_reason' => 'manual',
+        'parent' => null,
+    ]))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(0);
+});
+
+it('notifies nobody for a customer that belongs to no workspace', function (): void {
+    $team = stripeBillingTeam();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team, ['customer' => 'cus_unknown']))->assertOk();
+
+    expect($team->owner->notifications()->count())->toBe(0);
+});
+
+it('subscribes the Stripe endpoint to the failed-payment event', function (): void {
+    expect(config('cashier.webhook.events'))->toContain('invoice.payment_failed');
+});
+
 it('subscribes the Stripe endpoint to every checkout event the controller handles', function (): void {
     // `cashier:webhook` provisions the endpoint from config('cashier.webhook.events').
     // A handler that isn't in that list never fires in production, however well
-    // it is covered here — these tests POST to the route directly.
+    // it is covered here; these tests POST to the route directly.
     $handled = collect((new ReflectionClass(StripeWebhookController::class))->getMethods(ReflectionMethod::IS_PROTECTED))
         ->map(fn (ReflectionMethod $method): string => $method->getName())
         ->filter(fn (string $name): bool => str_starts_with($name, 'handleCheckoutSession'))

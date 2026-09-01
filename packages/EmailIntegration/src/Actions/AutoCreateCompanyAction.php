@@ -82,7 +82,7 @@ final readonly class AutoCreateCompanyAction
 
     /**
      * Convert a domain to a sensible default company name using the registrable
-     * label resolved against the Public Suffix List — so mail subdomains and
+     * label resolved against the Public Suffix List, so mail subdomains and
      * multi-part TLDs never leak in: "acme.com" → "Acme",
      * "email.anthropic.com" → "Anthropic", "mail.acme.co.uk" → "Acme".
      */

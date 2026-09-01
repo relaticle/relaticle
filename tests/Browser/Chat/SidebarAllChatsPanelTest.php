@@ -52,10 +52,7 @@ it('opens the all-chats flyout from the sidebar trigger and lists chats', functi
     }
     DB::table('agent_conversations')->insert($rows);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->resize(1920, 1080)
         ->assertVisible('button[aria-label="Open all chats"]')
@@ -93,10 +90,7 @@ it('navigates to a chat when clicked from the panel', function (): void {
     }
     DB::table('agent_conversations')->insert($rows);
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->resize(1920, 1080)
         ->assertVisible('button[aria-label="Open all chats"]');

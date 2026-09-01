@@ -15,7 +15,7 @@ use Relaticle\EmailIntegration\Services\EmailClassifier;
  *
  * Produced by {@see EmailClassifier} from deterministic rules during sync.
  * Values are stored verbatim on `email_labels.label`, so they double as the
- * on-the-wire contract — keep them stable.
+ * on-the-wire contract, so keep them stable.
  */
 enum EmailCategory: string implements HasColor, HasIcon, HasLabel
 {

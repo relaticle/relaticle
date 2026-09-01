@@ -57,6 +57,7 @@ trait HasEmailComposeActions
         return Action::make('composeEmail')
             ->label(__('filament/concerns/email-compose.actions.compose.label'))
             ->icon('heroicon-o-pencil-square')
+            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
             ->visible(fn (): bool => $this->hasActiveConnectedAccount())
             ->action(function (): void {
                 $this->dispatch('composer:open');

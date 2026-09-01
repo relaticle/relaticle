@@ -16,7 +16,7 @@ mutates(CreditService::class);
  *
  * Only consumption paths (reserveCredit/settleReservation/deduct) may bump it;
  * only refundReservation and resetPeriod may roll it back. Sysadmin `adjust`
- * is an accounting event — granting credits or clawing them back must NOT
+ * is an accounting event. Granting credits or clawing them back must NOT
  * touch the spend meter, otherwise revocations would let sysadmins silently
  * rewrite a tenant's consumption history.
  */
@@ -45,7 +45,7 @@ it('revocation adjustments do not touch credits_used', function (): void {
     ]);
     $admin = SystemAdministrator::factory()->create();
 
-    // Revoke more than the liquid balance — credits_remaining floors at 0,
+    // Revoke more than the liquid balance. credits_remaining floors at 0,
     // credits_used stays put because the period's spend is immutable history.
     app(CreditService::class)->adjust($team, -200, 'wipe', $admin->getKey());
 
@@ -85,11 +85,11 @@ it('reserve + settle + refund cycles move credits_used in lockstep with the chat
     expect($balance->credits_used)->toBe(3)
         ->and($balance->credits_remaining)->toBe(97);
 
-    // Sysadmin grants 50 — spend meter frozen.
+    // Sysadmin grants 50; spend meter frozen.
     $admin = SystemAdministrator::factory()->create();
     $service->adjust($team, 50, 'support', $admin->getKey());
 
-    // Sysadmin claws back 20 — spend meter still frozen.
+    // Sysadmin claws back 20; spend meter still frozen.
     $service->adjust($team, -20, 'fraud', $admin->getKey());
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();

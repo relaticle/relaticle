@@ -59,8 +59,8 @@ final readonly class AutoCreatePersonAction
 
     /**
      * Match an existing Person carrying this address in the people "emails"
-     * custom field. Returns null when the field is unconfigured for the team —
-     * there is then no canonical place email identity is stored, so the caller
+     * custom field. Returns null when the field is unconfigured for the team.
+     * There is then no canonical place email identity is stored, so the caller
      * falls through to creating a fresh record.
      */
     private function findByEmail(string $emailAddress, string $teamId, ?BaseCustomField $emailField): ?People
