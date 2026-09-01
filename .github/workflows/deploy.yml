@@ -4,18 +4,12 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      skip_verification:
-        description: 'Deploy without re-running CI. Only when CI already passed for this commit.'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    if: ${{ inputs.skip_verification != true }}
     uses: ./.github/workflows/ci.yml
 
   deploy:
@@ -23,32 +17,25 @@ jobs:
     name: Deploy to Forge
     needs: [verify]
 
-    # A status check function is required here because `verify` is skipped when a
-    # dispatch asks to skip it, and a skipped dependency would otherwise skip this
-    # job too. It has to be !cancelled() and not always(): always() fires even on a
-    # cancelled run, which would leave Cancel unable to stop a release once the
-    # verify jobs had gone green. Prereleases never deploy; a manual dispatch always
-    # may.
-    if: >-
-      ${{ !cancelled()
-          && needs.verify.result != 'failure'
-          && needs.verify.result != 'cancelled'
-          && (github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false) }}
+    # `needs` carries an implicit success() gate, so a failed, cancelled or skipped
+    # verify already blocks this job without any status function here. All that is
+    # left to state is that prereleases do not deploy, and that a manual dispatch
+    # carries no release payload to check.
+    if: ${{ github.event_name != 'release' || github.event.release.prerelease == false }}
 
-    # A webhook that accepts the connection and then stalls hangs an attempt with no
-    # ceiling, so the retry never gets its turn and the job runs until GitHub kills
-    # it at six hours with the release stuck in flight. --retry 5 means six attempts,
-    # so the worst case is 6 x 60 seconds plus 5 x 15 second delays, or 7m15s.
+    # A webhook that accepts the connection and then stalls would otherwise hang
+    # until GitHub kills the job at six hours, with the release stuck in flight.
+    # Worst case is six attempts at 60 seconds plus 31 seconds of backoff.
     timeout-minutes: 10
 
     steps:
       # Forge's webhook returned a proxy-level 502 on the v3.5.5 release while the
-      # deploy itself went through, so a single unretried request reports failure
-      # for a deploy that shipped. Forge queues duplicate triggers and the deploy
-      # script is idempotent, so retrying is cheaper than a false red release.
+      # deploy itself went through, so a single unretried request reports failure for
+      # a deploy that shipped. 502 is already in curl's transient set, as is a
+      # timeout, so --max-time turns a stalled attempt into a retry rather than a
+      # hang. --max-time resets per retry. Forge queues duplicate triggers and the
+      # deploy script is idempotent, so retrying is cheaper than a false red release.
       - name: Trigger Forge Deploy
         run: |
-          curl --fail --silent --show-error --location \
-            --retry 5 --retry-all-errors --retry-delay 15 \
-            --connect-timeout 10 --max-time 60 \
+          curl --fail --silent --show-error --location --retry 5 --max-time 60 \
             "${{ secrets.FORGE_DEPLOY_WEBHOOK }}"
