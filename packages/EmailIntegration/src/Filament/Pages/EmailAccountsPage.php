@@ -147,25 +147,6 @@ final class EmailAccountsPage extends Page
         ]));
     }
 
-    public function accountCapabilities(ConnectedAccount $account): string
-    {
-        $labels = [];
-
-        if ($account->hasEmail()) {
-            $labels[] = __('filament/pages/email-accounts.capabilities.email');
-        }
-
-        if ($account->hasCalendar()) {
-            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
-        }
-
-        if ($labels === []) {
-            return $account->provider->getLabel();
-        }
-
-        return implode(', ', $labels);
-    }
-
     public function syncingIcon(): Htmlable
     {
         return generate_icon_html(
