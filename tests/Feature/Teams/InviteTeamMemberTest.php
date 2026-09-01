@@ -13,6 +13,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -379,4 +380,24 @@ test('an invite that loses a race to an identical concurrent invite reports it a
             ValidationException::class,
             __('teams.validation.email_already_invited'),
         );
+});
+
+test('an administrator cannot invite someone straight to administrator', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    expect(fn (): TeamInvitation => resolve(InviteTeamMember::class)
+        ->invite($admin, $this->team, 'escalate@example.com', TeamRole::Admin->value))
+        ->toThrow(AuthorizationException::class);
+
+    expect(TeamInvitation::query()->where('email', 'escalate@example.com')->exists())->toBeFalse();
+});
+
+test('an administrator can invite someone as an editor', function (): void {
+    $admin = User::factory()->create();
+    $this->team->users()->attach($admin, ['role' => TeamRole::Admin->value]);
+
+    resolve(InviteTeamMember::class)->invite($admin, $this->team, 'fine@example.com', TeamRole::Editor->value);
+
+    expect(TeamInvitation::query()->where('email', 'fine@example.com')->exists())->toBeTrue();
 });

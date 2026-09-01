@@ -331,7 +331,7 @@ test('an expired invitation shows the expired state', function (): void {
         ->assertSee(__('teams.accept.expired.heading'));
 });
 
-test('two concurrent accepts attach exactly one membership', function (): void {
+test('a replayed accept attaches exactly one membership', function (): void {
     $invitation = $this->team->teamInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
     $raw = $invitation->issueToken();
     $invitation->save();
