@@ -144,11 +144,12 @@ trait HasEmailComposeActions
         $quotedBody = $user->can('viewBody', $email) ? ($email->body->body_html ?? '') : '';
 
         $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
+        $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
 
         return [
             'connected_account_id' => $account?->getKey(),
             'to' => $toParticipants,
-            'subject' => $subjectPrefix.($email->subject ?? ''),
+            'subject' => $subjectPrefix.$originalSubject,
             'body_html' => '',
             'quoted_body_html' => $quotedBody,
             'mode' => $mode,
