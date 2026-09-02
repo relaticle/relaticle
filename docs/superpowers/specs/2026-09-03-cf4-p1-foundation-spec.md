@@ -44,8 +44,8 @@ cleanups that depend on it (lookup_type retirement, the reflection helper) wait 
   deleted first, then `4.x` is cut from `origin/3.x`. Stale branches poison `4.x-dev`
   resolution on Packagist.
 - Pre-release tags mark phase boundaries so the host can test against a real version:
-  `4.0.0-alpha.1` after phase 1, `alpha.2` after phase 3, `beta.1` after phase 4, `4.0.0`
-  after phase 5. Phase 2 tags only if it ships early as a 3.x minor (see the phase 2 spec).
+  `4.0.0-alpha.1` after phase 1, `alpha.2` after phase 2, `alpha.3` after phase 3, `beta.1`
+  after phase 4, `4.0.0` after phase 5. Nothing from this program ships on 3.x.
 - One PR per plan into `4.x`; a phase ends when the package is green and tagged.
 
 ## Exit criterion

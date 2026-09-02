@@ -17,13 +17,9 @@ in relaticle#549.
 Select-option categories ship in the package as `settings.category` on the option row, with
 the category-per-option model (the workflow-state shape used by modern issue trackers). The
 first consumer is reporting correctness only: won revenue, task completion, cycle direction.
-The change is additive and would fit a 3.x minor; it rides the major by decision so the
-options editor changes once (with bulk paste, phase 4) and the host sweep lands in the same
-Relaticle release as the substrate bump.
-
-Backport decision point: if the 4.0 timeline stretches past roughly two months after this
-phase completes, ship phase 2.1 as a 3.x minor and tag it; the host plan (2.2) then runs
-against that minor. Decide at the end of phase 1.
+The change is additive, and it ships in 4.x only, no 3.x backport: the options editor
+changes once (with bulk paste, phase 4) and the host sweep lands in the same Relaticle
+release as the substrate bump.
 
 ## Answers to the six deliverables #556 asked for
 
@@ -78,5 +74,5 @@ transitions. This phase ships the category primitive they need; they are separat
 
 ## Exit criterion
 
-Package: enum, settings cast, scope, editor column, docs. Host: seeds, backfill, zero literal
+Package: enum, settings cast, scope, editor column, docs. `4.0.0-alpha.2` tagged on the package half. Host: seeds, backfill, zero literal
 status lookups, won revenue restored, category exposed in chat, MCP, REST.

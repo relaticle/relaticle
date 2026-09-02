@@ -195,4 +195,4 @@ users keep it. Decide whether to reproduce and fix in a 3.x patch or document it
 ## Exit criterion
 
 Package fully on links, lookup_type gone, stock-Filament record config working, migration and
-purge steps green on fixture data, `4.0.0-alpha.2` tagged.
+purge steps green on fixture data, `4.0.0-alpha.3` tagged.
