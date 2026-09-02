@@ -43,6 +43,7 @@ it('emits article and breadcrumb json-ld on a help article', function (): void {
         ->and($html)->toContain('"headline":"Create your first company"')
         ->and($html)->toContain('"description":"Add a company record and fill in the fields your team actually uses."')
         ->and($html)->toContain('"mainEntityOfPage":"'.$url.'"')
+        ->and($html)->toContain('"publisher":{"@type":"Organization","name":"'.config('app.name').'"')
         ->and($html)->toContain('"position":1')
         ->and($html)->toContain('"position":2')
         ->and($html)->toContain('"position":3');
@@ -110,7 +111,9 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
 
         preg_match('/<title>(.*?)<\/title>/', $html, $match);
 
-        $expected = "{$page->title} - {$brand}";
+        $expected = $page->area === DocUrl::HELP
+            ? "{$page->title} - {$brand} Help Centre"
+            : "{$page->title} - {$brand}";
 
         if (($match[1] ?? null) !== $expected || substr_count($match[1] ?? '', " - {$brand}") !== 1) {
             $offenders[] = "{$page->path} -> ".($match[1] ?? '(no title)');
@@ -118,6 +121,16 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
     }
 
     expect($offenders)->toBe([]);
+});
+
+it('marks content pages as articles and the hubs as websites in open graph', function (): void {
+    $article = $this->get('/help/getting-started/create-your-first-company')->assertOk()->getContent();
+    $guide = $this->get('/developers/mcp')->assertOk()->getContent();
+    $hub = $this->get('/help')->assertOk()->getContent();
+
+    expect($article)->toContain('<meta property="og:type" content="article" />')
+        ->and($guide)->toContain('<meta property="og:type" content="article" />')
+        ->and($hub)->toContain('<meta property="og:type" content="website" />');
 });
 
 it('lazy-loads article images', function (): void {

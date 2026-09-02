@@ -1,6 +1,6 @@
 ---
 title: Use the task board
-description: A kanban view of your tasks — one column per status, drag to update, with priority and due-date badges.
+description: A kanban view of your tasks. One column per status, drag to update, with priority and due-date badges.
 order: 2
 updated: "2026-08-13"
 related: [help/tasks-and-notes/work-with-tasks, help/custom-fields/edit-the-options-in-a-select-field, help/getting-started/track-a-deal-through-the-pipeline]
@@ -13,8 +13,8 @@ switcher next to the Tasks heading to open it.
 ## Reading the board
 
 Each card shows the task's title, a snippet of its description, a flag badge
-for **Priority**, a **Due Date** badge — which turns into "Due Today",
-"Due Tomorrow", or "(Overdue)" as the date approaches — and the assignees'
+for **Priority**, a **Due Date** badge that turns into "Due Today",
+"Due Tomorrow", or "(Overdue)" as the date approaches, and the assignees'
 avatars.
 
 Filter the whole board by **Assignee** to see one person's plate.
@@ -23,7 +23,7 @@ Filter the whole board by **Assignee** to see one person's plate.
 
 ## Working the board
 
-- **Drag a card** to another column to change its status — the change saves
+- **Drag a card** to another column to change its status. The change saves
   as it lands.
 - **Add a task in place** with the **+** button at the top of any column; the
   status is pre-set to that column.
@@ -31,7 +31,7 @@ Filter the whole board by **Assignee** to see one person's plate.
 
 ## The columns are yours
 
-Columns mirror the task **Status** field's options — To do, In progress, and
+Columns mirror the task **Status** field's options: To do, In progress, and
 Done out of the box. A workspace owner can rename them, add more, or reorder
 them on the Custom Fields page, and the board follows:
 [edit the options in a select field](/help/custom-fields/edit-the-options-in-a-select-field).

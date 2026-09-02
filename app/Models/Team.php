@@ -8,6 +8,8 @@ use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Models\ActivityLog\Activity;
+use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
 use App\Support\ReservedSlugAwareGenerateSlugAction;
 use Database\Factories\TeamFactory;
@@ -23,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -96,7 +99,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         'login', 'logout', 'register', 'signin', 'signout', 'signup',
         'auth', 'oauth', 'sso', 'callback', '.well-known',
         'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
-        'confirm-password', 'two-factor-challenge',
+        'confirm-password', 'two-factor-challenge', 'passkeys',
 
         // Administration
         'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',
@@ -280,6 +283,28 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     }
 
     /**
+     * The single row `Cashier::subscription()` resolves: the newest `default`
+     * subscription. It exists so a query can ask what `billingStatus()` asks:
+     * `whereHas('subscriptions', ...)` would match a superseded row and label a
+     * workspace by a subscription it no longer bills on.
+     *
+     * The type filter lives in the aggregate closure because the `ofMany`
+     * sub-query is built from a fresh query and does not inherit outer
+     * constraints. Filtering only on the outside would take MAX(created_at)
+     * across every type and then discard it.
+     *
+     * @return HasOne<Subscription, $this>
+     */
+    public function latestDefaultSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class, $this->getForeignKey())
+            ->ofMany(
+                ['created_at' => 'MAX', 'id' => 'MAX'],
+                fn (Builder $query): Builder => $query->where('type', 'default'),
+            );
+    }
+
+    /**
      * @param  Builder<Team>  $query
      * @return Builder<Team>
      */
@@ -367,5 +392,17 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     public function imports(): HasMany
     {
         return $this->hasMany(Import::class);
+    }
+
+    /**
+     * The relation already pins `team_id`, so the tenant scope adds nothing.
+     * Outside the app panel there is no tenant, which would narrow it to
+     * nothing at all.
+     *
+     * @return HasMany<Activity, $this>
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class)->withoutGlobalScope(TeamScope::class);
     }
 }

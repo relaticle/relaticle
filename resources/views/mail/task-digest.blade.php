@@ -8,7 +8,7 @@
 **Overdue**
 
 @foreach($team->overdue as $task)
-- [{{ $task->title }}]({{ $task->editUrl }}) — due {{ $task->dueAt->format('M j, Y') }}
+- [{{ $task->title }}]({{ $task->editUrl }}), due {{ $task->dueAt->format('M j, Y') }}
 @endforeach
 @endif
 
@@ -16,7 +16,7 @@
 **Upcoming**
 
 @foreach($team->upcoming as $task)
-- [{{ $task->title }}]({{ $task->editUrl }}) — due {{ $task->dueAt->format('M j, Y') }}
+- [{{ $task->title }}]({{ $task->editUrl }}), due {{ $task->dueAt->format('M j, Y') }}
 @endforeach
 @endif
 

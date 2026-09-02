@@ -57,8 +57,8 @@
                 </ul>
             </div>
 
-            <x-marketing.button href="{{ route('register') }}">
-                Start your 14-day trial — no card
+            <x-marketing.button href="{{ route('login') }}">
+                Start your 14-day trial, no card
             </x-marketing.button>
             <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500" x-text="yearly ? '$228 billed yearly · save $60' : 'Billed monthly · cancel anytime'">
                 $228 billed yearly · save $60
@@ -118,6 +118,6 @@
         <a href="{{ route('contact') }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">Talk to us</a>.
     </p>
     <p class="text-xs text-gray-400 dark:text-gray-500">
-        Credit cost varies by model and tool calls — a simple reply is 1 credit, a premium one costs more. Allowances may evolve with notice.
+        Credit cost varies by model and tool calls. A simple reply is 1 credit; a premium one costs more. Allowances may evolve with notice.
     </p>
 </div>

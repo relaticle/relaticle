@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Declares the launch set for the comparison-page engine. Every slug here
- * must have a matching entry in `resources/data/competitor-facts.php` —
+ * must have a matching entry in `resources/data/competitor-facts.php`.
  * `ComparisonController` and `AlternativesController` 404 for any slug not
  * listed below.
  *

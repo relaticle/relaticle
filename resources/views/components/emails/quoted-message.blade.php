@@ -3,7 +3,7 @@
 {{-- A read-only rendering of the message a draft answers or forwards.
 
      Deliberately not `x-emails.email-view`: that component is the reader, and it
-     carries the reply actions and the draft dock itself — rendering it inside the
+     carries the reply actions and the draft dock itself. Rendering it inside the
      composer would nest a composer in a composer. This shows only who wrote what. --}}
 @php
     use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;

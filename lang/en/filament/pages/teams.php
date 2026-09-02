@@ -38,8 +38,12 @@ return [
             'invite_subheading' => 'Invite your team to collaborate',
         ],
         'form' => [
-            'company_name' => [
-                'label' => 'Company name',
+            'your_name' => [
+                'label' => 'Your name',
+                'placeholder' => 'Jane Doe',
+            ],
+            'workspace_name' => [
+                'label' => 'Workspace name',
                 'placeholder' => 'Acme Corp',
             ],
             'workspace_handle' => [
@@ -53,8 +57,8 @@ return [
             'invite_email_placeholder' => 'name@company.com',
             'invite_role_member' => 'Member',
             'invite_role_admin' => 'Admin',
-            'invite_table_column_email' => 'Email',
-            'invite_table_column_role' => 'Role',
+            'invite_email_label' => 'Email',
+            'invite_role_label' => 'Role',
         ],
         'notifications' => [
             'workspace_created' => [
@@ -63,7 +67,7 @@ return [
             ],
             'invite_link_copied' => [
                 'title' => 'Invite link copied',
-                'body' => 'Share this link with your teammates. Anyone with the link can join this team.',
+                'body' => 'Share this link with your teammates. Anyone with the link can join this workspace.',
             ],
             'complete_previous_steps' => [
                 'title' => 'Complete the previous steps first',

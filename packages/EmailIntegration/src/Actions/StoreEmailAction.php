@@ -86,7 +86,7 @@ final readonly class StoreEmailAction
                 }
 
                 // "Internal" means every participant is a member of this workspace.
-                // Membership lives in the team_user pivot (plus the owner) — NOT in
+                // Membership lives in the team_user pivot (plus the owner), NOT in
                 // users.current_team_id, which only reflects a user's *active* team and
                 // would misclassify members whose active team is elsewhere.
                 $team = Team::query()->find($connectedAccount->team_id);
@@ -105,7 +105,7 @@ final readonly class StoreEmailAction
 
                 $email->updateQuietly(['is_internal' => $isInternal]);
 
-                // Deterministic, rule-based categorisation — cheap string heuristics,
+                // Deterministic, rule-based categorisation using cheap string heuristics,
                 // no LLM call. Runs inline now that participants/attachments/internal
                 // state are all known.
                 EmailLabel::query()->create([

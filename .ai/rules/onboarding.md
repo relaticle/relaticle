@@ -5,7 +5,7 @@
 
 The package binds it as a singleton, so every model shares one `OnboardingStep`
 instance. `OnboardingStep::complete()` memoizes via Laravel's `once()`, keyed on
-that shared object and the call site — the model is not part of the key. With the
+that shared object and the call site. The model is not part of the key. With the
 package's own binding, the first team evaluated in a process decides the answer
 for every later team: wrong onboarding state in any request or Horizon worker
 that touches two workspaces. Verified against 2.6.3; unreported upstream.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Store;
 
+use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\WithoutIncrementing;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -176,7 +177,7 @@ final class ImportRow extends Model
     #[Scope]
     protected function searchValue(Builder $query, string $column, string $search): void
     {
-        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+        $escaped = LikePattern::escape($search);
         $query->whereRaw('json_extract(raw_data, ?) LIKE ? ESCAPE ?', ['$.'.$column, "%{$escaped}%", '\\']);
     }
 

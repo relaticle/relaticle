@@ -17,7 +17,7 @@ use Relaticle\Chat\Support\TeamMembersContext;
 final readonly class ProposalDisplayBuilder
 {
     /**
-     * Per-entity title/summary literals — must match each Create*Tool::buildRecordDisplay()
+     * Per-entity title/summary literals. Must match each Create*Tool::buildRecordDisplay()
      * exactly so the card heading is stable across an edit.
      *
      * @var array<string, array{title: string, nameKey: string, label: string, summaryPrefix: string}>
@@ -103,7 +103,7 @@ final readonly class ProposalDisplayBuilder
     /**
      * Keep rows from existingFields that:
      * - have a 'label' key
-     * - whose label is not already produced by the builder — i.e. not a core row and not
+     * - whose label is not already produced by the builder, i.e. not a core row and not
      *   a re-derived custom-field row (not in $reservedLabels)
      * - do NOT have a 'type' key (defensive: a custom-field row always carries type)
      *

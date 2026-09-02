@@ -28,10 +28,10 @@ final readonly class DeleteEmailDraftAction
 
     /**
      * Best-effort cleanup for internal callers (e.g. post-send, where two
-     * tabs open on the same draft — or a retried request — can mean the
+     * tabs open on the same draft, or a retried request, can mean the
      * draft row is already gone by the time this runs). The desired end
      * state, "no draft row", already holds in that case, so a missing draft
-     * is success here, not a 403 — unlike {@see self::execute()}.
+     * is success here, not a 403, unlike {@see self::execute()}.
      */
     public function executeIfExists(User $user, string $draftId): void
     {
@@ -59,7 +59,7 @@ final readonly class DeleteEmailDraftAction
         DB::transaction(function () use ($draft): void {
             // Attachment bytes are the draft's own copies (send() duplicates them
             // onto the queued email), so deleting them here cannot strand a sent
-            // message — but skipping it would leak files on disk forever.
+            // message, but skipping it would leak files on disk forever.
             $disk = Storage::disk(EmailAttachment::DISK);
 
             foreach ($draft->attachments as $attachment) {
@@ -71,7 +71,7 @@ final readonly class DeleteEmailDraftAction
             $draft->attachments()->delete();
             $draft->body()->delete();
             $draft->participants()->delete();
-            // Email uses SoftDeletes — a plain delete() would leave a husk row
+            // Email uses SoftDeletes, so a plain delete() would leave a husk row
             // (subject/snippet intact) behind indefinitely. A deleted draft
             // must actually be gone.
             $draft->forceDelete();

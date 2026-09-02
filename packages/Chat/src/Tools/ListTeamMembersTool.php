@@ -15,7 +15,7 @@ final class ListTeamMembersTool implements Tool
     public function description(): string
     {
         return 'List workspace team members (users). Team members are the ONLY valid values'
-            .' for team-member fields — a company\'s account_owner_id and a task\'s assignee_ids.'
+            .' for team-member fields: a company\'s account_owner_id and a task\'s assignee_ids.'
             .' Contacts/people records are NOT valid for those fields. Call this to resolve a'
             .' member name to their user id before proposing such an update.';
     }

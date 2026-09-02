@@ -37,7 +37,7 @@ final class EmailAccountsPage extends Page
 
     /**
      * Heading and subheading are rendered inside the content column (see the page
-     * view) so they sit with the accounts panel under the cluster tabs — the page
+     * view) so they sit with the accounts panel under the cluster tabs. The page
      * header itself stays empty.
      */
     public function getHeading(): string
@@ -57,7 +57,7 @@ final class EmailAccountsPage extends Page
 
     /**
      * Keep the "Accounts" cluster item highlighted while a single account's
-     * settings page — a child of this one — is open.
+     * settings page, a child of this one, is open.
      *
      * @return array<int, string>
      */

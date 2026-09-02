@@ -85,7 +85,7 @@ it('scopes the hosted-plan faq to the pro tier when billing is on', function ():
         ->assertSee(__("What's included in the hosted plan?"))
         ->assertSee(__('What happens after my trial ends?'))
         ->assertSee('2,000-credit')
-        ->assertDontSee(__('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 30-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support — no credit card required.'));
+        ->assertDontSee('The hosted Cloud plan is $0/mo and includes unlimited users and data');
 });
 
 it('scopes the hosted-plan faq to the free tier when billing is off', function (): void {
@@ -105,7 +105,7 @@ it('shows the comparison list with the pro-tier hosted price and updates when bi
         ->assertOk()
         ->assertSee(__('Self-hosted or hosted: how to choose'))
         ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
-        ->assertSee(__('Managed by Relaticle — no self-hosted maintenance required'))
+        ->assertSee(__('Managed by Relaticle. No self-hosted maintenance required'))
         ->assertDontSee(__('$0/mo per workspace'))
         ->assertDontSee(__('Zero-downtime updates and automatic daily backups, handled for you'));
 });
@@ -187,7 +187,7 @@ it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan
 it('never names a model the app cannot actually serve', function (): void {
     // Gemini 3 Flash and Gemini 3.1 Pro carry supports_tools => false in chat.php, so
     // ModelDescriptor::isAvailable() always returns false for them and they can never
-    // be picked — the page must never claim a plan "unlocks" or is priced for them.
+    // be picked, so the page must never claim a plan "unlocks" or is priced for them.
     Feature::define(BillingFeature::class, true);
 
     $this->get('/pricing')
@@ -200,7 +200,7 @@ it('never names a model the app cannot actually serve', function (): void {
 
 it('pins the exact membership of every model list derived from the chat catalog', function (): void {
     // $freeCloudModels and $multiplierOneHalfModels (pricing.blade.php) are not covered by
-    // any other assertion in this file — a config edit that emptied either one (e.g. Sonnet's
+    // any other assertion in this file. A config edit that emptied either one (e.g. Sonnet's
     // min_plan changing, or the GPT rows' credit_multiplier changing) would still pass every
     // other test here, since those only assert substrings that come from the OTHER derived
     // lists ($paidCloudModels / $multiplierOneModels). Each line below anchors one full
@@ -212,7 +212,7 @@ it('pins the exact membership of every model list derived from the chat catalog'
         // $freeCloudModels, via $modelsUnlockAnswer
         ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
         // $paidCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4 — the models with a higher credit multiplier.')
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
         ->assertSee('1x for Sonnet 5 and self-hosted models; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
 });
@@ -221,7 +221,7 @@ it('pins the exact membership of every model list derived from the chat catalog'
  * What a plan includes is not a function of whether the web host currently holds an
  * Anthropic key. Reading these lists through ModelRegistry::available() made a key
  * rotation render "Every plan can use  and any self-hosted model you connect
- * yourself" — a public sentence with a hole in it, invisible to the rest of this
+ * yourself", a public sentence with a hole in it, invisible to the rest of this
  * suite because phpunit.xml sets a fake key for every provider.
  */
 it('names the models a plan includes even when this install holds no provider key', function (): void {
@@ -232,7 +232,7 @@ it('names the models a plan includes even when this install holds no provider ke
     $this->get('/pricing')
         ->assertOk()
         ->assertSee('Every plan can use Sonnet 5 and any self-hosted model you connect yourself.')
-        ->assertSee('Cloud Pro additionally unlocks GPT 5.5, Opus 5 and GPT 5.4', false)
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4', false)
         ->assertSee('3x for Opus 5', false)
         ->assertDontSee('Gemini');
 });
@@ -304,7 +304,7 @@ function assertNoCopyHoles(string $html): void
     expect($html)
         ->not->toMatch('/\dx for\s*[;)]/')
         ->not->toMatch('/can use\s+and\b/')
-        ->not->toMatch('/unlocks\s+—/')
+        ->not->toMatch('/higher-multiplier models:\s*\./')
         ->not->toMatch('/from\s+up to\b/')
         ->not->toMatch('/simple\s+replies\b/')
         ->not->toMatch('/^\s*is free on every plan/m');

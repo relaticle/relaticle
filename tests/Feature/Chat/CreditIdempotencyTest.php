@@ -98,7 +98,7 @@ it('settles a reservation exactly once even when called twice with the same key'
         'resolutionKey' => 'resolve-TURN-1',
     ];
     $service->settleReservation(...$args);
-    $service->settleReservation(...$args); // duplicate — must be a no-op
+    $service->settleReservation(...$args); // duplicate, which must be a no-op
 
     $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
     expect($balance->credits_used)->toBe(1); // sonnet multiplier 1 → charged 1, reserved 1, no extra

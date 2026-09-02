@@ -115,7 +115,7 @@ final readonly class LinkMeetingAction
     private function autoAttach(MorphToMany $relation, string $relatedId): bool
     {
         // Only attach (with link_source 'auto') when the record isn't already
-        // linked — never touch an existing pivot, so a prior manual link keeps
+        // linked. Never touch an existing pivot, so a prior manual link keeps
         // its 'manual' source instead of being silently downgraded to 'auto'.
         if ($relation->whereKey($relatedId)->exists()) {
             return false;

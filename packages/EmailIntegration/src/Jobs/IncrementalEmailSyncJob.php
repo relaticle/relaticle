@@ -95,7 +95,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         // Advancing the cursor before the fetched messages are stored loses any message
-        // whose StoreEmailJob exhausts its retries — the next sync starts past it and it
+        // whose StoreEmailJob exhausts its retries: the next sync starts past it and it
         // is never retried. So advance the cursor only once the batch has fully stored.
         // With no new messages the delta is read-only state, so advance inline.
         if ($newIds === []) {

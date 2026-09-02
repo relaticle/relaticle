@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\Teams;
 
 use App\Actions\Jetstream\InviteTeamMember;
+use App\Enums\TeamRole;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -35,7 +36,7 @@ final class AddTeamMember extends BaseLivewireComponent
     {
         $this->team = $team;
 
-        $this->form->fill($this->team->only(['name']));
+        $this->form->fill();
     }
 
     public function form(Schema $schema): Schema
@@ -49,6 +50,7 @@ final class AddTeamMember extends BaseLivewireComponent
                     ->description(__('teams.sections.add_team_member.description'))
                     ->schema([
                         TextEntry::make('addTeamMemberNotice')
+                            ->label(__('teams.sections.add_team_member.title'))
                             ->hiddenLabel()
                             ->state(fn (): string => __('teams.sections.add_team_member.notice')),
                         TextInput::make('email')
@@ -64,6 +66,9 @@ final class AddTeamMember extends BaseLivewireComponent
                                     Radio::make('role')
                                         ->hiddenLabel()
                                         ->required()
+                                        // Least privilege, matching the
+                                        // onboarding wizard's default.
+                                        ->default(TeamRole::Editor->value)
                                         ->in($roles->pluck('key'))
                                         ->options($roles->pluck('name', 'key'))
                                         ->descriptions($roles->pluck('description', 'key')),
@@ -110,7 +115,7 @@ final class AddTeamMember extends BaseLivewireComponent
 
         $this->sendNotification(__('teams.notifications.team_invitation_sent.success'));
 
-        $this->form->fill($this->team->only(['name']));
+        $this->form->fill();
 
         $this->dispatch('teamInvitationSent');
     }

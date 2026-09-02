@@ -25,7 +25,7 @@ beforeEach(function (): void {
 it('two-step first-message protocol: create returns id without dispatch; send to that id dispatches', function (): void {
     $doc = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'first message']]]]];
 
-    // Step 1: create — must NOT dispatch
+    // Step 1: create, which must NOT dispatch
     $createRes = $this->postJson(route('chat.conversations.create'), [
         'document' => $doc,
     ])->assertOk()->assertJsonStructure(['conversation_id']);
@@ -35,7 +35,7 @@ it('two-step first-message protocol: create returns id without dispatch; send to
     expect(DB::table('agent_conversations')->where('id', $conversationId)->exists())->toBeTrue();
     Queue::assertNotPushed(ProcessChatMessage::class);
 
-    // Step 2: send — must dispatch exactly once for this conversation_id
+    // Step 2: send, which must dispatch exactly once for this conversation_id
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => $doc,
     ])->assertOk();

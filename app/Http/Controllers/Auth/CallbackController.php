@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\EmailAddress;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,7 +24,7 @@ final readonly class CallbackController
 {
     public function __invoke(
         Request $request,
-        string $provider,
+        SocialiteProvider $provider,
         CreatesNewSocialUsers $creator
     ): RedirectResponse {
         if (! $request->has('code')) {
@@ -30,8 +32,8 @@ final readonly class CallbackController
         }
 
         try {
-            $socialUser = $this->retrieveSocialUser($provider);
-            $user = $this->resolveUser($provider, $socialUser, $creator);
+            $socialUser = $this->retrieveSocialUser($provider->value);
+            $user = $this->resolveUser($provider->value, $socialUser, $creator);
 
             if ($user->wasRecentlyCreated) {
                 $this->flagSignupForAnalytics();
@@ -45,7 +47,7 @@ final readonly class CallbackController
         } catch (Throwable $e) {
             report($e);
 
-            return $this->handleError($this->parseProviderError($e->getMessage(), $provider));
+            return $this->handleError($this->parseProviderError($e->getMessage(), $provider->value));
         }
     }
 
@@ -75,7 +77,9 @@ final readonly class CallbackController
             }
 
             $email = $socialUser->getEmail();
-            $user = $email ? User::query()->where('email', $email)->first() : null;
+            $user = $email
+                ? User::query()->where('email', EmailAddress::canonicalize($email))->first()
+                : null;
 
             if (! $user) {
                 $user = $this->createUser($socialUser, $creator, $provider);
@@ -136,8 +140,9 @@ final readonly class CallbackController
 
     private function extractEmail(SocialiteUser $socialUser, string $provider): string
     {
-        return $socialUser->getEmail()
-            ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId());
+        return EmailAddress::canonicalize(
+            $socialUser->getEmail() ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId()),
+        );
     }
 
     private function parseProviderError(string $exceptionMessage, string $provider): string

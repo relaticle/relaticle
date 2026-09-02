@@ -14,11 +14,11 @@ rich-text **Body**, and links to the records they're about.
 
 - From the **Notes** list, click **New note**, write, and link **Companies**
   and **People** as you go.
-- From a company, person, or opportunity page, use the **Notes** tab — the
+- From a company, person, or opportunity page, use the **Notes** tab. The
   note is created already attached to that record. Companies and
   opportunities can also **Attach** an existing note there.
 
-One note can sit on several records at once — attach the kickoff-meeting
+One note can sit on several records at once. Attach the kickoff-meeting
 note to the company *and* the two people who were in the room. Detaching it
 from one record doesn't remove it from the others, and the note itself lives
 on in the Notes list either way.

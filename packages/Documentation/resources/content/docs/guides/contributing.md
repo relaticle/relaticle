@@ -69,7 +69,7 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 
 - **PHP 8.5+** with extensions: pdo_pgsql, gd, bcmath, mbstring, xml
 - **PostgreSQL 17+**
-- **Node.js 20+**
+- **Node.js 22+** with pnpm
 - **Composer 2+**
 
 ### Manual Installation
@@ -78,12 +78,12 @@ All workspace data is isolated via the `HasTeam` trait. Every query automaticall
 git clone https://github.com/Relaticle/relaticle.git
 cd relaticle
 composer install
-npm install
+pnpm install
 cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan storage:link
-npm run build
+pnpm run build
 composer run dev
 ```
 
@@ -157,7 +157,7 @@ For production deployment instructions, including Docker setup, environment conf
 | Queue not processing | `php artisan queue:restart` |
 | File upload errors | `chmod -R 775 storage bootstrap/cache` |
 | Slow queries | Use Laravel Telescope to identify, then add indexes |
-| View cache issues | `php artisan view:clear && npm run build` |
+| View cache issues | `php artisan view:clear && pnpm run build` |
 
 ---
 

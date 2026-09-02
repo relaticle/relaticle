@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Scope;
  * Hides emails whose connected account has been disconnected (soft-deleted).
  *
  * The whereHas runs against the ConnectedAccount relation, so its own
- * SoftDeletingScope applies automatically — a trashed account fails the
+ * SoftDeletingScope applies automatically: a trashed account fails the
  * existence check and its emails drop out of every query. Opt out with
  * ->withoutGlobalScope(ActiveAccountScope::class) for audit/admin views.
  *

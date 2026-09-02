@@ -13,7 +13,7 @@ final class TitleSanitizer
     /**
      * Matched as a `/u` character class rather than passed to trim(): trim()
      * compares bytes, so a UTF-8 quote list also eats the trailing byte of any
-     * multibyte letter that shares one — "…ś" became invalid UTF-8.
+     * multibyte letter that shares one, so "…ś" became invalid UTF-8.
      */
     private const string WRAPPING_QUOTES = '["\'`“”„‟«»‘’‚‛\s]';
 
@@ -29,8 +29,8 @@ final class TitleSanitizer
      * Sanitize a model-written title.
      *
      * On top of `clean()` this removes the decorations a titling model adds
-     * even when told not to — wrapping quotes, a "Title:" style prefix, a
-     * closing full stop — and enforces a sidebar-sized cap rather than the
+     * even when told not to (wrapping quotes, a "Title:" style prefix, a
+     * closing full stop) and enforces a sidebar-sized cap rather than the
      * 200-character ceiling a human rename gets.
      */
     public static function generated(string $value): string

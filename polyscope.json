@@ -1,13 +1,10 @@
 {
     "scripts": {
         "setup": [
-            "herd link",
-            "herd secure",
             "bin/setup-workspace.sh"
         ],
         "archive": [
-            "herd unsecure",
-            "herd unlink"
+            "bin/archive-workspace.sh"
         ]
     },
     "preview": {

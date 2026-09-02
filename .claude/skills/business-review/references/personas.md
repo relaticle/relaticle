@@ -1,10 +1,10 @@
-# Personas — Relaticle roster, lenses first, fleet second
+# Personas: Relaticle roster, lenses first, fleet second
 
 A persona = a real Relaticle role + a behavior profile. **Personas are primarily LENSES**
 the walker applies; parallel persona *subagents* are a Tier-3 tool, not the default
 (field evidence: fleets repeatedly died on session capacity limits, and sequential
 persona-aware walks found the same bugs). An inline sequential walk that honestly applies
-each brief is a first-class mode — record which mode ran in the report.
+each brief is a first-class mode. Record which mode ran in the report.
 
 ## Roster (drawn from `profile.user_roles`)
 
@@ -24,19 +24,19 @@ only. Random clicking is noise, not testing.
 
 | Tier | Selection |
 |---|---|
-| 0 | 1 persona inline — the role closest to the touched surface |
+| 0 | 1 persona inline, the role closest to the touched surface |
 | 1 | 1–2 personas inline |
 | 2 | 3 distinct archetypes (subagents allowed, inline fallback fine) |
-| 3 | 3–5 including `integrity-breaker` — parallel subagents IF capacity allows |
+| 3 | 3–5 including `integrity-breaker`, as parallel subagents IF capacity allows |
 
 **Capacity check before spawning** (Tier 2+): spawn ONE persona subagent first; if it
 errors out on usage/session limits, run the remaining briefs inline sequentially and
-state that in the report. A dead subagent is never silently absorbed (`fleet.md`) — and
+state that in the report. A dead subagent is never silently absorbed (`fleet.md`), and
 losing independence matters for verification (SKILL.md gate 6), not for walking.
 
 ## Credentials & sessions
 
-Credentials come from `$REVIEW_DIR/project-profile.json.role_credentials` — resolved and
+Credentials come from `$REVIEW_DIR/project-profile.json.role_credentials`, resolved and
 verified by Stage 0 (`environment.md` §2), never hardcoded, never hunted mid-journey.
 A role with no obtainable login → its journeys become structured frontier items.
 
@@ -44,4 +44,4 @@ Each persona: own `AB_SESSION=<run>-<persona>` on EVERY agent-browser call; own 
 namespace `br-rel-<run>-<persona>-` on every created record. Tenant switching via the
 in-app switcher ONLY. Drive the app per the **`agent-browser-relaticle`** skill (panel
 URLs, login flow, Filament/Livewire `$wire` patterns); generic `agent-browser` is the
-fallback when that skill's pattern fails twice (then self-heal it — `environment.md` §3).
+fallback when that skill's pattern fails twice (then self-heal it; see `environment.md` §3).

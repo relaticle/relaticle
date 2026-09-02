@@ -1,7 +1,7 @@
-# Checks Matrix — Relaticle CRM
+# Checks Matrix for Relaticle CRM
 
 Per-element checks + change-type scenario hints. In v3 this matrix is consulted during
-journey synthesis and persona walks (`journeys.md`, `personas.md`) — pick the rows that
+journey synthesis and persona walks (`journeys.md`, `personas.md`). Pick the rows that
 match the touched SURFACES (paths/sections below), not classifier keys: the v3 classifier
 emits generic `change_types` (template/component/route/controller/validation/config/
 migration/infra) plus Relaticle `project_subsystems` (credit/billing/tenant/custom_field/
@@ -10,13 +10,13 @@ section labels only.
 
 **Matrix rows are suggestions; `regressions.json` entries are CONTRACTS.** When a row
 keeps catching real bugs, promote it to the regression ledger
-(`references/regression-ledger.md`) — that is the path from "suggested" to "enforced".
+(`references/regression-ledger.md`). That is the path from "suggested" to "enforced".
 
 ---
 
 ## Per-element checks
 
-**This is a reference, not a checklist.** Read it during Stage 2 (Run) planning to consider checks that matter for each interactive element type in the diff. Apply selectively based on scope — don't blanket-run every entry.
+**This is a reference, not a checklist.** Read it during Stage 2 (Run) planning to consider checks that matter for each interactive element type in the diff. Apply selectively based on scope, and don't blanket-run every entry.
 
 For each element type, the table lists checks worth considering, how to verify, and what evidence type the check produces. Evidence types defined in `run.md` "Evidence types" section.
 
@@ -61,7 +61,7 @@ When `change_types` includes `mutation`, `form`, or `table` on a resource path, 
 
 ### Custom Field
 
-`app/Models/CustomField.php`, `CustomFieldOption`, `CustomFieldSection`, `CustomFieldValue`. Models with the `UsesCustomFields` trait merge `custom_fields` into `$fillable` automatically — do NOT manually `saveCustomFields()` in actions.
+`app/Models/CustomField.php`, `CustomFieldOption`, `CustomFieldSection`, `CustomFieldValue`. Models with the `UsesCustomFields` trait merge `custom_fields` into `$fillable` automatically, so do NOT manually call `saveCustomFields()` in actions.
 
 When `change_types` includes `custom_fields`:
 
@@ -128,7 +128,7 @@ Selectors: `.fi-modal`, `<x-filament::modal>`.
 | State preserved (or cleared) on reopen | Open → fill → close → reopen | Per intent: persisted or empty | DOM read |
 | Stacked modal sanity | Open modal A → open modal B → close B | Modal A still rendered, focus returns to it | a11y_ref |
 
-Filament-specific gotcha: modal fade animation ~300ms — assert removal with `setTimeout(..., 500)` or `waitForElementHidden`. `wire:click="mountAction()"` may dispatch toast notifications; verify both modal close AND toast appearance.
+Filament-specific gotcha: modal fade animation runs ~300ms, so assert removal with `setTimeout(..., 500)` or `waitForElementHidden`. `wire:click="mountAction()"` may dispatch toast notifications; verify both modal close AND toast appearance.
 
 ---
 
@@ -243,7 +243,7 @@ Filament tenancy via `Team::class`, slug-based, ownership relationship `team`.
 | Non-sysadmin denied | Try `/sysadmin` as regular user | Redirect/403 | deterministic |
 | Resource lists render | Visit each resource index | Records visible, no broken layout | snapshot_diff |
 
-Per project memory: keep sysadmin tests minimal — basic render + record visibility only, no exhaustive column/sort/search coverage. It's internal, not user-facing.
+Per project memory: keep sysadmin tests minimal: basic render plus record visibility only, no exhaustive column/sort/search coverage. It's internal, not user-facing.
 
 ---
 
@@ -320,7 +320,7 @@ Cross-reference with the [Per-element checks](#per-element-checks) section above
 | `route` | `routes/*.php` touched | Route resolves with auth · route resolves without auth (where appropriate) · middleware stack applies |
 | `api` | `routes/api.php` or `app/Http/Controllers/Api/` touched | Auth required · tenant scope · QueryBuilder filter/sort/paginate · validation errors · Scribe docs generate |
 
-> **`infra_only` is NOT in `change_types[]`.** `classify_diff.py` emits it as a separate top-level boolean field on the JSON output. When `infra_only: true` AND `change_types: []`, treat the diff as backend-only and skip the browser — see below.
+> **`infra_only` is NOT in `change_types[]`.** `classify_diff.py` emits it as a separate top-level boolean field on the JSON output. When `infra_only: true` AND `change_types: []`, treat the diff as backend-only and skip the browser. See below.
 
 ### When `infra_only: true` and `change_types: []`
 
@@ -340,4 +340,4 @@ A successful Pest run with no new failures is the verdict signal. Still emit a R
 2. For each `change_type`, glance at the suggested scenarios above.
 3. Cross-reference with the per-element checks for the specific tables.
 4. Plan cases that cover what the AC require AND the highest-risk scenarios.
-5. Prioritize ruthlessly — for a wide diff, pick the highest-bug-risk scenarios.
+5. Prioritize ruthlessly. For a wide diff, pick the highest-bug-risk scenarios.

@@ -140,7 +140,7 @@ test('export datetimes name and use the requesting user timezone', function () {
     $exporter = new PeopleExporter(Export::latest()->first(), ['created_at' => 'Created At', 'deleted_at' => 'Deleted At'], []);
     $row = $exporter($person->fresh());
 
-    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo — the date rolls over.
+    // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo, so the date rolls over.
     expect($row[0])->toBe('2026-08-19 08:30:00')
         ->and($row[1])->toBeNull();
 });

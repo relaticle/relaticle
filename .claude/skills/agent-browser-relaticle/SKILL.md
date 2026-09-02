@@ -1,9 +1,9 @@
 ---
 name: agent-browser-relaticle
-description: "Use whenever driving agent-browser against the local Relaticle app (relaticle.test and its panels) for testing, QA, business review, or UI automation. Covers Filament v5 + Livewire v4 quirks specific to this codebase: panel URL derivation (domain-routed vs path-routed — never assume), login flows for the app and sysadmin panels, seeded credentials, Select/date-picker interaction, the $wire.mountAction gold pattern, tenant switching, Reverb/queue hazards, and session isolation. Every hard fact here is a DATED CACHED HINT — when one fails, re-derive from the running app and update this file (self-heal). Not for other sites or generic browser automation."
+description: "Use whenever driving agent-browser against the local Relaticle app (relaticle.test and its panels) for testing, QA, business review, or UI automation. Covers Filament v5 + Livewire v4 quirks specific to this codebase: panel URL derivation (domain-routed vs path-routed, never assumed), login flows for the app and sysadmin panels, seeded credentials, Select/date-picker interaction, the $wire.mountAction gold pattern, tenant switching, Reverb/queue hazards, and session isolation. Every hard fact here is a DATED CACHED HINT. When one fails, re-derive from the running app and update this file (self-heal). Not for other sites or generic browser automation."
 ---
 
-# agent-browser × Relaticle — cookbook (cached hints, verified dates, self-healing)
+# agent-browser × Relaticle cookbook (cached hints, verified dates, self-healing)
 
 **Prime rule: facts below are cached hints, not truth.** The app's URLs, routes,
 selectors, and seeders change. When a documented pattern fails **twice**, stop retrying:
@@ -24,7 +24,7 @@ php artisan tinker --execute 'echo json_encode([
 
 - app panel = `https://{app_domain}` if set, else `{base}/{app_path}`
 - sysadmin  = `https://{sysadmin_domain}` if set, else `{base}/{sysadmin_path}`
-- **Routing mode is per-checkout — derive it, never carry it over from another
+- **Routing mode is per-checkout. Derive it, and never carry it over from another
   workspace.** Both modes are live in the wild:
   - Conductor workspace `bamako`, `APP_PANEL_DOMAIN`/`SYSADMIN_DOMAIN` empty →
     path-routed: `https://bamako.test/app`, `https://bamako.test/sysadmin`
@@ -46,7 +46,7 @@ php artisan tinker --execute 'echo json_encode([
 ## 2. Session setup (every time)
 
 ```bash
-export AB_SESSION="<purpose>-<run-id>"     # ALWAYS unique per agent — sessions are machine-global
+export AB_SESSION="<purpose>-<run-id>"     # ALWAYS unique per agent; sessions are machine-global
 agent-browser --session "$AB_SESSION" set viewport 1920 1080
 agent-browser --session "$AB_SESSION" open "$APP_PANEL_URL"
 ```
@@ -68,18 +68,18 @@ user (`User::factory()->withPersonalTeam()->create([...])`). If the seeder email
 changed, fix this table (self-heal).
 
 Dev-login affordance: the app registers `laravel-login-link` (route `loginLinkLogin`,
-POST `laravel-login-link-login`; verified: 2026-06-12 via `route:list`) — local login
+POST `laravel-login-link-login`; verified 2026-06-12 via `route:list`). Local login
 pages may render one-click "Login as …" links; prefer them over typing credentials when
 present.
 
-## 4. Login flow (both panels — Filament stock login)
+## 4. Login flow (both panels, Filament stock login)
 
 **CORRECTION (verified: 2026-06-12, review PR 336):** the `input[name="email"]` selector
-is WRONG — it matches a **hidden** input belonging to the `laravel-login-link` dev package
+is WRONG. It matches a **hidden** input belonging to the `laravel-login-link` dev package
 (the page has hidden `_token`/`email`/`key`/`guard`/`user_model` inputs from that form).
 `agent-browser fill` against that hidden field **hung the daemon** (`os error 35`,
 "daemon may be busy or unresponsive") and never submitted. The REAL Filament inputs have
-NO `name` attribute — they are `id="form.email"` / `id="form.password"` with
+NO `name` attribute. They are `id="form.email"` / `id="form.password"` with
 `wire:model="data.email"` / `data.password`, inside the `<form wire:submit="authenticate">`.
 
 The recipe that works when `fill`/`type` hang (eval-driven, daemon-safe):
@@ -100,12 +100,12 @@ agent-browser eval 'location.pathname'   # confirm you left /login (lands on /<t
 
 - **Daemon hangs on `fill`/`type`** in this environment (verified: 2026-06-12). When a
   command returns `os error 35` / no output, `pkill -9 -f agent-browser; sleep 3` and
-  re-open. `open`/`eval`/`snapshot`/`screenshot` are reliable; `click` is flaky — prefer
+  re-open. `open`/`eval`/`snapshot`/`screenshot` are reliable; `click` is flaky, so prefer
   `eval` with `el.click()` for `<a wire:navigate>` links.
 - Many stale `--session` entries overload the daemon; keep ONE session per run and chain
   commands with `&&` in a single shell call (the daemon persists the browser).
 
-<details><summary>Older recipe (fill+click) — left here for reference, did NOT work on 2026-06-12</summary>
+<details><summary>Older recipe (fill+click), left here for reference; did NOT work on 2026-06-12</summary>
 
 ```bash
 agent-browser --session "$AB" open "$PANEL_URL/login"
@@ -119,18 +119,18 @@ agent-browser --session "$AB" eval 'location.pathname'   # confirm you left /log
 </details>
 
 - **`click` / `fill` take the element's VISIBLE TEXT or a CSS selector, NOT
-  `find role button "<name>"`** — that subcommand syntax errors on this binary
+  `find role button "<name>"`**. That subcommand syntax errors on this binary
   (verified: 2026-06-12). Use `agent-browser click "Sign in"`.
 - After **app-panel** login you land on the default team path `…/<team-slug>/…`
-  (e.g. `/tapix`) — re-derive the slug from `location.pathname` before navigating further
+  (e.g. `/tapix`), so re-derive the slug from `location.pathname` before navigating further
   (verified: 2026-06-12).
 - After **sysadmin** login you land on `/` (Dashboard) on `sysadmin.relaticle.test`
   (verified: 2026-06-12).
 - A **"Developer Login"** button is present on the login page but clicking it alone did
-  not establish a session in testing — prefer the fill+click recipe above
+  not establish a session in testing, so prefer the fill+click recipe above
   (verified: 2026-06-12).
 
-## 4b. Screenshot paths — ALWAYS absolute
+## 4b. Screenshot paths: ALWAYS absolute
 
 `agent-browser screenshot` parses a RELATIVE path containing `/` as a CSS selector and
 fails (`Unexpected token "/" while parsing css selector`). Always pass an absolute path:
@@ -139,11 +139,11 @@ fails (`Unexpected token "/" while parsing css selector`). Always pass an absolu
 
 ## 5. The gold patterns (Filament v5 + Livewire v4)
 
-Prefer **semantics over CSS selectors** — a11y-role finds and Livewire state survive
+Prefer **semantics over CSS selectors**. a11y-role finds and Livewire state survive
 Blade/Tailwind refactors.
 
 **`$wire` is NOT in scope inside `agent-browser eval`** (it's an Alpine magic; eval runs
-in plain page context — verified: 2026-06-12, cost a run 4 round-trips + one
+in plain page context (verified 2026-06-12, after it cost a run 4 round-trips and one
 self-inflicted 500 where the server was asked to call a method literally named
 `$wire`). Resolve the component first, then use `.set(...)` / `.call(...)`:
 
@@ -158,13 +158,13 @@ await comp2.set("mountedActions.0.data.title", "value", true);
 await comp2.call("callMountedAction");
 ```
 
-- **`Livewire.all()` entries have NO `.call`/`.set`** — they are metadata; always pass
+- **`Livewire.all()` entries have NO `.call`/`.set`.** They are metadata, so always pass
   the id through `Livewire.find()` (verified: 2026-06-12).
 - **Select dropdowns** (plain click is unreliable):
   `agent-browser find role combobox "<label>" click` then
-  `agent-browser find role option "<option>" click` — or `comp.set("data.company_id", 42, true)`.
+  `agent-browser find role option "<option>" click`, or `comp.set("data.company_id", 42, true)`.
 - **Date pickers** (plain type does nothing): `comp.set("data.closes_at", "2026-06-15", true)`.
-- **Action modals (Delete, custom row actions) — the single most useful pattern:**
+- **Action modals (Delete, custom row actions), the single most useful pattern:**
   ```js
   await comp.call("mountAction", "delete", { recordKey: 42 });
   await comp.set("mountedActions.0.data.reason", "why", true);
@@ -173,12 +173,12 @@ await comp2.call("callMountedAction");
   Every call must be `await`-ed. (verified: 2026-06-12 via the create-task modal)
 - **Read Livewire state**: `agent-browser eval '... JSON.stringify(comp.get("data"))'`
 - **Snapshots**: `agent-browser snapshot -i -c -d 8` (focused), never bare `snapshot`.
-  Refs (`@eXX`) shift between snapshots — keep snapshot→interaction adjacent or use
+  Refs (`@eXX`) shift between snapshots, so keep snapshot→interaction adjacent or use
   `find role/text … click`.
-- **Modals fade ~300ms** — `agent-browser wait '.fi-modal-window:not([data-state="open"])' 2000`
+- **Modals fade ~300ms**, so use `agent-browser wait '.fi-modal-window:not([data-state="open"])' 2000`
   before asserting removal.
 - **Tenant switching is browser-only** (in-app switcher; tinker tenant-switch breaks the
-  session → persistent 403s). After a switch the URL slug changes — re-derive.
+  session → persistent 403s). After a switch the URL slug changes, so re-derive.
 
 ## 6. Environment hazards (dated)
 
@@ -189,18 +189,18 @@ await comp2.call("callMountedAction");
   `$team->forceFill(['trial_ends_at' => now()->addDays(14)])->save();` (LocalSeeder's
   user is already provisioned; this bites ChatQaSeeder and factory users).
 - **Shared local Redis across Herd apps**: another app's Horizon can consume this app's
-  queue jobs (verified: 2026-06-11 — Journey ate Relaticle chat jobs). Use a dedicated
+  queue jobs (verified 2026-06-11, when Journey ate Relaticle chat jobs). Use a dedicated
   `REDIS_DB` in `.env`; before queue-dependent testing, dispatch a sentinel job and
   confirm THIS checkout's worker consumed it.
 - **Reverb/websockets**: agent-browser's Chromium may use a wrong websocket host or a
-  stale built bundle — looks like a dead page, is an env defect. `npm run build`, check
+  stale built bundle. It looks like a dead page but is an env defect. `pnpm run build`, check
   `agent-browser console` for websocket errors (verified: 2026-06-10).
 - **419 CSRF after idle** → `agent-browser reload` and retry once (verified: 2026-05).
 - **A failed Livewire request leaves a full-screen error overlay in the DOM** (Laravel
-  error page in a modal) that silently photobombs every later screenshot — the page
+  error page in a modal) that silently photobombs every later screenshot. The page
   underneath still works, so nothing looks wrong until you read the PNG back. After ANY
   errored `comp.call`, `agent-browser open` the page fresh (or remove the overlay)
-  before shooting (verified: 2026-06-12 — a stale overlay replaced the board in an
+  before shooting (verified 2026-06-12, when a stale overlay replaced the board in an
   evidence shot).
 - **Stale session after branch switches** → first action of a batch is a fresh login.
 - **AI credits drain during chat testing** → re-seed `LocalSeeder` to top up before
@@ -218,7 +218,7 @@ await comp2.call("callMountedAction");
   the probe fails twice, stop shooting: assert via DOM reads (computed styles,
   elementFromPoint, rects) and treat those as the truth for visual verification.
 
-## 7. DB-assert (corroboration only — the UI is the proof)
+## 7. DB-assert (corroboration only; the UI is the proof)
 
 ```bash
 php artisan tinker --execute '$c = \App\Models\Company::where("name", "br-rel-test")->first(); echo $c ? "found:".$c->id : "missing";'
@@ -226,7 +226,7 @@ php artisan tinker --execute '$c = \App\Models\Company::where("name", "br-rel-te
 
 Tenant-scoped query? Set context first:
 `\Relaticle\CustomFields\Services\TenantContextService::setTenantId($teamId);`
-Never use tinker/DB writes to fix or fake a result — an on-screen error is a finding.
+Never use tinker or DB writes to fix or fake a result. An on-screen error is a finding.
 
 ## 8. Screenshots
 

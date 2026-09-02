@@ -162,18 +162,30 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * @return array<int, mixed>
+     * @return array<int, Action>
      */
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            $this->composeEmailAction(),
+        ];
+    }
+
+    protected function composeEmailAction(): Action
+    {
+        return Action::make('composeEmail')
+            ->label(__('filament/concerns/email-compose.actions.compose.label'))
+            ->icon('heroicon-o-pencil-square')
+            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
+            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
+            ->action(function (): void {
+                $this->dispatch('composer:open');
+            });
     }
 
     /**
-     * No page heading. The board is the page — a title bar above it repeating the word
-     * already highlighted in the sidebar only pushes the list down. Filament drops the
-     * whole header block when the heading and header actions are both empty. Compose
-     * is the global floating composer (`c` / the composer:open event).
+     * No page heading. The sidebar already marks Email as active; the header row
+     * carries only the compose action above the tab strip.
      */
     public function getHeading(): string
     {
@@ -190,7 +202,7 @@ final class EmailInboxPage extends Page
 
         $query = Email::query()
             // participants + shares are needed by PrivacyService::effectiveTier() (which each
-            // row's can('viewSubject'/'viewBody') hits) — eager-load them to avoid 2 lazy
+            // row's can('viewSubject'/'viewBody') hits), so eager-load them to avoid 2 lazy
             // queries per row, matching BaseRecordEmailsPage / BaseEmailsRelationManager.
             ->with(['from', 'labels', 'participants', 'shares'])
             ->withReadStateFor($user->getKey())
@@ -209,7 +221,7 @@ final class EmailInboxPage extends Page
 
         // `sent()`/`inbox()` already exclude drafts structurally (direction
         // OUTBOUND+sent_at NOT NULL / direction INBOUND), but the `All` folder
-        // applies neither — without this, VisibleEmailScope's owner clause
+        // applies neither. Without this, VisibleEmailScope's owner clause
         // would surface the viewer's own in-progress drafts in the unified list.
         $query->where('status', '!=', EmailStatus::DRAFT);
 
@@ -241,7 +253,7 @@ final class EmailInboxPage extends Page
 
     /**
      * Pending access requests for the open email, but only when the viewer owns
-     * it — the detail pane shows an inline approve/deny strip for these.
+     * it. The detail pane shows an inline approve/deny strip for these.
      *
      * @return Collection<int, EmailAccessRequest>
      */
@@ -784,7 +796,7 @@ final class EmailInboxPage extends Page
 
         /** @var list<string> */
         return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier) — without this, a
+            // Drafts are private (never-sent, PRIVATE tier). Without this, a
             // teammate's still-unsent draft leaks its to/cc/bcc addresses into
             // everyone else's recipient autocomplete via this team-wide query.
             ->whereHas('email', fn (Builder $q): Builder => $q

@@ -11,7 +11,7 @@ return [
         ],
         'template' => [
             'label' => 'Template',
-            'placeholder' => 'None — write below',
+            'placeholder' => 'None. Write below',
         ],
         'body' => [
             'label' => 'Body',

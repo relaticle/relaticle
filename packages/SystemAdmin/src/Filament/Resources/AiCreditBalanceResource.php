@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -60,7 +61,7 @@ final class AiCreditBalanceResource extends Resource
                 TextInput::make('credits_remaining')
                     ->numeric()
                     ->minValue(fn (?AiCreditBalance $record): int => $record?->purchased_credits ?? 0)
-                    ->helperText('Cannot go below purchased credits — the DB enforces purchased_credits <= credits_remaining.')
+                    ->helperText('Cannot go below purchased credits. The DB enforces purchased_credits <= credits_remaining.')
                     ->required(),
                 TextInput::make('credits_used')
                     ->numeric()
@@ -89,7 +90,7 @@ final class AiCreditBalanceResource extends Resource
                     TextEntry::make('purchased_credits')
                         ->numeric()
                         ->label('Purchased credits')
-                        ->helperText('Floor for credits_remaining — the DB rejects a lower value.'),
+                        ->helperText('Floor for credits_remaining. The DB rejects a lower value.'),
                     TextEntry::make('period_starts_at')->dateTime(),
                     TextEntry::make('period_ends_at')->dateTime(),
                     TextEntry::make('updated_at')->dateTime(),
@@ -109,25 +110,11 @@ final class AiCreditBalanceResource extends Resource
                     ->sortable()
                     ->color('primary')
                     ->url(RecordLink::to(TeamResource::class, 'team')),
-                TextColumn::make('origin')
-                    ->label('Origin')
-                    ->state(function (AiCreditBalance $record): string {
-                        $team = $record->team;
-
-                        return match (true) {
-                            $team->subscription()?->valid() ?? false => 'subscription',
-                            $team->trial_ends_at?->isFuture() ?? false => 'trial',
-                            $team->plan !== Plan::default() => 'manual',
-                            default => '—',
-                        };
-                    })
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'subscription' => 'success',
-                        'trial' => 'info',
-                        'manual' => 'warning',
-                        default => 'gray',
-                    }),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->state(fn (AiCreditBalance $record): BillingStatus => $record->team->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                    ->badge(),
                 TextColumn::make('credits_remaining')
                     ->numeric()
                     ->sortable()
@@ -257,7 +244,7 @@ final class AiCreditBalanceResource extends Resource
             ->modalHeading('Reset billing period')
             ->modalDescription(fn (AiCreditBalance $record): string => 'Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.'
                 .(($record->team->subscription()?->valid() ?? false)
-                    ? ' WARNING: this team has an active Stripe subscription — webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
+                    ? ' WARNING: this team has an active Stripe subscription, so webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
                     : ''))
             ->schema([
                 Select::make('plan')

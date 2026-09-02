@@ -136,7 +136,7 @@ test('team with null invite_link_token is unreachable via the original token', f
         ->assertNotFound();
 });
 
-test('guest hitting join link is redirected to register', function (): void {
+test('guest hitting join link is redirected to login', function (): void {
     $owner = User::factory()->create();
     $team = resolve(CreateTeam::class)->create($owner, [
         'name' => 'Acme',
@@ -145,7 +145,7 @@ test('guest hitting join link is redirected to register', function (): void {
     ]);
 
     $this->get(route('teams.join', ['token' => $team->invite_link_token]))
-        ->assertRedirect(Filament::getRegistrationUrl());
+        ->assertRedirect(Filament::getLoginUrl());
 });
 
 test('user scheduled for deletion cannot view join confirmation', function (): void {

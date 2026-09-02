@@ -45,14 +45,14 @@ final readonly class EmailThreadSummaryService
         $lines = [];
         $lines[] = "Email thread: \"{$thread->subject}\"";
         $lines[] = "{$thread->email_count} emails, {$thread->participant_count} participants";
-        $lines[] = 'Date range: '.($thread->first_email_at?->toDateString() ?? '—').' — '.($thread->last_email_at?->toDateString() ?? '—');
+        $lines[] = 'Date range: '.($thread->first_email_at?->toDateString() ?? '—').' to '.($thread->last_email_at?->toDateString() ?? '—');
         $lines[] = '';
 
         foreach ($emails as $index => $email) {
             $n = $index + 1;
             // `from` is eager-loaded above to avoid an N+1 across the thread's emails.
             // A malformed/draft message can carry no `from` participant, so the collection
-            // may be empty — default rather than dereference a missing row.
+            // may be empty, so default rather than dereference a missing row.
             $firstFrom = $email->from->first();
             $from = $firstFrom instanceof EmailParticipant
                 ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
@@ -76,7 +76,7 @@ final readonly class EmailThreadSummaryService
             } elseif ($tier === EmailPrivacyTier::METADATA_ONLY) {
                 $lines[] = '(metadata only)';
             } else {
-                // null tier — fully hidden from this viewer
+                // null tier: fully hidden from this viewer
                 $lines[] = '(restricted)';
             }
 

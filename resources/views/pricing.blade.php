@@ -83,7 +83,7 @@
                 $dearestReplyCost = max(1, (int) ceil($dearestEntry['credit_multiplier'] + 1.0));
 
                 $creditFaqAnswer = __(
-                    'Credit cost depends on the model and how much work a reply does — it is not flat. Each message costs its model\'s credit multiplier (:multipliers), plus 0.5 credits for every tool call the assistant makes while answering — searching, creating, or updating a record — rounded up to the next whole credit with a 1-credit minimum. A simple reply from :cheapestModel with no tool calls costs 1 credit; a reply from :dearestModel that touches two records costs :dearestCost. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
+                    'Credit cost is not flat. It depends on the model and on how much work a reply does. Each message costs its model\'s credit multiplier (:multipliers), plus 0.5 credits for every tool call the assistant makes while answering, such as searching, creating, or updating a record. The total rounds up to the next whole credit, with a 1-credit minimum. A simple reply from :cheapestModel with no tool calls costs 1 credit; a reply from :dearestModel that touches two records costs :dearestCost. Using the REST API or the MCP server directly, outside the built-in chat, never touches your credit balance.',
                     [
                         'multipliers' => $creditMultiplierList,
                         'cheapestModel' => $cheapestModel,
@@ -92,15 +92,15 @@
                     ]
                 );
 
-                // "Cloud Pro" is the billing-on marketing name only — under billing-off there is
+                // "Cloud Pro" is the billing-on marketing name only. Under billing-off there is
                 // no self-service path onto a paid plan at all (CreateTeam only auto-starts a
                 // trial when Feature::active(Billing), and the billing page 403s otherwise), so
                 // these two facts use the generic "a paid plan" label when billing is off.
                 $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
 
                 // No Enterprise plan card or checkout path exists anywhere in the codebase, so
-                // whether it's an actual purchasable offering isn't something the code can confirm
-                // — it's mentioned nowhere in this page's visible copy for that reason.
+                // whether it's an actual purchasable offering isn't something the code can
+                // confirm. It is mentioned nowhere in this page's visible copy for that reason.
                 // Two independent sentences rather than one with two holes in it: a catalog
                 // with no free-tier model rendered "Every plan can use  and any self-hosted
                 // model you connect yourself", which is the failure this shape removes.
@@ -110,22 +110,22 @@
                         : __('Every plan can use :freeModels and any self-hosted model you connect yourself.', ['freeModels' => $freeCloudModels]),
                     $paidCloudModels === ''
                         ? ''
-                        : __(':paidPlan additionally unlocks :paidModels — the models with a higher credit multiplier.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
+                        : __(':paidPlan additionally unlocks the higher-multiplier models: :paidModels.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
                 ])));
 
                 $rateLimitAnswer = __(
-                    'Yes — a per-minute cap shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
+                    'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
                     ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'paidPlan' => $paidPlanLabel]
                 );
 
                 $selfHostedCreditAnswer = __(
-                    'No. Self-hosting does not disable credit metering: every workspace, self-hosted or hosted, defaults to the Free plan\'s :credits-credit monthly allowance — the same one a brand-new Cloud signup gets. Self-hosters do have direct database access, so they can raise their own workspace\'s plan value, but no plan removes metering entirely (even the highest built-in plan caps out at :enterpriseCredits credits/month), and changing the plan value alone doesn\'t reset the current period\'s balance — that only happens automatically once the existing period ends.',
+                    'No. Self-hosting does not disable credit metering. Every workspace defaults to the Free plan\'s :credits-credit monthly allowance, whether self-hosted or hosted, and a brand-new Cloud signup gets exactly the same one. Self-hosters do have direct database access, so they can raise their own workspace\'s plan value, but no plan removes metering entirely (even the highest built-in plan caps out at :enterpriseCredits credits/month). Changing the plan value alone doesn\'t reset the current period\'s balance. That happens automatically once the existing period ends.',
                     ['credits' => $freeCredits, 'enterpriseCredits' => $enterpriseCredits]
                 );
 
                 if ($billingActive) {
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
-                    $hostedUpdatesCell = __('Managed by Relaticle — no self-hosted maintenance required');
+                    $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
                     $hostedPlanAnswer = __(
                         'Cloud Pro is :price and includes unlimited users and records, every supported AI model from :cheapestModel up to :dearestModel, the REST API, the 37-tool MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
@@ -141,7 +141,7 @@
                         ]
                     );
                     $planLimitAnswer = __(
-                        'CRM data itself is never capped — every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is the AI assistant: Cloud Pro\'s :credits credits a month reset each billing (or trial) period. Once they are used up, the assistant declines new chat requests until the next reset — Cloud Pro workspaces can also buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
+                        'CRM data itself is never capped. Every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is the AI assistant: Cloud Pro\'s :credits credits a month reset each billing (or trial) period. Once they are used up, the assistant declines new chat requests until the next reset. Cloud Pro workspaces can buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
                         ['credits' => $proCredits]
                     );
                 } else {
@@ -149,7 +149,7 @@
                     $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
                     $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the 37-tool MCP server, the REST API, all 22 custom field types, multi-team workspaces, zero-downtime updates, automatic daily backups, and email support. No credit card is required.');
                     $planLimitAnswer = __(
-                        'CRM data itself is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. The AI assistant is metered, though: every workspace defaults to the Free plan\'s :credits credits a month (self-hosted included — see "Are self-hosted installs exempt from AI credit limits?" below), resetting every calendar month. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
+                        'CRM data itself is never capped on any plan. Every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. The AI assistant is metered, though: every workspace defaults to the Free plan\'s :credits credits a month, resetting every calendar month. That includes self-hosted installs; see "Are self-hosted installs exempt from AI credit limits?" below. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
                         ['credits' => $freeCredits]
                     );
                 }
@@ -175,8 +175,8 @@
                 {{--
                     List layout kept for responsive styling; tables DO convert to
                     markdown since the TableAwareLeagueDriver landed. <ul>/<li>/<p>
-                    (category names are CSS-bold, not <strong> — no semantic-bold
-                    tag is used) were verified to survive conversion — each row
+                    (category names are CSS-bold, not <strong>, so no semantic-bold
+                    tag is used) were verified to survive conversion. Each row
                     below reads as "Category" / "Self-Hosted: X" / "Hosted: Y" in markdown.
                 --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -215,11 +215,11 @@
                     $pricingFaqs = [
                         [
                             __('Is Relaticle really free to self-host?'),
-                            __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file — your data stays on your own server the entire time.'),
+                            __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file. Your data stays on your own server the entire time.'),
                         ],
                         [
                             __('Do you charge per seat?'),
-                            __('No — Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
+                            __('No. Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
                         ],
                         [__("What's included in the hosted plan?"), $hostedPlanAnswer],
                         [__('What happens when I hit a plan limit?'), $planLimitAnswer],
@@ -229,7 +229,7 @@
                         [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
                         [
                             __('Can I switch between self-hosted and cloud?'),
-                            __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV — moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
+                            __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
                         ],
                     ];
 

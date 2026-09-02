@@ -2,8 +2,8 @@
  * Behaviour for the documentation shell: client-side search over the
  * pre-built index, copy buttons on code blocks, and the on-this-page rail.
  *
- * Search is exposed on `window` because the shell drives it from Alpine —
- * the ranking stays here so the Blade template holds markup, not algorithms.
+ * Search is exposed on `window` because the shell drives it from Alpine.
+ * The ranking stays here so the Blade template holds markup, not algorithms.
  */
 
 const SNIPPET_RADIUS = 70;
@@ -124,7 +124,7 @@ window.RelaticleDocs = {
 
         const phrase = query.trim().toLowerCase();
 
-        // An empty box lists the pages themselves — somewhere to start rather
+        // An empty box lists the pages themselves, somewhere to start rather
         // than an empty panel.
         if (phrase === '') {
             return records
@@ -178,8 +178,8 @@ function addCopyButtons(root) {
                     button.innerHTML = COPY_ICON;
                 }, 1500);
             } catch {
-                // Clipboard denied (insecure context or blocked permission) —
-                // the code is still selectable, so there is nothing to recover.
+                // Clipboard denied (insecure context or blocked permission).
+                // The code is still selectable, so there is nothing to recover.
             }
         });
 
@@ -199,7 +199,7 @@ function trackTableOfContents() {
             const anchor = document.getElementById(decodeURIComponent(link.getAttribute('href').slice(1)));
 
             // The renderer puts the id on a permalink anchor inside the
-            // heading, and that anchor is absolutely positioned — measure the
+            // heading, and that anchor is absolutely positioned, so measure the
             // heading instead.
             return anchor ? { link, element: anchor.closest('h2, h3, h4') ?? anchor } : null;
         })

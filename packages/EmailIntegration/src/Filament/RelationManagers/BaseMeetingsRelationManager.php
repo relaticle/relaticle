@@ -144,7 +144,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
     private function searchOptions(string $type): array
     {
         // CRM models carry no global tenant scope, so every query here must be
-        // constrained to the current tenant — otherwise the option list (and the
+        // constrained to the current tenant. Otherwise the option list (and the
         // resolveRecord lookup below) would expose and link records from other teams.
         $teamId = filament()->getTenant()?->getKey();
 

@@ -3,8 +3,8 @@
 @import "~/css/theme.css";
 
 /*
- * The documentation surface is its own shell — it does not render the
- * marketing header or footer — so its reading styles live here rather than
+ * The documentation surface is its own shell and does not render the
+ * marketing header or footer, so its reading styles live here rather than
  * leaning on the typography plugin. Sizes are deliberately tighter than the
  * marketing pages: this is a manual, not a landing page.
  */
@@ -149,8 +149,10 @@ html {
     @apply my-10 border-gray-200 dark:border-white/10;
 }
 
+/* Screenshots are captured in light mode only; dimming them keeps a dark
+   page from getting a full-brightness white block per image. */
 .prose-docs img {
-    @apply my-5 rounded-lg border border-gray-200 dark:border-white/10;
+    @apply my-5 rounded-lg border border-gray-200 dark:border-white/10 dark:brightness-90;
 }
 
 .prose-docs table {
@@ -234,7 +236,7 @@ html {
 
 /*
  * The permalink is the element that actually carries the heading id, and it is
- * absolutely positioned, so it needs its own scroll margin — otherwise a
+ * absolutely positioned, so it needs its own scroll margin. Otherwise a
  * deep-linked heading lands underneath the sticky header.
  */
 .prose-docs .heading-permalink {

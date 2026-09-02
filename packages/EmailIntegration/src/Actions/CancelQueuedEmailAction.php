@@ -22,11 +22,11 @@ final readonly class CancelQueuedEmailAction
             // races against the QUEUED state. Once claimed to SENDING a worker is
             // actively delivering it: send() calls the provider OUTSIDE any row lock,
             // so a "SENDING && provider_message_id === null" check is not a reliable
-            // "not yet delivered" signal — cancelling there could mark CANCELLED an
+            // "not yet delivered" signal: cancelling there could mark CANCELLED an
             // email the provider already accepted (and updateSentEmail would then race
             // it back to SENT). Treat SENDING as too late.
             if ($lockedEmail->status !== EmailStatus::QUEUED) {
-                throw new RuntimeException("Email cannot be cancelled — status is {$lockedEmail->status->value}.");
+                throw new RuntimeException("Email cannot be cancelled. Status is {$lockedEmail->status->value}.");
             }
 
             $lockedEmail->update(['status' => EmailStatus::CANCELLED]);

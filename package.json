@@ -1,8 +1,9 @@
 {
     "private": true,
+    "packageManager": "pnpm@11.24.0",
     "type": "module",
     "engines": {
-        "node": "^20.19.0 || >=22.12.0"
+        "node": ">=22.12.0"
     },
     "scripts": {
         "dev": "vite",
@@ -23,6 +24,7 @@
     },
     "dependencies": {
         "@alpinejs/collapse": "^3.15.12",
+        "@laravel/passkeys": "^0.2.0",
         "@tailwindcss/vite": "^4.3.3",
         "@tiptap/core": "^3.29.2",
         "@tiptap/extension-document": "^3.29.2",
