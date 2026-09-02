@@ -42,11 +42,11 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class EmailInboxPage extends Page
@@ -792,24 +792,7 @@ final class EmailInboxPage extends Page
      */
     private function contactEmailSuggestions(): array
     {
-        $teamId = filament()->getTenant()?->getKey();
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier). Without this, a
-            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
-            // everyone else's recipient autocomplete via this team-wide query.
-            ->whereHas('email', fn (Builder $q): Builder => $q
-                ->where('team_id', $teamId)
-                ->where('status', '!=', EmailStatus::DRAFT))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->values()
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->authUser());
     }
 
     /**
