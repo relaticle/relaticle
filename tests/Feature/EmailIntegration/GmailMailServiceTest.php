@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 use Google\Service\Gmail;
+use Google\Service\Gmail\History;
+use Google\Service\Gmail\HistoryLabelAdded;
+use Google\Service\Gmail\HistoryLabelRemoved;
+use Google\Service\Gmail\HistoryMessageAdded;
+use Google\Service\Gmail\ListHistoryResponse;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartBody;
@@ -35,6 +40,55 @@ function fakeGmail(Closure $capture): Gmail
 function decodeRaw(Message $message): string
 {
     return base64_decode(strtr($message->getRaw(), '-_', '+/'));
+}
+
+/**
+ * @param  Closure(string, array<string, mixed>): ListHistoryResponse  $responder
+ */
+function fakeGmailHistory(Closure $responder): Gmail
+{
+    $history = Mockery::mock();
+    $history->shouldReceive('listUsersHistory')
+        ->atLeast()
+        ->once()
+        ->andReturnUsing(fn (string $userId, array $params): ListHistoryResponse => $responder($userId, $params));
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_history = $history;
+
+    return $gmail;
+}
+
+function gmailHistoryMessageAdded(string $id): HistoryMessageAdded
+{
+    $added = new HistoryMessageAdded;
+    $added->setMessage(new Message(['id' => $id]));
+
+    return $added;
+}
+
+/**
+ * @param  list<string>  $labelIds
+ */
+function gmailHistoryLabelRemoved(string $id, array $labelIds): HistoryLabelRemoved
+{
+    $change = new HistoryLabelRemoved;
+    $change->setMessage(new Message(['id' => $id]));
+    $change->setLabelIds($labelIds);
+
+    return $change;
+}
+
+/**
+ * @param  list<string>  $labelIds
+ */
+function gmailHistoryLabelAdded(string $id, array $labelIds): HistoryLabelAdded
+{
+    $change = new HistoryLabelAdded;
+    $change->setMessage(new Message(['id' => $id]));
+    $change->setLabelIds($labelIds);
+
+    return $change;
 }
 
 it('wraps the body and attachment in a multipart/mixed MIME message', function (): void {
@@ -289,4 +343,100 @@ it('keeps unreferenced gmail attachment-disposition cid images downloadable', fu
         ->and($data->attachments[0]['content_id'])->toBe('photo@example.test')
         ->and($data->attachments[0]['attachment_id'])->toBe('photo-attachment-id')
         ->and($data->attachments[0]['is_inline'])->toBeFalse();
+});
+
+it('requests gmail history with singular history type enums', function (): void {
+    $account = ConnectedAccount::factory()->make();
+    $captured = [];
+
+    $history = new History;
+    $history->setMessagesAdded([gmailHistoryMessageAdded('msg-new')]);
+
+    $response = new ListHistoryResponse;
+    $response->setHistoryId('4000');
+    $response->setHistory([$history]);
+
+    $gmail = fakeGmailHistory(function (string $userId, array $params) use (&$captured, $response): ListHistoryResponse {
+        $captured[] = ['userId' => $userId, 'params' => $params];
+
+        return $response;
+    });
+
+    new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($captured)->toHaveCount(1)
+        ->and($captured[0]['userId'])->toBe('me')
+        ->and($captured[0]['params'])->toBe([
+            'startHistoryId' => '3891',
+            'historyTypes' => ['messageAdded', 'labelRemoved', 'labelAdded'],
+        ]);
+});
+
+it('surfaces new, read, and unread message ids from gmail history', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $history = new History;
+    $history->setMessagesAdded([gmailHistoryMessageAdded('msg-new')]);
+    $history->setLabelsRemoved([
+        gmailHistoryLabelRemoved('msg-read', ['UNREAD']),
+        gmailHistoryLabelRemoved('msg-starred', ['STARRED']),
+    ]);
+    $history->setLabelsAdded([
+        gmailHistoryLabelAdded('msg-unread', ['UNREAD']),
+        gmailHistoryLabelAdded('msg-important', ['IMPORTANT']),
+    ]);
+
+    $response = new ListHistoryResponse;
+    $response->setHistoryId('4000');
+    $response->setHistory([$history]);
+
+    $gmail = fakeGmailHistory(fn (): ListHistoryResponse => $response);
+
+    $delta = new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($delta->messageIds->all())->toBe(['msg-new'])
+        ->and($delta->readMessageIds->all())->toBe(['msg-read'])
+        ->and($delta->unreadMessageIds?->all())->toBe(['msg-unread'])
+        ->and($delta->newCursor)->toBe('4000');
+});
+
+it('follows gmail history pages until the token is exhausted', function (): void {
+    $account = ConnectedAccount::factory()->make();
+    $captured = [];
+
+    $firstHistory = new History;
+    $firstHistory->setMessagesAdded([gmailHistoryMessageAdded('msg-page-1')]);
+
+    $firstPage = new ListHistoryResponse;
+    $firstPage->setHistoryId('4100');
+    $firstPage->setNextPageToken('page-2');
+    $firstPage->setHistory([$firstHistory]);
+
+    $secondHistory = new History;
+    $secondHistory->setMessagesAdded([gmailHistoryMessageAdded('msg-page-2')]);
+
+    $secondPage = new ListHistoryResponse;
+    $secondPage->setHistoryId('4100');
+    $secondPage->setHistory([$secondHistory]);
+
+    $gmail = fakeGmailHistory(function (string $userId, array $params) use (&$captured, $firstPage, $secondPage): ListHistoryResponse {
+        $captured[] = $params;
+
+        return isset($params['pageToken']) ? $secondPage : $firstPage;
+    });
+
+    $delta = new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($captured)->toHaveCount(2)
+        ->and($captured[0])->toBe([
+            'startHistoryId' => '3891',
+            'historyTypes' => ['messageAdded', 'labelRemoved', 'labelAdded'],
+        ])
+        ->and($captured[1])->toBe([
+            'startHistoryId' => '3891',
+            'historyTypes' => ['messageAdded', 'labelRemoved', 'labelAdded'],
+            'pageToken' => 'page-2',
+        ])
+        ->and($delta->messageIds->all())->toBe(['msg-page-1', 'msg-page-2'])
+        ->and($delta->newCursor)->toBe('4100');
 });
