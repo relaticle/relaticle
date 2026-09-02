@@ -56,6 +56,7 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 
 /**
  * @property-read Action $createSignatureAction
@@ -644,23 +645,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     #[Computed]
     public function recipientSuggestions(): array
     {
-        $teamId = $this->authUser()->current_team_id;
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier). Without this, a
-            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
-            // everyone else's recipient autocomplete via this team-wide query.
-            ->whereHas('email', fn (Builder $q): Builder => $q
-                ->where('team_id', $teamId)
-                ->where('status', '!=', EmailStatus::DRAFT))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->authUser());
     }
 
     /**

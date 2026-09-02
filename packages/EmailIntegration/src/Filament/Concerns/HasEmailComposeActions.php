@@ -18,7 +18,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\HtmlString;
@@ -31,16 +30,16 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use RuntimeException;
 
 trait HasEmailComposeActions
 {
     /**
-     * Return the CRM record these emails belong to (People, Company, or Opportunity).
+     * Return the CRM record these emails belong to (People, Company, or Opportunity)
      */
     abstract protected function getCrmRecord(): Model;
 
@@ -386,19 +385,7 @@ trait HasEmailComposeActions
      */
     private function contactEmailSuggestions(): array
     {
-        $teamId = filament()->getTenant()?->getKey();
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            ->whereHas('email', fn (Builder $q): Builder => $q->where('team_id', $teamId))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->values()
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->getAuthenticatedUser());
     }
 
     /**
