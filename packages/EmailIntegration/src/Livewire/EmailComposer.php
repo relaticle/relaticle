@@ -276,7 +276,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->all()),
         };
 
-        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').($email->subject ?? '');
+        // Only prefill the original subject when the viewer is entitled to see it.
+        // `can('view')` is true at METADATA_ONLY; `viewSubject` is not.
+        $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
+        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').$originalSubject;
 
         // Only quote the original body when the viewer is entitled to read it.
         $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
@@ -1113,6 +1116,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * ULID. Reject anything that isn't one of this user's own active accounts so
      * every downstream read (signature options, the default signature, `send()`)
      * inherits ownership instead of re-deriving it. See {@see self::ownedAccountId()}.
+     * 
      */
     public function updatedAccountId(?string $value): void
     {

@@ -20,7 +20,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
-mutates(EmailsRelationManager::class);
+mutates(EmailsRelationManager::class, EmailComposer::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -173,6 +173,30 @@ it('reply_all recipients keep the original sender and drop the user\'s own addre
         ->toContain('cc-person@contact.com')   // cc recipients included
         ->not->toContain('me@example.com');    // self excluded
 });
+
+it('inline composer prefills the original subject only when the viewer may see it', function (EmailPrivacyTier $tier, string $expectedSubject): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($viewer, ['role' => 'editor']);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+        'status' => 'active',
+    ]));
+
+    $this->inboundEmail->update(['privacy_tier' => $tier]);
+
+    $this->actingAs($viewer);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('isOpen', true)
+        ->assertSet('subject', $expectedSubject)
+        ->assertSet('quotedBodyHtml', null);
+})->with([
+    'metadata only' => [EmailPrivacyTier::METADATA_ONLY, 'Re: '],
+    'subject line' => [EmailPrivacyTier::SUBJECT, 'Re: Original Subject'],
+]);
 
 it('inline composer prefills a reply from the selected email and queues it', function (): void {
     // The reply icons carry the target email, and the docked composer answers
