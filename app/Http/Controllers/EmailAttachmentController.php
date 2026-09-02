@@ -31,7 +31,6 @@ final readonly class EmailAttachmentController
 
     private function inlineResponse(EmailAttachment $attachment): Response
     {
-        
         abort_unless($attachment->is_inline, 404);
         abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
 
