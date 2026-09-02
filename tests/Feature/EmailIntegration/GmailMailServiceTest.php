@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use Google\Service\Exception as GoogleServiceException;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartBody;
 use Google\Service\Gmail\MessagePartHeader;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Services\GmailService;
 
 mutates(GmailService::class);
@@ -289,4 +291,34 @@ it('keeps unreferenced gmail attachment-disposition cid images downloadable', fu
         ->and($data->attachments[0]['content_id'])->toBe('photo@example.test')
         ->and($data->attachments[0]['attachment_id'])->toBe('photo-attachment-id')
         ->and($data->attachments[0]['is_inline'])->toBeFalse();
+});
+
+it('requires a full mailbox resync when Gmail history returns 404 for a stale cursor', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $history = Mockery::mock();
+    $history->shouldReceive('listUsersHistory')
+        ->once()
+        ->andThrow(new GoogleServiceException('Requested entity was not found.', 404));
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_history = $history;
+
+    expect(fn () => new GmailService($account, $gmail)->fetchDelta('stale-history'))
+        ->toThrow(MailHistoryExpired::class);
+});
+
+it('does not treat other Gmail history HTTP errors as an expired cursor', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $history = Mockery::mock();
+    $history->shouldReceive('listUsersHistory')
+        ->once()
+        ->andThrow(new GoogleServiceException('Backend Error', 500));
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_history = $history;
+
+    expect(fn () => new GmailService($account, $gmail)->fetchDelta('history-1'))
+        ->toThrow(GoogleServiceException::class);
 });
