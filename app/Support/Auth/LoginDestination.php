@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Auth;
 
-use App\Filament\Pages\Dashboard;
+use App\Enums\LandingPage;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
@@ -37,7 +37,7 @@ final readonly class LoginDestination
     private function fallback(User $user): string
     {
         return $user->currentWorkspace
-            ? Dashboard::getUrl(['tenant' => $user->currentWorkspace])
+            ? LandingPage::fromUser($user)->url($user->currentWorkspace)
             : Filament::getPanel('app')->getUrl();
     }
 
