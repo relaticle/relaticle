@@ -122,6 +122,16 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return $this->account ??= $this->ownedAccountsQuery()->findOrFail($this->accountId);
     }
 
+    public function refreshAccount(): void
+    {
+        $this->account = null;
+    }
+
+    public function isImportingHistory(): bool
+    {
+        return $this->account()->isImportingHistory();
+    }
+
     protected function afterAccountChanged(): void
     {
         $this->account = null;
@@ -197,7 +207,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     }
 
     /**
-     * Attio-style radio cards. The tier is stored on the user, not the account —
+     * Radio cards. The tier is stored on the user, not the account —
      * the leading card hands the decision back to the workspace default.
      */
     private function sharingTierField(): ViewField

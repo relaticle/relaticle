@@ -10,6 +10,7 @@ use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -125,6 +126,39 @@ final class EmailAccountsPage extends Page
     public function refreshAccounts(): void
     {
         $this->connectedAccounts = $this->getAccounts();
+    }
+
+    public function isImportingAnyAccount(): bool
+    {
+        return $this->connectedAccounts->contains(
+            fn (ConnectedAccount $account): bool => $account->isImportingHistory(),
+        );
+    }
+
+    public function connectedSectionDescription(): HtmlString
+    {
+        return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
+            'url' => route('policy.show'),
+        ]));
+    }
+
+    public function accountCapabilities(ConnectedAccount $account): string
+    {
+        $labels = [];
+
+        if ($account->hasEmail()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.email');
+        }
+
+        if ($account->hasCalendar()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
+        }
+
+        if ($labels === []) {
+            return $account->provider->getLabel();
+        }
+
+        return implode(', ', $labels);
     }
 
     protected function afterAccountChanged(): void
