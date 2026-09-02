@@ -7,10 +7,7 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\Size;
-use Filament\Support\View\ComponentAttributeBag;
-use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\HtmlString;
@@ -18,8 +15,6 @@ use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-
-use function Filament\Support\generate_icon_html;
 
 final class EmailAccountsPage extends Page
 {
@@ -145,15 +140,6 @@ final class EmailAccountsPage extends Page
         return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
             'url' => route('policy.show'),
         ]));
-    }
-
-    public function syncingIcon(): Htmlable
-    {
-        return generate_icon_html(
-            'heroicon-m-arrow-path',
-            attributes: new ComponentAttributeBag(['class' => 'motion-safe:animate-spin']),
-            size: IconSize::Small,
-        ) ?? new HtmlString('');
     }
 
     protected function afterAccountChanged(): void

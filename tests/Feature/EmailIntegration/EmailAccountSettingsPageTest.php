@@ -151,6 +151,18 @@ it('does not touch another account\'s signature', function (): void {
     $this->assertDatabaseHas(EmailSignature::class, ['id' => $signature->id]);
 });
 
+it('shows syncing percent while mailbox history is importing', function (): void {
+    $this->account->update([
+        'sync_cursor' => null,
+        'initial_sync_imported' => 57,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->assertSee(__('filament/pages/email-accounts.importing'))
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 57]));
+});
+
 it('does not open the settings page for another user\'s account', function (): void {
     $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
     $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([

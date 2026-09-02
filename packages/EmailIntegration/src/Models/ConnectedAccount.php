@@ -286,6 +286,25 @@ final class ConnectedAccount extends Model
         return (bool) ($this->capabilities['email'] ?? true);
     }
 
+    public function capabilitiesLabel(): string
+    {
+        $labels = [];
+
+        if ($this->hasEmail()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.email');
+        }
+
+        if ($this->hasCalendar()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
+        }
+
+        if ($labels === []) {
+            return $this->provider->getLabel();
+        }
+
+        return implode(', ', $labels);
+    }
+
     public function enableCalendar(): void
     {
         $capabilities = $this->capabilities ?? [];

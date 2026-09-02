@@ -59,6 +59,12 @@
 
         </form>
 
+        @island(name: 'mailbox-import')
+            @if (\Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class))
+                @livewire('email-integration.mailbox-import-status', ['placement' => 'home'])
+            @endif
+        @endisland
+
         @include('chat::filament.pages.partials.my-tasks')
     </div>
 
