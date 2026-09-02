@@ -96,6 +96,35 @@ it('batches StoreEmailJob for new Microsoft messages and defers the cursor to th
     expect($account->refresh()->sync_cursor)->toBe('old-cursor');
 });
 
+it('advances the cursor after the store batch completes', function (): void {
+    Bus::fake();
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
+        messageIds: collect(['M1']),
+        readMessageIds: collect([]),
+        newCursor: 'new-cursor',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    $this->app->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            $callback();
+        }
+
+        return true;
+    });
+
+    expect($account->refresh()->sync_cursor)->toBe('new-cursor');
+});
+
 it('advances the cursor inline when the delta has no new messages', function (): void {
     Bus::fake();
 

@@ -18,7 +18,7 @@ use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
-mutates(EmailAccountsPage::class);
+mutates(EmailAccountsPage::class, ConnectedAccount::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -182,6 +182,11 @@ it('does not re-import another user\'s account', function (): void {
     expect(fn () => livewire(EmailAccountsPage::class)
         ->callAction('reimportHistory', arguments: ['account_id' => $otherAccount->id]))
         ->toThrow(ModelNotFoundException::class);
+});
+
+it('shows mailbox capabilities on each connected account', function (): void {
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.capabilities.email'));
 });
 
 it('renders Connect Gmail and hides Connect Outlook for now', function (): void {

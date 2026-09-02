@@ -9,15 +9,21 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
+use Filament\Support\View\ComponentAttributeBag;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+
+use function Filament\Support\generate_icon_html;
 
 /**
  * The per-account action menu shared by the accounts list and a single account's
@@ -35,6 +41,15 @@ trait HasConnectedAccountActions
     protected function afterAccountDisconnected(): void
     {
         $this->afterAccountChanged();
+    }
+
+    public function syncingIcon(): Htmlable
+    {
+        return generate_icon_html(
+            'heroicon-m-arrow-path',
+            attributes: new ComponentAttributeBag(['class' => 'motion-safe:animate-spin']),
+            size: IconSize::Small,
+        ) ?? new HtmlString('');
     }
 
     /**

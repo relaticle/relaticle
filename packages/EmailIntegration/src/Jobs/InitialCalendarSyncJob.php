@@ -48,12 +48,12 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         $result = $service->initialSync($this->pageToken);
 
         if ($result->events === []) {
-            $this->continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken);
+            self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken);
 
             return;
         }
 
-        $accountId = (int) $account->getKey();
+        $accountId = (string) $account->getKey();
         $nextPageToken = $result->nextPageToken;
         $nextSyncToken = $result->nextSyncToken;
 
@@ -66,14 +66,14 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial calendar sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(function () use ($accountId, $nextPageToken, $nextSyncToken): void {
+            ->then(static function () use ($accountId, $nextPageToken, $nextSyncToken): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
 
                 if (! $account instanceof ConnectedAccount) {
                     return;
                 }
 
-                $this->continueOrFinish($account, $nextPageToken, $nextSyncToken);
+                self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
             })
             ->dispatch();
     }
@@ -91,7 +91,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         return 'initial-calendar-sync-'.$this->connectedAccount->getKey().'-'.hash('xxh3', $this->pageToken ?? 'start');
     }
 
-    private function continueOrFinish(
+    private static function continueOrFinish(
         ConnectedAccount $account,
         ?string $nextPageToken,
         ?string $nextSyncToken,

@@ -54,10 +54,7 @@ final readonly class EmailAttachmentController
         /** @var User $user */
         $user = $request->user();
 
-        // Verify the user belongs to the same team as the email.
-        abort_unless($user->current_team_id === $email->team_id, 403);
-
-        // Respect privacy; body access is required to download or render attachments.
+        abort_unless($user->belongsToTeamId($email->team_id), 403);
         abort_unless($user->can('viewBody', $email), 403);
 
         return $attachment;

@@ -68,6 +68,27 @@ it('aborts 403 when user belongs to a different team than the email', function (
         ->assertForbidden();
 });
 
+it('streams a download when the viewer belongs to the email team but current_team_id is another workspace', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/draft.pdf', 'locally stored bytes');
+
+    $otherTeam = Team::factory()->create(['user_id' => $this->user->getKey()]);
+    $this->user->teams()->attach($otherTeam, ['role' => 'admin']);
+    $this->user->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+    $this->actingAs($this->user->fresh());
+
+    $attachment = makeAttachmentForUser($this->user, $this->team, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/draft.pdf',
+        'filename' => 'draft.pdf',
+    ]);
+
+    $response = $this->get(route('email-attachments.download', ['attachment' => $attachment->id]));
+
+    $response->assertOk();
+    expect($response->streamedContent())->toBe('locally stored bytes');
+});
+
 it('aborts 403 when viewer has no body access (private privacy tier)', function (): void {
     $owner = User::factory()->create(['current_team_id' => $this->team->id]);
     $this->team->users()->attach($owner, ['role' => 'editor']);

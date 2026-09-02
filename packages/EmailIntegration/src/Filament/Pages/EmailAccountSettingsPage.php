@@ -122,6 +122,16 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return $this->account ??= $this->ownedAccountsQuery()->findOrFail($this->accountId);
     }
 
+    public function refreshAccount(): void
+    {
+        $this->account = null;
+    }
+
+    public function isImportingHistory(): bool
+    {
+        return $this->account()->isImportingHistory();
+    }
+
     protected function afterAccountChanged(): void
     {
         $this->account = null;
