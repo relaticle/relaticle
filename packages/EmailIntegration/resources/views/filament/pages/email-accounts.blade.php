@@ -33,7 +33,7 @@
                                 @endif
                             </div>
                             <p class="truncate text-xs text-gray-500 dark:text-gray-400">
-                                {{ $this->accountCapabilities($account) }}
+                                {{ $account->capabilitiesLabel() }}
                             </p>
                         </div>
                     </div>
