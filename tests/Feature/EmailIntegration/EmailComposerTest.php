@@ -18,18 +18,23 @@ use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -403,6 +408,78 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
         ->recipientSuggestions();
 
     expect($suggestions)->not->toContain('hidden-recipient@example.com');
+});
+
+it('excludes a teammate\'s private mail recipients from recipient suggestions', function (): void {
+    $address = 'private-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::PRIVATE, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes protected-recipient addresses from recipient suggestions', function (): void {
+    $address = 'vip@protected.example';
+
+    ProtectedRecipient::factory()->email($address)->create([
+        'team_id' => $this->user->current_team_id,
+        'created_by' => $this->user->id,
+    ]);
+
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes a teammate\'s BCC addresses from recipient suggestions', function (): void {
+    $bcc = 'secret-bcc@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $bcc, EmailParticipantRole::BCC);
+
+    expect(composerRecipientSuggestions())->not->toContain($bcc);
+});
+
+it('excludes a teammate\'s internal mail recipients from recipient suggestions', function (): void {
+    $address = 'internal-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO, isInternal: true);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('includes recipients from a teammate\'s workspace-visible mail in recipient suggestions', function (): void {
+    $address = 'shared-to@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::METADATA_ONLY, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->toContain($address);
+});
+
+it('includes the owner\'s own private and BCC addresses in recipient suggestions', function (): void {
+    $to = 'own-private@example.com';
+    $bcc = 'own-bcc@example.com';
+
+    $email = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'is_internal' => false,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $to,
+        'role' => EmailParticipantRole::TO,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $bcc,
+        'role' => EmailParticipantRole::BCC,
+    ]);
+
+    $suggestions = composerRecipientSuggestions();
+
+    expect($suggestions)->toContain($to)
+        ->and($suggestions)->toContain($bcc);
 });
 
 it('adds every company team member primary email to recipients', function (): void {
@@ -871,3 +948,45 @@ it('drops a pending attachment when it is removed before sending', function (): 
     $email = Email::query()->where('subject', 'No attachment after all')->sole();
     expect($email->attachments()->pluck('filename')->all())->toBe(['keep.pdf']);
 });
+
+/**
+ * @return list<string>
+ */
+function composerRecipientSuggestions(): array
+{
+    return Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientSuggestions();
+}
+
+function teammateSentEmail(
+    User $viewer,
+    EmailPrivacyTier $privacyTier,
+    string $address,
+    EmailParticipantRole $role,
+    bool $isInternal = false,
+): void {
+    $teammate = User::factory()->create(['current_team_id' => $viewer->current_team_id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'team_id' => $viewer->current_team_id,
+        'status' => 'active',
+    ]));
+
+    $email = Email::factory()->create([
+        'team_id' => $viewer->current_team_id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => $privacyTier,
+        'is_internal' => $isInternal,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $address,
+        'role' => $role,
+    ]);
+}
