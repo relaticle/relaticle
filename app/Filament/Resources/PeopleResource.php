@@ -43,6 +43,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class PeopleResource extends Resource
@@ -145,7 +146,10 @@ final class PeopleResource extends Resource
             ->recordActions([
                 ActionGroup::make([
                     ViewAction::make(),
-                    EditAction::make(),
+                    EditAction::make()
+                        ->after(function (People $record, LinkPersonCompanyFromEmails $linker): void {
+                            $linker->execute($record->fresh());
+                        }),
                     RestoreAction::make(),
                     DeleteAction::make(),
                     ForceDeleteAction::make(),

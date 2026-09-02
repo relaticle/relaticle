@@ -6,6 +6,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -135,6 +136,22 @@ it('can create a person', function (): void {
         'name' => 'Jane Doe',
         'team_id' => $this->team->id,
     ]);
+});
+
+it('auto-creates a company from a work email on create', function (): void {
+    $this->team->update(['auto_create_companies' => true]);
+
+    livewire(ListPeople::class)
+        ->callAction('create', data: [
+            'name' => 'Jane Doe',
+            'custom_fields' => ['emails' => ['jane@filament-acme.com']],
+        ])
+        ->assertHasNoActionErrors();
+
+    $person = People::query()->where('name', 'Jane Doe')->firstOrFail();
+
+    expect($person->company_id)->not->toBeNull();
+    expect(Company::query()->where('team_id', $this->team->id)->where('name', 'Filament-acme')->exists())->toBeTrue();
 });
 
 it('can edit a person', function (): void {

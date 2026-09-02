@@ -11,9 +11,14 @@ use App\Support\CustomFieldMerger;
 use App\Support\TenantFkValidator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 
 final readonly class UpdatePeople
 {
+    public function __construct(
+        private LinkPersonCompanyFromEmails $linkPersonCompanyFromEmails,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -31,6 +36,8 @@ final readonly class UpdatePeople
 
         return DB::transaction(function () use ($people, $attributes): People {
             $people->update($attributes);
+
+            $this->linkPersonCompanyFromEmails->execute($people->fresh());
 
             return $people->refresh()->load('customFieldValues.customField.options');
         });
