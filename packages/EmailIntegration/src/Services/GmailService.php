@@ -48,7 +48,7 @@ final readonly class GmailService implements MailServiceInterface
         do {
             $params = [
                 'startHistoryId' => $cursor,
-                'historyTypes' => ['messageAdded', 'labelsRemoved', 'labelsAdded'],
+                'historyTypes' => ['messageAdded', 'labelRemoved', 'labelAdded'],
             ];
 
             if ($pageToken !== null) {
