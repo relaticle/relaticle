@@ -43,7 +43,7 @@ final readonly class LinkMeetingAction
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
-                if (! $company && $team?->auto_create_companies) {
+                if (! $company && $team && $team->auto_create_companies && $this->shouldCreatePerson($team)) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 

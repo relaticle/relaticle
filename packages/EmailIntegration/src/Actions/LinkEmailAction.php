@@ -112,8 +112,13 @@ final readonly class LinkEmailAction
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
-                // 2. Auto-create Company when no existing record found.
-                if (! $company && ! $isAutomatedSender && $team?->auto_create_companies) {
+                if (
+                    ! $company
+                    && ! $isAutomatedSender
+                    && $connectedAccount
+                    && $team
+                    && $this->shouldCreateCompany($team, $participant->email_address, $email)
+                ) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -191,6 +196,18 @@ final readonly class LinkEmailAction
                 || $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
         };
+    }
+
+    /**
+     * A company is created only when a person would be created for this address
+     * and the workspace company toggle is on. None never creates companies.
+     * Selective creates them only for addresses the workspace has emailed (or
+     * the outbound message being linked). All creates them for every eligible
+     * address.
+     */
+    private function shouldCreateCompany(Team $team, string $emailAddress, Email $email): bool
+    {
+        return $team->auto_create_companies && $this->shouldCreatePerson($team, $emailAddress, $email);
     }
 
     /**

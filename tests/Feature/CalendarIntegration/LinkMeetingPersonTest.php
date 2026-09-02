@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -125,6 +126,7 @@ it('skips person creation when contact_creation_mode=None', function (): void {
     (app(LinkMeetingAction::class))->execute($meeting->fresh());
 
     expect(People::query()->where('team_id', $team->id)->count())->toBe(0);
+    expect(Company::query()->where('team_id', $team->id)->count())->toBe(0);
 });
 
 it('auto-creates a person on the first meeting in Selective mode', function (): void {

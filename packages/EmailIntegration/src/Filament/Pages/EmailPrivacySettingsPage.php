@@ -121,6 +121,10 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     public function updatedContactCreationMode(): void
     {
+        if ($this->contact_creation_mode === ContactCreationMode::None->value) {
+            $this->auto_create_companies = false;
+        }
+
         $this->persistContactCreationSettings();
     }
 
@@ -214,6 +218,10 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
         /** @var User $user */
         $user = auth()->user();
+
+        if ($mode === ContactCreationMode::None) {
+            $this->auto_create_companies = false;
+        }
 
         resolve(UpdateTeamContactCreationSettingsAction::class)->execute(
             $user->currentTeam,

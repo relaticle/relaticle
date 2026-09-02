@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 
 mutates(LinkEmailAction::class);
 mutates(AutoCreatePersonAction::class);
+mutates(AutoCreateCompanyAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -238,7 +239,10 @@ it('updates participant contact_id when linked to a person', function (): void {
 });
 
 it('does not auto-create companies when auto_create_companies is false', function (): void {
-    $this->team->update(['auto_create_companies' => false]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => false,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -254,8 +258,51 @@ it('does not auto-create companies when auto_create_companies is false', functio
     expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create a company when record creation is None', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::None,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'prospect@none-corp.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company in Selective mode for inbound-only addresses', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::Selective,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'inbound@selective-corp.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
 it('auto-creates a company when auto_create_companies is true', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -270,7 +317,10 @@ it('auto-creates a company when auto_create_companies is true', function (): voi
 });
 
 it('derives the company name from the registrable domain, not a mail subdomain', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -281,12 +331,32 @@ it('derives the company name from the registrable domain, not a mail subdomain',
 
     app(LinkEmailAction::class)->execute($email);
 
-    expect(Company::where('team_id', $this->team->id)->where('name', 'Anthropic')->exists())->toBeTrue()
+    $company = Company::where('team_id', $this->team->id)
+        ->where('name', 'Anthropic')
+        ->with('customFieldValues.customField')
+        ->first();
+
+    expect($company)->not->toBeNull()
         ->and(Company::where('team_id', $this->team->id)->where('name', 'Email')->exists())->toBeFalse();
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    if ($domainsField && $company) {
+        expect($company->getCustomFieldValue($domainsField))
+            ->toContain('www.email.anthropic.com')
+            ->not->toContain('www.anthropic.com');
+    }
 });
 
 it('derives the company name from the registrable label across TLD shapes', function (string $address, string $expected): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -309,7 +379,10 @@ it('derives the company name from the registrable label across TLD shapes', func
 ]);
 
 it('does not auto-create a company for a no-reply / automated sender', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -344,7 +417,10 @@ it('does not auto-create a person for a no-reply / automated sender', function (
 });
 
 it('seeds an auto-created company with a protocol-less domain and ICP set to false', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -383,6 +459,71 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
     }
 });
 
+it('creates distinct companies for different subdomains of the same apex', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    foreach (['a@accounts.printtest.com', 'b@ideas.printtest.com'] as $address) {
+        $email = makeLinkEmail();
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => $address,
+        ]);
+        app(LinkEmailAction::class)->execute($email);
+    }
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    $companies = Company::where('team_id', $this->team->id)
+        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('name', 'Printtest')
+        ->with('customFieldValues.customField')
+        ->get();
+
+    expect($companies)->toHaveCount(2);
+
+    if ($domainsField) {
+        $stored = $companies
+            ->map(fn (Company $company): string => json_encode($company->getCustomFieldValue($domainsField)) ?: '')
+            ->implode(' ');
+
+        expect($stored)->toContain('www.accounts.printtest.com')
+            ->and($stored)->toContain('www.ideas.printtest.com');
+    }
+});
+
+it('reuses one company when the host only differs by a www prefix', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $first = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $first->getKey(),
+        'email_address' => 'hello@cap.so',
+    ]);
+    app(LinkEmailAction::class)->execute($first);
+
+    $second = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $second->getKey(),
+        'email_address' => 'alerts@www.cap.so',
+    ]);
+    app(LinkEmailAction::class)->execute($second);
+
+    expect(Company::where('team_id', $this->team->id)
+        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('name', 'Cap')
+        ->count())->toBe(1);
+});
+
 it('does not create a duplicate company when the domain is already owned', function (): void {
     $action = app(AutoCreateCompanyAction::class);
 
@@ -391,6 +532,16 @@ it('does not create a duplicate company when the domain is already owned', funct
 
     expect($second->getKey())->toBe($first->getKey());
     expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->count())->toBe(1);
+});
+
+it('creates distinct companies for a mail subdomain and the apex domain', function (): void {
+    $action = app(AutoCreateCompanyAction::class);
+
+    $first = $action->execute('cap.so', $this->team->id, $this->team);
+    $second = $action->execute('send.cap.so', $this->team->id, $this->team);
+
+    expect($second->getKey())->not->toBe($first->getKey());
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Cap')->count())->toBe(2);
 });
 
 it('reuses an existing company that already owns the domain instead of creating one', function (): void {

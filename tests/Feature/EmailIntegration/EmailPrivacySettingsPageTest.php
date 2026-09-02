@@ -212,6 +212,26 @@ it('autosaves auto_create_companies for the workspace', function (): void {
     expect($this->team->fresh()->auto_create_companies)->toBeFalse();
 });
 
+it('turns off company creation when record creation is set to None', function (): void {
+    $this->team->update(['auto_create_companies' => true]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->set('contact_creation_mode', ContactCreationMode::None->value)
+        ->assertSet('auto_create_companies', false);
+
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::None)
+        ->and($this->team->fresh()->auto_create_companies)->toBeFalse();
+});
+
+it('disables the company creation switch when record creation is None', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::None]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->assertSeeHtml('disabled');
+});
+
 it('renders a switch for automatic company creation', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'record_creation')
