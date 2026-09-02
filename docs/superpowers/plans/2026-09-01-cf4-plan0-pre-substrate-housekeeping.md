@@ -32,6 +32,8 @@
 
 - `declare(strict_types=1)` in the 8 files missing it (`CustomFieldDoesNotExistException`, `CustomFieldQueryBuilder`, `CustomFieldSectionObserver`, `HasFieldType`, `InfolistContainer`, `FormContainer`, `FormBuilder`, `TernaryFilter`).
 - Final-class sweep: mark non-extension-point services/components final; the documented extension points stay open (`BaseFieldType`, swap-registry models, contracts).
+- Publish an extensibility docs page listing the supported extension points and how to use each. This is the standing answer to #45-class requests: extension happens through documented seams, not through un-finalizing internals.
+- Review every 3.x feature flag's default at the major: flip mature opt-in flags on by default (e.g. `UI_SECTION_WIDTH_CONTROL` from #181) and record each keep-off call with its reason in the features config block.
 - Remove `down()` from the existing migrations (`create_custom_fields_table`, `relax_custom_fields_unique_key`); delete the orphaned Database Configuration header block in `config/custom-fields.php:139-144`.
 - Resolve the 3 `->todo()` tests (`ViewRecordTest.php:147,212`, `CustomFieldsFieldManagementTest.php:866`); keep the conditional skip only if the feature gate demands it.
 - Verify: full gate.
