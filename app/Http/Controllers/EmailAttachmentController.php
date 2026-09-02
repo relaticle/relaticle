@@ -31,7 +31,7 @@ final readonly class EmailAttachmentController
 
     private function inlineResponse(EmailAttachment $attachment): Response
     {
-        // Verify the user belongs to the same team as the email.
+        
         abort_unless($attachment->is_inline, 404);
         abort_unless(str_starts_with((string) $attachment->mime_type, 'image/'), 404);
 
