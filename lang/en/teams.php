@@ -19,12 +19,36 @@ return [
         'invite_as' => [
             'label' => 'Invite as',
         ],
+        'team_logo' => [
+            'label' => 'Workspace logo',
+            'helper_text' => 'Shown in the sidebar and workspace switcher so workspaces are easy to tell apart.',
+        ],
+        'accent_color' => [
+            'label' => 'Accent color',
+            'helper_text' => 'Colors the whole workspace so it is identifiable at a glance.',
+            'placeholder' => 'Brand default',
+        ],
+    ],
+
+    'accent_colors' => [
+        'Ares' => 'Ares — red',
+        'Slate' => 'Slate — blue-gray',
+        'Poseidon' => 'Poseidon — ocean blue',
+        'Sisyphus' => 'Sisyphus — purple',
+        'Charizard' => 'Charizard — orange',
+        'Sienna' => 'Sienna — clay',
+        'Mono' => 'Mono — gray',
+        'Nous' => 'Nous — steel blue',
     ],
 
     'sections' => [
         'update_team_name' => [
             'title' => 'Workspace Name',
             'description' => 'The workspace\'s name and owner information.',
+        ],
+        'update_team_branding' => [
+            'title' => 'Workspace Look',
+            'description' => 'Give this workspace its own logo and accent color so it is easy to tell apart from the others.',
         ],
         'add_team_member' => [
             'title' => 'Invite people',
