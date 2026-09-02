@@ -68,12 +68,12 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $newIds = array_values(array_diff($allIds, $storedIds));
 
         if ($newIds === []) {
-            $this->continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
+            self::continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
 
             return;
         }
 
-        $accountId = (int) $account->getKey();
+        $accountId = (string) $account->getKey();
         $nextPageToken = $page->nextPageToken;
         $pageCursor = $page->cursor;
 
@@ -86,14 +86,14 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
+            ->then(static function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
 
                 if (! $account instanceof ConnectedAccount) {
                     return;
                 }
 
-                $this->continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
+                self::continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
             })
             ->dispatch();
     }
@@ -122,7 +122,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         return (int) $days;
     }
 
-    private function continueOrFinish(
+    private static function continueOrFinish(
         ConnectedAccount $account,
         ?string $historyCursor,
         ?string $nextPageToken,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
@@ -113,4 +114,51 @@ it('skips accounts without calendar capability', function (): void {
     (new InitialCalendarSyncJob($account))->handle($factory);
 
     Bus::assertNotDispatched(StoreMeetingJob::class);
+});
+
+it('stores the sync token when the batch completion callback runs', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    $event = new CalendarEventData(
+        providerEventId: 'evt-callback',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Callback',
+        description: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [],
+    );
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('initialSync')->once()
+        ->andReturn(new CalendarSyncResult(events: [$event], nextSyncToken: 'token-batch'));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    (new InitialCalendarSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
+            $closure();
+        }
+
+        return true;
+    });
+
+    expect($account->fresh()?->calendar_sync_cursor)->toBe('token-batch')
+        ->and($account->fresh()?->last_calendar_synced_at)->not->toBeNull();
 });
