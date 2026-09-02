@@ -18,6 +18,10 @@ return [
             'helper_text' => 'Dates and times across the app are shown in this timezone.',
             'placeholder' => 'Select a timezone',
         ],
+        'landing_page' => [
+            'label' => 'Landing page',
+            'helper_text' => 'Where you land after signing in.',
+        ],
         'current_password' => [
             'label' => 'Current Password',
         ],
@@ -37,6 +41,10 @@ return [
         'update_profile_information' => [
             'title' => 'Profile Information',
             'description' => 'Update your account\'s profile information and email address.',
+        ],
+        'update_landing_page' => [
+            'title' => 'Default Landing Page',
+            'description' => 'Choose which page you see first after signing in.',
         ],
         'update_password' => [
             'title' => 'Update Password',
@@ -137,6 +145,15 @@ return [
     ],
 
     'edit_profile' => 'Edit Profile',
+
+    'landing_pages' => [
+        'dashboard' => 'Dashboard',
+        'people' => 'People',
+        'companies' => 'Companies',
+        'opportunities' => 'Opportunities',
+        'tasks' => 'Tasks',
+        'notes' => 'Notes',
+    ],
 
     'scheduled_deletion_interstitial' => [
         'heading' => 'Your account is scheduled for deletion',

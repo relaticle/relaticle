@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Enums\LandingPage;
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
@@ -191,6 +192,19 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
+     * The panel home URL (logo click) follows the user's landing-page
+     * preference, falling back to the Dashboard for guests and sysadmin.
+     */
+    private function homeUrlFor(?User $user): string
+    {
+        if ($user instanceof User && $user->currentTeam) {
+            return LandingPage::fromUser($user)->url($user->currentTeam);
+        }
+
+        return Dashboard::getUrl();
+    }
+
+    /**
      * Configure the Filament admin panel.
      *
      * @throws Exception
@@ -208,7 +222,9 @@ final class AppPanelProvider extends PanelProvider
         }
 
         $panel
-            ->homeUrl(fn (): string => Dashboard::getUrl())
+            ->homeUrl(fn (): string => $this->isCurrentPanel()
+                ? $this->homeUrlFor(Auth::user())
+                : Dashboard::getUrl())
             ->brandName('Relaticle')
             ->brandLogo(fn (): View|Factory => Auth::user()?->hasVerifiedEmail()
                 ? view('filament.app.logo-empty')
