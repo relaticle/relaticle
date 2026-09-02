@@ -63,9 +63,45 @@ echo "→ Testing database ${TEST_DB}"
 sed -i '' "s|^DB_DATABASE=.*|DB_DATABASE=${TEST_DB}|" .env.testing
 git update-index --skip-worktree .env.testing
 TEST_DB_USER="$(sed -n 's/^DB_USERNAME=//p' .env.testing | head -1)"
-if ! psql -U "${TEST_DB_USER:-postgres}" -h 127.0.0.1 -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${TEST_DB}'" | grep -q 1; then
-    psql -U "${TEST_DB_USER:-postgres}" -h 127.0.0.1 -d postgres -c "CREATE DATABASE \"${TEST_DB}\""
-fi
+TEST_DB_HOST="$(sed -n 's/^DB_HOST=//p' .env.testing | head -1)"
+TEST_DB_PORT="$(sed -n 's/^DB_PORT=//p' .env.testing | head -1)"
+TEST_DB_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' .env.testing | head -1)"
+# Homebrew libpq is keg-only, so `psql` is missing from PATH (exit 127 in
+# Cursor worktree setup). Herd's PHP already has pdo_pgsql.
+SETUP_TEST_DB="$TEST_DB" \
+    SETUP_TEST_DB_HOST="${TEST_DB_HOST:-127.0.0.1}" \
+    SETUP_TEST_DB_PORT="${TEST_DB_PORT:-5432}" \
+    SETUP_TEST_DB_USER="${TEST_DB_USER:-postgres}" \
+    SETUP_TEST_DB_PASSWORD="${TEST_DB_PASSWORD:-}" \
+    php <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+$db = getenv('SETUP_TEST_DB');
+if ($db === false || $db === '' || preg_match('/[^A-Za-z0-9_]/', $db) === 1) {
+    fwrite(STDERR, "✗ invalid testing database name\n");
+    exit(1);
+}
+
+$pdo = new PDO(
+    sprintf(
+        'pgsql:host=%s;port=%s;dbname=postgres',
+        getenv('SETUP_TEST_DB_HOST') ?: '127.0.0.1',
+        getenv('SETUP_TEST_DB_PORT') ?: '5432',
+    ),
+    getenv('SETUP_TEST_DB_USER') ?: 'postgres',
+    getenv('SETUP_TEST_DB_PASSWORD') !== false ? (string) getenv('SETUP_TEST_DB_PASSWORD') : '',
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+);
+
+$exists = $pdo->query('SELECT 1 FROM pg_database WHERE datname = '.$pdo->quote($db))->fetchColumn();
+if ($exists !== false) {
+    exit(0);
+}
+
+$pdo->exec(sprintf('CREATE DATABASE "%s"', $db));
+PHP
 
 echo "→ PHP dependencies (vendor cloned from root checkout)"
 if [[ ! -e vendor && -d "$ROOT/vendor" ]] && [[ ! "$ROOT" -ef "$PWD" ]]; then
