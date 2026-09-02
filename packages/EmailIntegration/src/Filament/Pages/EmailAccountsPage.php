@@ -10,6 +10,7 @@ use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -125,6 +126,20 @@ final class EmailAccountsPage extends Page
     public function refreshAccounts(): void
     {
         $this->connectedAccounts = $this->getAccounts();
+    }
+
+    public function isImportingAnyAccount(): bool
+    {
+        return $this->connectedAccounts->contains(
+            fn (ConnectedAccount $account): bool => $account->isImportingHistory(),
+        );
+    }
+
+    public function connectedSectionDescription(): HtmlString
+    {
+        return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
+            'url' => route('policy.show'),
+        ]));
     }
 
     protected function afterAccountChanged(): void

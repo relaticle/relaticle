@@ -79,9 +79,15 @@ return [
     ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
-    'importing' => 'Importing',
-    'importing_count' => ':count emails',
-    'importing_progress' => ':imported of :estimated emails',
+    'importing' => 'Syncing',
+    'importing_percent' => ':percent%',
+    'sync_status' => [
+        'title_syncing' => 'Syncing',
+        'title_complete' => 'Import complete',
+        'emails_processed' => '{1}:count email processed|[2,*]:count emails processed',
+        'close' => 'Dismiss',
+        'open_settings' => 'Open account settings',
+    ],
     'capabilities' => [
         'email' => 'Email',
         'calendar' => 'Calendar',

@@ -92,6 +92,78 @@ it('batches one page of messages and leaves the cursor unset until the page stor
     Notification::assertNothingSent();
 });
 
+it('serializes the store-batch continuation without the running queue worker', function (): void {
+    Bus::fake();
+    Notification::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']),
+        nextPageToken: 'page-2',
+        cursor: 'history-1',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    $syncJob = new InitialEmailSyncJob($account);
+    $syncJob->job = new class
+    {
+        public mixed $resource;
+
+        public function __construct()
+        {
+            $this->resource = fopen('php://memory', 'r');
+        }
+    };
+
+    $syncJob->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            serialize($callback);
+        }
+
+        return true;
+    });
+});
+
+it('chains the next page after the store batch completes', function (): void {
+    Bus::fake();
+    Notification::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']),
+        nextPageToken: 'page-2',
+        cursor: 'history-1',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    (new InitialEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            $callback();
+        }
+
+        return true;
+    });
+
+    Bus::assertDispatched(
+        InitialEmailSyncJob::class,
+        fn (InitialEmailSyncJob $job): bool => $job->pageToken === 'page-2'
+            && $job->historyCursor === 'history-1',
+    );
+    expect($account->fresh()?->sync_cursor)->toBeNull();
+});
+
 it('chains the next page when the current page has no new ids', function (): void {
     Bus::fake();
     Notification::fake();

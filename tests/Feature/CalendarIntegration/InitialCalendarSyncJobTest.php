@@ -58,6 +58,111 @@ it('batches a StoreMeetingJob per event and does not advance the cursor until th
     expect($account->fresh()?->calendar_sync_cursor)->toBeNull();
 });
 
+it('serializes the store-batch continuation without the running queue worker', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    $event = new CalendarEventData(
+        providerEventId: 'evt-A',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Test',
+        description: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [],
+    );
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('initialSync')->once()
+        ->with(null)
+        ->andReturn(new CalendarSyncResult(events: [$event], nextSyncToken: null, nextPageToken: 'page-2'));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    $syncJob = new InitialCalendarSyncJob($account);
+    $syncJob->job = new class
+    {
+        public mixed $resource;
+
+        public function __construct()
+        {
+            $this->resource = fopen('php://memory', 'r');
+        }
+    };
+
+    $syncJob->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            serialize($callback);
+        }
+
+        return true;
+    });
+});
+
+it('chains the next calendar page after the store batch completes', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    $event = new CalendarEventData(
+        providerEventId: 'evt-A',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Test',
+        description: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [],
+    );
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('initialSync')->once()
+        ->with(null)
+        ->andReturn(new CalendarSyncResult(events: [$event], nextSyncToken: null, nextPageToken: 'page-2'));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    (new InitialCalendarSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->thenCallbacks() as $callback) {
+            $callback();
+        }
+
+        return true;
+    });
+
+    Bus::assertDispatched(
+        InitialCalendarSyncJob::class,
+        fn (InitialCalendarSyncJob $job): bool => $job->pageToken === 'page-2',
+    );
+    expect($account->fresh()?->calendar_sync_cursor)->toBeNull();
+});
+
 it('stores the sync token immediately when the last page has no events', function (): void {
     Bus::fake();
 

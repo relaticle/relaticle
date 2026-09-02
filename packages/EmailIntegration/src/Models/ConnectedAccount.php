@@ -236,6 +236,21 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * Percent of the first mailbox import. Starts at 0 until the provider
+     * gives a size estimate and imported rows start landing.
+     */
+    public function initialSyncProgressPercent(): int
+    {
+        $estimated = $this->initial_sync_estimated;
+
+        if ($estimated === null || $estimated <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(($this->initial_sync_imported / $estimated) * 100));
+    }
+
+    /**
      * Whether emails of the given direction should be synced, per the user's
      * inbox/sent toggles. The single source of truth for direction gating,
      * consulted on the store path so it covers both providers and both the
@@ -269,6 +284,25 @@ final class ConnectedAccount extends Model
     public function hasEmail(): bool
     {
         return (bool) ($this->capabilities['email'] ?? true);
+    }
+
+    public function capabilitiesLabel(): string
+    {
+        $labels = [];
+
+        if ($this->hasEmail()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.email');
+        }
+
+        if ($this->hasCalendar()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
+        }
+
+        if ($labels === []) {
+            return $this->provider->getLabel();
+        }
+
+        return implode(', ', $labels);
     }
 
     public function enableCalendar(): void

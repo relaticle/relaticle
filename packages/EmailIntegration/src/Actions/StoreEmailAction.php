@@ -31,7 +31,7 @@ final readonly class StoreEmailAction
         $storedInlinePaths = [];
 
         try {
-            return DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
+            $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
                 $email = Email::query()->create([
                     'team_id' => $connectedAccount->team_id,
                     'user_id' => $connectedAccount->user_id,
@@ -121,6 +121,10 @@ final readonly class StoreEmailAction
 
                 return $email;
             });
+
+            $this->bumpInitialImportProgress($connectedAccount);
+
+            return $email;
         } catch (Throwable $exception) {
             Storage::disk(EmailAttachment::DISK)->delete($storedInlinePaths);
 
@@ -154,5 +158,13 @@ final readonly class StoreEmailAction
         $storedInlinePaths[] = $path;
 
         return $path;
+    }
+
+    private function bumpInitialImportProgress(ConnectedAccount $connectedAccount): void
+    {
+        ConnectedAccount::query()
+            ->whereKey($connectedAccount->getKey())
+            ->whereNull('sync_cursor')
+            ->increment('initial_sync_imported');
     }
 }
