@@ -1,6 +1,6 @@
 # Custom Fields 4.0, Plan 4: Relaticle Surface Migration
 
-> **For agentic workers:** REQUIRED SUB-SKILL: sdd-lean, task-by-task. Runs in the relaticle/relaticle repo on a feature branch, AFTER package Plans 0 through 3 are complete on the `4.x` branch, with the package wired via composer path repository until 4.0.0 tags. Relaticle gates apply (pint, rector, phpstan level 7, type coverage 100, targeted pest; `composer test:pest:full` before push).
+> **For agentic workers:** REQUIRED SUB-SKILL: sdd-lean, task-by-task. Runs in the relaticle/relaticle repo on a feature branch, AFTER package Plans 0 through 3, Plan 2b and Plan 5 are complete on the `4.x` branch, with the package wired via composer path repository until 4.0.0 tags. Relaticle gates apply (pint, rector, phpstan level 7, type coverage 100, targeted pest; `composer test:pest:full` before push).
 
 **Goal:** Move every Relaticle consumer of record-field storage onto the 4.0 substrate in one release, so the composer bump, the data migration, and the surface changes land together. Evidence for each consumer: 2026-09-01 architecture review (P1.4) and the host-surface survey.
 
@@ -52,8 +52,18 @@
 - New chat tool: depth-limited recursive-CTE traversal over custom_field_links, grouped by relationship code, read-only, `lookup: true` support per chat tool rules.
 - Verify: Feature test over a two-hop fixture graph; prompt allowlist entry.
 
-### Task 8: Rehearsal and release
+### Task 8: Option categories (closes relaticle/relaticle#556)
 
-- Migration rehearsal against a copy of production data (1,573 fields): run `custom-fields:upgrade`, verify reads in both directions (set and clear) through panel and API, then the purge step, then re-verify.
+- Seed: `app/Enums/CustomFields/TaskField.php` and `OpportunityField.php` gain `getOptionCategories()` beside `getOptionColors()` (To do unstarted, In progress started, Done completed; Prospecting unstarted, the middle stages started, Closed Won completed, Closed Lost cancelled). `app/Listeners/CreateTeamCustomFields.php:100-110` passes the category into the migrator `options()` payload so new workspaces are categorized from day one.
+- Backfill: `custom-fields:backfill-categories` command, copied from `app/Console/Commands/BackfillCustomFieldColorsCommand.php` (`--dry-run`, `--team`), matches options by seeded name per tenant and writes `settings.category`; renamed options stay null and are reported in the summary so support can follow up. Run once in the same release as the bump, after the substrate migration.
+- Delete every literal lookup: `app/Actions/Task/CompleteTask.php:35`, `packages/Chat/src/Services/MyTasksService.php:133`, `app/Services/Notifications/DigestService.php:109`, `app/Actions/Crm/GetCrmSummary.php:123`. Each resolves the first `completed` option of the status field instead; rename `hasDoneOption` and `done_option_id` to category language so `app/Filament/Pages/Dashboard.php:115` reads true. The 422 message in `CompleteTask` becomes "no completed task status", still raised when the category is unset.
+- Restore won revenue in `GetCrmSummary` as the sum over opportunities whose stage option is `completed`, with `cancelled` reported as lost. This reverses the #549 removal on category, never on label; the test fixture renames Closed Won to prove it.
+- Chat: `packages/Chat/src/Services/Tools/CustomFieldsSchemaDescriber.php:30` eager-loads `options:id,custom_field_id,name`; add `settings` or the category is invisible to the model. Describe the category next to each option label. `GetCrmSchemaTool` and `ListCustomFieldsTool` expose it; the REST option shape gains `category`; Scribe regenerates.
+- All reads go through `App\Models\CustomFieldOption` (arch rule); sweep SystemAdmin for any `match` over the new enum.
+- Verify: Feature tests on a tenant with renamed Done and Closed Won options: complete a task, read the digest, read the CRM summary; all succeed with zero label matching. Backfill command test on a fixture tenant, dry-run and real.
+
+### Task 9: Rehearsal and release
+
+- Migration rehearsal against a copy of production data (1,573 fields): run `custom-fields:upgrade`, verify reads in both directions (set and clear) through panel and API, then the purge step, then re-verify. Run `custom-fields:backfill-categories --dry-run` against the same copy and review the unmatched-option report before the real run.
 - Business-review of the full loop on the production-shaped stack.
 - Tag 4.0.0; one Relaticle PR bumps the constraint and carries all of the above; follow-up post on relaticle/relaticle#469; package changelog + upgrade guide.

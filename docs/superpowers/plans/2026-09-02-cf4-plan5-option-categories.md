@@ -1,0 +1,31 @@
+# Custom Fields 4.0, Plan 5: Option Categories
+
+> **For agentic workers:** REQUIRED SUB-SKILL: sdd-lean, task-by-task. Runs on the `4.x` branch AFTER Plan 0 (clean base, interface break landed) and BEFORE Plan 2 Tasks 4 and 5 (the field-management polish pass and the bulk-paste action reshape the same options repeater; land the category column first so that pass restyles it once). Plan 4 Task 8 consumes it. Substrate-independent: nothing here reads lookup_type, definitions, or links. Every task ends with the package quality gate: `vendor/bin/pint --dirty --format agent`, `vendor/bin/rector --dry-run`, `vendor/bin/phpstan analyse`, `vendor/bin/pest --type-coverage --min=100.0`, targeted pest run.
+
+**Goal:** Give every single-choice option a nullable machine-readable category so consumers stop matching labels. Spec section 1.4; closes relaticle/relaticle#556 once Plan 4 Task 8 lands the host side.
+
+**Not in this plan:** a transition event, webhooks, host seeding or backfill (Plan 4 Task 8), and any consumer.
+
+### Task 1: Vocabulary and settings shape
+
+- `src/Enums/OptionCategory.php`: string-backed enum `unstarted`, `started`, `completed`, `cancelled`; `isTerminal()` true for the last two; `HasLabel` with translated labels like the sibling enums.
+- `src/Data/CustomFieldOptionSettingsData.php`: add `public ?OptionCategory $category = null` beside `color`. Verify the `:default` cast on `CustomFieldOption::$casts` round-trips a backed enum through laravel-data with no extra transformer; if it does not, the implementer picks the transformer and records why in the commit.
+- Verify: a settings test writes each category, reloads the option, reads the enum back; null stays null; an unknown string fails validation rather than storing garbage.
+
+### Task 2: Query surface
+
+- `CustomField::optionsInCategory(OptionCategory $category)` returning the ordered option collection; `CustomFieldOption::scopeWhereCategory()` as the query-builder form for joins (JSON path on `settings->category`, Postgres and MySQL syntax both covered by the query builder, SQLite for tests).
+- Verify: scope test on a field with two `completed` options and one `cancelled`; the multi-option case is the point (Closed Won plus Won Back).
+
+### Task 3: Editor column and feature flag
+
+- `CustomFieldsFeature::FIELD_OPTION_CATEGORIES`, default enabled, config-disableable exactly like `FIELD_OPTION_COLORS`; document it in the features config block.
+- `src/Filament/Management/Schemas/FieldForm.php:170`: add a `Select::make('settings.category')` column to the options repeater table, options from `OptionCategory`, nullable, placeholder "None". Visible only when the flag is on AND the field's data type is `FieldDataType::SINGLE_CHOICE` (read the type through `Get`, mirroring the color column's `../../settings.enable_option_colors` reach-up).
+- No field-level toggle: the flag is host-wide. The implementer may add a per-field `enable_option_categories` setting only if the browser pass shows the column crowds the repeater on tenants that never use it; record the call either way.
+- Verify: Livewire test sets a category on a select field option and asserts persistence; the column is absent on a multi-select field; the column is absent with the flag off. Browser click-through light and dark before any done claim.
+
+### Task 4: Documentation
+
+- Docs page for option categories: vocabulary, terminal semantics, the flag, the query surface, and a host recipe for seeding categories through the migrator's `options()` payload.
+- Changelog entry under 4.0 as additive; the upgrade guide states nothing is required.
+- Verify: docs build green.

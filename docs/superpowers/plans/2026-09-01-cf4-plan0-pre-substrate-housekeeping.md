@@ -10,7 +10,8 @@
 
 - `src/Filament/Integration/Factories/FieldComponentFactory.php:33-51` holds a dual code path checking `instanceof AbstractFormComponent` to conditionally pass `$record`.
 - Add `?Model $record` to `make()` on `FormComponentInterface`, `InfolistComponentInterface`, `TableColumnInterface`, `TableFilterInterface`; delete the instanceof branch.
-- Update every in-package implementation; note the break in the upgrade guide (third-party components must add the parameter; `AbstractFormComponent` subclasses inherit it).
+- ALSO add `?string $through = null` to `TableFilterInterface::make()` in the same break, unused until Plan 2b implements it. Filters cannot be re-wrapped from the builder the way columns can: `modifyQueryUsing` is protected with no public getter, and each filter type builds a different query. Without this, `TableFilterInterface` breaks twice inside one major. Columns need nothing here (`getStateUsing`, `sortable`, `searchable` are idempotent public setters).
+- Update every in-package implementation; note the break in the upgrade guide (third-party components must add the parameters; `AbstractFormComponent` subclasses inherit them).
 - Verify: full Filament feature suite.
 
 ### Task 2: Contract renames and interface collapse

@@ -16,6 +16,18 @@ Origin: discussion relaticle/relaticle#469 and the brainstorm that followed it.
    Relaticle core owns all AI intelligence. The commercial license gains a field-of-use clause at 4.0.
 7. The relationship vocabulary (machine-readable codes) ships in 4.x, not later.
 8. A separate definitions table exists. Fields are presentation slots of a definition.
+9. Two ergonomics features ride the major rather than shipping as 3.x minors: through-relation
+   table surfaces (issue #53, section 3.5) and bulk paste for choice options (section 3.3).
+   #53 must wait, because Plan 1 rewrites the sort and filter paths it hooks into and the
+   builder verb has to be named while "relationship" is being redefined. Bulk paste has no
+   such dependency; it rides the major by decision, so the whole options editor changes once.
+10. Select-option categories ship in 4.0, in the package, as settings.category on the option
+    row (section 1.4). This closes relaticle/relaticle#556 with the category-per-option model
+    (Linear's workflow-state shape). First consumer is reporting correctness only: won revenue,
+    task completion, cycle direction. No transition event, no webhooks, no proactive assistant
+    in this major. The change is additive and would fit a 3.x minor; it rides the major by
+    decision, so the options editor changes once (with bulk paste) and the host sweep lands in
+    the same Relaticle release as the substrate bump.
 
 Key evidence, verified during research:
 
@@ -100,6 +112,41 @@ a separate purge step runs after verification, so rollback stays trivial at ever
 Record fields flip to sortable and searchable. The single-value filter bug dies with the
 storage that hosted it.
 
+### 1.4 Option categories (relaticle/relaticle#556)
+
+A select option is a free-text label. Nothing tells the system what an option means, so every
+consumer that reasons about a status or a stage guesses from the label and breaks on rename or
+translation. Relaticle spells `Done` four ways today and lost won-revenue reporting to a regex
+in #549. 4.0 gives options a machine-readable category. Answers to the six deliverables #556
+asked for:
+
+1. Model: one category per option from a closed vocabulary, `OptionCategory`:
+   `unstarted`, `started`, `completed`, `cancelled`. Nullable. Many options may share a
+   category (Closed Won and Won Back are both `completed`), so there is no uniqueness rule.
+   Rejected: a per-field semantic flag (repeats the four-places problem per field), a
+   field-level id map (goes stale on option delete, breaks with two done-like states), and a
+   locked seed (blocks the rename and translation that caused the complaint).
+2. One mechanism covers both task status and opportunity stage. The two-outcome ending
+   (Won versus Lost) fits without a second axis: Won is `completed`, Lost is `cancelled`,
+   exactly as Linear separates completed from cancelled. Direction of movement follows for
+   free: within a category, higher sort_order is forward; entering a terminal category is a
+   close. `OptionCategory::isTerminal()` names the two terminal states.
+3. Storage: `settings.category` on `custom_field_options`, added to
+   `CustomFieldOptionSettingsData` beside `color`. JSON, no migration, no breaking change.
+   Exposed for `FieldDataType::SINGLE_CHOICE` fields only; multi-choice options keep null.
+4. Migration and backfill: the package ships nothing to backfill because it seeds no options.
+   The host backfills by seeded name per tenant (section 4.1); options a tenant already
+   renamed stay null and get set in the editor. Null means unknown, never "not done".
+5. Setting it: a Select column beside the color picker in the options repeater, gated by a
+   `FIELD_OPTION_CATEGORIES` feature flag mirroring `FIELD_OPTION_COLORS`, so hosts can hide
+   it. New-workspace defaults come from the host's seed, not from the package.
+6. Read API: `CustomField::optionsInCategory(OptionCategory)` and an `OptionCategory` cast on
+   the settings data. Consumers stop matching labels; the host deletes every literal lookup.
+
+Out of this section: a stage-transition event, outbound webhooks, and the assistant reacting
+to a transition. Those were stress-tested in the same brainstorm and deferred; the category
+is the primitive each of them would need, and it stands on reporting alone.
+
 No sync engine exists anywhere. One row is read from both sides. Inverse drift, loop guards,
 and 1:1 steal-cleanup bugs are structurally impossible.
 
@@ -178,6 +225,13 @@ Searchable type-picker grid with icons and descriptions. Attio-style attribute t
 reorder handles, type icons, badges, inline activate; relationship pairs visually connected.
 Educational empty states. Slide-over editing, cmd+enter, skeletons, dark-mode audit.
 
+Bulk paste for choice options: a hint action on the options repeater opens a textarea, one
+option name per line, appended as deduplicated rows. Today a 200-value vocabulary is 200
+clicks through the add-option button. Names only; the color column is conditionally visible,
+so a two-column paste format would read wrong on most tenants. State is appended through the
+repeater (generated item keys, child-schema fill), never by writing option models directly,
+so tenant stamping and sort_order keep working. A cap protects the Livewire payload.
+
 ### 3.4 Flavor registry
 
 Two presentation flavors over one logic layer:
@@ -190,7 +244,38 @@ and only for the surfaces where polished is custom (configurator, chips and pick
 type-picker grid, attribute table). Critical browser paths run in both flavors in CI.
 Cost accepted: 15 to 20 percent on UI work.
 
-### 3.5 Verification
+### 3.5 Through-relation table surfaces
+
+Issue #53. A relation manager whose record does not itself hold custom fields cannot show the
+related record's fields today: every column resolver type-hints HasCustomFields on the row
+record. The table builder gains a through path:
+
+    CustomFields::table()->forModel(Member::class)->through('member')->columns()
+
+Scope wall: to-one relations only (BelongsTo, HasOne, MorphOne). Filters generalize to any
+relation via whereHas, but sorting does not, because a to-many relation gives no single value
+to sort by. The API rejects a to-many path rather than documenting the limitation later.
+
+Mechanics, verified against Filament 5:
+
+- Columns need no interface change. getStateUsing, sortable(condition, query) and
+  searchable(condition, query) are idempotent public setters, so TableBuilder re-wraps the
+  factory-built column exactly as it already re-wraps formatStateUsing.
+- Filters do need one. modifyQueryUsing is protected with no public getter, and each filter
+  type builds a different query, so the path must reach the filter's own make(). It rides the
+  TableFilterInterface break in Plan 0 Task 1; the interface must not break twice in one major.
+- Visibility conditions evaluate against the related record, not the row record. TableBuilder
+  passes $record->{$relation} to BackendVisibilityService or columns silently mis-hide.
+- Sorting a BelongsTo needs no join: entity_id correlates to the foreign key already on the
+  main table. HasOne and MorphOne take one more hop.
+- Eager loading is the host's job and must be documented. Column names are already dotted
+  (custom_fields.code), so Filament's relationship inference contributes nothing here, and
+  under strict lazy loading an N+1 is a 500, not a slow page.
+
+Record-type columns through a relation are display and filter only in 4.0; sorting them means
+joining the link ledger through a second relation hop, which is not worth the first release.
+
+### 3.6 Verification
 
 Every screen: agent-browser click-through, light and dark, mobile viewport, empty states,
 before any done claim. Package UI stays themeable; no Relaticle styling leaks in.
@@ -206,6 +291,14 @@ before any done claim. Package UI stays themeable; no Relaticle styling leaks in
   API; Scribe regenerates; GetCrmSchemaTool exposes the vocabulary.
 - ImportWizard: same payload path; imports stamp source = import.
 - Activity log: one listener writes timeline entries on both records from one event.
+- Option categories (section 1.4): the seeded Task status and Opportunity stage enums carry a
+  category map beside their color map; `CreateTeamCustomFields` passes it through the
+  migrator; a `custom-fields:backfill-categories` command (dry-run, per-team) sets categories
+  on existing tenants by seeded name. Every literal `Done` lookup (`CompleteTask`,
+  `DigestService`, `MyTasksService`, `GetCrmSummary`) moves onto `completed`, and won revenue
+  returns to `GetCrmSummary` as the sum over `completed` stage options, reversing the #549
+  removal on solid ground. Chat schema describer, `GetCrmSchemaTool`, and the REST option
+  shape expose the category so agents and integrations stop guessing from labels too.
 
 ### 4.2 Intelligence (core-only, never packaged)
 
@@ -260,17 +353,22 @@ Package (Pest): definition creation for all three field counts; link add, remove
 both sides; symmetric canonicalization; each cardinality enforced (validation layer and
 constraint layer, including the race path); 1:1 replace; tenant isolation; force-delete
 cascade; soft-delete read behavior; history reads; migration command on fixture data both
-ways; both UI flavors on critical browser paths.
+ways; both UI flavors on critical browser paths; option category round-trip through the
+options editor, the settings cast, and the category scope, with the column hidden on
+multi-choice fields and behind the flag.
 
 Relaticle (Feature and Browser): the chat propose-approve-timeline loop for link writes;
 API filter and sort on record fields; import with a relationship column; activity-log entries
-on both records; GetRelatedRecordsTool traversal.
+on both records; GetRelatedRecordsTool traversal; task completion and won revenue on a
+tenant whose Done and Closed Won options are renamed, proving no label lookup survives.
 
 ## Out of scope
 
 - Attributes on the edge beyond the reserved columns (no started_on or notes UI in 4.0).
 - Inferred edges and everything in 4.3.
 - Graph visualization.
+- A stage-transition domain event, outbound webhooks, and proactive assistant suggestions on
+  transitions. Section 1.4 ships the category they need; they are separate decisions.
 
 ## Open items carried out of the brainstorm
 
