@@ -145,7 +145,7 @@ old edge auditable in history.
 - withCustomFieldValues and LookupPreloader batch-load links; no N+1 on tables.
 - RecordColumn sorts via join on the target primary attribute; searches via whereExists;
   RecordFilter becomes an indexed whereExists. The orWhereJsonContains loop is deleted.
-- History: links()->withInactive(), a full-history read.
+- History: closed edges stay queryable (active_until not null); no dedicated scope beyond active() in 4.0.
 
 ### 2.3 Events and management API
 
