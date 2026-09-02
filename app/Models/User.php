@@ -61,6 +61,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
+ * @property array<string, mixed>|null $table_column_preferences
  * @property-read Team|null $currentTeam
  */
 #[Appends([
@@ -73,6 +74,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'ai_preferences',
     'notification_preferences',
+    'table_column_preferences',
 ])]
 #[Hidden([
     'password',
@@ -111,6 +113,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'password' => 'hashed',
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
+            'table_column_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
         ];
     }
