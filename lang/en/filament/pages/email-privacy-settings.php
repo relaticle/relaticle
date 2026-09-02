@@ -52,7 +52,7 @@ return [
         ],
         'companies' => [
             'label' => 'Automatically create company records',
-            'description' => 'Company records will be automatically created based on the domain in a person\'s email address.',
+            'description' => 'When enabled, a company is created from a person\'s email domain. This follows the contact setting above. It is unavailable when record creation is None.',
         ],
     ],
     'notifications' => [

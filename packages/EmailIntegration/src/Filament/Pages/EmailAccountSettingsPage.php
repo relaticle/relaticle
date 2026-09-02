@@ -207,8 +207,9 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     }
 
     /**
-     * Attio-style radio cards. The tier is stored on the user, not the account,
-     * and the leading card hands the decision back to the workspace default.
+     * Radio cards for the sharing tier. The tier is stored on the user, not the
+     * account, and the leading card hands the decision back to the workspace
+     * default.
      */
     private function sharingTierField(): ViewField
     {
