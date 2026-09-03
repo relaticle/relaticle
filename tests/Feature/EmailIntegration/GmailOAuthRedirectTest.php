@@ -27,11 +27,13 @@ it('redirects to Google using the Gmail OAuth client and the email-account callb
         ->and($query['redirect_uri'] ?? null)->toBe('http://localhost/email-accounts/callback/gmail')
         ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/gmail.readonly')
         ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/gmail.send')
+        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.events')
+        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.readonly')
         ->and($query['access_type'] ?? null)->toBe('offline')
         ->and($query['prompt'] ?? null)->toBe('consent');
 });
 
-it('adds the calendar.readonly scope when capability=calendar', function (): void {
+it('includes calendar.readonly even when the leftover capability query is sent', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
@@ -39,5 +41,7 @@ it('adds the calendar.readonly scope when capability=calendar', function (): voi
         ->headers->get('Location');
     parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
 
-    expect(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.readonly');
+    expect(urldecode((string) ($query['scope'] ?? '')))
+        ->toContain('https://www.googleapis.com/auth/calendar.events')
+        ->toContain('https://www.googleapis.com/auth/calendar.readonly');
 });

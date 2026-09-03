@@ -64,6 +64,19 @@ it('shows mass send when email integration is enabled and an account is connecte
         ->assertTableBulkActionVisible('massSend');
 });
 
+it('hides mass send when no connected account can send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(ListPeople::class)
+        ->assertTableBulkActionHidden('massSend');
+});
+
 it('creates an EmailBatch and persists one Email row per recipient', function (): void {
     $people = collect(range(1, 3))->map(fn (int $i): People => People::create([
         'team_id' => $this->team->id,

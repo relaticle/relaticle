@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -26,6 +27,8 @@ use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
 /**
@@ -40,12 +43,25 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
 
     public function table(Table $table): Table
     {
+        $composeEmail = $this->composeEmailAction();
+
         return $table
             ->query($this->buildQuery())
             ->defaultSort('updated_at', 'desc')
-            ->emptyStateHeading(__('filament/pages/email-inbox.drafts.empty.heading'))
-            ->emptyStateDescription(__('filament/pages/email-inbox.drafts.empty.description'))
-            ->emptyStateIcon(Heroicon::OutlinedPencilSquare)
+            ->headerActions([$composeEmail])
+            ->emptyStateHeading(fn (): string => $this->hasMailbox()
+                ? __('filament/pages/email-inbox.drafts.empty.heading')
+                : __('filament/pages/email-accounts.not_connected.inbox.heading'))
+            ->emptyStateDescription(fn (): string => $this->hasMailbox()
+                ? __('filament/pages/email-inbox.drafts.empty.description')
+                : __('filament/pages/email-accounts.not_connected.inbox.description'))
+            ->emptyStateIcon(fn (): Heroicon => $this->hasMailbox()
+                ? Heroicon::OutlinedPencilSquare
+                : Heroicon::OutlinedEnvelope)
+            ->emptyStateActions([
+                $composeEmail,
+                ConfigureMailboxAction::make(),
+            ])
             ->recordAction('openDraft')
             ->columns([
                 TextColumn::make('subject')
@@ -134,6 +150,18 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
         return view('email-integration::livewire.table');
     }
 
+    private function composeEmailAction(): Action
+    {
+        return Action::make('composeEmail')
+            ->label(__('filament/concerns/email-compose.actions.compose.label'))
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
+            ->visible(fn (): bool => $this->hasMailbox())
+            ->action(function (): void {
+                $this->dispatch('composer:open');
+            });
+    }
+
     /**
      * Drafts are private to their author, so this is scoped to the signed-in
      * user within the current team, never the whole team.
@@ -144,7 +172,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
     {
         return Email::query()
             ->with(['participants'])
-            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where('team_id', $this->currentTeam()?->getKey())
             ->where('user_id', auth()->id())
             ->where('status', EmailStatus::DRAFT);
     }
@@ -153,5 +181,23 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
     {
         /** @var User */
         return auth()->user();
+    }
+
+    private function hasMailbox(): bool
+    {
+        return ConnectedAccount::hasConnectedFor($this->authUser(), $this->currentTeam());
+    }
+
+    private function currentTeam(): ?Team
+    {
+        $tenant = filament()->getTenant();
+
+        if ($tenant instanceof Team) {
+            return $tenant;
+        }
+
+        $team = $this->authUser()->currentTeam;
+
+        return $team instanceof Team ? $team : null;
     }
 }

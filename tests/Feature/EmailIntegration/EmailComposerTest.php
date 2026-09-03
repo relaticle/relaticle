@@ -56,6 +56,86 @@ it('opens via the composer:open event with the default account preselected', fun
         ->assertSet('accountId', $this->account->id);
 });
 
+it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.grant_send.description'))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'))
+        ->assertDontSee(__('filament/emails/composer.fields.subject_placeholder'));
+});
+
+it('opens the composer when a sync-error mailbox cannot send', function (): void {
+    $this->account->update([
+        'status' => EmailAccountStatus::ERROR,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]));
+});
+
+it('redirects to oauth when grant permission is clicked', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('opens from a sendable mailbox when another connected account cannot send', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+        'capabilities' => [
+            'email' => true,
+            'send' => true,
+            'calendar' => false,
+        ],
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
 it('queues an email through SendEmailAction on send with the persisted body and undo-send window', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')

@@ -58,6 +58,9 @@ final readonly class SendEmailAction
             ->ownedBy($user, $user->currentTeam)
             ->whereKey($data['connected_account_id'])
             ->firstOrFail();
+
+        abort_unless($account->hasSend(), 403);
+
         $priority = $data['priority'] ?? EmailPriority::BULK;
 
         $this->assertUnderMaxQueued((string) $account->user_id);

@@ -189,6 +189,21 @@ it('shows mailbox capabilities on each connected account', function (): void {
         ->assertSee(__('filament/pages/email-accounts.capabilities.email'));
 });
 
+it('warns when a connected mailbox cannot send', function (): void {
+    $this->account->update([
+        'sync_cursor' => 'done',
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.send_missing_tooltip'))
+        ->assertSee(__('filament/pages/email-accounts.in_sync'));
+});
+
 it('renders Connect Gmail and hides Connect Outlook for now', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertActionExists('connectGmail')

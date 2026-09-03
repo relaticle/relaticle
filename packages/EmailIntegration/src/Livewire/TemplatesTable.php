@@ -10,6 +10,7 @@ use Filament\Actions\CreateAction;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
@@ -31,22 +32,31 @@ final class TemplatesTable extends Component implements HasActions, HasSchemas, 
 
     public function table(Table $table): Table
     {
+        $createTemplate = $this->createTemplateAction();
+
         return EmailTemplateResource::table($table)
             ->query(fn () => EmailTemplateResource::getEloquentQuery()
                 ->where('team_id', filament()->getTenant()?->getKey()))
-            ->headerActions([
-                CreateAction::make()
-                    ->model(EmailTemplate::class)
-                    ->label(__('filament/resources/email-template.actions.create.label'))
-                    ->icon('heroicon-o-plus')
-                    ->schema(fn (Schema $schema): Schema => EmailTemplateResource::form($schema))
-                    ->mutateFormDataUsing(function (array $data): array {
-                        $data['team_id'] = filament()->getTenant()?->getKey();
-                        $data['created_by'] = auth()->id();
+            ->headerActions([$createTemplate])
+            ->emptyStateHeading(__('filament/resources/email-template.empty.heading'))
+            ->emptyStateDescription(__('filament/resources/email-template.empty.description'))
+            ->emptyStateIcon(Heroicon::OutlinedDocumentDuplicate)
+            ->emptyStateActions([$createTemplate]);
+    }
 
-                        return $data;
-                    }),
-            ]);
+    private function createTemplateAction(): CreateAction
+    {
+        return CreateAction::make()
+            ->model(EmailTemplate::class)
+            ->label(__('filament/resources/email-template.actions.create.label'))
+            ->icon('heroicon-o-plus')
+            ->schema(fn (Schema $schema): Schema => EmailTemplateResource::form($schema))
+            ->mutateFormDataUsing(function (array $data): array {
+                $data['team_id'] = filament()->getTenant()?->getKey();
+                $data['created_by'] = auth()->id();
+
+                return $data;
+            });
     }
 
     public function render(): View
