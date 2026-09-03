@@ -21,7 +21,7 @@ final class TaskFactory extends Factory
     public function definition(): array
     {
         return [
-            'title' => $this->faker->sentence(3),
+            'title' => fake()->sentence(3),
             'created_at' => Date::now(),
             'updated_at' => Date::now(),
             'team_id' => Team::factory(),

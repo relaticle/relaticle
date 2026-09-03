@@ -24,7 +24,7 @@ final class ChatMessageFeedbackFactory extends Factory
             'user_id' => User::factory(),
             'conversation_id' => (string) Str::uuid7(),
             'message_id' => (string) Str::uuid7(),
-            'rating' => $this->faker->randomElement([ChatMessageFeedback::RATING_UP, ChatMessageFeedback::RATING_DOWN]),
+            'rating' => fake()->randomElement([ChatMessageFeedback::RATING_UP, ChatMessageFeedback::RATING_DOWN]),
             'category' => null,
             'comment' => null,
             'model' => 'claude-sonnet-4',

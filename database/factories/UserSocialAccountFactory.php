@@ -26,7 +26,7 @@ final class UserSocialAccountFactory extends Factory
         return [
             'user_id' => User::factory(),
             'provider_name' => 'facebook',
-            'provider_id' => $this->faker->unique()->randomNumber(),
+            'provider_id' => fake()->unique()->randomNumber(),
         ];
     }
 

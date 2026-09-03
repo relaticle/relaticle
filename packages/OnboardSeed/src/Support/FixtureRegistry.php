@@ -24,9 +24,7 @@ final class FixtureRegistry
      */
     public static function register(string $type, string $key, Model $entity): void
     {
-        if (! isset(self::$registry[$type])) {
-            self::$registry[$type] = [];
-        }
+        self::$registry[$type] ??= [];
 
         self::$registry[$type][$key] = $entity;
     }

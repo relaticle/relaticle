@@ -27,8 +27,8 @@ final class CustomFieldSectionFactory extends Factory
         return [
             'tenant_id' => Team::factory(),
             'entity_type' => 'company',
-            'code' => 'section_'.$this->faker->unique()->lexify('????????'),
-            'name' => $this->faker->words(2, true),
+            'code' => 'section_'.fake()->unique()->lexify('????????'),
+            'name' => fake()->words(2, true),
             'type' => CustomFieldSectionType::SECTION,
             'sort_order' => 1,
             'active' => true,
