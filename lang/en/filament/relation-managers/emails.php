@@ -81,7 +81,8 @@ return [
         ],
     ],
     'empty_state' => [
-        'heading' => 'No emails yet',
-        'description' => 'Emails exchanged with this record appear here.',
+        'heading' => 'No emails',
+        'description' => 'This record doesn\'t have any emails, or they may be hidden due to permissions.',
+        'compose' => 'Compose email',
     ],
 ];

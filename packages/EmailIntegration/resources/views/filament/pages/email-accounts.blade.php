@@ -50,8 +50,16 @@
                                 {{ $account->isActive() ? __('filament/pages/email-accounts.in_sync') : $account->status->getLabel() }}
                             </x-filament::badge>
                         @endif
+                        @if (! $account->hasSend())
+                            <x-filament::badge
+                                color="warning"
+                                icon="heroicon-m-exclamation-triangle"
+                                :tooltip="__('filament/pages/email-accounts.send_missing_tooltip')"
+                                :aria-label="__('filament/pages/email-accounts.send_missing_tooltip')"
+                            />
+                        @endif
 
-                        {{ $this->accountActions($account->getKey(), $account->status, [$this->editSettingsAction()]) }}
+                        {{ $this->accountActions($account->getKey(), $account->status) }}
                     </div>
                 </div>
             @endforeach

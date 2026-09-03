@@ -41,7 +41,7 @@
                         <x-email-integration::importing-badge :account="$account" :icon="$this->syncingIcon()" />
                     @endif
 
-                    {{ $this->accountActions($account->getKey(), $account->status) }}
+                    {{ $this->accountActions($account->getKey(), $account->status, includeSettings: false) }}
                 </div>
             </x-slot>
 

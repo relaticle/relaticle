@@ -13,9 +13,10 @@ final readonly class DisconnectConnectedAccountAction
     {
         DB::transaction(function () use ($account): void {
             // Account is soft-deleted, so the DB-level cascade on email_signatures never
-            // fires. Remove dependent signatures explicitly to avoid orphaned rows whose
-            // connectedAccount relation resolves to null on the signatures page.
+            // fires. Remove dependent signatures and blocklist entries explicitly to avoid
+            // orphaned rows whose connectedAccount relation resolves to null.
             $account->signatures()->delete();
+            $account->blocklist()->delete();
 
             $wasDefault = $account->is_default;
 

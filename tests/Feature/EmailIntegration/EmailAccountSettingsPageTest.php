@@ -26,22 +26,21 @@ beforeEach(function (): void {
     ]));
 });
 
-it('fills the form from the account, the user tier and the existing blocklist', function (): void {
+it('loads the account form and existing blocklist entries on mount', function (): void {
     $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value]);
 
     EmailBlocklist::factory()->create([
         'user_id' => $this->user->id,
         'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
         'type' => EmailBlocklistType::DOMAIN,
         'value' => 'spammy.com',
     ]);
 
-    $data = livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->assertSet('data.sync_inbox', $this->account->fresh()->sync_inbox)
         ->assertSet('data.default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
-        ->get('data');
-
-    expect($data['blocklist_domains'])->toContain('spammy.com');
+        ->assertCount('blocklistEntries', 1);
 });
 
 it('does not expose workspace record creation controls on a personal account', function (): void {
@@ -50,7 +49,7 @@ it('does not expose workspace record creation controls on a personal account', f
         ->assertDontSee(__('filament/pages/email-privacy-settings.record_creation.companies.label'));
 });
 
-it('saves account settings, the sharing tier and the blocklist together', function (): void {
+it('saves account settings and the sharing tier from the save action', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
             'sync_inbox' => false,
@@ -58,8 +57,6 @@ it('saves account settings, the sharing tier and the blocklist together', functi
             'hourly_send_limit' => 25,
             'daily_send_limit' => 100,
             'default_email_sharing_tier' => EmailPrivacyTier::FULL->value,
-            'blocklist_emails' => ['NOISY@Example.com'],
-            'blocklist_domains' => ['Spammy.com'],
         ])
         ->callAction('save')
         ->assertNotified();
@@ -71,20 +68,45 @@ it('saves account settings, the sharing tier and the blocklist together', functi
         ->daily_send_limit->toBe(100);
 
     expect($this->user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('adds blocklist entries from the blocklist modal', function (): void {
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->callAction('addBlocklist', data: [
+            'blocklist_emails' => ['NOISY@Example.com'],
+            'blocklist_domains' => ['Spammy.com'],
+        ])
+        ->assertNotified();
 
     $this->assertDatabaseHas(EmailBlocklist::class, [
-        'user_id' => $this->user->id,
-        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
         'type' => EmailBlocklistType::EMAIL->value,
         'value' => 'noisy@example.com',
     ]);
 
     $this->assertDatabaseHas(EmailBlocklist::class, [
-        'user_id' => $this->user->id,
-        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
         'type' => EmailBlocklistType::DOMAIN->value,
         'value' => 'spammy.com',
     ]);
+});
+
+it('does not load another account\'s blocklist on this settings page', function (): void {
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    EmailBlocklist::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $otherAccount->id,
+        'type' => EmailBlocklistType::EMAIL,
+        'value' => 'other@example.com',
+    ]);
+
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->assertCount('blocklistEntries', 0);
 });
 
 it('creates a signature for this account from the signatures tab', function (): void {

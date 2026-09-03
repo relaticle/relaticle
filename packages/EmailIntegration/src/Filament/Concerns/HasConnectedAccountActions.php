@@ -20,6 +20,7 @@ use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -57,14 +58,20 @@ trait HasConnectedAccountActions
      * each child action so the group can be rendered once per account in the blade.
      *
      * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
+     * @param  bool  $includeSettings  whether to show the Settings link (hidden on the settings page itself)
      */
-    public function accountActions(string $accountId, EmailAccountStatus $status, array $extraActions = []): ActionGroup
+    public function accountActions(string $accountId, EmailAccountStatus $status, array $extraActions = [], bool $includeSettings = true): ActionGroup
     {
         $arguments = ['account_id' => $accountId];
+
+        $settingsAction = $includeSettings
+            ? [($this->accountSettingsAction())($arguments)]
+            : [];
 
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
+            ...$settingsAction,
             ($this->setDefaultAction())($arguments),
             ($this->reAuthAction())($arguments)
                 ->visible(in_array($status, [
@@ -82,6 +89,18 @@ trait HasConnectedAccountActions
             ->color('gray')
             ->size(Size::Small)
             ->iconButton();
+    }
+
+    public function accountSettingsAction(): Action
+    {
+        return Action::make('accountSettings')
+            ->label(__('filament/pages/email-accounts.actions.manage'))
+            ->icon('heroicon-o-cog-6-tooth')
+            ->color('gray')
+            ->size(Size::Small)
+            ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
+                'account' => (string) $arguments['account_id'],
+            ]));
     }
 
     public function reAuthAction(): Action
@@ -126,7 +145,7 @@ trait HasConnectedAccountActions
                 }
 
                 // Always re-run OAuth when enabling so the provider grants the calendar scope on the token.
-                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]).'?capability=calendar');
+                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]));
             });
     }
 

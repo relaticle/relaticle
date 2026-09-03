@@ -11,6 +11,7 @@ use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 
@@ -180,7 +181,32 @@ it('stores the sync token immediately when the last page has no events', functio
     (new InitialCalendarSyncJob($account))->handle($factory);
 
     Bus::assertNothingBatched();
-    expect($account->fresh()?->calendar_sync_cursor)->toBe('token-xyz');
+    expect($account->fresh()?->calendar_sync_cursor)->toBe('token-xyz')
+        ->and($account->fresh()?->initial_calendar_sync_imported)->toBe(0);
+});
+
+it('writes the stored meeting count when the initial calendar backfill finishes', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    Meeting::factory()->count(2)->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('initialSync')->once()
+        ->andReturn(new CalendarSyncResult(events: [], nextSyncToken: 'token-xyz'));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    (new InitialCalendarSyncJob($account))->handle($factory);
+
+    expect($account->fresh()?->initial_calendar_sync_imported)->toBe(2);
 });
 
 it('chains the next calendar page instead of advancing the cursor', function (): void {

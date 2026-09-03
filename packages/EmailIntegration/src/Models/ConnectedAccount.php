@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
  * @property bool $sync_sent
  * @property string $access_token
  * @property string|null $refresh_token
+ * @property array{email?: bool, send?: bool, calendar?: bool}|null $capabilities
  * @property Carbon|null $token_expires_at
  * @property int|null $hourly_send_limit
  * @property int|null $daily_send_limit
@@ -42,6 +43,7 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
  * @property Carbon|null $last_synced_at
  * @property int $initial_sync_imported
  * @property int|null $initial_sync_estimated
+ * @property int $initial_calendar_sync_imported
  * @property string|null $calendar_sync_cursor
  * @property Carbon|null $last_calendar_synced_at
  */
@@ -73,6 +75,7 @@ final class ConnectedAccount extends Model
         'last_synced_at',
         'initial_sync_imported',
         'initial_sync_estimated',
+        'initial_calendar_sync_imported',
         'calendar_sync_cursor',
         'last_calendar_synced_at',
         'status',
@@ -91,6 +94,7 @@ final class ConnectedAccount extends Model
         'last_calendar_synced_at' => 'datetime',
         'initial_sync_imported' => 'integer',
         'initial_sync_estimated' => 'integer',
+        'initial_calendar_sync_imported' => 'integer',
         'is_default' => 'boolean',
         'sync_inbox' => 'boolean',
         'sync_sent' => 'boolean',
@@ -127,6 +131,19 @@ final class ConnectedAccount extends Model
     protected function active(Builder $query): Builder
     {
         return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
+    /**
+     * Scope to accounts that are still connected. Sync-error and reauth-required
+     * mailboxes count: the user already added them. Disconnected ones do not.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function connected(Builder $query): Builder
+    {
+        return $query->whereNot('status', EmailAccountStatus::DISCONNECTED);
     }
 
     /**
@@ -193,12 +210,31 @@ final class ConnectedAccount extends Model
         return $this->hasMany(EmailSignature::class);
     }
 
+    /**
+     * @return HasMany<EmailBlocklist, $this>
+     */
+    public function blocklist(): HasMany
+    {
+        return $this->hasMany(EmailBlocklist::class);
+    }
+
     // Helpers
 
     /**
-     * Whether the user has at least one connected, authorised account in the given team.
-     * Single source of truth for the "is email set up?" gate that drives compose actions
-     * and the not-connected empty states.
+     * Whether the user has added a mailbox in this team. Sync-error and
+     * reauth-required accounts count. Disconnected accounts do not.
+     */
+    public static function hasConnectedFor(User $user, ?Team $team): bool
+    {
+        if (! $team instanceof Team) {
+            return false;
+        }
+
+        return self::query()->ownedBy($user, $team)->connected()->exists();
+    }
+
+    /**
+     * Whether the user has at least one account that is safe to sync or send through.
      */
     public static function hasActiveFor(User $user, ?Team $team): bool
     {
@@ -207,6 +243,23 @@ final class ConnectedAccount extends Model
         }
 
         return self::query()->ownedBy($user, $team)->active()->exists();
+    }
+
+    /**
+     * Whether the user has at least one active mailbox that can send from Relaticle.
+     * Accounts connected before send was tracked are treated as sendable.
+     */
+    public static function hasSendableFor(User $user, ?Team $team): bool
+    {
+        if (! $team instanceof Team) {
+            return false;
+        }
+
+        return self::query()
+            ->ownedBy($user, $team)
+            ->active()
+            ->get()
+            ->contains(fn (ConnectedAccount $account): bool => $account->hasSend());
     }
 
     public function isTokenExpired(): bool
@@ -284,6 +337,15 @@ final class ConnectedAccount extends Model
     public function hasEmail(): bool
     {
         return (bool) ($this->capabilities['email'] ?? true);
+    }
+
+    /**
+     * Whether this token can send mail. Missing `send` means the account was
+     * connected before Relaticle recorded the grant, so treat it as allowed.
+     */
+    public function hasSend(): bool
+    {
+        return (bool) ($this->capabilities['send'] ?? true);
     }
 
     public function capabilitiesLabel(): string

@@ -5,7 +5,14 @@
          the record, then this page. --}}
     <x-filament::breadcrumbs :breadcrumbs="$this->getBreadcrumbs()" class="-mb-2" />
 
-    @if ($this->showConnectPrompt)
+    @if ($this->hidesRecordMailbox)
+        <div class="flex h-[80vh] items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <x-emails.protected-mailbox
+                :heading="$this->recordMailboxHiddenCopy['heading']"
+                :description="$this->recordMailboxHiddenCopy['description']"
+            />
+        </div>
+    @elseif ($this->showConnectPrompt)
         <div class="flex h-[80vh] items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <x-emails.not-connected
                 :heading="__('filament/pages/email-accounts.not_connected.record.heading')"
@@ -51,14 +58,20 @@
             @endif
         </div>
 
-        <div class="flex-1 divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
+        <div class="flex flex-1 flex-col divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
             @forelse ($this->emails as $email)
                 <x-emails.list-row-wide :email="$email" :folder="$folder" :own-addresses="$this->ownEmailAddresses" />
             @empty
-                <x-emails.list-empty :search="$search" :folder="$folder" />
+                <x-emails.list-empty
+                    class="flex-1"
+                    :search="$search"
+                    :folder="$folder"
+                    :can-compose="$this->hasActiveConnectedAccount"
+                />
             @endforelse
         </div>
 
+        @if ($this->emails->isNotEmpty())
         <div class="flex shrink-0 items-center justify-between border-t border-gray-200 bg-gray-50/80 px-4 py-2 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
             <button
                 wire:click="previousPage"
@@ -86,6 +99,7 @@
                 <x-heroicon-o-chevron-right class="h-3.5 w-3.5" />
             </button>
         </div>
+        @endif
     </div>
 
     {{-- ── Reader ──────────────────────────────────────────────────────────
