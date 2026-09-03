@@ -84,7 +84,7 @@ it('effectiveTier returns a tier when only some participants are protected', fun
 
     EmailParticipant::factory()->to()->create([
         'email_id' => $email->getKey(),
-        'email_address' => 'external@example.com',
+        'email_address' => 'external@acme.test',
     ]);
 
     $tier = $this->service->effectiveTier($email, $viewer);

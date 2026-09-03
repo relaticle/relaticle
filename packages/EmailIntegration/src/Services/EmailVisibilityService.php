@@ -114,7 +114,7 @@ final class EmailVisibilityService
             return false;
         }
 
-        return $this->recordMailboxHiddenEnforcement($record) !== null;
+        return $this->recordMailboxHiddenEnforcement($record) instanceof EmailVisibilityEnforcement;
     }
 
     public function recordMailboxHiddenEnforcement(People|Company $record): ?EmailVisibilityEnforcement
@@ -156,7 +156,7 @@ final class EmailVisibilityService
     {
         $enforcement = $this->recordMailboxHiddenEnforcement($record);
 
-        if ($enforcement === null) {
+        if (! $enforcement instanceof EmailVisibilityEnforcement) {
             return null;
         }
 

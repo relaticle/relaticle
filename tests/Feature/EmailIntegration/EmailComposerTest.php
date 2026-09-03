@@ -525,7 +525,7 @@ it('excludes a teammate\'s internal mail recipients from recipient suggestions',
 });
 
 it('includes recipients from a teammate\'s workspace-visible mail in recipient suggestions', function (): void {
-    $address = 'shared-to@example.com';
+    $address = 'shared-to@acme.test';
     teammateSentEmail($this->user, EmailPrivacyTier::METADATA_ONLY, $address, EmailParticipantRole::TO);
 
     expect(composerRecipientSuggestions())->toContain($address);

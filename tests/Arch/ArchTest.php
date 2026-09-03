@@ -223,6 +223,7 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Support\TitleSanitizer',
         'Relaticle\Documentation\Services\DocumentationService',
         // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
+        'Relaticle\EmailIntegration\Services\EmailVisibilityService',
         'Relaticle\EmailIntegration\Services\MicrosoftGraphMailService',
         'Relaticle\EmailIntegration\Services\PrivacyService',
         // Exceptions necessarily extend a base throwable:
