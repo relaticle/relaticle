@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Google\Service\Exception as GoogleServiceException;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
@@ -17,6 +18,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 
 final readonly class GmailService implements MailServiceInterface
 {
@@ -25,6 +27,8 @@ final readonly class GmailService implements MailServiceInterface
     /**
      * Fetch messages newer than the given cursor (incremental sync).
      * Returns new message IDs and IDs of messages where UNREAD was removed (marked as read).
+     *
+     * @throws MailHistoryExpired when Gmail invalidates startHistoryId (HTTP 404)
      */
     public function fetchDelta(string $cursor): MailDeltaResult
     {
@@ -51,7 +55,15 @@ final readonly class GmailService implements MailServiceInterface
                 $params['pageToken'] = $pageToken;
             }
 
-            $history = $this->gmail->users_history->listUsersHistory('me', $params);
+            try {
+                $history = $this->gmail->users_history->listUsersHistory('me', $params);
+            } catch (GoogleServiceException $exception) {
+                if ($exception->getCode() === 404) {
+                    throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+                }
+
+                throw $exception;
+            }
 
             foreach ($history->getHistory() ?? [] as $item) {
                 foreach ($item->getMessagesAdded() ?? [] as $added) {
