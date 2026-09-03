@@ -26,7 +26,7 @@ final class CompanyFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->company(),
+            'name' => fake()->company(),
             'account_owner_id' => User::factory(),
             'team_id' => Team::factory(),
         ];

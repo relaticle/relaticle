@@ -35,7 +35,7 @@ final class CustomFieldValueFactory extends Factory
                 'entity_type' => 'company',
                 'type' => 'text',
             ])->getKey(),
-            'string_value' => $this->faker->word(),
+            'string_value' => fake()->word(),
         ];
     }
 

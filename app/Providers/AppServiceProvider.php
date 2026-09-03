@@ -123,7 +123,7 @@ final class AppServiceProvider extends ServiceProvider
         // worker that touches two workspaces. Rebinding per resolve gives each
         // lookup its own step objects, so once() memoizes within one lookup as
         // intended. Registration lives here because a fresh registry starts empty.
-        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+        $this->app->bind(function (): OnboardingSteps {
             $steps = new OnboardingSteps;
 
             ActivationSteps::registerOn($steps);

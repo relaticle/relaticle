@@ -11,17 +11,14 @@ use App\Models\User;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\FailOnException;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -57,10 +54,7 @@ use Relaticle\ImportWizard\Support\EntityLinkStorage\EntityLinkStorageInterface;
 final class ExecuteImportJob implements ShouldQueue
 {
     use Batchable;
-    use Dispatchable;
-    use InteractsWithQueue;
     use Queueable;
-    use SerializesModels;
 
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
@@ -498,9 +492,7 @@ final class ExecuteImportJob implements ShouldQueue
     {
         $code = $cf->code;
 
-        if (! isset($this->pendingTagOptions[$code])) {
-            $this->pendingTagOptions[$code] = ['field' => $cf, 'values' => []];
-        }
+        $this->pendingTagOptions[$code] ??= ['field' => $cf, 'values' => []];
 
         foreach ($values as $value) {
             if (is_string($value) && trim($value) !== '') {
