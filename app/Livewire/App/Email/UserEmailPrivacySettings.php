@@ -6,16 +6,13 @@ namespace App\Livewire\App\Email;
 
 use App\Livewire\BaseLivewireComponent;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\View\View;
 use Relaticle\EmailIntegration\Actions\UpdateUserEmailPrivacySettingsAction;
-use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Models\EmailBlocklist;
 
 final class UserEmailPrivacySettings extends BaseLivewireComponent
 {
@@ -26,23 +23,8 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
     {
         $user = $this->authUser();
 
-        $blocklist = EmailBlocklist::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', $user->currentTeam->getKey())
-            ->get(['type', 'value']);
-
         $this->form->fill([
             'default_email_sharing_tier' => $user->default_email_sharing_tier?->value,
-            'blocklist_emails' => $blocklist
-                ->where('type', EmailBlocklistType::EMAIL)
-                ->pluck('value')
-                ->values()
-                ->all(),
-            'blocklist_domains' => $blocklist
-                ->where('type', EmailBlocklistType::DOMAIN)
-                ->pluck('value')
-                ->values()
-                ->all(),
         ]);
     }
 
@@ -70,27 +52,6 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
                                 ->submit('save'),
                         ]),
                     ]),
-
-                Section::make(__('email/privacy-settings.blocklist.heading'))
-                    ->aside()
-                    ->description(__('email/privacy-settings.blocklist.description'))
-                    ->schema([
-                        TagsInput::make('blocklist_emails')
-                            ->label(__('email/privacy-settings.blocklist.emails_label'))
-                            ->placeholder(__('email/privacy-settings.blocklist.emails_placeholder'))
-                            ->helperText(__('email/privacy-settings.blocklist.emails_helper'))
-                            ->nestedRecursiveRules(['email', 'max:255']),
-                        TagsInput::make('blocklist_domains')
-                            ->label(__('email/privacy-settings.blocklist.domains_label'))
-                            ->placeholder(__('email/privacy-settings.blocklist.domains_placeholder'))
-                            ->helperText(__('email/privacy-settings.blocklist.domains_helper'))
-                            ->nestedRecursiveRules(['regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i', 'max:255']),
-                        Actions::make([
-                            Action::make('saveBlocklist')
-                                ->label(__('email/privacy-settings.actions.save'))
-                                ->submit('save'),
-                        ]),
-                    ]),
             ])
             ->statePath('data');
     }
@@ -106,7 +67,7 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
             default => null,
         };
 
-        $action->execute($this->authUser(), $defaultTier, $this->blocklistRows($data));
+        $action->execute($this->authUser(), $defaultTier);
 
         $this->sendNotification(__('email/privacy-settings.notifications.saved'));
     }
@@ -114,22 +75,5 @@ final class UserEmailPrivacySettings extends BaseLivewireComponent
     public function render(): View
     {
         return view('livewire.app.email.user-email-privacy-settings');
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return list<array{type: string, value: string}>
-     */
-    private function blocklistRows(array $data): array
-    {
-        return array_values(collect([
-            EmailBlocklistType::EMAIL->value => $data['blocklist_emails'] ?? [],
-            EmailBlocklistType::DOMAIN->value => $data['blocklist_domains'] ?? [],
-        ])
-            ->flatMap(fn (array $values, string $type): array => array_map(
-                fn (string $value): array => ['type' => $type, 'value' => $value],
-                $values,
-            ))
-            ->all());
     }
 }

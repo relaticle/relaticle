@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Features\EmailIntegration;
 use App\Models\User;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\PrivacyService;
@@ -13,9 +15,13 @@ final readonly class EmailPolicy
 {
     public function __construct(private PrivacyService $privacyService) {}
 
-    public function viewAny(): bool
+    public function viewAny(User $user): bool
     {
-        return true;
+        if (! Feature::active(EmailIntegration::class)) {
+            return false;
+        }
+
+        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
     }
 
     /** Can the viewer see this email exists at all? */

@@ -30,6 +30,11 @@ return [
         ],
     ],
 
+    'empty' => [
+        'heading' => 'No templates',
+        'description' => 'Save a message you send often so you can reuse it.',
+    ],
+
     'actions' => [
         'create' => [
             'label' => 'New template',

@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
@@ -30,8 +31,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
+use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
+use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountBlocklistAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateUserEmailPrivacySettingsAction;
@@ -48,9 +51,9 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  * Per-account settings, reached from the "Settings" entry of an account's action
  * group on {@see EmailAccountsPage}.
  *
- * Sharing tier and blocklist are stored per user + team (not per account), so the
- * General and Blocklist tabs edit settings that apply to every mailbox this user
- * has connected, and the info tooltips say so. Signatures are per account.
+ * Sharing tier is stored per user + team (not per account), so the General and
+ * Sharing tabs edit settings that apply to every mailbox this user has connected.
+ * Blocklist and signatures are per account.
  *
  * @property-read Schema $form
  */
@@ -93,11 +96,18 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
             'default_email_sharing_tier' => $user->default_email_sharing_tier->value ?? '',
-            'blocklist_emails' => $this->blocklistValues(EmailBlocklistType::EMAIL),
-            'blocklist_domains' => $this->blocklistValues(EmailBlocklistType::DOMAIN),
         ]);
 
         $this->signatures = $this->loadSignatures();
+    }
+
+    /**
+     * @return Collection<int, EmailBlocklist>
+     */
+    #[Computed]
+    public function blocklistEntries(): Collection
+    {
+        return $this->loadBlocklistEntries();
     }
 
     public function getTitle(): string
@@ -158,11 +168,29 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.blocklist'))
                             ->icon(Heroicon::OutlinedNoSymbol)
-                            ->schema($this->blocklistFields()),
+                            ->schema([
+                                Section::make(__('filament/pages/email-account-settings.blocklist.label'))
+                                    ->description(__('filament/pages/email-account-settings.blocklist.hint'))
+                                    ->compact()
+                                    ->headerActions([
+                                        fn (): Action => $this->addBlocklistAction()
+                                            ->visible(fn (): bool => $this->blocklistEntries->isNotEmpty()),
+                                    ])
+                                    ->schema([$this->blocklistField()]),
+                            ]),
 
                         Tab::make(__('filament/pages/email-account-settings.tabs.signatures'))
                             ->icon(Heroicon::OutlinedPencilSquare)
-                            ->schema([$this->signaturesField()]),
+                            ->schema([
+                                Section::make(__('filament/pages/email-account-settings.signatures.label'))
+                                    ->description(__('filament/pages/email-account-settings.signatures.hint'))
+                                    ->compact()
+                                    ->headerActions([
+                                        fn (): Action => $this->createSignatureAction()
+                                            ->visible(fn (): bool => $this->signatures->isNotEmpty()),
+                                    ])
+                                    ->schema([$this->signaturesField()]),
+                            ]),
                     ]),
             ])
             ->statePath('data');
@@ -243,32 +271,141 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         );
     }
 
+    private function blocklistField(): View
+    {
+        return View::make('email-integration::forms.blocklist-entries')
+            ->viewData([
+                'emptyHeading' => __('filament/pages/email-account-settings.blocklist.empty_heading'),
+                'emptyDescription' => __('filament/pages/email-account-settings.blocklist.empty_description'),
+            ]);
+    }
+
     /**
-     * Addresses and domains get a tag input each: type, hit enter, done. Splitting
-     * them by field removes the per-row "is this an address or a domain?" step the
-     * repeater forced on every entry.
-     *
-     * @return array<int, Component|Field>
+     * @return array<int, TagsInput>
      */
-    private function blocklistFields(): array
+    private function blocklistFormSchema(): array
     {
         return [
             TagsInput::make('blocklist_emails')
-                ->label($this->labelWithInfo(
-                    __('filament/pages/email-account-settings.blocklist.emails_label'),
-                    __('filament/pages/email-account-settings.blocklist.hint'),
-                ))
+                ->label(__('filament/pages/email-account-settings.blocklist.emails_label'))
                 ->placeholder(__('filament/pages/email-account-settings.blocklist.emails_placeholder'))
+                ->afterLabel(__('filament/pages/email-account-settings.blocklist.emails_after_label'))
                 ->nestedRecursiveRules(['email', 'max:255']),
-
             TagsInput::make('blocklist_domains')
-                ->label($this->labelWithInfo(
-                    __('filament/pages/email-account-settings.blocklist.domains_label'),
-                    __('filament/pages/email-account-settings.blocklist.hint'),
-                ))
+                ->label(__('filament/pages/email-account-settings.blocklist.domains_label'))
                 ->placeholder(__('filament/pages/email-account-settings.blocklist.domains_placeholder'))
+                ->afterLabel(__('filament/pages/email-account-settings.blocklist.domains_after_label'))
                 ->nestedRecursiveRules(['regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i', 'max:255']),
         ];
+    }
+
+    public function addBlocklistAction(): Action
+    {
+        return Action::make('addBlocklist')
+            ->label(__('filament/pages/email-account-settings.blocklist.add'))
+            ->icon(Heroicon::OutlinedPlus)
+            ->size(Size::Small)
+            ->modalHeading(__('filament/pages/email-account-settings.blocklist.add'))
+            ->schema($this->blocklistFormSchema())
+            ->action(function (array $data, UpdateConnectedAccountBlocklistAction $updateBlocklist): void {
+                [$emails, $domains] = $this->mergedBlocklistValues(
+                    $data['blocklist_emails'] ?? [],
+                    $data['blocklist_domains'] ?? [],
+                );
+
+                $updateBlocklist->execute($this->account(), $this->blocklistRowsFromValues($emails, $domains));
+
+                unset($this->blocklistEntries);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-account-settings.blocklist.notifications.added'))
+                    ->send();
+            });
+    }
+
+    public function deleteBlocklistEntryAction(): Action
+    {
+        return Action::make('deleteBlocklistEntry')
+            ->label(__('filament/pages/email-signatures.actions.delete'))
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->size(Size::Small)
+            ->iconButton()
+            ->requiresConfirmation()
+            ->action(function (array $arguments): void {
+                EmailBlocklist::query()
+                    ->where('connected_account_id', $this->account()->getKey())
+                    ->whereKey((string) $arguments['entry_id'])
+                    ->firstOrFail()
+                    ->delete();
+
+                unset($this->blocklistEntries);
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-account-settings.blocklist.notifications.deleted'))
+                    ->send();
+            });
+    }
+
+    /**
+     * @param  array<int, string>  $newEmails
+     * @param  array<int, string>  $newDomains
+     * @return array{0: array<int, string>, 1: array<int, string>}
+     */
+    private function mergedBlocklistValues(array $newEmails, array $newDomains): array
+    {
+        $emails = $this->blocklistEntries
+            ->where('type', EmailBlocklistType::EMAIL)
+            ->pluck('value')
+            ->merge($newEmails)
+            ->map(fn (mixed $value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $domains = $this->blocklistEntries
+            ->where('type', EmailBlocklistType::DOMAIN)
+            ->pluck('value')
+            ->merge($newDomains)
+            ->map(fn (mixed $value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return [$emails, $domains];
+    }
+
+    /**
+     * @param  array<int, string>  $emails
+     * @param  array<int, string>  $domains
+     * @return list<array{type: string, value: string}>
+     */
+    private function blocklistRowsFromValues(array $emails, array $domains): array
+    {
+        return array_values(collect([
+            EmailBlocklistType::EMAIL->value => $emails,
+            EmailBlocklistType::DOMAIN->value => $domains,
+        ])
+            ->flatMap(fn (array $values, string $type): array => array_map(
+                fn (string $value): array => ['type' => $type, 'value' => $value],
+                $values,
+            ))
+            ->all());
+    }
+
+    /**
+     * @return Collection<int, EmailBlocklist>
+     */
+    private function loadBlocklistEntries(): Collection
+    {
+        return $this->blocklistQuery()
+            ->with('user')
+            ->latest()
+            ->get();
     }
 
     /**
@@ -305,6 +442,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         return Action::make('createSignature')
             ->label(__('filament/pages/email-account-settings.signatures.add'))
             ->icon(Heroicon::OutlinedPlus)
+            ->size(Size::Small)
             ->modalHeading(__('filament/pages/email-account-settings.signatures.add'))
             ->schema($this->signatureFormSchema())
             ->action(function (array $data, CreateSignatureAction $createSignature): void {
@@ -415,7 +553,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                         filled($tier) => EmailPrivacyTier::from((string) $tier),
                         default => null,
                     },
-                    $this->blocklistRows($data),
                 );
 
                 $this->account()->refresh();
@@ -425,36 +562,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                     ->title(__('filament/pages/email-account-settings.notifications.saved'))
                     ->send();
             });
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function blocklistValues(EmailBlocklistType $type): array
-    {
-        return $this->blocklistQuery()
-            ->where('type', $type)
-            ->pluck('value')
-            ->all();
-    }
-
-    /**
-     * Flatten both tag inputs back into the {type, value} rows the action stores.
-     *
-     * @param  array<string, mixed>  $data
-     * @return list<array{type: string, value: string}>
-     */
-    private function blocklistRows(array $data): array
-    {
-        return array_values(collect([
-            EmailBlocklistType::EMAIL->value => $data['blocklist_emails'] ?? [],
-            EmailBlocklistType::DOMAIN->value => $data['blocklist_domains'] ?? [],
-        ])
-            ->flatMap(fn (array $values, string $type): array => array_map(
-                fn (string $value): array => ['type' => $type, 'value' => $value],
-                $values,
-            ))
-            ->all());
     }
 
     /**
@@ -474,7 +581,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     private function blocklistQuery(): Builder
     {
         return EmailBlocklist::query()
-            ->where('user_id', $this->account()->user_id)
-            ->where('team_id', $this->account()->team_id);
+            ->where('connected_account_id', $this->account()->getKey());
     }
 }

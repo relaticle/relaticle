@@ -6,13 +6,24 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityAction;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityEntryAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
-use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(EmailPrivacySettingsPage::class, UpdateTeamEmailPrivacySettingsAction::class, UpdateTeamContactCreationSettingsAction::class);
+mutates(
+    EmailPrivacySettingsPage::class,
+    EmailVisibilityTable::class,
+    UpdateTeamEmailPrivacySettingsAction::class,
+    UpdateTeamEmailVisibilityAction::class,
+    UpdateTeamEmailVisibilityEntryAction::class,
+    UpdateTeamContactCreationSettingsAction::class,
+);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -23,6 +34,7 @@ beforeEach(function (): void {
 
 it('updates the team default_email_sharing_tier on save', function (): void {
     livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
         ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
         ->callAction('save');
 
@@ -31,23 +43,24 @@ it('updates the team default_email_sharing_tier on save', function (): void {
 
 it('shows each sharing tier with its explanation', function (): void {
     livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
         ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
         ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
         ->assertSee(EmailPrivacyTier::FULL->getDescription());
 });
 
-it('shows the workspace privacy sections in two columns on large screens', function (): void {
-    livewire(EmailPrivacySettingsPage::class)
-        ->assertSeeHtml('--cols-lg: repeat(2, minmax(0, 1fr));');
-});
+it('creates protected TeamEmailBlocklist rows from the add contacts modal', function (): void {
+    livewire(EmailVisibilityTable::class)
+        ->callAction('addVisibilityContact', data: [
+            'visibility_emails' => ['legal@acme.com', 'hr@acme.com'],
+            'visibility_domains' => [],
+            'enforcement_level' => EmailVisibilityEnforcement::Protected->value,
+        ])
+        ->assertNotified();
 
-it('creates ProtectedRecipient rows with type email on save', function (): void {
-    livewire(EmailPrivacySettingsPage::class)
-        ->set('protected_emails', ['legal@acme.com', 'hr@acme.com'])
-        ->callAction('save');
-
-    expect(ProtectedRecipient::query()
+    expect(TeamEmailBlocklist::query()
         ->where('team_id', $this->team->id)
+        ->where('enforcement_level', EmailVisibilityEnforcement::Protected->value)
         ->where('type', 'email')
         ->pluck('value')
         ->sort()
@@ -56,42 +69,75 @@ it('creates ProtectedRecipient rows with type email on save', function (): void 
     )->toBe(['hr@acme.com', 'legal@acme.com']);
 });
 
-it('creates ProtectedRecipient rows with type domain on save', function (): void {
-    livewire(EmailPrivacySettingsPage::class)
-        ->set('protected_domains', ['acme.com', 'rival.io'])
-        ->callAction('save');
+it('creates blocked TeamEmailBlocklist rows from the add contacts modal', function (): void {
+    livewire(EmailVisibilityTable::class)
+        ->callAction('addVisibilityContact', data: [
+            'visibility_emails' => [],
+            'visibility_domains' => ['spam.com'],
+            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
+        ])
+        ->assertNotified();
 
-    expect(ProtectedRecipient::query()
+    expect(TeamEmailBlocklist::query()
         ->where('team_id', $this->team->id)
+        ->where('enforcement_level', EmailVisibilityEnforcement::Blocked->value)
         ->where('type', 'domain')
         ->pluck('value')
-        ->sort()
-        ->values()
         ->all()
-    )->toBe(['acme.com', 'rival.io']);
+    )->toBe(['spam.com']);
 });
 
-it('deletes all prior ProtectedRecipient rows for the team when saving an empty list', function (): void {
-    ProtectedRecipient::factory()->email('old@acme.com')->create([
-        'team_id' => $this->team->id,
-        'created_by' => $this->user->id,
-    ]);
-
-    ProtectedRecipient::factory()->domain('acme.com')->create([
-        'team_id' => $this->team->id,
-        'created_by' => $this->user->id,
-    ]);
+it('shows system default visibility rows on the visibility tab', function (): void {
+    $this->user->update(['email' => 'owner@thefireflytech.com']);
 
     livewire(EmailPrivacySettingsPage::class)
-        ->set('protected_emails', [])
-        ->set('protected_domains', [])
-        ->callAction('save');
+        ->assertSee(__('filament/pages/email-privacy-settings.visibility.table.members_row'))
+        ->assertSee('thefireflytech.com')
+        ->assertSee(__('filament/pages/email-privacy-settings.visibility.table.system_default'));
+});
 
-    expect(ProtectedRecipient::query()->where('team_id', $this->team->id)->count())->toBe(0);
+it('shows custom visibility entries in the table', function (): void {
+    TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    livewire(EmailVisibilityTable::class)
+        ->assertSee('legal@acme.com');
+});
+
+it('deletes a custom visibility entry from the table', function (): void {
+    $entry = TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    livewire(EmailVisibilityTable::class)
+        ->callAction('deleteVisibilityEntry', arguments: ['entry_id' => $entry->id])
+        ->assertNotified();
+
+    expect(TeamEmailBlocklist::query()->whereKey($entry->id)->exists())->toBeFalse();
+});
+
+it('updates enforcement level for a custom visibility entry', function (): void {
+    $entry = TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    resolve(UpdateTeamEmailVisibilityEntryAction::class)->execute(
+        $this->team,
+        $this->user,
+        $entry,
+        EmailVisibilityEnforcement::Blocked,
+    );
+
+    expect($entry->fresh()->enforcement_level)->toBe(EmailVisibilityEnforcement::Blocked);
 });
 
 it('sends a success notification after save', function (): void {
     livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
         ->callAction('save')
         ->assertNotified('Privacy settings saved.');
 });
@@ -100,27 +146,8 @@ it('pre-fills default_email_sharing_tier from the team on mount', function (): v
     $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
         ->assertSet('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value);
-});
-
-it('pre-fills protected_emails from existing ProtectedRecipient rows on mount', function (): void {
-    ProtectedRecipient::factory()->email('legal@acme.com')->create([
-        'team_id' => $this->team->id,
-        'created_by' => $this->user->id,
-    ]);
-
-    livewire(EmailPrivacySettingsPage::class)
-        ->assertSet('protected_emails', ['legal@acme.com']);
-});
-
-it('pre-fills protected_domains from existing ProtectedRecipient rows on mount', function (): void {
-    ProtectedRecipient::factory()->domain('acme.com')->create([
-        'team_id' => $this->team->id,
-        'created_by' => $this->user->id,
-    ]);
-
-    livewire(EmailPrivacySettingsPage::class)
-        ->assertSet('protected_domains', ['acme.com']);
 });
 
 it('forbids a non-admin member from changing team privacy settings', function (): void {
@@ -131,8 +158,6 @@ it('forbids a non-admin member from changing team privacy settings', function ()
         $this->team,
         $member,
         EmailPrivacyTier::FULL,
-        [],
-        [],
     ))->toThrow(HttpException::class);
 
     expect($this->team->fresh()->default_email_sharing_tier)->not->toBe(EmailPrivacyTier::FULL);
@@ -145,6 +170,7 @@ it('allows an admin member to change team privacy settings', function (): void {
     Filament::setTenant($this->team);
 
     livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
         ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
         ->callAction('save');
 
@@ -196,20 +222,51 @@ it('pre-fills record creation settings from the team on mount', function (): voi
         ->assertSet('auto_create_companies', false);
 });
 
-it('autosaves contact_creation_mode for every mailbox on the team', function (): void {
+it('saves contact_creation_mode when the record creation tab is saved', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'record_creation')
-        ->set('contact_creation_mode', ContactCreationMode::All->value);
+        ->set('contact_creation_mode', ContactCreationMode::All->value)
+        ->callAction('save')
+        ->assertNotified('Privacy settings saved.');
 
     expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::All);
 });
 
-it('autosaves auto_create_companies for the workspace', function (): void {
+it('saves auto_create_companies when the record creation tab is saved', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'record_creation')
-        ->set('auto_create_companies', false);
+        ->set('auto_create_companies', false)
+        ->callAction('save')
+        ->assertNotified('Privacy settings saved.');
 
     expect($this->team->fresh()->auto_create_companies)->toBeFalse();
+});
+
+it('does not save record creation settings when adding a visibility entry', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->set('contact_creation_mode', ContactCreationMode::All->value)
+        ->call('setTab', 'visibility');
+
+    livewire(EmailVisibilityTable::class)
+        ->callAction('addVisibilityContact', data: [
+            'visibility_emails' => ['blocked@example.com'],
+            'visibility_domains' => [],
+            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
+        ]);
+
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
+});
+
+it('does not persist settings when save is called on the visibility tab', function (): void {
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'visibility')
+        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
+        ->callAction('save');
+
+    expect($this->team->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
 it('renders a switch for automatic company creation', function (): void {
@@ -231,4 +288,38 @@ it('forbids a non-admin member from changing record creation settings', function
     ))->toThrow(HttpException::class);
 
     expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
+});
+
+it('forbids a non-admin member from changing workspace email visibility', function (): void {
+    $member = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    expect(fn () => resolve(UpdateTeamEmailVisibilityAction::class)->execute(
+        $this->team,
+        $member,
+        [[
+            'type' => 'email',
+            'value' => 'blocked@example.com',
+            'enforcement_level' => EmailVisibilityEnforcement::Blocked,
+        ]],
+    ))->toThrow(HttpException::class);
+});
+
+it('does not save sharing settings from the visibility modal', function (): void {
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+    livewire(EmailVisibilityTable::class)
+        ->callAction('addVisibilityContact', data: [
+            'visibility_emails' => ['blocked@example.com'],
+            'visibility_domains' => [],
+            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
+        ])
+        ->assertNotified();
+
+    expect($this->team->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+
+    $this->assertDatabaseHas(TeamEmailBlocklist::class, [
+        'team_id' => $this->team->id,
+        'value' => 'blocked@example.com',
+    ]);
 });

@@ -81,3 +81,11 @@ it('soft-deletes existing meeting when it becomes private', function (): void {
 
     expect($existing->fresh()?->trashed())->toBeTrue();
 });
+
+it('does not bump calendar import progress for a skipped private event', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+
+    (app(StoreMeetingAction::class))->execute(payload(['visibility' => CalendarVisibility::PRIVATE]), $account);
+
+    expect($account->fresh()?->initial_calendar_sync_imported)->toBe(0);
+});

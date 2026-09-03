@@ -28,15 +28,17 @@ it('redirects to Microsoft with mail Graph scopes and prompt=consent', function 
         ->toContain(urlencode('https://graph.microsoft.com/Mail.Send'))
         ->toContain(urlencode('https://graph.microsoft.com/User.Read'))
         ->toContain(urlencode('offline_access'))
-        ->not->toContain(urlencode('https://graph.microsoft.com/Calendars.Read'));
+        ->toContain(urlencode('https://graph.microsoft.com/Calendars.ReadWrite'))
+        ->toContain(urlencode('https://graph.microsoft.com/Calendars.Read'));
 });
 
-it('adds the Graph Calendars.Read scope when capability=calendar', function (): void {
+it('includes Calendars.Read even when the leftover capability query is sent', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
     $response = $this->get(route('email-accounts.redirect', ['provider' => 'azure']).'?capability=calendar');
 
     expect($response->headers->get('Location'))
+        ->toContain(urlencode('https://graph.microsoft.com/Calendars.ReadWrite'))
         ->toContain(urlencode('https://graph.microsoft.com/Calendars.Read'));
 });

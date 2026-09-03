@@ -3,13 +3,21 @@
 declare(strict_types=1);
 
 use App\Features\EmailIntegration;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
+use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
+use App\Models\People;
 use App\Models\User;
+use App\Policies\EmailPolicy;
+use App\Policies\MeetingPolicy;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Meeting;
 
-mutates(EmailIntegration::class);
+mutates(EmailIntegration::class, EmailPolicy::class, MeetingPolicy::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -55,4 +63,65 @@ it('gates the email template resource when the feature is inactive', function ()
     Feature::deactivate(EmailIntegration::class);
 
     expect(EmailTemplateResource::canAccess())->toBeFalse();
+});
+
+it('forbids listing emails when the feature is inactive', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    expect($this->user->can('viewAny', Email::class))->toBeFalse();
+});
+
+it('forbids listing meetings when the feature is inactive', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    expect($this->user->can('viewAny', Meeting::class))->toBeFalse();
+});
+
+it('hides emails and meetings relation managers on a person when the feature is inactive', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
+
+    expect(EmailsRelationManager::canViewForRecord($person, ViewPeople::class))->toBeFalse()
+        ->and(MeetingsRelationManager::canViewForRecord($person, ViewPeople::class))->toBeFalse();
+
+    $managers = livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->instance()
+        ->getRelationManagers();
+
+    expect($managers)->not->toContain(EmailsRelationManager::class)
+        ->and($managers)->not->toContain(MeetingsRelationManager::class);
+});
+
+it('registers emails and meetings relation managers on a person when the feature is active', function (): void {
+    Feature::activate(EmailIntegration::class);
+
+    $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
+
+    $managers = livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->instance()
+        ->getRelationManagers();
+
+    expect($managers)->toContain(EmailsRelationManager::class)
+        ->and($managers)->toContain(MeetingsRelationManager::class);
+});
+
+it('forbids listing emails when the viewer has no verified email', function (): void {
+    Feature::activate(EmailIntegration::class);
+
+    $unverified = User::factory()->unverified()->withTeam()->create();
+
+    $this->actingAs($unverified);
+
+    expect($unverified->can('viewAny', Email::class))->toBeFalse();
+});
+
+it('forbids listing meetings when the viewer has no verified email', function (): void {
+    Feature::activate(EmailIntegration::class);
+
+    $unverified = User::factory()->unverified()->withTeam()->create();
+
+    $this->actingAs($unverified);
+
+    expect($unverified->can('viewAny', Meeting::class))->toBeFalse();
 });

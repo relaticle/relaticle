@@ -32,10 +32,10 @@ beforeEach(function (): void {
     ]));
 });
 
-it('links editSettings to the per-account settings page', function (): void {
+it('links accountSettings to the per-account settings page', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertActionHasUrl(
-            TestAction::make('editSettings')->arguments(['account_id' => $this->account->id]),
+            TestAction::make('accountSettings')->arguments(['account_id' => $this->account->id]),
             EmailAccountSettingsPage::getUrl(['account' => $this->account->id]),
         );
 });
@@ -187,6 +187,21 @@ it('does not re-import another user\'s account', function (): void {
 it('shows mailbox capabilities on each connected account', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.capabilities.email'));
+});
+
+it('warns when a connected mailbox cannot send', function (): void {
+    $this->account->update([
+        'sync_cursor' => 'done',
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.send_missing_tooltip'))
+        ->assertSee(__('filament/pages/email-accounts.in_sync'));
 });
 
 it('renders Connect Gmail and hides Connect Outlook for now', function (): void {

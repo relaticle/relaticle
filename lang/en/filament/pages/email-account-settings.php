@@ -7,7 +7,7 @@ return [
     'tabs' => [
         'general' => 'General',
         'sharing' => 'Sharing',
-        'blocklist' => 'Blocklist',
+        'blocklist' => 'Mailbox-only blocklist',
         'signatures' => 'Signatures',
     ],
     'sharing' => [
@@ -20,9 +20,18 @@ return [
         'label' => 'Blocked addresses and domains',
         'emails_label' => 'Blocked addresses',
         'emails_placeholder' => 'noisy@example.com',
+        'emails_after_label' => 'Press Enter(⏎) to add each address.',
         'domains_label' => 'Blocked domains',
         'domains_placeholder' => 'example.com',
-        'hint' => 'Hidden from your view, across all your mailboxes.',
+        'domains_after_label' => 'Press Enter(⏎) to add each domain.',
+        'hint' => 'Hidden from this mailbox only. Other connected accounts are not affected.',
+        'add' => 'Add to blocklist',
+        'empty_heading' => 'No emails or domains yet',
+        'empty_description' => 'Emails from blocklisted domains and addresses will not appear in this mailbox.',
+        'notifications' => [
+            'added' => 'Blocklist updated.',
+            'deleted' => 'Blocklist entry removed.',
+        ],
     ],
     'signatures' => [
         'label' => 'Signatures',

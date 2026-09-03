@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SendEmailAction::class, EmailSendingService::class);
 
@@ -59,6 +60,29 @@ it('persists a queued Email row for the outbox', function (): void {
         ->and($email->batch_id)->toBeNull()
         // A stable Message-ID is stamped at queue time for retry de-duplication.
         ->and($email->rfc_message_id)->toMatch('/^<[0-9A-Za-z]+@.+>$/');
+});
+
+it('forbids queuing mail when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello World',
+        'body_html' => '<p>Test</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]))->toThrow(HttpException::class);
 });
 
 it('ignores an in_reply_to_email_id that belongs to another team', function (): void {
