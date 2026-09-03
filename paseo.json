@@ -1,6 +1,6 @@
 {
     "worktree": {
-        "setup": "CONDUCTOR_ROOT_PATH=\"$PASEO_SOURCE_CHECKOUT_PATH\" bash bin/setup-workspace.sh",
+        "setup": "bash bin/setup-workspace.sh",
         "teardown": "bash bin/archive-workspace.sh"
     }
 }

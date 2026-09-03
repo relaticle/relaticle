@@ -23,7 +23,7 @@ if [[ ! -f artisan ]]; then
 fi
 
 FOLDER="$(basename "$PWD")"
-ROOT="${CONDUCTOR_ROOT_PATH:-$HOME/Herd/relaticle}"
+ROOT="${PASEO_SOURCE_CHECKOUT_PATH:-$HOME/Herd/relaticle}"
 
 echo "→ Provisioning workspace '${FOLDER}' (root: ${ROOT})"
 
