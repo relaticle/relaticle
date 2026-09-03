@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Filament\RelationManagers;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Model;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 
 abstract class BaseMeetingsRelationManager extends RelationManager
 {
@@ -39,7 +41,15 @@ abstract class BaseMeetingsRelationManager extends RelationManager
     {
         return $table
             // `team` is read per row by MeetingPolicy; eager-load it to avoid a lazy load.
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('team'))
+            ->modifyQueryUsing(function (Builder $query): Builder {
+                $user = auth()->user();
+
+                if ($user instanceof User) {
+                    $query->withGlobalScope('visible', new VisibleMeetingScope($user));
+                }
+
+                return $query->with('team');
+            })
             ->columns([
                 TextColumn::make('title')
                     ->searchable()

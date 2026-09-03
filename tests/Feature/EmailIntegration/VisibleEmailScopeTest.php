@@ -9,9 +9,12 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+
+mutates(VisibleEmailScope::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withTeam()->create();
@@ -122,4 +125,39 @@ it('still shows a protected email to its owner', function (): void {
     $protected = ($this->makeCoworkerEmail)(['vip@contact.com']);
 
     expect(visibleTo($this->coworker)->modelKeys())->toContain($protected->id);
+});
+
+it('hides a workspace-blocked email from its owner', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@contact.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $blocked = ($this->makeCoworkerEmail)(['blocked@contact.com', 'normal@contact.com']);
+
+    expect(visibleTo($this->coworker)->modelKeys())->not->toContain($blocked->id);
+});
+
+it('hides a mailbox-blocklisted email from its owner', function (): void {
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->coworker->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $blocked = ($this->makeCoworkerEmail)(['spam@badactor.com']);
+
+    expect(visibleTo($this->coworker)->modelKeys())->not->toContain($blocked->id);
+});
+
+it('hides a mailbox-blocklisted email from teammates', function (): void {
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->coworker->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $blocked = ($this->makeCoworkerEmail)(['spam@badactor.com', 'normal@contact.com']);
+
+    expect(visibleTo($this->viewer)->modelKeys())->not->toContain($blocked->id);
 });

@@ -13,7 +13,7 @@ use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 final readonly class UpdateTeamEmailVisibilityAction
 {
     /**
-     * @param  list<array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>  $entries
+     * @param  array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>  $entries
      */
     public function execute(Team $team, User $actor, array $entries): void
     {
@@ -25,7 +25,7 @@ final readonly class UpdateTeamEmailVisibilityAction
         TeamEmailBlocklist::query()->where('team_id', $team->getKey())->delete();
 
         foreach ($entries as $entry) {
-            if (blank($entry['value'] ?? null)) {
+            if (blank($entry['value'])) {
                 continue;
             }
 

@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 
+/**
+ * @property EmailBlocklistType $type
+ * @property string $value
+ */
 final class EmailBlocklist extends Model
 {
     /**

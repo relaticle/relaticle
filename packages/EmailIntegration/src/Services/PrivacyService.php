@@ -9,7 +9,7 @@ use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 
-final class PrivacyService
+final readonly class PrivacyService
 {
     public function __construct(private EmailVisibilityService $visibility) {}
 
@@ -19,8 +19,11 @@ final class PrivacyService
      */
     public function effectiveTier(Email $email, User $viewer): ?EmailPrivacyTier
     {
-        // Owner always gets full access
         if ($email->user_id === $viewer->getKey()) {
+            if ($this->visibility->isHiddenFromOwner($email)) {
+                return null;
+            }
+
             return EmailPrivacyTier::FULL;
         }
 

@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
@@ -285,4 +286,46 @@ it('effectiveTier owner access is not blocked by protected recipient', function 
     $tier = $this->service->effectiveTier($email, $this->owner);
 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('effectiveTier hides a blocked email from its owner', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@sensitive.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->owner->id,
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@sensitive.com',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'external@example.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $this->owner);
+
+    expect($tier)->toBeNull();
+});
+
+it('effectiveTier hides a mailbox-blocklisted email from its owner', function (): void {
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->owner->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'spam@badactor.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $this->owner);
+
+    expect($tier)->toBeNull();
 });

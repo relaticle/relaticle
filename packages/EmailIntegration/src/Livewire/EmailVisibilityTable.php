@@ -35,7 +35,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
     public string $search = '';
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     #[Computed]
     public function visibilityRows(): array
@@ -171,7 +171,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
     /**
      * @param  array<int, string>  $newEmails
      * @param  array<int, string>  $newDomains
-     * @return list<array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>
+     * @return array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>
      */
     private function mergedVisibilityEntries(array $newEmails, array $newDomains, EmailVisibilityEnforcement $enforcement): array
     {
@@ -179,7 +179,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             ->map(fn (TeamEmailBlocklist $entry): array => [
                 'type' => $entry->type->value,
                 'value' => $entry->value,
-                'enforcement_level' => $entry->enforcement_level ?? EmailVisibilityEnforcement::Blocked,
+                'enforcement_level' => $entry->enforcement_level,
             ])
             ->all();
 

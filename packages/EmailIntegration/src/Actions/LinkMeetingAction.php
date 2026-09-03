@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkMeetingAction
@@ -26,6 +27,7 @@ final readonly class LinkMeetingAction
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
+        private EmailVisibilityService $visibility,
     ) {}
 
     public function execute(Meeting $meeting): void
@@ -39,11 +41,16 @@ final readonly class LinkMeetingAction
         foreach ($attendees as $attendee) {
             $company = null;
             $domain = $this->extractDomain($attendee->email_address);
+            $suppressCreate = $this->visibility->suppressesRecordCreation(
+                $attendee->email_address,
+                $teamId,
+                $meeting->connected_account_id,
+            );
 
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
-                if (! $company && $team?->auto_create_companies) {
+                if (! $company && ! $suppressCreate && $team?->auto_create_companies) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -62,7 +69,7 @@ final readonly class LinkMeetingAction
                 )
                 ->first();
 
-            if (! $person && $account && $team && $this->shouldCreatePerson($team)) {
+            if (! $person && ! $suppressCreate && $account && $team && $this->shouldCreatePerson($team)) {
                 $person = $this->autoCreatePerson->execute(
                     $attendee->name ?? '',
                     $attendee->email_address,

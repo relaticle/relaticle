@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
@@ -12,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
@@ -23,22 +25,29 @@ final class EmailVisibilityService
     private array $workspaceEntryCache = [];
 
     /**
-     * @var array<string, list<lowercase-string>>
+     * @var array<string, array<int, lowercase-string>>
      */
     private array $workspaceDomainCache = [];
 
     /**
-     * @var array<string, list<lowercase-string>>
+     * @var array<string, array<int, lowercase-string>>
      */
     private array $teamMemberEmailCache = [];
 
+    /**
+     * @var array<string, Collection<int, EmailBlocklist>>
+     */
+    private array $accountBlocklistCache = [];
+
     public function isHiddenFromOwner(Email $email): bool
     {
-        if ($this->matchesAccountBlocklist($email)) {
-            return true;
-        }
+        $email->loadMissing('participants');
 
-        return $this->matchesWorkspaceEnforcement($email, EmailVisibilityEnforcement::Blocked);
+        return $this->isHiddenFromOwnerFor(
+            (string) $email->team_id,
+            $email->connected_account_id,
+            $email->participants->pluck('email_address')->all(),
+        );
     }
 
     public function isHiddenFromTeammate(Email $email): bool
@@ -47,25 +56,71 @@ final class EmailVisibilityService
             return true;
         }
 
-        if ($this->matchesWorkspaceEnforcement($email, EmailVisibilityEnforcement::Blocked)) {
+        if ($this->isHiddenFromOwner($email)) {
             return true;
         }
 
         return $this->allParticipantsAreProtected($email);
     }
 
+    public function isMeetingHiddenFromViewer(Meeting $meeting, User $viewer): bool
+    {
+        $meeting->loadMissing(['attendees', 'connectedAccount']);
+
+        $attendeeAddresses = $meeting->attendees
+            ->pluck('email_address')
+            ->filter()
+            ->values()
+            ->all();
+
+        $hideAddresses = $attendeeAddresses;
+
+        if (filled($meeting->organizer_email)) {
+            $hideAddresses[] = $meeting->organizer_email;
+        }
+
+        $isOwner = $meeting->connectedAccount?->user_id === $viewer->getKey();
+
+        if ($this->isHiddenFromOwnerFor(
+            (string) $meeting->team_id,
+            $meeting->connected_account_id,
+            $hideAddresses,
+        )) {
+            return true;
+        }
+
+        if ($isOwner) {
+            return false;
+        }
+
+        return $this->allAddressesAreProtected($attendeeAddresses, (string) $meeting->team_id);
+    }
+
     /**
-     * @return list<array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}>
+     * Blocked workspace entries and mailbox-only blocklists must not spawn CRM records.
+     */
+    public function suppressesRecordCreation(string $address, string $teamId, ?string $connectedAccountId): bool
+    {
+        if ($this->matchesCustomEntry($address, $teamId, EmailVisibilityEnforcement::Blocked)) {
+            return true;
+        }
+
+        return $this->matchesAccountBlocklistAddress($address, $connectedAccountId);
+    }
+
+    /**
+     * @param  Collection<int, TeamEmailBlocklist>  $customEntries
+     * @return array<int, array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}>
      */
     public function visibilityTableRows(Team $team, Collection $customEntries): array
     {
         $systemRows = [
             [
                 'key' => 'system-members',
-                'address' => __('filament/pages/email-privacy-settings.visibility.table.members_row'),
+                'address' => (string) __('filament/pages/email-privacy-settings.visibility.table.members_row'),
                 'enforcement' => EmailVisibilityEnforcement::Protected->getLabel(),
                 'enforcement_value' => EmailVisibilityEnforcement::Protected->value,
-                'source' => __('filament/pages/email-privacy-settings.visibility.table.system_default'),
+                'source' => (string) __('filament/pages/email-privacy-settings.visibility.table.system_default'),
                 'is_system' => true,
             ],
         ];
@@ -76,21 +131,21 @@ final class EmailVisibilityService
                 'address' => $domain,
                 'enforcement' => EmailVisibilityEnforcement::Protected->getLabel(),
                 'enforcement_value' => EmailVisibilityEnforcement::Protected->value,
-                'source' => __('filament/pages/email-privacy-settings.visibility.table.system_default'),
+                'source' => (string) __('filament/pages/email-privacy-settings.visibility.table.system_default'),
                 'is_system' => true,
             ];
         }
 
         $customRows = $customEntries
             ->map(function (TeamEmailBlocklist $entry): array {
-                $enforcement = $entry->enforcement_level ?? EmailVisibilityEnforcement::Blocked;
+                $enforcement = $entry->enforcement_level;
 
                 return [
                     'key' => 'custom-'.$entry->getKey(),
                     'address' => $entry->value,
                     'enforcement' => $enforcement->getLabel(),
                     'enforcement_value' => $enforcement->value,
-                    'source' => $entry->creator?->name ?? __('filament/pages/email-privacy-settings.visibility.table.unknown_user'),
+                    'source' => $entry->creator->name,
                     'is_system' => false,
                     'entry_id' => $entry->getKey(),
                     'updated_at' => $entry->updated_at?->toFormattedDateString(),
@@ -102,7 +157,7 @@ final class EmailVisibilityService
     }
 
     /**
-     * @return list<lowercase-string>
+     * @return array<int, lowercase-string>
      */
     public function workspaceDomains(Team $team): array
     {
@@ -145,28 +200,40 @@ final class EmailVisibilityService
     {
         $email->loadMissing('participants');
 
-        $statuses = $email->participants
-            ->map(fn ($participant): ?EmailVisibilityEnforcement => $this->participantEnforcement(
-                (string) $participant->email_address,
-                $email->team_id,
-            ))
-            ->filter();
-
-        if ($statuses->isEmpty()) {
-            return false;
-        }
-
-        return $statuses->every(
-            fn (?EmailVisibilityEnforcement $enforcement): bool => $enforcement === EmailVisibilityEnforcement::Protected,
+        return $this->allAddressesAreProtected(
+            $email->participants->pluck('email_address')->all(),
+            (string) $email->team_id,
         );
     }
 
-    private function matchesWorkspaceEnforcement(Email $email, EmailVisibilityEnforcement $level): bool
+    /**
+     * @param  array<int, mixed>  $addresses
+     */
+    private function allAddressesAreProtected(array $addresses, string $teamId): bool
     {
-        $email->loadMissing('participants');
+        if ($addresses === []) {
+            return false;
+        }
 
-        foreach ($email->participants as $participant) {
-            if ($this->matchesCustomEntry((string) $participant->email_address, $email->team_id, $level)) {
+        return array_all(
+            $addresses,
+            fn (mixed $address): bool => $this->participantEnforcement((string) $address, $teamId) === EmailVisibilityEnforcement::Protected,
+        );
+    }
+
+    /**
+     * @param  array<int, mixed>  $addresses
+     */
+    private function isHiddenFromOwnerFor(string $teamId, ?string $connectedAccountId, array $addresses): bool
+    {
+        foreach ($addresses as $address) {
+            $normalized = (string) $address;
+
+            if ($this->matchesAccountBlocklistAddress($normalized, $connectedAccountId)) {
+                return true;
+            }
+
+            if ($this->matchesCustomEntry($normalized, $teamId, EmailVisibilityEnforcement::Blocked)) {
                 return true;
             }
         }
@@ -174,25 +241,23 @@ final class EmailVisibilityService
         return false;
     }
 
-    private function matchesAccountBlocklist(Email $email): bool
+    private function matchesAccountBlocklistAddress(string $address, ?string $connectedAccountId): bool
     {
-        if ($email->connected_account_id === null) {
+        if ($connectedAccountId === null) {
             return false;
         }
 
-        $email->loadMissing('participants');
+        return $this->matchesRows($address, $this->accountBlocklistRows($connectedAccountId));
+    }
 
-        $rows = EmailBlocklist::query()
-            ->where('connected_account_id', $email->connected_account_id)
+    /**
+     * @return Collection<int, EmailBlocklist>
+     */
+    private function accountBlocklistRows(string $connectedAccountId): Collection
+    {
+        return $this->accountBlocklistCache[$connectedAccountId] ??= EmailBlocklist::query()
+            ->where('connected_account_id', $connectedAccountId)
             ->get();
-
-        foreach ($email->participants as $participant) {
-            if ($this->matchesRows((string) $participant->email_address, $rows)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function participantEnforcement(string $address, string $teamId): ?EmailVisibilityEnforcement
@@ -239,11 +304,11 @@ final class EmailVisibilityService
         $domain = $this->domainFromEmail($address) ?? '';
 
         $emails = $rows
-            ->filter(fn (mixed $row): bool => ($row->type instanceof EmailBlocklistType ? $row->type : EmailBlocklistType::from((string) $row->type)) === EmailBlocklistType::EMAIL)
+            ->filter(fn (TeamEmailBlocklist|EmailBlocklist $row): bool => $row->type === EmailBlocklistType::EMAIL)
             ->pluck('value')
             ->map(fn (mixed $value): string => strtolower((string) $value));
         $domains = $rows
-            ->filter(fn (mixed $row): bool => ($row->type instanceof EmailBlocklistType ? $row->type : EmailBlocklistType::from((string) $row->type)) === EmailBlocklistType::DOMAIN)
+            ->filter(fn (TeamEmailBlocklist|EmailBlocklist $row): bool => $row->type === EmailBlocklistType::DOMAIN)
             ->pluck('value')
             ->map(fn (mixed $value): string => strtolower((string) $value));
 
@@ -265,7 +330,7 @@ final class EmailVisibilityService
     }
 
     /**
-     * @return list<lowercase-string>
+     * @return array<int, lowercase-string>
      */
     public function memberEmailsForTeam(Team $team): array
     {
@@ -278,7 +343,7 @@ final class EmailVisibilityService
     }
 
     /**
-     * @return list<lowercase-string>
+     * @return array<int, lowercase-string>
      */
     private function teamMemberEmails(string $teamId): array
     {

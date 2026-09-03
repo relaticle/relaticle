@@ -17,7 +17,7 @@ final readonly class WorkspaceEmailProtectionService
      * Corporate domains inferred from workspace members and connected mailboxes.
      * Consumer domains (gmail.com, etc.) are excluded.
      *
-     * @return list<lowercase-string>
+     * @return array<int, lowercase-string>
      */
     public function workspaceDomains(Team $team): array
     {
@@ -87,7 +87,7 @@ final readonly class WorkspaceEmailProtectionService
                 'key' => 'custom-'.$entry->getKey(),
                 'address' => $entry->value,
                 'protection' => __('filament/pages/email-privacy-settings.privacy_protections.table.protected'),
-                'source' => $entry->creator?->name ?? __('filament/pages/email-privacy-settings.privacy_protections.table.unknown_user'),
+                'source' => $entry->creator->name,
                 'is_system' => false,
                 'entry_id' => $entry->getKey(),
             ])
@@ -100,7 +100,7 @@ final readonly class WorkspaceEmailProtectionService
      * Domains that are always protected for a workspace: inferred corporate domains
      * plus any custom domains an admin added manually.
      *
-     * @return list<lowercase-string>
+     * @return array<int, lowercase-string>
      */
     public function protectedDomainsForTeam(string $teamId): array
     {

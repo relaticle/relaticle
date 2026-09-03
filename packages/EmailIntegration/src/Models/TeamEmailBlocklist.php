@@ -13,6 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 
+/**
+ * @property EmailBlocklistType $type
+ * @property EmailVisibilityEnforcement $enforcement_level
+ * @property string $value
+ * @property User|null $creator
+ */
 final class TeamEmailBlocklist extends Model
 {
     /**
