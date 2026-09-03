@@ -120,7 +120,9 @@ final class AppPanelProvider extends PanelProvider
         // Table and Schema configuration is global, so both callbacks have to check
         // which panel is actually serving the request before they touch the format.
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
             : $table);
 
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
