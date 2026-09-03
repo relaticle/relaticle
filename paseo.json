@@ -1,0 +1,6 @@
+{
+    "worktree": {
+        "setup": "bash bin/setup-workspace.sh",
+        "teardown": "bash bin/archive-workspace.sh"
+    }
+}
