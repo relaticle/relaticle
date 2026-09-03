@@ -111,6 +111,11 @@
                                     {{ __('filament/pages/email-accounts.importing_percent', ['percent' => $mailbox['percent']]) }}
                                 </span>
                             </div>
+                            @if ($mailbox['hasCalendar'])
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                    {{ trans_choice('filament/pages/email-accounts.sync_status.meetings_processed', $mailbox['meetingsImported'], ['count' => $mailbox['meetingsImported']]) }}
+                                </p>
+                            @endif
                             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
                                 {{ trans_choice('filament/pages/email-accounts.sync_status.emails_processed', $mailbox['imported'], ['count' => $mailbox['imported']]) }}
                             </p>

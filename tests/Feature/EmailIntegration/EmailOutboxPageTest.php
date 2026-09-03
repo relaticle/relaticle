@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -111,8 +112,21 @@ it('locked failed mode lists every failed email owned by the user', function ():
 });
 
 it('locked failed mode has a dedicated empty state', function (): void {
-    livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
-        ->assertSee('No failed emails');
+    $component = livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+        ->assertSee(__('filament/pages/email-inbox.failed.empty.heading'))
+        ->assertSee(__('filament/pages/email-inbox.failed.empty.description'));
+
+    expect($component->instance()->getTable()->getEmptyStateIcon())
+        ->toBe(Heroicon::OutlinedExclamationCircle);
+});
+
+it('uses an outlined clock for the outbox empty state', function (): void {
+    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false])
+        ->assertSee(__('filament/pages/email-inbox.outbox.empty.heading'))
+        ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
+
+    expect($component->instance()->getTable()->getEmptyStateIcon())
+        ->toBe(Heroicon::OutlinedClock);
 });
 
 it('can exclude failed from the status filter without changing standalone outbox', function (): void {

@@ -13,6 +13,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 mutates(LinkMeetingAction::class);
 
@@ -258,4 +259,36 @@ it('never regresses last_meeting_at when an older meeting is linked after a newe
     $person = People::query()->where('team_id', $team->id)->first();
     expect($person?->meeting_count)->toBe(2);
     expect(Carbon::parse($person?->last_meeting_at)->timestamp)->toBe($recent->starts_at->timestamp);
+});
+
+it('does not auto-create a person for a workspace-blocked attendee', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@acme.com')->create([
+        'team_id' => $team->id,
+        'created_by' => $user->id,
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'blocked@acme.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(People::query()->where('team_id', $team->id)->count())->toBe(0);
 });

@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Filament\Pages;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\HtmlString;
@@ -109,18 +108,6 @@ final class EmailAccountsPage extends Page
             // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
             ->hidden()
             ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
-    }
-
-    public function editSettingsAction(): Action
-    {
-        return Action::make('editSettings')
-            ->label(__('filament/pages/email-accounts.actions.edit_settings'))
-            ->icon('heroicon-o-cog-6-tooth')
-            ->color('gray')
-            ->size(Size::Small)
-            ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
-                'account' => (string) $arguments['account_id'],
-            ]));
     }
 
     public function refreshAccounts(): void

@@ -7,9 +7,10 @@ use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
-use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
 mutates(PrivacyService::class);
@@ -46,10 +47,10 @@ it('effectiveTier returns FULL when viewer is the email owner', function (): voi
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-it('effectiveTier returns null when a participant matches a protected email address', function (): void {
+it('effectiveTier returns null when all participants are protected by a protected email address', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
-    ProtectedRecipient::factory()->email('protected@sensitive.com')->create([
+    TeamEmailBlocklist::factory()->protected()->email('protected@sensitive.com')->create([
         'team_id' => $this->team->id,
         'created_by' => $this->owner->id,
     ]);
@@ -66,10 +67,35 @@ it('effectiveTier returns null when a participant matches a protected email addr
     expect($tier)->toBeNull();
 });
 
-it('effectiveTier returns null when a participant matches a protected domain', function (): void {
+it('effectiveTier returns a tier when only some participants are protected', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
-    ProtectedRecipient::factory()->domain('sensitive.com')->create([
+    TeamEmailBlocklist::factory()->protected()->email('protected@sensitive.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->owner->id,
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'protected@sensitive.com',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'external@acme.test',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('effectiveTier returns null when all participants match a protected domain', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    TeamEmailBlocklist::factory()->protected()->domain('sensitive.com')->create([
         'team_id' => $this->team->id,
         'created_by' => $this->owner->id,
     ]);
@@ -86,21 +112,60 @@ it('effectiveTier returns null when a participant matches a protected domain', f
     expect($tier)->toBeNull();
 });
 
+it('effectiveTier returns null when all participants match an inferred workspace domain', function (): void {
+    $this->owner->update(['email' => 'owner@thefireflytech.com']);
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'client@thefireflytech.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBeNull();
+});
+
 it('matches the protected domain by the host after the last @ for malformed addresses', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
-    ProtectedRecipient::factory()->domain('sensitive.com')->create([
+    TeamEmailBlocklist::factory()->protected()->domain('sensitive.com')->create([
         'team_id' => $this->team->id,
         'created_by' => $this->owner->id,
     ]);
 
     $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
 
-    // The real domain is the host after the LAST '@'. Reading the first label
-    // ("decoy.com") would wrongly expose this email.
     EmailParticipant::factory()->to()->create([
         'email_id' => $email->getKey(),
         'email_address' => 'user@decoy.com@sensitive.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBeNull();
+});
+
+it('effectiveTier returns null when any participant matches a blocked entry', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@sensitive.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->owner->id,
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@sensitive.com',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'external@example.com',
     ]);
 
     $tier = $this->service->effectiveTier($email, $viewer);
@@ -206,7 +271,7 @@ it('defaultTierForUser returns metadata-only when the user has no current team',
 });
 
 it('effectiveTier owner access is not blocked by protected recipient', function (): void {
-    ProtectedRecipient::factory()->email('protected@sensitive.com')->create([
+    TeamEmailBlocklist::factory()->protected()->email('protected@sensitive.com')->create([
         'team_id' => $this->team->id,
         'created_by' => $this->owner->id,
     ]);
@@ -218,8 +283,49 @@ it('effectiveTier owner access is not blocked by protected recipient', function 
         'email_address' => 'protected@sensitive.com',
     ]);
 
-    // Owner can still see their own email even when a protected recipient is involved
     $tier = $this->service->effectiveTier($email, $this->owner);
 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('effectiveTier hides a blocked email from its owner', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@sensitive.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->owner->id,
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@sensitive.com',
+    ]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'external@example.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $this->owner);
+
+    expect($tier)->toBeNull();
+});
+
+it('effectiveTier hides a mailbox-blocklisted email from its owner', function (): void {
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->owner->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'spam@badactor.com',
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $this->owner);
+
+    expect($tier)->toBeNull();
 });

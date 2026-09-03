@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 
+/**
+ * @property EmailBlocklistType $type
+ * @property string $value
+ */
 final class EmailBlocklist extends Model
 {
     /**
@@ -28,6 +32,7 @@ final class EmailBlocklist extends Model
     protected $fillable = [
         'user_id',
         'team_id',
+        'connected_account_id',
         'type',
         'value',
     ];
@@ -45,5 +50,13 @@ final class EmailBlocklist extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<ConnectedAccount, $this>
+     */
+    public function connectedAccount(): BelongsTo
+    {
+        return $this->belongsTo(ConnectedAccount::class);
     }
 }
