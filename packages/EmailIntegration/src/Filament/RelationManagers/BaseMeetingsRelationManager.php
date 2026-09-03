@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 abstract class BaseMeetingsRelationManager extends RelationManager
 {
@@ -46,6 +47,10 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
                 if ($user instanceof User) {
                     $query->withGlobalScope('visible', new VisibleMeetingScope($user));
+                }
+
+                if ($this->hidesOwnerMailbox()) {
+                    $query->whereRaw('0 = 1');
                 }
 
                 return $query->with('team');
@@ -68,6 +73,11 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->badge(),
             ])
             ->defaultSort('starts_at', 'desc')
+            ->emptyStateIcon(fn (): Heroicon => $this->hidesOwnerMailbox()
+                ? Heroicon::OutlinedShieldCheck
+                : Heroicon::Calendar)
+            ->emptyStateHeading(fn (): string => ($this->recordMailboxHiddenCopy() ?? [])['heading'] ?? __('filament-tables::table.empty.heading'))
+            ->emptyStateDescription(fn (): ?string => ($this->recordMailboxHiddenCopy() ?? [])['description'] ?? null)
             ->filters([
                 Filter::make('upcoming')
                     ->query(fn (Builder $q): Builder => $q->where('starts_at', '>=', now())),
@@ -176,5 +186,24 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             'Opportunity' => Opportunity::query()->where('team_id', $teamId)->findOrFail($id),
             default => throw new \InvalidArgumentException("Unsupported type: {$type}"),
         };
+    }
+
+    private function hidesOwnerMailbox(): bool
+    {
+        return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getOwnerRecord());
+    }
+
+    /**
+     * @return array{heading: string, description: string}|null
+     */
+    private function recordMailboxHiddenCopy(): ?array
+    {
+        $record = $this->getOwnerRecord();
+
+        if (! $record instanceof People && ! $record instanceof Company) {
+            return null;
+        }
+
+        return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
     }
 }

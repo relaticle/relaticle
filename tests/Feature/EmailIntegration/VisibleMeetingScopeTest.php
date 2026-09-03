@@ -126,3 +126,26 @@ it('hides a mailbox-blocklisted meeting from its mailbox owner', function (): vo
 
     expect(visibleMeetingsTo($this->coworker)->modelKeys())->not->toContain($blocked->id);
 });
+
+it('hides a meeting when the organizer is workspace-blocked', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->email('blocked-organizer@contact.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+        'organizer_email' => 'blocked-organizer@contact.com',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'email_address' => 'normal@contact.com',
+        'is_self' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    expect(visibleMeetingsTo($this->viewer)->modelKeys())->not->toContain($meeting->id)
+        ->and(visibleMeetingsTo($this->coworker)->modelKeys())->not->toContain($meeting->id);
+});

@@ -32,6 +32,7 @@ final readonly class LinkMeetingAction
 
     public function execute(Meeting $meeting): void
     {
+        $countsTowardIntelligence = $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting);
         $attendees = $meeting->attendees()->where('is_self', false)->get();
         $teamId = $meeting->team_id;
         $team = $meeting->team;
@@ -56,7 +57,7 @@ final readonly class LinkMeetingAction
 
                 if ($company instanceof Company) {
                     $attendee->update(['company_id' => $company->getKey()]);
-                    if ($this->autoAttach($meeting->companies(), $company->getKey())) {
+                    if ($this->autoAttach($meeting->companies(), $company->getKey()) && $countsTowardIntelligence) {
                         $this->updateCompanyMetrics($company, $meeting);
                     }
                 }
@@ -81,7 +82,7 @@ final readonly class LinkMeetingAction
 
             if ($person) {
                 $attendee->update(['contact_id' => $person->getKey()]);
-                if ($this->autoAttach($meeting->people(), $person->getKey())) {
+                if ($this->autoAttach($meeting->people(), $person->getKey()) && $countsTowardIntelligence) {
                     $this->updatePersonMetrics($person, $meeting);
                 }
 
@@ -94,7 +95,7 @@ final readonly class LinkMeetingAction
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey())) {
+                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey()) && $countsTowardIntelligence) {
                         $this->updateOpportunityMetrics($opportunity, $meeting);
                     }
                 }

@@ -32,6 +32,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 abstract class BaseRecordEmailsPage extends Page
 {
@@ -87,7 +88,8 @@ abstract class BaseRecordEmailsPage extends Page
     protected function getHeaderActions(): array
     {
         return [
-            $this->composeEmailAction(),
+            $this->composeEmailAction()
+                ->visible(fn (): bool => $this->hasActiveConnectedAccount() && ! $this->hidesRecordMailbox()),
         ];
     }
 
@@ -97,6 +99,10 @@ abstract class BaseRecordEmailsPage extends Page
     #[Computed]
     public function emails(): LengthAwarePaginator
     {
+        if ($this->hidesRecordMailbox()) {
+            return new LengthAwarePaginator([], 0, 20);
+        }
+
         $user = $this->authUser();
 
         /** @var Company|Opportunity|People $record */
@@ -133,7 +139,7 @@ abstract class BaseRecordEmailsPage extends Page
     #[Computed]
     public function showConnectPrompt(): bool
     {
-        if ($this->hasActiveConnectedAccount()) {
+        if ($this->hidesRecordMailbox() || $this->hasActiveConnectedAccount()) {
             return false;
         }
 
@@ -147,9 +153,30 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     #[Computed]
+    public function hidesRecordMailbox(): bool
+    {
+        return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getRecord());
+    }
+
+    /**
+     * @return array{heading: string, description: string}|null
+     */
+    #[Computed]
+    public function recordMailboxHiddenCopy(): ?array
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof People && ! $record instanceof Company) {
+            return null;
+        }
+
+        return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
+    }
+
+    #[Computed]
     public function selectedEmail(): ?Email
     {
-        if ($this->selectedEmailId === null) {
+        if ($this->selectedEmailId === null || $this->hidesRecordMailbox()) {
             return null;
         }
 
@@ -168,6 +195,10 @@ abstract class BaseRecordEmailsPage extends Page
     #[Computed]
     public function inboxUnreadCount(): int
     {
+        if ($this->hidesRecordMailbox()) {
+            return 0;
+        }
+
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 

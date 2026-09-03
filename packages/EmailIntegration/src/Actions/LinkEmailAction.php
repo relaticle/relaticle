@@ -272,6 +272,10 @@ final readonly class LinkEmailAction
      */
     private function incrementEmailMetrics(Model $record, Email $email): void
     {
+        if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
+            return;
+        }
+
         $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
 
         // Raw, parameterised UPDATE: counters increment atomically (no lost updates

@@ -38,9 +38,11 @@ final readonly class VisibleMeetingScope implements Scope
             ->where('team_id', $teamId)
             ->where(function (Builder $visibilityQuery) use ($viewerId, $teamId): void {
                 $this->excludeMeetingsMatchingMailboxBlocklist($visibilityQuery);
+                $this->excludeMeetingsWithBlockedOrganizerMatchingMailboxBlocklist($visibilityQuery);
 
                 if ($teamId !== null) {
                     $this->excludeMeetingsWithBlockedAttendee($visibilityQuery, $teamId);
+                    $this->excludeMeetingsWithBlockedOrganizer($visibilityQuery, $teamId);
                 }
 
                 $visibilityQuery->where(function (Builder $ownerOrShared) use ($viewerId, $teamId): void {
@@ -97,6 +99,58 @@ final readonly class VisibleMeetingScope implements Scope
                         ->whereRaw("lower(meeting_attendees.email_address) like '%@' || lower(email_blocklists.value)");
                 });
             });
+        });
+    }
+
+    /**
+     * @param  Builder<covariant TModel>  $builder
+     */
+    private function excludeMeetingsWithBlockedOrganizerMatchingMailboxBlocklist(Builder $builder): void
+    {
+        $builder->where(function (Builder $query): void {
+            $query->whereNull('organizer_email')
+                ->orWhere(function (Builder $visibleOrganizer): void {
+                    $visibleOrganizer
+                        ->whereNotExists(function (BaseBuilder $blockedEmail): void {
+                            $blockedEmail->from('email_blocklists')
+                                ->whereColumn('email_blocklists.connected_account_id', 'meetings.connected_account_id')
+                                ->where('email_blocklists.type', EmailBlocklistType::EMAIL->value)
+                                ->whereRaw('lower(email_blocklists.value) = lower(meetings.organizer_email)');
+                        })
+                        ->whereNotExists(function (BaseBuilder $blockedDomain): void {
+                            $blockedDomain->from('email_blocklists')
+                                ->whereColumn('email_blocklists.connected_account_id', 'meetings.connected_account_id')
+                                ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value)
+                                ->whereRaw("lower(meetings.organizer_email) like '%@' || lower(email_blocklists.value)");
+                        });
+                });
+        });
+    }
+
+    /**
+     * @param  Builder<covariant TModel>  $builder
+     */
+    private function excludeMeetingsWithBlockedOrganizer(Builder $builder, string $teamId): void
+    {
+        $builder->where(function (Builder $query) use ($teamId): void {
+            $query->whereNull('organizer_email')
+                ->orWhere(function (Builder $visibleOrganizer) use ($teamId): void {
+                    $visibleOrganizer
+                        ->whereNotExists(function (BaseBuilder $blockedEmail) use ($teamId): void {
+                            $blockedEmail->from('team_email_blocklists')
+                                ->where('team_email_blocklists.team_id', $teamId)
+                                ->where('team_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Blocked->value)
+                                ->where('team_email_blocklists.type', EmailBlocklistType::EMAIL->value)
+                                ->whereRaw('lower(team_email_blocklists.value) = lower(meetings.organizer_email)');
+                        })
+                        ->whereNotExists(function (BaseBuilder $blockedDomain) use ($teamId): void {
+                            $blockedDomain->from('team_email_blocklists')
+                                ->where('team_email_blocklists.team_id', $teamId)
+                                ->where('team_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Blocked->value)
+                                ->where('team_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
+                                ->whereRaw("lower(meetings.organizer_email) like '%@' || lower(team_email_blocklists.value)");
+                        });
+                });
         });
     }
 

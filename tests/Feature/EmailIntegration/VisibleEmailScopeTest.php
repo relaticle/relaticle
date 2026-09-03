@@ -161,3 +161,17 @@ it('hides a mailbox-blocklisted email from teammates', function (): void {
 
     expect(visibleTo($this->viewer)->modelKeys())->not->toContain($blocked->id);
 });
+
+it('hides a coworker email when every participant is a connected mailbox address', function (): void {
+    $this->account->update(['email_address' => 'whitesacks.dev@gmail.com']);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->viewer->id,
+        'email_address' => 'xyg@gmail.com',
+    ]));
+
+    $internal = ($this->makeCoworkerEmail)(['whitesacks.dev@gmail.com', 'xyg@gmail.com']);
+
+    expect(visibleTo($this->viewer)->modelKeys())->not->toContain($internal->id);
+});

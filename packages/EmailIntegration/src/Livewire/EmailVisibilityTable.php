@@ -95,8 +95,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
                 TagsInput::make('visibility_domains')
                     ->label(__('filament/pages/email-privacy-settings.visibility.domains_label'))
                     ->placeholder(__('filament/pages/email-privacy-settings.visibility.domains_placeholder'))
-                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.domains_after_label'))
-                    ->nestedRecursiveRules(['regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i', 'max:255']),
+                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.domains_after_label')),
                 Select::make('enforcement_level')
                     ->label(__('filament/pages/email-privacy-settings.visibility.table.enforcement'))
                     ->options(EmailVisibilityEnforcement::class)
@@ -200,9 +199,15 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
                 continue;
             }
 
+            $normalized = resolve(EmailVisibilityService::class)->normalizeDomainInput((string) $domain);
+
+            if ($normalized === null) {
+                continue;
+            }
+
             $entries[] = [
                 'type' => EmailBlocklistType::DOMAIN->value,
-                'value' => strtolower(trim($domain)),
+                'value' => $normalized,
                 'enforcement_level' => $enforcement,
             ];
         }

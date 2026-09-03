@@ -87,6 +87,29 @@ it('creates blocked TeamEmailBlocklist rows from the add contacts modal', functi
     )->toBe(['spam.com']);
 });
 
+it('normalizes domain urls when adding visibility entries', function (): void {
+    livewire(EmailVisibilityTable::class)
+        ->callAction('addVisibilityContact', data: [
+            'visibility_emails' => [],
+            'visibility_domains' => ['https://mail.outskill.com', 'outskill.com'],
+            'enforcement_level' => EmailVisibilityEnforcement::Protected->value,
+        ])
+        ->assertNotified();
+
+    expect(TeamEmailBlocklist::query()
+        ->where('team_id', $this->team->id)
+        ->where('type', 'domain')
+        ->orderBy('value')
+        ->pluck('value')
+        ->all()
+    )->toBe(['mail.outskill.com', 'outskill.com']);
+
+    livewire(EmailVisibilityTable::class)
+        ->assertSee('mail.outskill.com')
+        ->assertSee('outskill.com')
+        ->assertSee(EmailVisibilityEnforcement::Protected->getLabel());
+});
+
 it('shows system default visibility rows on the visibility tab', function (): void {
     $this->user->update(['email' => 'owner@thefireflytech.com']);
 

@@ -4,8 +4,16 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Enums\CustomFields\CompanyField;
+use App\Enums\CustomFields\PeopleField;
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\People;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
@@ -97,6 +105,119 @@ final class EmailVisibilityService
     }
 
     /**
+     * Protected people and companies keep their mailbox empty on the record page,
+     * even when mixed threads with unprotected contacts stay visible elsewhere.
+     */
+    public function hidesRecordMailbox(Model $record): bool
+    {
+        if (! $record instanceof People && ! $record instanceof Company) {
+            return false;
+        }
+
+        return $this->recordMailboxHiddenEnforcement($record) !== null;
+    }
+
+    public function recordMailboxHiddenEnforcement(People|Company $record): ?EmailVisibilityEnforcement
+    {
+        $teamId = (string) $record->team_id;
+        $isProtected = false;
+
+        foreach ($this->recordIdentityAddresses($record) as $address) {
+            $enforcement = $this->participantEnforcement($address, $teamId);
+
+            if ($enforcement === EmailVisibilityEnforcement::Blocked) {
+                return EmailVisibilityEnforcement::Blocked;
+            }
+
+            if ($enforcement === EmailVisibilityEnforcement::Protected) {
+                $isProtected = true;
+            }
+        }
+
+        foreach ($this->recordIdentityDomains($record) as $domain) {
+            $enforcement = $this->participantEnforcement("mailbox@{$domain}", $teamId);
+
+            if ($enforcement === EmailVisibilityEnforcement::Blocked) {
+                return EmailVisibilityEnforcement::Blocked;
+            }
+
+            if ($enforcement === EmailVisibilityEnforcement::Protected) {
+                $isProtected = true;
+            }
+        }
+
+        return $isProtected ? EmailVisibilityEnforcement::Protected : null;
+    }
+
+    /**
+     * @return array{heading: string, description: string}|null
+     */
+    public function recordMailboxHiddenCopy(People|Company $record): ?array
+    {
+        $enforcement = $this->recordMailboxHiddenEnforcement($record);
+
+        if ($enforcement === null) {
+            return null;
+        }
+
+        $key = match ($enforcement) {
+            EmailVisibilityEnforcement::Blocked => 'blocked',
+            EmailVisibilityEnforcement::Protected => 'protected',
+        };
+
+        return [
+            'heading' => (string) __("filament/pages/record-emails.{$key}.heading"),
+            'description' => (string) __("filament/pages/record-emails.{$key}.description"),
+        ];
+    }
+
+    /**
+     * Hidden communications must not advance shared communication-intelligence metrics.
+     */
+    public function countsTowardCommunicationIntelligence(Email $email): bool
+    {
+        if ($this->isHiddenFromOwner($email)) {
+            return false;
+        }
+
+        if ($email->is_internal) {
+            return false;
+        }
+
+        return ! $this->allParticipantsAreProtected($email);
+    }
+
+    public function meetingCountsTowardCommunicationIntelligence(Meeting $meeting): bool
+    {
+        $meeting->loadMissing(['attendees', 'connectedAccount']);
+
+        $addresses = $meeting->attendees
+            ->pluck('email_address')
+            ->filter()
+            ->values()
+            ->all();
+
+        if (filled($meeting->organizer_email)) {
+            $addresses[] = $meeting->organizer_email;
+        }
+
+        if ($this->isHiddenFromOwnerFor(
+            (string) $meeting->team_id,
+            $meeting->connected_account_id,
+            $addresses,
+        )) {
+            return false;
+        }
+
+        return ! $this->allAddressesAreProtected($addresses, (string) $meeting->team_id);
+    }
+
+    public function normalizeDomainInput(string $value): ?string
+    {
+        return $this->hostFromDomainValue($value);
+    }
+
+    /**
      * Blocked workspace entries and mailbox-only blocklists must not spawn CRM records.
      */
     public function suppressesRecordCreation(string $address, string $teamId, ?string $connectedAccountId): bool
@@ -125,7 +246,10 @@ final class EmailVisibilityService
             ],
         ];
 
-        foreach ($this->workspaceDomains($team) as $domain) {
+        $workspaceDomains = $this->workspaceDomains($team);
+        $memberEmails = $this->memberEmailsForTeam($team);
+
+        foreach ($workspaceDomains as $domain) {
             $systemRows[] = [
                 'key' => 'system-domain-'.$domain,
                 'address' => $domain,
@@ -137,6 +261,14 @@ final class EmailVisibilityService
         }
 
         $customRows = $customEntries
+            ->reject(function (TeamEmailBlocklist $entry) use ($workspaceDomains, $memberEmails): bool {
+                $value = strtolower($entry->value);
+
+                return match ($entry->type) {
+                    EmailBlocklistType::DOMAIN => in_array($value, $workspaceDomains, true),
+                    EmailBlocklistType::EMAIL => in_array($value, $memberEmails, true),
+                };
+            })
             ->map(function (TeamEmailBlocklist $entry): array {
                 $enforcement = $entry->enforcement_level;
 
@@ -194,6 +326,97 @@ final class EmailVisibilityService
             ->sort()
             ->values()
             ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function recordIdentityAddresses(People|Company $record): array
+    {
+        if (! $record instanceof People) {
+            return [];
+        }
+
+        $field = $this->customFieldFor((string) $record->team_id, 'people', PeopleField::EMAILS->value);
+
+        if (! $field instanceof CustomField) {
+            return [];
+        }
+
+        $record->loadMissing('customFieldValues.customField');
+
+        return $this->stringList($record->getCustomFieldValue($field));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function recordIdentityDomains(People|Company $record): array
+    {
+        if (! $record instanceof Company) {
+            return [];
+        }
+
+        $field = $this->customFieldFor((string) $record->team_id, 'company', CompanyField::DOMAINS->value);
+
+        if (! $field instanceof CustomField) {
+            return [];
+        }
+
+        $record->loadMissing('customFieldValues.customField');
+
+        $hosts = [];
+
+        foreach ($this->stringList($record->getCustomFieldValue($field)) as $value) {
+            $host = $this->hostFromDomainValue($value);
+
+            if ($host !== null) {
+                $hosts[] = $host;
+            }
+        }
+
+        return $hosts;
+    }
+
+    private function customFieldFor(string $teamId, string $entityType, string $code): ?CustomField
+    {
+        $field = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', $entityType)
+            ->where('code', $code)
+            ->first();
+
+        return $field instanceof CustomField ? $field : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        return array_values(array_filter(
+            Arr::wrap($value),
+            fn (mixed $item): bool => is_string($item) && $item !== '',
+        ));
+    }
+
+    private function hostFromDomainValue(string $value): ?string
+    {
+        $value = strtolower(trim($value));
+        $value = (string) Str::of($value)->replaceStart('https://', '')->replaceStart('http://', '');
+
+        if (str_starts_with($value, '@')) {
+            $value = substr($value, 1);
+        }
+
+        $host = Str::before(Str::before($value, '/'), ':');
+
+        if ($host === '' || ! preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/', $host)) {
+            return null;
+        }
+
+        return $host;
     }
 
     private function allParticipantsAreProtected(Email $email): bool
@@ -357,9 +580,34 @@ final class EmailVisibilityService
             return $this->teamMemberEmailCache[$teamId] = [];
         }
 
-        return $this->teamMemberEmailCache[$teamId] = $team->allUsers()
+        $emails = $team->allUsers()
             ->pluck('email')
-            ->map(fn (string $email): string => strtolower($email))
+            ->map(fn (string $email): string => strtolower($email));
+
+        ConnectedAccount::query()
+            ->where('team_id', $teamId)
+            ->pluck('email_address')
+            ->each(function (mixed $emailAddress) use ($emails): void {
+                $normalized = strtolower(trim((string) $emailAddress));
+
+                if ($normalized !== '') {
+                    $emails->push($normalized);
+                }
+            });
+
+        TeamInvitation::query()
+            ->where('team_id', $teamId)
+            ->pluck('email')
+            ->each(function (mixed $emailAddress) use ($emails): void {
+                $normalized = strtolower(trim((string) $emailAddress));
+
+                if ($normalized !== '') {
+                    $emails->push($normalized);
+                }
+            });
+
+        return $this->teamMemberEmailCache[$teamId] = $emails
+            ->unique()
             ->values()
             ->all();
     }
