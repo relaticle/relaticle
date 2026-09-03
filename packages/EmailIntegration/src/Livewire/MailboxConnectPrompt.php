@@ -17,7 +17,6 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 /**
@@ -46,11 +45,6 @@ final class MailboxConnectPrompt extends Component implements HasActions, HasSch
         }
 
         return ! ConnectedAccount::hasActiveFor($user, $team instanceof Team ? $team : null);
-    }
-
-    public function inboxUrl(): string
-    {
-        return EmailInboxPage::getUrl();
     }
 
     public function render(): View

@@ -9,7 +9,6 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\MailboxConnectPrompt;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -28,7 +27,6 @@ it('shows the Google connect prompt on home when no mailbox is connected', funct
         ->assertSee(__('filament/pages/dashboard.mailbox.empty.title'))
         ->assertSee(__('filament/pages/dashboard.mailbox.empty.description'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
-        ->assertSeeHtml(EmailInboxPage::getUrl())
         ->assertActionVisible('connectGmail')
         ->assertActionHidden('connectAzure');
 });
@@ -85,7 +83,6 @@ it('hides the prompt when email integration is off', function (): void {
 
 it('shows the connect prompt on the dashboard page', function (): void {
     livewire(Dashboard::class)
-        ->assertSee(__('filament/pages/dashboard.mailbox.heading'))
         ->assertSee(__('filament/pages/dashboard.mailbox.empty.title'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
         ->assertSee('data-mailbox-connect="home"', escape: false);

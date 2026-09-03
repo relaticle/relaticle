@@ -35,8 +35,6 @@ return [
         ],
     ],
     'mailbox' => [
-        'heading' => 'Emails',
-        'view_all' => 'View all',
         'empty' => [
             'title' => 'Keep conversations in one place',
             'description' => 'Connect your mailbox to read and reply next to your records',
