@@ -66,7 +66,7 @@ final class MailboxImportStatus extends Component
     }
 
     /**
-     * @return list<array{id: string, email: string, imported: int, percent: int, importing: bool, settings_url: string}>
+     * @return list<array{id: string, email: string, imported: int, meetingsImported: int, hasCalendar: bool, percent: int, importing: bool, settings_url: string}>
      */
     public function visibleMailboxes(): array
     {
@@ -91,6 +91,8 @@ final class MailboxImportStatus extends Component
                 'id' => $id,
                 'email' => $account->email_address,
                 'imported' => $account->initial_sync_imported,
+                'meetingsImported' => $account->initial_calendar_sync_imported,
+                'hasCalendar' => $account->hasCalendar(),
                 'percent' => $account->initialSyncProgressPercent(),
                 'importing' => $account->isImportingHistory(),
                 'settings_url' => EmailAccountSettingsPage::getUrl(['account' => $id]),

@@ -9,6 +9,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
@@ -60,6 +61,11 @@ function makeDraft(User $user, ConnectedAccount $account, array $overrides = [])
 
 it('uses an outlined icon for the failed tab', function (): void {
     expect(EmailPageTab::FAILED->getIcon())->toBe(Heroicon::OutlinedExclamationCircle);
+});
+
+it('uses an outlined key for the requests empty state', function (): void {
+    expect(Livewire::test(AccessRequestsTable::class)->instance()->getTable()->getEmptyStateIcon())
+        ->toBe(Heroicon::OutlinedKey);
 });
 
 it('defaults to the first tab and switches between tabs', function (): void {
@@ -224,6 +230,80 @@ it('saves an email privacy tier from the sharing cards', function (): void {
     expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
+it('shows the configure empty state on drafts when no mailbox is connected', function (): void {
+    $this->account->forceDelete();
+
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
+        ->assertSee(__('filament/pages/email-accounts.not_connected.action'))
+        ->assertDontSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertDontSee(__('filament/emails/composer.grant_send.description'))
+        ->assertDontSee(__('filament/concerns/email-compose.actions.compose.label'))
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'configureMailbox']);
+});
+
+it('opens the composer from the drafts empty state when a mailbox is connected', function (): void {
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertSee(__('filament/concerns/email-compose.actions.compose.label'))
+        ->assertTableHeaderActionsExistInOrder(['composeEmail'])
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'configureMailbox'])
+        ->callAction(TestAction::make('composeEmail')->table())
+        ->assertDispatched('composer:open');
+});
+
+it('keeps the drafts empty copy when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
+        ->assertDontSee(__('filament/emails/composer.grant_send.description'));
+});
+
+it('keeps the drafts empty copy when the mailbox has a sync error', function (): void {
+    $this->account->update([
+        'status' => EmailAccountStatus::ERROR,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'));
+});
+
+it('keeps the drafts empty copy when the mailbox can send', function (): void {
+    Livewire::test(DraftsTable::class)
+        ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
+        ->assertDontSee(__('filament/emails/composer.grant_send.description'));
+});
+
+it('lists drafts even when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    $draft = makeDraft($this->user, $this->account);
+
+    Livewire::test(DraftsTable::class)
+        ->assertCanSeeTableRecords([$draft])
+        ->assertDontSee(__('filament/emails/composer.grant_send.description'));
+});
+
 it('lists only the signed-in user\'s own drafts', function (): void {
     $mine = makeDraft($this->user, $this->account);
 
@@ -269,6 +349,14 @@ it('deletes a draft from the drafts table, attachment rows and files included', 
         ->and(EmailAttachment::query()->where('email_id', $draft->getKey())->exists())->toBeFalse();
 
     Storage::disk(EmailAttachment::DISK)->assertMissing($path);
+});
+
+it('shows create on the templates empty state', function (): void {
+    Livewire::test(TemplatesTable::class)
+        ->assertSee(__('filament/resources/email-template.empty.heading'))
+        ->assertSee(__('filament/resources/email-template.empty.description'))
+        ->assertSee(__('filament/resources/email-template.actions.create.label'))
+        ->assertTableEmptyStateActionsExistInOrder(['create']);
 });
 
 it('lists shared and own templates in the templates tab', function (): void {

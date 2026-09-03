@@ -140,6 +140,36 @@ it('renders nothing on home when nothing is importing', function (): void {
         ->assertDontSee(__('filament/pages/email-accounts.sync_status.title_syncing'));
 });
 
+it('does not list meetings on a mailbox without calendar', function (): void {
+    importingAccount();
+
+    livewire(MailboxImportStatus::class, ['placement' => 'home'])
+        ->assertSee(trans_choice('filament/pages/email-accounts.sync_status.emails_processed', 643, ['count' => 643]))
+        ->assertDontSee(trans_choice('filament/pages/email-accounts.sync_status.meetings_processed', 0, ['count' => 0]));
+});
+
+it('lists meetings processed above emails on home when calendar is enabled', function (): void {
+    importingAccount([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'initial_calendar_sync_imported' => 12,
+        'initial_sync_imported' => 57,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    $html = livewire(MailboxImportStatus::class, ['placement' => 'home'])->html();
+    $meetings = trans_choice('filament/pages/email-accounts.sync_status.meetings_processed', 12, ['count' => 12]);
+    $emails = trans_choice('filament/pages/email-accounts.sync_status.emails_processed', 57, ['count' => 57]);
+
+    expect($html)->toContain($meetings)->toContain($emails);
+
+    $meetingsPosition = strpos($html, $meetings);
+    $emailsPosition = strpos($html, $emails);
+
+    expect($meetingsPosition)->toBeInt()
+        ->and($emailsPosition)->toBeInt()
+        ->and($meetingsPosition)->toBeLessThan($emailsPosition);
+});
+
 it('shows the home sync section on the dashboard page', function (): void {
     $account = importingAccount(['initial_sync_imported' => 57, 'initial_sync_estimated' => 100]);
 
@@ -149,6 +179,30 @@ it('shows the home sync section on the dashboard page', function (): void {
         ->assertSee(trans_choice('filament/pages/email-accounts.sync_status.emails_processed', 57, ['count' => 57]))
         ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 57]))
         ->assertSee('role="progressbar"', false);
+});
+
+it('shows meetings processed above emails on the dashboard', function (): void {
+    $account = importingAccount([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'initial_calendar_sync_imported' => 12,
+        'initial_sync_imported' => 57,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    $html = livewire(Dashboard::class)->html();
+    $meetings = trans_choice('filament/pages/email-accounts.sync_status.meetings_processed', 12, ['count' => 12]);
+    $emails = trans_choice('filament/pages/email-accounts.sync_status.emails_processed', 57, ['count' => 57]);
+
+    expect($html)->toContain($account->email_address)
+        ->toContain($meetings)
+        ->toContain($emails);
+
+    $meetingsPosition = strpos($html, $meetings);
+    $emailsPosition = strpos($html, $emails);
+
+    expect($meetingsPosition)->toBeInt()
+        ->and($emailsPosition)->toBeInt()
+        ->and($meetingsPosition)->toBeLessThan($emailsPosition);
 });
 
 it('shows the syncing badge on the accounts page without the progress section', function (): void {

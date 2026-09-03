@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -162,30 +161,8 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * @return array<int, Action>
-     */
-    protected function getHeaderActions(): array
-    {
-        return [
-            $this->composeEmailAction(),
-        ];
-    }
-
-    protected function composeEmailAction(): Action
-    {
-        return Action::make('composeEmail')
-            ->label(__('filament/concerns/email-compose.actions.compose.label'))
-            ->icon('heroicon-o-pencil-square')
-            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
-            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
-            ->action(function (): void {
-                $this->dispatch('composer:open');
-            });
-    }
-
-    /**
-     * No page heading. The sidebar already marks Email as active; the header row
-     * carries only the compose action above the tab strip.
+     * No page heading. The sidebar already marks Email as active. Compose lives
+     * on the Drafts table so it does not appear on the other tabs.
      */
     public function getHeading(): string
     {
@@ -752,39 +729,6 @@ final class EmailInboxPage extends Page
         }
 
         return $this->defaultPrivacyTier();
-    }
-
-    /**
-     * Drives the "connect a mailbox" empty state, so it is read from the blade
-     * as a computed property.
-     */
-    #[Computed]
-    public function hasActiveConnectedAccount(): bool
-    {
-        /** @var Team|null $team */
-        $team = filament()->getTenant();
-
-        return ConnectedAccount::hasActiveFor($this->authUser(), $team);
-    }
-
-    /**
-     * Take the whole page over with the connect prompt only when the user has nothing
-     * to read here: teammates without a mailbox of their own still get the inbox for
-     * emails shared with them.
-     */
-    #[Computed]
-    public function showConnectPrompt(): bool
-    {
-        if ($this->hasActiveConnectedAccount()) {
-            return false;
-        }
-
-        $user = $this->authUser();
-
-        return Email::query()
-            ->forTeam($user->current_team_id)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->doesntExist();
     }
 
     /**

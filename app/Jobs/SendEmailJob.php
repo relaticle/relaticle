@@ -9,10 +9,9 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
-use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
+use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\EmailBatch;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Throwable;
 
@@ -99,47 +98,8 @@ final class SendEmailJob implements ShouldQueue
         $this->syncBatchCounters($email->batch_id);
     }
 
-    /**
-     * Recount sent/failed from email statuses so a crash after delivery cannot
-     * leave the batch hanging, and a retry cannot double-count.
-     */
     private function syncBatchCounters(?string $batchId): void
     {
-        if ($batchId === null) {
-            return;
-        }
-
-        DB::transaction(function () use ($batchId): void {
-            $batch = EmailBatch::query()->lockForUpdate()->find($batchId);
-
-            if ($batch === null) {
-                return;
-            }
-
-            $sentCount = Email::query()
-                ->where('batch_id', $batchId)
-                ->where('status', EmailStatus::SENT)
-                ->count();
-
-            $failedCount = Email::query()
-                ->where('batch_id', $batchId)
-                ->where('status', EmailStatus::FAILED)
-                ->count();
-
-            $processed = $sentCount + $failedCount;
-            $status = $batch->status;
-
-            if ($processed >= $batch->total_recipients) {
-                $status = $failedCount > 0
-                    ? EmailBatchStatus::PartialFailure
-                    : EmailBatchStatus::Completed;
-            }
-
-            $batch->update([
-                'sent_count' => $sentCount,
-                'failed_count' => $failedCount,
-                'status' => $status,
-            ]);
-        });
+        resolve(SyncEmailBatchCountersAction::class)->execute($batchId);
     }
 }

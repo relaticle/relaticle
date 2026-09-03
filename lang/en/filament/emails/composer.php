@@ -50,6 +50,14 @@ return [
         'restore' => 'Restore',
         'close' => 'Close',
         'discard' => 'Discard draft',
+        'grant_send' => [
+            'label' => 'Grant permission',
+        ],
+    ],
+    'grant_send' => [
+        'heading' => '":email" does not have permission to send emails.',
+        'heading_generic' => 'This mailbox does not have permission to send emails.',
+        'description' => 'Please grant permission to enable email sending.',
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],

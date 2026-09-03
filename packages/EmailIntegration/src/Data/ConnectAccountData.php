@@ -19,5 +19,6 @@ final readonly class ConnectAccountData
         public ?string $refreshToken,
         public ?Carbon $tokenExpiresAt,
         public bool $hasCalendar,
+        public bool $hasSend,
     ) {}
 }

@@ -126,7 +126,7 @@ trait HasConnectedAccountActions
                 }
 
                 // Always re-run OAuth when enabling so the provider grants the calendar scope on the token.
-                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]).'?capability=calendar');
+                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]));
             });
     }
 

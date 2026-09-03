@@ -37,6 +37,12 @@ return [
             'bulk_deleted' => '{1}1 draft deleted|[2,*]:count drafts deleted',
         ],
     ],
+    'outbox' => [
+        'empty' => [
+            'heading' => 'No emails in the outbox',
+            'description' => 'Queued and scheduled emails appear here until they send.',
+        ],
+    ],
     'failed' => [
         'empty' => [
             'heading' => 'No failed emails',

@@ -21,6 +21,44 @@ final readonly class CallbackController
 {
     private const array SUPPORTED_PROVIDERS = ['gmail', 'azure'];
 
+    /**
+     * Google Calendar grants that mean Relaticle may sync meetings. Granular
+     * consent can return any one of these instead of the full requested set.
+     *
+     * @var list<string>
+     */
+    private const array GMAIL_CALENDAR_SCOPES = [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar.events.readonly',
+        'https://www.googleapis.com/auth/calendar',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const array AZURE_CALENDAR_SCOPES = [
+        'https://graph.microsoft.com/Calendars.Read',
+        'https://graph.microsoft.com/Calendars.ReadWrite',
+    ];
+
+    /**
+     * Grants that mean Relaticle may send mail from this mailbox.
+     *
+     * @var list<string>
+     */
+    private const array GMAIL_SEND_SCOPES = [
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://mail.google.com/',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const array AZURE_SEND_SCOPES = [
+        'https://graph.microsoft.com/Mail.Send',
+    ];
+
     public function __invoke(Request $request, string $provider): RedirectResponse
     {
         /** @var User $user */
@@ -56,6 +94,7 @@ final readonly class CallbackController
         /** @var array<int, string> $grantedScopes */
         $grantedScopes = $socialUser->approvedScopes;
         $hasCalendar = $this->detectCalendarCapability($provider, $grantedScopes);
+        $hasSend = $this->detectSendCapability($provider, $grantedScopes);
 
         resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
             userId: $user->getKey(),
@@ -68,6 +107,7 @@ final readonly class CallbackController
             refreshToken: $socialUser->refreshToken,
             tokenExpiresAt: now()->addSeconds($socialUser->expiresIn),
             hasCalendar: $hasCalendar,
+            hasSend: $hasSend,
         ));
 
         return redirect(EmailAccountsPage::getUrl([
@@ -88,9 +128,33 @@ final readonly class CallbackController
     private function detectCalendarCapability(string $provider, array $approvedScopes): bool
     {
         return match ($provider) {
-            'gmail' => in_array('https://www.googleapis.com/auth/calendar.readonly', $approvedScopes, true),
-            'azure' => in_array('https://graph.microsoft.com/Calendars.Read', $approvedScopes, true),
+            'gmail' => $this->grantsAnyScope($approvedScopes, self::GMAIL_CALENDAR_SCOPES),
+            'azure' => $this->grantsAnyScope($approvedScopes, self::AZURE_CALENDAR_SCOPES),
             default => false,
         };
+    }
+
+    /**
+     * @param  array<int, string>  $approvedScopes
+     */
+    private function detectSendCapability(string $provider, array $approvedScopes): bool
+    {
+        return match ($provider) {
+            'gmail' => $this->grantsAnyScope($approvedScopes, self::GMAIL_SEND_SCOPES),
+            'azure' => $this->grantsAnyScope($approvedScopes, self::AZURE_SEND_SCOPES),
+            default => false,
+        };
+    }
+
+    /**
+     * @param  array<int, string>  $approvedScopes
+     * @param  list<string>  $wanted
+     */
+    private function grantsAnyScope(array $approvedScopes, array $wanted): bool
+    {
+        return array_any(
+            $approvedScopes,
+            fn (string $scope): bool => in_array($scope, $wanted, true),
+        );
     }
 }

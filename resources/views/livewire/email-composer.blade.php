@@ -120,6 +120,11 @@
             @endif
 
             @unless ($isMinimized)
+                @if (! $this->canSendFromSelectedAccount())
+                    <x-emails.composer-send-missing :email="$this->fromAccount?->email_address">
+                        {{ $this->grantSendPermissionAction }}
+                    </x-emails.composer-send-missing>
+                @else
                 {{-- The message being answered or forwarded, above the draft and split
                      off by the same dashed rule the inline dock uses, so a reply looks
                      the same whether it is being written under the original or reopened
@@ -263,6 +268,7 @@
                         {{ __('filament/emails/composer.actions.send') }}
                     </x-filament::button>
                 </div>
+                @endif
             @endunless
         </div>
     @endif

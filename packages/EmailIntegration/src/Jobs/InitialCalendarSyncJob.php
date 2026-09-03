@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Throwable;
 
@@ -96,7 +97,12 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         ?string $nextPageToken,
         ?string $nextSyncToken,
     ): void {
+        $imported = Meeting::query()
+            ->where('connected_account_id', $account->getKey())
+            ->count();
+
         if ($nextPageToken !== null && $nextPageToken !== '') {
+            $account->update(['initial_calendar_sync_imported' => $imported]);
             dispatch(new self($account, $nextPageToken));
 
             return;
@@ -106,6 +112,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             'last_calendar_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,
+            'initial_calendar_sync_imported' => $imported,
         ];
 
         if ($nextSyncToken !== null && $nextSyncToken !== '') {

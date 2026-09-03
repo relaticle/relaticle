@@ -61,6 +61,7 @@ use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 /**
  * @property-read Action $createSignatureAction
  * @property-read Action $createTemplateAction
+ * @property-read Action $grantSendPermissionAction
  */
 final class EmailComposer extends Component implements HasActions, HasSchemas
 {
@@ -200,9 +201,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $account = $this->activeAccounts()->first();
+        $account = $this->sendableAccount() ?? $this->activeAccounts()->first();
 
-        if ($account === null) {
+        if (! $account instanceof ConnectedAccount) {
             return;
         }
 
@@ -249,9 +250,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $account = $this->activeAccounts()->first();
+        $account = $this->sendableAccount() ?? $this->activeAccounts()->first();
 
-        if ($account === null) {
+        if (! $account instanceof ConnectedAccount) {
             return;
         }
 
@@ -1018,6 +1019,28 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
+     * Send the user back through OAuth when the selected mailbox cannot send.
+     */
+    public function grantSendPermissionAction(): Action
+    {
+        return Action::make('grantSendPermission')
+            ->label(__('filament/emails/composer.actions.grant_send.label'))
+            ->color('primary')
+            ->visible(fn (): bool => ! $this->canSendFromSelectedAccount())
+            ->action(function (): void {
+                $account = $this->selectedAccount();
+
+                if (! $account instanceof ConnectedAccount || $account->hasSend()) {
+                    return;
+                }
+
+                $this->redirect(route('email-accounts.redirect', [
+                    'provider' => $account->provider->value,
+                ]));
+            });
+    }
+
+    /**
      * Create a signature for the account currently selected in the "From" row and
      * apply it to the message immediately.
      */
@@ -1452,10 +1475,31 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return once(fn (): Collection => ConnectedAccount::query()
             ->where('user_id', $this->authUser()->getKey())
             ->where('team_id', $this->authUser()->current_team_id)
-            ->where('status', 'active')
+            ->connected()
             ->orderByDesc('is_default')
             ->oldest()
             ->get());
+    }
+
+    public function canSendFromSelectedAccount(): bool
+    {
+        return $this->selectedAccount()?->hasSend() ?? false;
+    }
+
+    private function sendableAccount(): ?ConnectedAccount
+    {
+        return $this->activeAccounts()
+            ->first(fn (ConnectedAccount $account): bool => $account->hasSend());
+    }
+
+    private function selectedAccount(): ?ConnectedAccount
+    {
+        if ($this->accountId === null) {
+            return null;
+        }
+
+        return $this->activeAccounts()
+            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->accountId);
     }
 
     /**

@@ -25,7 +25,9 @@ final readonly class StoreMeetingAction
             return null;
         }
 
-        return DB::transaction(function () use ($payload, $account): Meeting {
+        $isNewMeeting = false;
+
+        $meeting = DB::transaction(function () use ($payload, $account, &$isNewMeeting): Meeting {
             $meeting = Meeting::withTrashed()
                 ->where('connected_account_id', $account->getKey())
                 ->where('provider_event_id', $payload->providerEventId)
@@ -91,6 +93,12 @@ final readonly class StoreMeetingAction
 
             return $meeting;
         });
+
+        if ($isNewMeeting) {
+            $this->bumpInitialCalendarImportProgress($account);
+        }
+
+        return $meeting;
     }
 
     private function shouldSkip(NormalizedMeetingPayload $payload): bool
@@ -111,5 +119,13 @@ final readonly class StoreMeetingAction
             ->where('connected_account_id', $account->getKey())
             ->where('provider_event_id', $providerEventId)
             ->delete();
+    }
+
+    private function bumpInitialCalendarImportProgress(ConnectedAccount $connectedAccount): void
+    {
+        ConnectedAccount::query()
+            ->whereKey($connectedAccount->getKey())
+            ->whereNull('calendar_sync_cursor')
+            ->increment('initial_calendar_sync_imported');
     }
 }

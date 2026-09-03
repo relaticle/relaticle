@@ -50,13 +50,15 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
         return $table
             ->query($this->buildQuery())
             ->filters($this->lockedStatus instanceof EmailStatus ? [] : [$this->statusFilter()])
-            ->when(
-                $this->lockedStatus === EmailStatus::FAILED,
-                fn (Table $table): Table => $table
-                    ->emptyStateHeading(__('filament/pages/email-inbox.failed.empty.heading'))
-                    ->emptyStateDescription(__('filament/pages/email-inbox.failed.empty.description'))
-                    ->emptyStateIcon(Heroicon::ExclamationCircle),
-            )
+            ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
+                ? __('filament/pages/email-inbox.failed.empty.heading')
+                : __('filament/pages/email-inbox.outbox.empty.heading'))
+            ->emptyStateDescription(fn (): string => $this->lockedStatus === EmailStatus::FAILED
+                ? __('filament/pages/email-inbox.failed.empty.description')
+                : __('filament/pages/email-inbox.outbox.empty.description'))
+            ->emptyStateIcon(fn (): Heroicon => $this->lockedStatus === EmailStatus::FAILED
+                ? Heroicon::OutlinedExclamationCircle
+                : Heroicon::OutlinedClock)
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')

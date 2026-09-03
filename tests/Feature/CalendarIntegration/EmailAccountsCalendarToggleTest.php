@@ -30,7 +30,7 @@ it('redirects to oauth when enabling calendar sync', function (): void {
 
     livewire(EmailAccountsPage::class)
         ->callAction('syncCalendar', arguments: ['account_id' => $account->id])
-        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']).'?capability=calendar');
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
 
     expect($account->fresh()?->hasCalendar())->toBeFalse();
     Bus::assertNotDispatched(InitialCalendarSyncJob::class);

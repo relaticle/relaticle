@@ -375,7 +375,7 @@ trait HasEmailComposeActions
         /** @var Team|null $team */
         $team = filament()->getTenant();
 
-        return ConnectedAccount::hasActiveFor($this->getAuthenticatedUser(), $team);
+        return ConnectedAccount::hasConnectedFor($this->getAuthenticatedUser(), $team);
     }
 
     /**

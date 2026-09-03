@@ -133,3 +133,82 @@ it('updates an existing meeting idempotently', function (): void {
     expect(Meeting::query()->count())->toBe(1);
     expect(Meeting::query()->first()?->title)->toBe('Second title');
 });
+
+it('bumps calendar import progress while the calendar cursor is still empty', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+
+    (app(StoreMeetingAction::class))->execute(new NormalizedMeetingPayload(
+        providerEventId: 'evt-progress',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'Kickoff',
+        description: null,
+        location: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        allDay: false,
+        organizerEmail: null,
+        organizerName: null,
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: AttendeeResponseStatus::ACCEPTED,
+        htmlLink: null,
+        attendees: [],
+    ), $account);
+
+    expect($account->fresh()?->initial_calendar_sync_imported)->toBe(1);
+});
+
+it('does not bump calendar import progress after the calendar cursor is written', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'calendar_sync_cursor' => 'sync-1',
+    ]));
+
+    (app(StoreMeetingAction::class))->execute(new NormalizedMeetingPayload(
+        providerEventId: 'evt-after-cursor',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'Kickoff',
+        description: null,
+        location: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        allDay: false,
+        organizerEmail: null,
+        organizerName: null,
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: AttendeeResponseStatus::ACCEPTED,
+        htmlLink: null,
+        attendees: [],
+    ), $account);
+
+    expect($account->fresh()?->initial_calendar_sync_imported)->toBe(0);
+});
+
+it('does not bump calendar import progress when updating an existing meeting', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+    $payload = new NormalizedMeetingPayload(
+        providerEventId: 'evt-no-double-count',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'First',
+        description: null,
+        location: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        allDay: false,
+        organizerEmail: null,
+        organizerName: null,
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: AttendeeResponseStatus::ACCEPTED,
+        htmlLink: null,
+        attendees: [],
+    );
+
+    (app(StoreMeetingAction::class))->execute($payload, $account);
+    (app(StoreMeetingAction::class))->execute($payload, $account);
+
+    expect($account->fresh()?->initial_calendar_sync_imported)->toBe(1);
+});

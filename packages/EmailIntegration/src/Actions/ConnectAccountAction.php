@@ -29,6 +29,7 @@ final readonly class ConnectAccountAction
                 'last_error' => null,
                 'capabilities' => [
                     'email' => true,
+                    'send' => $data->hasSend,
                     'calendar' => $data->hasCalendar,
                 ],
             ];

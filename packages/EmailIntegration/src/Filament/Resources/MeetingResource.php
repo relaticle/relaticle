@@ -155,7 +155,7 @@ final class MeetingResource extends Resource
         /** @var Team|null $team */
         $team = filament()->getTenant();
 
-        return $user instanceof User && ConnectedAccount::hasActiveFor($user, $team);
+        return $user instanceof User && ConnectedAccount::hasConnectedFor($user, $team);
     }
 
     #[Override]
