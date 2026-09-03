@@ -74,6 +74,18 @@ present.
 
 ## 4. Login flow (both panels, Filament stock login)
 
+**UPDATE (verified: 2026-09-03, app panel, path-routed `astana-v1`):** the app login is
+now identifier-first (PR #285). `/app/login` renders only `id="form.email"` plus a
+"Continue" submit; there is no `form.password` on the first step, so the eval recipe
+below returns `no-inputs`. Two things that worked:
+
+- Herd's cert fails Chromium's name check (`ERR_CERT_COMMON_NAME_INVALID`). Export
+  `AGENT_BROWSER_IGNORE_HTTPS_ERRORS=1` (or pass `--ignore-https-errors`) on every call.
+- Local login pages render one-click `laravel-login-link` buttons labelled by email
+  (`owner@relaticle.test`, `trial@relaticle.test`, ...). Click one via eval:
+  `[...document.querySelectorAll("button[type=submit]")].find(b=>b.innerText.trim()==="owner@relaticle.test").click()`
+  and you land on `/app/<team-slug>` (`acme-sales` for owner) with no password step.
+
 **CORRECTION (verified: 2026-06-12, review PR 336):** the `input[name="email"]` selector
 is WRONG. It matches a **hidden** input belonging to the `laravel-login-link` dev package
 (the page has hidden `_token`/`email`/`key`/`guard`/`user_model` inputs from that form).
