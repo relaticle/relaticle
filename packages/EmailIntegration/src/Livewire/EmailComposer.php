@@ -392,6 +392,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public function send(): void
     {
+        if (! $this->canSendFromSelectedAccount()) {
+            return;
+        }
+
         $this->validate([
             'accountId' => ['required'],
             'to' => ['required', 'array', 'min:1'],

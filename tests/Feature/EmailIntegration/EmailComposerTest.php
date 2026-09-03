@@ -136,6 +136,26 @@ it('opens from a sendable mailbox when another connected account cannot send', f
         ->assertSet('accountId', $sendable->id);
 });
 
+it('does not queue mail from send when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
 it('queues an email through SendEmailAction on send with the persisted body and undo-send window', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')

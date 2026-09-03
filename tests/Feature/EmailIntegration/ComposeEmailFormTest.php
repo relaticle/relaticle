@@ -41,6 +41,24 @@ it('opens the floating composer instead of a compose modal', function (): void {
         ->assertDispatched('composer:open');
 });
 
+it('opens the composer when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertActionVisible('composeEmail')
+        ->callAction('composeEmail')
+        ->assertDispatched('composer:open');
+});
+
 it('is hidden when user has no active connected account', function (): void {
     $this->account->update(['status' => EmailAccountStatus::DISCONNECTED]);
 
