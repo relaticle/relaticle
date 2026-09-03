@@ -24,8 +24,8 @@ final class TeamInvitationFactory extends Factory
     {
         return [
             'team_id' => Team::factory(),
-            'email' => $this->faker->unique()->safeEmail(),
-            'role' => $this->faker->randomElement([TeamRole::Admin->value, TeamRole::Editor->value]),
+            'email' => fake()->unique()->safeEmail(),
+            'role' => fake()->randomElement([TeamRole::Admin->value, TeamRole::Editor->value]),
             'expires_at' => now()->addDays(config('jetstream.invitation_expiry_days', 7)),
         ];
     }

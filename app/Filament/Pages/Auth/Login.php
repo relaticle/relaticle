@@ -8,6 +8,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsTeamInvitation;
 use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use App\Support\EmailAddress;
@@ -158,7 +159,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $invitation = $this->getTeamInvitationFromSession();
 
-        if ($invitation && ! $invitation->isExpired() && $invitation->email === $email && $user->markEmailAsVerified()) {
+        if ($invitation instanceof TeamInvitation && ! $invitation->isExpired() && $invitation->email === $email && $user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
