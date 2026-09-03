@@ -3,7 +3,7 @@
 # Gitignored files each new worktree needs (.env, Passport keys) are copied via
 # .worktreeinclude at the repo root. Everything else (Herd site, .env
 # rewrites, per-workspace testing DB, dependencies, build) lives in the
-# scripts, shared with Polyscope (polyscope.json calls the same files).
+# scripts, shared with Paseo and Polyscope.
 
 [scripts]
 setup = "bash bin/setup-workspace.sh"
