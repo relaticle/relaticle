@@ -34,6 +34,12 @@ return [
             ],
         ],
     ],
+    'mailbox' => [
+        'empty' => [
+            'title' => 'Keep conversations in one place',
+            'description' => 'Connect your mailbox to read and reply next to your records',
+        ],
+    ],
     'tasks' => [
         'heading' => 'Tasks',
         'view_all' => 'View all',

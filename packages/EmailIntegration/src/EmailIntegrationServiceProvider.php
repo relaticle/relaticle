@@ -26,6 +26,7 @@ use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
+use Relaticle\EmailIntegration\Livewire\MailboxConnectPrompt;
 use Relaticle\EmailIntegration\Livewire\MailboxImportStatus;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
@@ -90,6 +91,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.mailbox-import-status', MailboxImportStatus::class);
+        Livewire::component('email-integration.mailbox-connect-prompt', MailboxConnectPrompt::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the
