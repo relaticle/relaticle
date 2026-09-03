@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Provisions a parallel workspace (Polyscope or Conductor): Herd site, .env
+# Provisions a parallel workspace (Paseo, Polyscope, or Conductor): Herd site, .env
 # rewrites, per-workspace testing database, dependencies, and a frontend build.
 # Run from the workspace root. Idempotent: safe to re-run.
 #
-# Everything is keyed off the folder basename, never CONDUCTOR_WORKSPACE_NAME:
-# Conductor renames workspaces after setup, which would strand the Herd site
-# and .env under the old name. The folder never changes.
+# Isolation keys use the folder basename, never CONDUCTOR_WORKSPACE_NAME.
+# They add the repository name only when another project already owns that
+# workspace name.
 #
 # The dev database (relaticle_app) stays shared across workspaces. We rewrite
 # APP_URL and SESSION_DOMAIN so absolute URLs and session cookies match
@@ -31,13 +31,36 @@ if [[ ! -f .env ]]; then
     cp "$ROOT/.env" .env
 fi
 
-echo "→ Herd site"
-herd link "$FOLDER"
-herd secure "$FOLDER"
+site_is_linked() {
+    herd links 2>/dev/null | grep -Fq "| $1 "
+}
 
-echo "→ Pointing .env at ${FOLDER}.test"
-sed -i '' "s|^APP_URL=.*|APP_URL=https://${FOLDER}.test|" .env
-sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${FOLDER}.test|" .env
+site_points_here() {
+    herd links 2>/dev/null | grep -F "| $1 " | grep -qF "| $PWD "
+}
+
+SITE_NAME="${WORKSPACE_SITE_NAME:-$FOLDER}"
+if [[ "$SITE_NAME" == "$FOLDER" ]] && site_is_linked "$SITE_NAME" && ! site_points_here "$SITE_NAME"; then
+    SITE_NAME="$(basename "$ROOT")-$FOLDER"
+fi
+
+if site_is_linked "$SITE_NAME" && ! site_points_here "$SITE_NAME"; then
+    echo "✗ Herd site '${SITE_NAME}' already belongs to another directory" >&2
+    exit 1
+fi
+
+sed -i '' "/^WORKSPACE_SITE_NAME=/d" .env
+echo "WORKSPACE_SITE_NAME=${SITE_NAME}" >> .env
+
+echo "→ Herd site"
+if ! site_points_here "$SITE_NAME"; then
+    herd link "$SITE_NAME"
+fi
+herd secure "$SITE_NAME"
+
+echo "→ Pointing .env at ${SITE_NAME}.test"
+sed -i '' "s|^APP_URL=.*|APP_URL=https://${SITE_NAME}.test|" .env
+sed -i '' "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.${SITE_NAME}.test|" .env
 sed -i '' "s|^APP_PANEL_DOMAIN=.*|APP_PANEL_DOMAIN=|" .env
 sed -i '' "s|^SYSADMIN_DOMAIN=.*|SYSADMIN_DOMAIN=|" .env
 
@@ -45,20 +68,20 @@ sed -i '' "s|^SYSADMIN_DOMAIN=.*|SYSADMIN_DOMAIN=|" .env
 # checkout resolves the same default key prefix (APP_NAME-derived), so another
 # workspace's Horizon worker consumes THIS workspace's jobs with foreign code,
 # and cache entries leak across branches.
-echo "→ Isolating Redis keys for ${FOLDER}"
+echo "→ Isolating Redis keys for ${SITE_NAME}"
 sed -i '' "/^REDIS_PREFIX=/d; /^CACHE_PREFIX=/d; /^HORIZON_PREFIX=/d" .env
 {
     echo ""
-    echo "REDIS_PREFIX=${FOLDER}_database_"
-    echo "CACHE_PREFIX=${FOLDER}_cache_"
-    echo "HORIZON_PREFIX=${FOLDER}_horizon:"
+    echo "REDIS_PREFIX=${SITE_NAME}_database_"
+    echo "CACHE_PREFIX=${SITE_NAME}_cache_"
+    echo "HORIZON_PREFIX=${SITE_NAME}_horizon:"
 } >> .env
 
 # Each workspace gets its own testing database: two suites sharing one DB
 # deadlock, and a migration on one branch breaks the other's schema mid-run.
 # phpunit.xml deliberately omits DB_DATABASE so this .env.testing value wins;
 # skip-worktree keeps the tracked file's rewrite out of every diff.
-TEST_DB="relaticle_testing_$(echo "$FOLDER" | tr '-' '_')"
+TEST_DB="relaticle_testing_$(echo "$SITE_NAME" | tr '-' '_')"
 echo "→ Testing database ${TEST_DB}"
 sed -i '' "s|^DB_DATABASE=.*|DB_DATABASE=${TEST_DB}|" .env.testing
 git update-index --skip-worktree .env.testing
@@ -74,7 +97,8 @@ fi
 composer install --no-interaction --prefer-dist
 
 echo "→ JS dependencies"
-pnpm install --prefer-offline
+PNPM_VERSION="$(node -p "require('./package.json').packageManager.split('@').pop()")"
+CI=true npx --yes "pnpm@${PNPM_VERSION}" install --frozen-lockfile --prefer-offline
 
 # Tokens must verify across every checkout because the dev database is shared:
 # copy the root's keys instead of minting fresh ones.
@@ -89,6 +113,6 @@ php artisan config:clear --no-interaction
 php artisan route:clear --no-interaction
 
 echo "→ Building frontend assets"
-pnpm run build
+npx --yes "pnpm@${PNPM_VERSION}" run build
 
-echo "✓ Workspace ready: https://${FOLDER}.test (app panel at /app, sysadmin at /sysadmin)"
+echo "✓ Workspace ready: https://${SITE_NAME}.test (app panel at /app, sysadmin at /sysadmin)"

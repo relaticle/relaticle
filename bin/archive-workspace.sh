@@ -18,18 +18,30 @@ unlink_site() {
     herd unlink "$1" >/dev/null 2>&1 || true
 }
 
-unlink_site "$FOLDER"
+site_points_here() {
+    herd links 2>/dev/null | grep -F "| $1 " | grep -qF "| $PWD "
+}
+
+SITE_NAME="$(sed -n 's/^WORKSPACE_SITE_NAME=//p' .env 2>/dev/null | head -1)"
+SITE_NAME="${SITE_NAME:-$FOLDER}"
+
+if site_points_here "$SITE_NAME"; then
+    unlink_site "$SITE_NAME"
+fi
+
+if [[ "$SITE_NAME" != "$FOLDER" ]] && site_points_here "$FOLDER"; then
+    unlink_site "$FOLDER"
+fi
 
 # An older setup may have linked the workspace name rather than the folder.
 # Only touch that site when it provably points at THIS directory. The name
 # can also belong to a different workspace's folder.
 WORKSPACE_NAME="${CONDUCTOR_WORKSPACE_NAME:-}"
-if [[ -n "$WORKSPACE_NAME" && "$WORKSPACE_NAME" != "$FOLDER" ]] &&
-    herd links 2>/dev/null | grep -F " $WORKSPACE_NAME " | grep -qF "$PWD"; then
+if [[ -n "$WORKSPACE_NAME" && "$WORKSPACE_NAME" != "$FOLDER" ]] && site_points_here "$WORKSPACE_NAME"; then
     unlink_site "$WORKSPACE_NAME"
 fi
 
-TEST_DB="relaticle_testing_$(echo "$FOLDER" | tr '-' '_')"
+TEST_DB="relaticle_testing_$(echo "$SITE_NAME" | tr '-' '_')"
 TEST_DB_USER="$(sed -n 's/^DB_USERNAME=//p' .env.testing 2>/dev/null | head -1)"
 for db in $(psql -U "${TEST_DB_USER:-postgres}" -h 127.0.0.1 -d postgres -tAc "SELECT datname FROM pg_database WHERE datname='${TEST_DB}' OR datname ~ '^${TEST_DB}_test_[0-9]+$'" 2>/dev/null); do
     echo "→ Dropping ${db}"
@@ -40,7 +52,7 @@ done
 # --scan without -n only ever looks at db 0 and would silently delete nothing.
 if command -v redis-cli >/dev/null 2>&1; then
     for db in $(sed -n 's/^REDIS_DB=//p; s/^REDIS_CACHE_DB=//p' .env 2>/dev/null | sort -u); do
-        for pattern in "${FOLDER}_database_*" "${FOLDER}_cache_*" "${FOLDER}_horizon:*"; do
+        for pattern in "${SITE_NAME}_database_*" "${SITE_NAME}_cache_*" "${SITE_NAME}_horizon:*"; do
             redis-cli -n "$db" --scan --pattern "$pattern" | xargs -n 100 redis-cli -n "$db" del >/dev/null 2>&1 || true
         done
     done
