@@ -53,6 +53,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
+use Filament\Support\Colors\Color;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -191,6 +192,41 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
+     * The panel brand logo: a workspace with a custom logo shows that instead
+     * of the stock mark, so the active workspace is identifiable at a glance.
+     */
+    private function brandLogoView(?User $user): View|Factory
+    {
+        $team = $user?->currentTeam;
+
+        if ($team instanceof Team && filled($team->logo_path)) {
+            return view('filament.app.team-logo', ['team' => $team]);
+        }
+
+        return $user?->hasVerifiedEmail()
+            ? view('filament.app.logo-empty')
+            : view('filament.app.logo');
+    }
+
+    /**
+     * The primary color ramp follows the workspace accent when one is set,
+     * falling back to the brand palette. Filament expands the hex via
+     * Color::hex() into a full 50-950 ramp, so one seed color is enough.
+     *
+     * @return array<int|string, string>
+     */
+    private function primaryColors(): array
+    {
+        $team = Filament::getTenant();
+
+        if ($team instanceof Team && filled($team->accent_color)) {
+            return Color::hex($team->accent_color);
+        }
+
+        return BrandColors::primary();
+    }
+
+    /**
      * Configure the Filament admin panel.
      *
      * @throws Exception
@@ -210,9 +246,7 @@ final class AppPanelProvider extends PanelProvider
         $panel
             ->homeUrl(fn (): string => Dashboard::getUrl())
             ->brandName('Relaticle')
-            ->brandLogo(fn (): View|Factory => Auth::user()?->hasVerifiedEmail()
-                ? view('filament.app.logo-empty')
-                : view('filament.app.logo'))
+            ->brandLogo(fn (): View|Factory => $this->brandLogoView(Auth::user()))
             ->brandLogoHeight('2.6rem')
             ->login(Login::class)
             ->authGuard('web')
@@ -235,8 +269,8 @@ final class AppPanelProvider extends PanelProvider
                 livewireComponent: AppDatabaseNotifications::class,
                 position: DatabaseNotificationsPosition::Sidebar,
             )
-            ->colors([
-                'primary' => BrandColors::primary(),
+            ->colors(fn (): array => [
+                'primary' => $this->primaryColors(),
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
