@@ -97,8 +97,17 @@ fi
 composer install --no-interaction --prefer-dist
 
 echo "→ JS dependencies"
-PNPM_VERSION="$(node -p "require('./package.json').packageManager.split('@').pop()")"
-CI=true npx --yes "pnpm@${PNPM_VERSION}" install --frozen-lockfile --prefer-offline
+if [[ -f pnpm-lock.yaml ]]; then
+    PNPM_VERSION="$(node -p "require('./package.json').packageManager.split('@').pop()")"
+    CI=true npx --yes "pnpm@${PNPM_VERSION}" install --frozen-lockfile --prefer-offline
+    JS_BUILD_COMMAND=(npx --yes "pnpm@${PNPM_VERSION}" run build)
+elif [[ -f package-lock.json ]]; then
+    npm ci
+    JS_BUILD_COMMAND=(npm run build)
+else
+    echo "✗ no supported JS lockfile found" >&2
+    exit 1
+fi
 
 # Tokens must verify across every checkout because the dev database is shared:
 # copy the root's keys instead of minting fresh ones.
@@ -113,6 +122,6 @@ php artisan config:clear --no-interaction
 php artisan route:clear --no-interaction
 
 echo "→ Building frontend assets"
-npx --yes "pnpm@${PNPM_VERSION}" run build
+"${JS_BUILD_COMMAND[@]}"
 
 echo "✓ Workspace ready: https://${SITE_NAME}.test (app panel at /app, sysadmin at /sysadmin)"
