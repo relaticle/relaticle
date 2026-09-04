@@ -110,6 +110,34 @@ describe('requestAccess table action', function (): void {
         )->toBe(1);
     });
 
+    it('pre-selects the pending access tier when reopening the request modal', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::SUBJECT)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->mountTableAction('requestAccess', $email)
+            ->assertSchemaStateSet([
+                'tier_requested' => EmailPrivacyTier::SUBJECT->value,
+            ]);
+    });
+
     it('is hidden when the authenticated user is the email owner', function (): void {
         $email = Email::factory()->create([
             'team_id' => $this->team->id,

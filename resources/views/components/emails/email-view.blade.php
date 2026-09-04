@@ -23,16 +23,13 @@
         ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
         ->implode('');
 
-    $aiLabelColor = match ($aiLabel?->label) {
-        'Scheduling' => 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-        'Marketing'  => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-        'Invoice'    => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-        'Support'    => 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-        'Sales'      => 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-        default      => 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-    };
-
     $recipientChipClass = 'inline-flex cursor-pointer items-center rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 ring-1 ring-inset ring-gray-200 dark:ring-gray-700 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700';
+
+    $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    $subject = $decode($record->subject);
+    $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($record->snippet)) ?? '');
+    $isReply = filled($record->in_reply_to);
 
     // Hoisted so the reader knows up front whether there is a frame to wait for: a
     // text-only body or a privacy gate has nothing to load and must not sit behind
@@ -65,7 +62,8 @@
          crams sender, address, date, badges and every recipient together. The
          recipients collapse behind a disclosure; they are reference, not headline. --}}
 
-    {{-- Subject, with the record-level actions kept out of the reading path --}}
+    {{-- Subject row: title, category pill, and sharing actions. Snippet sits on
+         the line below so the headline stays scannable. --}}
     <div class="flex shrink-0 items-start gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 pr-12 sm:px-6 sm:pr-14">
         {{-- Back to the list on narrow viewports, where the two panes alternate.
              The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
@@ -80,20 +78,39 @@
             </button>
         @endif
 
-        @if ($canViewSubject)
-            {{-- A subject is the one thing worth reading in full: it wraps rather than
-                 truncating, since the ellipsis usually hides the part that matters. --}}
-            <h2 class="min-w-0 flex-1 text-base font-semibold leading-snug text-gray-900 dark:text-white break-words">
-                {{ $record->subject ?: '(no subject)' }}
-            </h2>
-        @else
-            <p class="min-w-0 flex-1 text-sm italic text-gray-400 dark:text-gray-500">(subject hidden)</p>
-        @endif
+        <div class="min-w-0 flex-1">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                    @if ($canViewSubject)
+                        <h2 class="min-w-0 text-base font-semibold leading-snug text-gray-900 break-words dark:text-white">
+                            {{ $subject ?: '(no subject)' }}
+                        </h2>
+                    @else
+                        <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">(subject hidden)</p>
+                    @endif
 
-        {{-- gap-2, not gap-1: adjacent hit targets want ~8px between them so they do
-             not read as one blob and are not mis-tapped. --}}
-        <div class="flex shrink-0 items-center gap-2 pt-0.5">
-            <x-emails.detail-action-bar :email="$record" />
+                    @if ($aiLabel)
+                        <x-emails.category-badge :label="$aiLabel->label" />
+                    @endif
+                </div>
+
+                {{-- gap-2, not gap-1: adjacent hit targets want ~8px between them so they do
+                     not read as one blob and are not mis-tapped. --}}
+                <div class="flex shrink-0 items-center gap-2">
+                    <x-emails.detail-action-bar :email="$record" />
+                </div>
+            </div>
+
+            @if ($canViewSubject && filled($snippet))
+                <p class="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-gray-500 dark:text-gray-400">
+                    @if ($isReply)
+                        <x-ri-reply-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                    @else
+                        <x-ri-file-text-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                    @endif
+                    <span>{{ $snippet }}</span>
+                </p>
+            @endif
         </div>
     </div>
 
@@ -151,11 +168,6 @@
                     <span class="text-sm font-medium text-gray-900 dark:text-white">
                         {{ $from?->name ?: $from?->email_address ?: '(unknown sender)' }}
                     </span>
-                    @if ($aiLabel)
-                        <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium {{ $aiLabelColor }}">
-                            {{ $aiLabel->label }}
-                        </span>
-                    @endif
                 </div>
 
                 @if ($toList->isNotEmpty() || $ccList->isNotEmpty())
@@ -359,27 +371,29 @@
                 <div class="space-y-1">
                     <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
                         @if ($record->privacy_tier === EmailPrivacyTier::METADATA_ONLY)
-                            Email body and subject are restricted
+                            {{ __('filament/pages/email-inbox.privacy_gate.metadata_only.heading') }}
                         @elseif ($record->privacy_tier === EmailPrivacyTier::SUBJECT)
-                            Email body is restricted
+                            {{ __('filament/pages/email-inbox.privacy_gate.subject_only.heading') }}
                         @else
-                            This email is private
+                            {{ __('filament/pages/email-inbox.privacy_gate.private.heading') }}
                         @endif
                     </p>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         @if ($record->privacy_tier === EmailPrivacyTier::METADATA_ONLY)
-                            You can see participant and date information. Request access to view the subject and body.
+                            {{ __('filament/pages/email-inbox.privacy_gate.metadata_only.description') }}
                         @elseif ($record->privacy_tier === EmailPrivacyTier::SUBJECT)
-                            You can see the subject line. The full email body is hidden. Request access to see more.
+                            {{ __('filament/pages/email-inbox.privacy_gate.subject_only.description') }}
                         @else
-                            Only the email owner can view this content.
+                            {{ __('filament/pages/email-inbox.privacy_gate.private.description') }}
                         @endif
                     </p>
                 </div>
 
                 @if ($authUser->can('requestAccess', $record))
                     <p class="text-xs text-gray-400 dark:text-gray-500">
-                        Use <span class="font-semibold text-gray-600 dark:text-gray-300">Request Access</span> from the row actions to ask for expanded access.
+                        {{ __('filament/pages/email-inbox.privacy_gate.request_hint', [
+                            'action' => __('filament/pages/email-inbox.request_access.label'),
+                        ]) }}
                     </p>
                 @endif
 

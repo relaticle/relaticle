@@ -17,11 +17,14 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -504,4 +507,116 @@ it('keeps the emails tab visible on an opportunity', function (): void {
     livewire(OpportunityEmailsPage::class, ['record' => $opportunity->getKey()])
         ->assertSee('Visible on the deal')
         ->assertDontSee(__('filament/pages/record-emails.protected.heading'));
+});
+
+it('shows the imported mailbox name on record email list rows', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'display_name' => 'Sales Inbox',
+    ]));
+
+    $email = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Quarterly forecast',
+        'is_internal' => false,
+    ]);
+
+    EmailParticipant::query()->create([
+        'email_id' => $email->id,
+        'email_address' => 'customer@acme.com',
+        'name' => 'Customer',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $this->person->emails()->attach($email->getKey());
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSee(__('filament/pages/email-inbox.list_row.via', ['name' => 'Sales Inbox']));
+});
+
+it('shows a request access pill on record mailbox rows without body access', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $viewer = User::factory()->create(['current_team_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'editor']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $person = People::factory()->create([
+        'team_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'subject' => 'Quarterly forecast',
+        'snippet' => 'Secret preview text',
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    Notification::fake();
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+        ->assertSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
+        ->assertDontSee('Secret preview text')
+        ->mountAction('requestAccess', arguments: ['emailId' => $email->getKey()])
+        ->setActionData(['tier_requested' => EmailPrivacyTier::FULL->value])
+        ->callMountedAction()
+        ->assertNotified('Access request sent.');
+});
+
+it('shows a requested label on the list pill when an access request is pending', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $viewer = User::factory()->create(['current_team_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'editor']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $person = People::factory()->create([
+        'team_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $email->getKey(),
+        'requester_id' => $viewer->id,
+        'owner_id' => $owner->id,
+    ]);
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+        ->assertSee(__('filament/pages/email-inbox.list_row.requested'))
+        ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
+        ->mountAction('requestAccess', arguments: ['emailId' => $email->getKey()])
+        ->assertSchemaStateSet([
+            'tier_requested' => EmailPrivacyTier::FULL->value,
+        ]);
 });

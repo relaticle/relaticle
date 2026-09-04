@@ -253,6 +253,30 @@ final class Email extends Model
     }
 
     /**
+     * Name of the mailbox that imported this email, for list-row "via …" copy.
+     * Prefer the provider display name on the connected account, then the
+     * teammate who linked that mailbox, then the address itself.
+     */
+    public function mailboxViaName(): ?string
+    {
+        $account = $this->connectedAccount;
+
+        if ($account !== null) {
+            if (filled($account->display_name)) {
+                return $account->display_name;
+            }
+
+            if (filled($account->user?->name)) {
+                return $account->user->name;
+            }
+
+            return $account->email_address ?: null;
+        }
+
+        return $this->user?->name;
+    }
+
+    /**
      * @return EloquentCollection<int, EmailAttachment>
      */
     public function inlineAttachments(): EloquentCollection
@@ -306,6 +330,14 @@ final class Email extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(EmailShare::class);
+    }
+
+    /**
+     * @return HasMany<EmailAccessRequest, $this>
+     */
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(EmailAccessRequest::class);
     }
 
     /**
