@@ -21,6 +21,7 @@ return [
         ],
         'request_access' => [
             'label' => 'Request Access',
+            'modal_heading' => 'Request access',
         ],
     ],
     'fields' => [
@@ -50,8 +51,8 @@ return [
         'from_address' => [
             'label' => 'From',
         ],
-        'ai_label' => [
-            'label' => 'Label',
+        'category' => [
+            'label' => 'Category',
         ],
         'direction' => [
             'label' => 'Direction',

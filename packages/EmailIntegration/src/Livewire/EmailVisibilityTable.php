@@ -9,8 +9,6 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TagsInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
@@ -18,11 +16,11 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
-use Livewire\Attributes\Computed;
+use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
-use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityEntryAction;
-use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -35,27 +33,10 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
     public string $search = '';
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Re-render when contacts are added from the page header action.
      */
-    #[Computed]
-    public function visibilityRows(): array
-    {
-        $rows = resolve(EmailVisibilityService::class)->visibilityTableRows(
-            $this->currentTeam(),
-            $this->customEntries(),
-        );
-
-        $search = strtolower(trim($this->search));
-
-        if ($search === '') {
-            return $rows;
-        }
-
-        return array_values(array_filter(
-            $rows,
-            fn (array $row): bool => str_contains(strtolower((string) $row['address']), $search),
-        ));
-    }
+    #[On('visibility-entries-updated')]
+    public function refreshVisibilityEntries(): void {}
 
     public function updateEnforcement(string $entryId, string $enforcement): void
     {
@@ -71,58 +52,10 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             EmailVisibilityEnforcement::from($enforcement),
         );
 
-        unset($this->visibilityRows);
-
         Notification::make()
             ->success()
             ->title(__('filament/pages/email-privacy-settings.visibility.notifications.updated'))
             ->send();
-    }
-
-    public function addVisibilityContactAction(): Action
-    {
-        return Action::make('addVisibilityContact')
-            ->label(__('filament/pages/email-privacy-settings.visibility.add'))
-            ->icon(Heroicon::OutlinedPlus)
-            ->size(Size::Small)
-            ->modalHeading(__('filament/pages/email-privacy-settings.visibility.add'))
-            ->schema([
-                TagsInput::make('visibility_emails')
-                    ->label(__('filament/pages/email-privacy-settings.visibility.emails_label'))
-                    ->placeholder(__('filament/pages/email-privacy-settings.visibility.emails_placeholder'))
-                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.emails_after_label'))
-                    ->nestedRecursiveRules(['email', 'max:255']),
-                TagsInput::make('visibility_domains')
-                    ->label(__('filament/pages/email-privacy-settings.visibility.domains_label'))
-                    ->placeholder(__('filament/pages/email-privacy-settings.visibility.domains_placeholder'))
-                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.domains_after_label')),
-                Select::make('enforcement_level')
-                    ->label(__('filament/pages/email-privacy-settings.visibility.table.enforcement'))
-                    ->options(EmailVisibilityEnforcement::class)
-                    ->default(EmailVisibilityEnforcement::Protected->value)
-                    ->required(),
-            ])
-            ->action(function (array $data): void {
-                $user = $this->authUser();
-                $enforcement = $this->resolveEnforcement($data['enforcement_level']);
-
-                resolve(UpdateTeamEmailVisibilityAction::class)->execute(
-                    $this->currentTeam(),
-                    $user,
-                    $this->mergedVisibilityEntries(
-                        $data['visibility_emails'] ?? [],
-                        $data['visibility_domains'] ?? [],
-                        $enforcement,
-                    ),
-                );
-
-                unset($this->visibilityRows);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-privacy-settings.visibility.notifications.added'))
-                    ->send();
-            });
     }
 
     public function deleteVisibilityEntryAction(): Action
@@ -141,8 +74,6 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
                     ->firstOrFail()
                     ->delete();
 
-                unset($this->visibilityRows);
-
                 Notification::make()
                     ->success()
                     ->title(__('filament/pages/email-privacy-settings.visibility.notifications.deleted'))
@@ -152,7 +83,42 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
 
     public function render(): View
     {
-        return view('email-integration::livewire.email-visibility-table');
+        $search = trim($this->search);
+
+        return view('email-integration::livewire.email-visibility-table', [
+            'rows' => $this->visibilityRecords($search !== '' ? $search : null),
+        ]);
+    }
+
+    public function hasCustomVisibilityEntries(): bool
+    {
+        return $this->customEntries()->isNotEmpty();
+    }
+
+    /**
+     * @return SupportCollection<string, array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}>
+     */
+    private function visibilityRecords(?string $search): SupportCollection
+    {
+        $rows = resolve(EmailVisibilityService::class)->visibilityTableRows(
+            $this->currentTeam(),
+            $this->customEntries(),
+        );
+
+        /** @var SupportCollection<string, array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}> $records */
+        $records = collect($rows)->mapWithKeys(
+            fn (array $row): array => [(string) $row['key'] => $row],
+        );
+
+        if (blank($search)) {
+            return $records;
+        }
+
+        $needle = Str::lower(trim($search));
+
+        return $records->filter(
+            fn (array $row): bool => str_contains(Str::lower((string) $row['address']), $needle),
+        );
     }
 
     /**
@@ -165,66 +131,6 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             ->with('creator')
             ->latest()
             ->get();
-    }
-
-    /**
-     * @param  array<int, string>  $newEmails
-     * @param  array<int, string>  $newDomains
-     * @return array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>
-     */
-    private function mergedVisibilityEntries(array $newEmails, array $newDomains, EmailVisibilityEnforcement $enforcement): array
-    {
-        $entries = $this->customEntries()
-            ->map(fn (TeamEmailBlocklist $entry): array => [
-                'type' => $entry->type->value,
-                'value' => $entry->value,
-                'enforcement_level' => $entry->enforcement_level,
-            ])
-            ->all();
-
-        foreach ($newEmails as $email) {
-            if (blank($email)) {
-                continue;
-            }
-
-            $entries[] = [
-                'type' => EmailBlocklistType::EMAIL->value,
-                'value' => strtolower(trim($email)),
-                'enforcement_level' => $enforcement,
-            ];
-        }
-
-        foreach ($newDomains as $domain) {
-            if (blank($domain)) {
-                continue;
-            }
-
-            $normalized = resolve(EmailVisibilityService::class)->normalizeDomainInput((string) $domain);
-
-            if ($normalized === null) {
-                continue;
-            }
-
-            $entries[] = [
-                'type' => EmailBlocklistType::DOMAIN->value,
-                'value' => $normalized,
-                'enforcement_level' => $enforcement,
-            ];
-        }
-
-        return collect($entries)
-            ->unique(fn (array $entry): string => $entry['type'].'|'.$entry['value'])
-            ->values()
-            ->all();
-    }
-
-    private function resolveEnforcement(mixed $value): EmailVisibilityEnforcement
-    {
-        if ($value instanceof EmailVisibilityEnforcement) {
-            return $value;
-        }
-
-        return EmailVisibilityEnforcement::from((string) $value);
     }
 
     private function authUser(): User

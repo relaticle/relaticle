@@ -26,7 +26,6 @@
             $from    = $email->fromParticipant();
             $toList  = $email->toParticipants();
             $ccList  = $email->ccParticipants();
-            $aiLabel = $email->aiLabel();
 
             $senderName = $from?->name ?: $from?->email_address ?: '?';
             $initials   = collect(explode(' ', trim($senderName)))

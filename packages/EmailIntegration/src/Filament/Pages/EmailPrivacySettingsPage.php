@@ -10,6 +10,7 @@ use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -18,11 +19,18 @@ use Filament\Schemas\Components\View;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
+use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
@@ -136,6 +144,48 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
             });
     }
 
+    public function addVisibilityContactAction(): Action
+    {
+        return Action::make('addVisibilityContact')
+            ->label(__('filament/pages/email-privacy-settings.visibility.add'))
+            ->icon(Heroicon::OutlinedPlus)
+            ->size(Size::Small)
+            ->modalHeading(__('filament/pages/email-privacy-settings.visibility.add'))
+            ->schema([
+                TagsInput::make('visibility_emails')
+                    ->label(__('filament/pages/email-privacy-settings.visibility.emails_label'))
+                    ->placeholder(__('filament/pages/email-privacy-settings.visibility.emails_placeholder'))
+                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.emails_after_label'))
+                    ->nestedRecursiveRules(['email', 'max:255']),
+                TagsInput::make('visibility_domains')
+                    ->label(__('filament/pages/email-privacy-settings.visibility.domains_label'))
+                    ->placeholder(__('filament/pages/email-privacy-settings.visibility.domains_placeholder'))
+                    ->afterLabel(__('filament/pages/email-privacy-settings.visibility.domains_after_label')),
+            ])
+            ->action(function (array $data): void {
+                /** @var User $user */
+                $user = auth()->user();
+                $team = $user->currentTeam;
+
+                resolve(UpdateTeamEmailVisibilityAction::class)->execute(
+                    $team,
+                    $user,
+                    $this->mergedVisibilityEntries(
+                        $team,
+                        $data['visibility_emails'] ?? [],
+                        $data['visibility_domains'] ?? [],
+                    ),
+                );
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-privacy-settings.visibility.notifications.added'))
+                    ->send();
+
+                $this->dispatch('visibility-entries-updated');
+            });
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->schema([
@@ -143,6 +193,9 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                 ->description(__('filament/pages/email-privacy-settings.visibility.description'))
                 ->compact()
                 ->visible(fn (): bool => $this->tab === 'visibility')
+                ->headerActions([
+                    $this->addVisibilityContactAction(...),
+                ])
                 ->schema([
                     View::make('email-integration::livewire.email-visibility-table-embed'),
                 ]),
@@ -197,5 +250,61 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         );
 
         return true;
+    }
+
+    /**
+     * @param  array<int, string>  $newEmails
+     * @param  array<int, string>  $newDomains
+     * @return array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>
+     */
+    private function mergedVisibilityEntries(Team $team, array $newEmails, array $newDomains): array
+    {
+        $enforcement = EmailVisibilityEnforcement::Protected;
+
+        $entries = TeamEmailBlocklist::query()
+            ->where('team_id', $team->getKey())
+            ->latest()
+            ->get()
+            ->map(fn (TeamEmailBlocklist $entry): array => [
+                'type' => $entry->type->value,
+                'value' => $entry->value,
+                'enforcement_level' => $entry->enforcement_level,
+            ])
+            ->all();
+
+        foreach ($newEmails as $email) {
+            if (blank($email)) {
+                continue;
+            }
+
+            $entries[] = [
+                'type' => EmailBlocklistType::EMAIL->value,
+                'value' => strtolower(trim($email)),
+                'enforcement_level' => $enforcement,
+            ];
+        }
+
+        foreach ($newDomains as $domain) {
+            if (blank($domain)) {
+                continue;
+            }
+
+            $normalized = resolve(EmailVisibilityService::class)->normalizeDomainInput((string) $domain);
+
+            if ($normalized === null) {
+                continue;
+            }
+
+            $entries[] = [
+                'type' => EmailBlocklistType::DOMAIN->value,
+                'value' => $normalized,
+                'enforcement_level' => $enforcement,
+            ];
+        }
+
+        return collect($entries)
+            ->unique(fn (array $entry): string => $entry['type'].'|'.$entry['value'])
+            ->values()
+            ->all();
     }
 }

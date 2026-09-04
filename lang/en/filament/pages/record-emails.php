@@ -18,6 +18,7 @@ return [
         ],
         'request_access' => [
             'label' => 'Request Access',
+            'modal_heading' => 'Request access',
         ],
         'approve_access_request' => [
             'modal_heading' => 'Approve access request',
