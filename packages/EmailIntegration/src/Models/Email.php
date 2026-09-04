@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -247,9 +248,25 @@ final class Email extends Model
         return $this->participants->where('role', EmailParticipantRole::CC);
     }
 
-    public function aiLabel(): ?EmailLabel
+    /**
+     * The rule-based category stamped at sync. StoreEmailAction writes
+     * `source = system`. The unmatched Other fallback is stored, not shown.
+     */
+    public function categoryLabel(): ?EmailLabel
     {
-        return $this->labels->firstWhere('source', 'ai');
+        $label = $this->labels->firstWhere('source', 'system');
+
+        if (! $label instanceof EmailLabel) {
+            return null;
+        }
+
+        $category = EmailCategory::tryFrom($label->label);
+
+        if (! $category instanceof EmailCategory || ! $category->isVisible()) {
+            return null;
+        }
+
+        return $label;
     }
 
     /**

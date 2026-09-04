@@ -9,7 +9,7 @@
     $from       = $email->from->first();
     $senderName = $from?->name ?: $from?->email_address ?: '?';
     $authUser   = auth()->user();
-    $aiLabel    = $email->aiLabel();
+    $categoryLabel = $email->categoryLabel();
     $isReply    = filled($email->in_reply_to);
     $mailboxViaName = $email->mailboxViaName();
 
@@ -100,7 +100,7 @@
                 {{ $participantLine }}
             </span>
 
-            @if ($canViewBody && (filled($snippet) || $aiLabel !== null))
+            @if ($canViewBody && (filled($snippet) || $categoryLabel !== null))
                 <span class="mt-0.5 flex items-center justify-between gap-3">
                     @if (filled($snippet))
                         <span class="flex min-w-0 items-center gap-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
@@ -115,8 +115,8 @@
                         <span class="min-w-0 flex-1"></span>
                     @endif
 
-                    @if ($aiLabel !== null)
-                        <x-emails.category-badge :label="$aiLabel->label" class="ml-auto" />
+                    @if ($categoryLabel !== null)
+                        <x-emails.category-badge :label="$categoryLabel->label" class="ml-auto" />
                     @endif
                 </span>
             @endif

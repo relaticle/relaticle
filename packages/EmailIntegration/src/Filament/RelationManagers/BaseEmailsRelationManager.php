@@ -25,6 +25,7 @@ use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -162,8 +163,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         ?? $record->from->first()->email_address
                         ?? '—'),
 
-                TextColumn::make('ai_label')
-                    ->label(__('filament/relation-managers/emails.columns.ai_label.label'))
+                TextColumn::make('category')
+                    ->label(__('filament/relation-managers/emails.columns.category.label'))
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'Scheduling' => 'info',
@@ -173,7 +174,11 @@ abstract class BaseEmailsRelationManager extends RelationManager
                         'Sales' => 'primary',
                         default => 'gray',
                     })
-                    ->getStateUsing(fn (Email $record): string => $record->labels->where('source', 'ai')->first()->label ?? ''),
+                    ->getStateUsing(function (Email $record): string {
+                        $label = $record->categoryLabel();
+
+                        return $label instanceof EmailLabel ? $label->label : '';
+                    }),
 
                 TextColumn::make('direction')
                     ->label(__('filament/relation-managers/emails.columns.direction.label'))

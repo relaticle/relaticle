@@ -51,8 +51,8 @@ return [
         'from_address' => [
             'label' => 'From',
         ],
-        'ai_label' => [
-            'label' => 'Label',
+        'category' => [
+            'label' => 'Category',
         ],
         'direction' => [
             'label' => 'Direction',

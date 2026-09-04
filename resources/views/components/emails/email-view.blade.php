@@ -10,7 +10,7 @@
     $from    = $record->fromParticipant();
     $toList  = $record->toParticipants();
     $ccList  = $record->ccParticipants();
-    $aiLabel = $record->aiLabel();
+    $categoryLabel = $record->categoryLabel();
 
     $canViewSubject = $authUser->can('viewSubject', $record);
     $canViewBody    = $authUser->can('viewBody', $record);
@@ -89,8 +89,8 @@
                         <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">(subject hidden)</p>
                     @endif
 
-                    @if ($aiLabel)
-                        <x-emails.category-badge :label="$aiLabel->label" />
+                    @if ($categoryLabel)
+                        <x-emails.category-badge :label="$categoryLabel->label" />
                     @endif
                 </div>
 
