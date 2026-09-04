@@ -34,6 +34,11 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
  */
 trait HasEmailReaderActions
 {
+    protected function viewAction(): ViewAction
+    {
+        return $this->viewEmailAction();
+    }
+
     protected function viewEmailAction(): ViewAction
     {
         return ViewAction::make()
@@ -53,9 +58,36 @@ trait HasEmailReaderActions
                 ViewEntry::make('email')
                     ->hiddenLabel()
                     ->view('filament.emails.email-view')
+                    ->viewData(fn (?Email $record): array => [
+                        'pendingAccessRequests' => $record instanceof Email
+                            ? $this->pendingAccessRequestsFor($record)
+                            : collect(),
+                        'inlineAccessActions' => $this->usesInlineAccessActionsInReader(),
+                    ])
                     ->columnSpanFull(),
             ])
             ->columns(1);
+    }
+
+    /**
+     * @return Collection<int, EmailAccessRequest>
+     */
+    protected function pendingAccessRequestsFor(Email $email): Collection
+    {
+        if ($email->user_id !== $this->readerUser()->getKey()) {
+            return collect();
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->where('email_id', $email->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->get();
+    }
+
+    protected function usesInlineAccessActionsInReader(): bool
+    {
+        return false;
     }
 
     protected function manageSharingAction(): Action

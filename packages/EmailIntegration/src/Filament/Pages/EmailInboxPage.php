@@ -143,7 +143,6 @@ final class EmailInboxPage extends Page
             // component, so the tab badges have to be told when those counts move.
             'drafts:changed' => 'refreshTabCounts',
             'outbox:changed' => 'refreshTabCounts',
-            'access-requests:changed' => 'refreshTabCounts',
         ];
     }
 
@@ -343,11 +342,6 @@ final class EmailInboxPage extends Page
                 ->where(fn (Builder $q): Builder => $q
                     ->where('is_shared', true)
                     ->orWhere('created_by', $user->getKey()))
-                ->count(),
-            EmailPageTab::REQUESTS->value => EmailAccessRequest::query()
-                ->where('owner_id', $user->getKey())
-                ->whereHas('email', fn (Builder $query): Builder => $query->where('team_id', $teamId))
-                ->where('status', EmailAccessRequestStatus::PENDING)
                 ->count(),
         ];
     }

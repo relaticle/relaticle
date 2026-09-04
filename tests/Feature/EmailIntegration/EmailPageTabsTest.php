@@ -23,7 +23,6 @@ use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
@@ -76,10 +75,7 @@ it('defaults to the first tab and switches between tabs', function (): void {
         ->call('setTab', 'failed')
         ->assertSet('tab', EmailPageTab::FAILED)
         ->call('setTab', 'templates')
-        ->assertSet('tab', EmailPageTab::TEMPLATES)
-        ->call('setTab', 'requests')
-        ->assertSet('tab', EmailPageTab::REQUESTS)
-        ->assertSee('email-integration.access-requests-table');
+        ->assertSet('tab', EmailPageTab::TEMPLATES);
 });
 
 it('loads the failed tab from the URL', function (): void {
@@ -127,28 +123,7 @@ it('counts drafts, pending outbox mail and available templates for the tab badge
         'outbox' => 1,
         'failed' => 1,
         'templates' => 1,
-        'requests' => 0,
     ]);
-});
-
-it('shows received access requests in the emails tab bar', function (): void {
-    $requester = User::factory()->create(['current_team_id' => $this->team->id]);
-
-    EmailAccessRequest::factory()->pending()->create([
-        'owner_id' => $this->user->id,
-        'requester_id' => $requester->id,
-        'email_id' => Email::factory()->private()->create([
-            'team_id' => $this->team->id,
-            'user_id' => $this->user->id,
-            'connected_account_id' => $this->account->id,
-        ])->id,
-    ]);
-
-    $page = Livewire::test(EmailInboxPage::class)
-        ->assertSee('Requests');
-
-    expect($page->instance()->tabCounts())
-        ->toMatchArray(['requests' => 1]);
 });
 
 it('refreshes the tab badges when the composer saves a draft', function (): void {
