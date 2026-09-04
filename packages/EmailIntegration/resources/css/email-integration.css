@@ -238,7 +238,7 @@
 }
 
 /* ── Email visibility table (workspace privacy settings) ───────────────────
-   Custom Blade table with a card-based enforcement picker per row. */
+   Custom Blade table with a described enforcement picker per row. */
 .ei-visibility-search {
     display: flex;
     justify-content: end;
