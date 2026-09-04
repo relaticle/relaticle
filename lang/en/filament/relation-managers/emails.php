@@ -21,6 +21,7 @@ return [
         ],
         'request_access' => [
             'label' => 'Request Access',
+            'modal_heading' => 'Request access',
         ],
     ],
     'fields' => [

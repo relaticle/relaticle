@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
@@ -49,12 +50,25 @@ it('shows each sharing tier with its explanation', function (): void {
         ->assertSee(EmailPrivacyTier::FULL->getDescription());
 });
 
-it('creates protected TeamEmailBlocklist rows from the add contacts modal', function (): void {
+it('shows enforcement level explanations in the row picker', function (): void {
+    TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
     livewire(EmailVisibilityTable::class)
+        ->assertSee(EmailVisibilityEnforcement::Protected->getLabel())
+        ->assertSee(EmailVisibilityEnforcement::Protected->getDescription())
+        ->assertSee(EmailVisibilityEnforcement::Blocked->getLabel())
+        ->assertSee(EmailVisibilityEnforcement::Blocked->getDescription());
+});
+
+it('creates protected TeamEmailBlocklist rows from the add contacts modal', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'visibility')
         ->callAction('addVisibilityContact', data: [
             'visibility_emails' => ['legal@acme.com', 'hr@acme.com'],
             'visibility_domains' => [],
-            'enforcement_level' => EmailVisibilityEnforcement::Protected->value,
         ])
         ->assertNotified();
 
@@ -69,30 +83,36 @@ it('creates protected TeamEmailBlocklist rows from the add contacts modal', func
     )->toBe(['hr@acme.com', 'legal@acme.com']);
 });
 
-it('creates blocked TeamEmailBlocklist rows from the add contacts modal', function (): void {
-    livewire(EmailVisibilityTable::class)
+it('defaults new visibility entries to protected and allows changing enforcement from the table', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'visibility')
         ->callAction('addVisibilityContact', data: [
             'visibility_emails' => [],
             'visibility_domains' => ['spam.com'],
-            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
         ])
         ->assertNotified();
 
-    expect(TeamEmailBlocklist::query()
+    $entry = TeamEmailBlocklist::query()
         ->where('team_id', $this->team->id)
-        ->where('enforcement_level', EmailVisibilityEnforcement::Blocked->value)
         ->where('type', 'domain')
-        ->pluck('value')
-        ->all()
-    )->toBe(['spam.com']);
+        ->where('value', 'spam.com')
+        ->firstOrFail();
+
+    expect($entry->enforcement_level)->toBe(EmailVisibilityEnforcement::Protected);
+
+    livewire(EmailVisibilityTable::class)
+        ->call('updateEnforcement', (string) $entry->id, EmailVisibilityEnforcement::Blocked->value)
+        ->assertNotified();
+
+    expect($entry->fresh()->enforcement_level)->toBe(EmailVisibilityEnforcement::Blocked);
 });
 
 it('normalizes domain urls when adding visibility entries', function (): void {
-    livewire(EmailVisibilityTable::class)
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'visibility')
         ->callAction('addVisibilityContact', data: [
             'visibility_emails' => [],
             'visibility_domains' => ['https://mail.outskill.com', 'outskill.com'],
-            'enforcement_level' => EmailVisibilityEnforcement::Protected->value,
         ])
         ->assertNotified();
 
@@ -129,6 +149,20 @@ it('shows custom visibility entries in the table', function (): void {
         ->assertSee('legal@acme.com');
 });
 
+it('refreshes the visibility table when entries are updated elsewhere on the page', function (): void {
+    $component = livewire(EmailVisibilityTable::class)
+        ->assertDontSee('new-contact@example.com');
+
+    TeamEmailBlocklist::factory()->protected()->email('new-contact@example.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $component
+        ->dispatch('visibility-entries-updated')
+        ->assertSee('new-contact@example.com');
+});
+
 it('deletes a custom visibility entry from the table', function (): void {
     $entry = TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
         'team_id' => $this->team->id,
@@ -136,7 +170,7 @@ it('deletes a custom visibility entry from the table', function (): void {
     ]);
 
     livewire(EmailVisibilityTable::class)
-        ->callAction('deleteVisibilityEntry', arguments: ['entry_id' => $entry->id])
+        ->callAction(TestAction::make('deleteVisibilityEntry')->arguments(['entry_id' => $entry->id]))
         ->assertNotified();
 
     expect(TeamEmailBlocklist::query()->whereKey($entry->id)->exists())->toBeFalse();
@@ -269,13 +303,10 @@ it('does not save record creation settings when adding a visibility entry', func
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'record_creation')
         ->set('contact_creation_mode', ContactCreationMode::All->value)
-        ->call('setTab', 'visibility');
-
-    livewire(EmailVisibilityTable::class)
+        ->call('setTab', 'visibility')
         ->callAction('addVisibilityContact', data: [
             'visibility_emails' => ['blocked@example.com'],
             'visibility_domains' => [],
-            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
         ]);
 
     expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
@@ -331,11 +362,11 @@ it('forbids a non-admin member from changing workspace email visibility', functi
 it('does not save sharing settings from the visibility modal', function (): void {
     $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
 
-    livewire(EmailVisibilityTable::class)
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'visibility')
         ->callAction('addVisibilityContact', data: [
             'visibility_emails' => ['blocked@example.com'],
             'visibility_domains' => [],
-            'enforcement_level' => EmailVisibilityEnforcement::Blocked->value,
         ])
         ->assertNotified();
 

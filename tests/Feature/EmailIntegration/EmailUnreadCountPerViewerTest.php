@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -52,17 +51,11 @@ it('lets a teammate clear their own unread count on a shared email', function ()
     $page = livewire(EmailInboxPage::class);
     expect($page->instance()->inboxUnreadCount())->toBe(2);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertSeeHtml('data-unread-indicator');
-
     $page->call('selectEmail', $this->older->getKey());
     expect($page->instance()->inboxUnreadCount())->toBe(1);
 
     $page->call('selectEmail', $this->newer->getKey());
     expect($page->instance()->inboxUnreadCount())->toBe(0);
-
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertDontSeeHtml('data-unread-indicator');
 });
 
 it('keeps each viewer unread state independent of the owner', function (): void {

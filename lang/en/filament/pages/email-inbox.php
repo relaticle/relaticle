@@ -69,6 +69,12 @@ return [
         'sent' => 'No sent emails',
         'inbox' => 'No received emails',
     ],
+    'list_row' => [
+        'via' => 'via :name',
+        'timestamp_yesterday' => 'Yesterday, :time',
+        'request_access' => 'Request access from :name',
+        'requested' => 'Requested',
+    ],
     'detail_empty' => [
         'heading' => 'Select an email to read',
         'description' => 'Choose a message from the list on the left',
@@ -87,6 +93,21 @@ return [
                 'body' => 'Your email is being sent.',
             ],
         ],
+    ],
+    'privacy_gate' => [
+        'metadata_only' => [
+            'heading' => 'Email body and subject are restricted',
+            'description' => 'You can see participant and date information. Request access to view the subject and body.',
+        ],
+        'subject_only' => [
+            'heading' => 'Email body is restricted',
+            'description' => 'You can see the subject line. The full email body is hidden. Request access to see more.',
+        ],
+        'private' => [
+            'heading' => 'This email is private',
+            'description' => 'Only the email owner can view this content.',
+        ],
+        'request_hint' => 'Select :action on the email list to ask for expanded access.',
     ],
     'reader' => [
         'heading' => 'View email',

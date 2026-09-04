@@ -111,8 +111,13 @@ abstract class BaseRecordEmailsPage extends Page
         $query = $record
             ->emails()
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
-            ->with(['from', 'labels', 'participants', 'shares'])
+            ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
+            ->withExists([
+                'accessRequests as viewer_has_pending_access_request' => fn (Builder $query) => $query
+                    ->where('requester_id', $user->getKey())
+                    ->where('status', EmailAccessRequestStatus::PENDING),
+            ])
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {

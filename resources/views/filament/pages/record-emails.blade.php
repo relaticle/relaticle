@@ -25,7 +25,10 @@
          Livewire re-render (x-init does not re-run after a morph), which drops the
          pane back to its min-height mid-interaction. The subtraction is the chrome
          above it: topbar, record header and the resource tabs. --}}
-    <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
+    <div @class([
+        'flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10',
+        'invisible' => $this->selectedEmail !== null,
+    ])>
 
         {{-- Toolbar: what you are looking at on the left, what you can do with it on
              the right, one control height throughout. Compose is the header action,
@@ -35,7 +38,7 @@
             <div class="flex min-w-0 flex-1 items-center gap-3">
                 <div class="flex shrink-0 items-center gap-1 rounded-lg bg-gray-100 p-1 ring-1 ring-gray-950/5 dark:bg-gray-950 dark:ring-white/10">
                     <x-emails.folder-tab :grow="false" folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   :label="__('filament/pages/email-inbox.folders.all')" />
-                    <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" :badge="$this->inboxUnreadCount" />
+                    <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" />
                     <x-emails.folder-tab :grow="false" folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" :label="__('filament/pages/email-inbox.folders.sent')" />
                 </div>
 
@@ -43,24 +46,11 @@
                     <x-emails.search-bar :search="$search" :framed="false" />
                 </div>
             </div>
-
-            @if ($this->inboxUnreadCount > 0)
-                <button
-                    wire:click="markAllAsRead"
-                    wire:loading.attr="disabled"
-                    wire:target="markAllAsRead"
-                    type="button"
-                    class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                >
-                    <x-ri-check-double-line class="h-4 w-4" />
-                    <span class="hidden lg:inline">{{ __('filament/pages/email-inbox.mark_all_read.label') }}</span>
-                </button>
-            @endif
         </div>
 
         <div class="flex flex-1 flex-col divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
             @forelse ($this->emails as $email)
-                <x-emails.list-row-wide :email="$email" :folder="$folder" :own-addresses="$this->ownEmailAddresses" />
+                <x-emails.list-row-wide :email="$email" />
             @empty
                 <x-emails.list-empty
                     class="flex-1"
@@ -138,7 +128,7 @@
             }"
             wire:key="email-reader"
             x-on:keydown.escape.window="closeReader()"
-            class="fixed inset-0 z-30 flex items-center justify-center p-4 sm:p-6"
+            class="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6"
         >
             <div
                 x-on:click="closeReader()"
