@@ -123,7 +123,7 @@ it('renders email participants and ai label through the email view helpers', fun
     ]);
 
     $email->labels()->create([
-        'source' => 'ai',
+        'source' => 'system',
         'label' => 'Sales',
     ]);
 

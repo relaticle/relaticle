@@ -24,11 +24,11 @@ final class EmailLabelFactory extends Factory
         ];
     }
 
-    public function ai(): static
+    public function category(?string $label = null): static
     {
         return $this->state(fn (): array => [
-            'source' => 'ai',
-            'label' => $this->faker->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
+            'source' => 'system',
+            'label' => $label ?? $this->faker->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
         ]);
     }
 }

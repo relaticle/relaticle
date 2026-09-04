@@ -38,7 +38,7 @@
             <div class="flex min-w-0 flex-1 items-center gap-3">
                 <div class="flex shrink-0 items-center gap-1 rounded-lg bg-gray-100 p-1 ring-1 ring-gray-950/5 dark:bg-gray-950 dark:ring-white/10">
                     <x-emails.folder-tab :grow="false" folder="all"   :active="$folder->value === 'all'"   icon="heroicon-o-squares-2x2"   :label="__('filament/pages/email-inbox.folders.all')" />
-                    <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" :badge="$this->inboxUnreadCount" />
+                    <x-emails.folder-tab :grow="false" folder="inbox" :active="$folder->value === 'inbox'" icon="heroicon-o-inbox"          :label="__('filament/pages/email-inbox.folders.inbox')" />
                     <x-emails.folder-tab :grow="false" folder="sent"  :active="$folder->value === 'sent'"  icon="heroicon-o-paper-airplane" :label="__('filament/pages/email-inbox.folders.sent')" />
                 </div>
 
@@ -46,24 +46,11 @@
                     <x-emails.search-bar :search="$search" :framed="false" />
                 </div>
             </div>
-
-            @if ($this->inboxUnreadCount > 0)
-                <button
-                    wire:click="markAllAsRead"
-                    wire:loading.attr="disabled"
-                    wire:target="markAllAsRead"
-                    type="button"
-                    class="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                >
-                    <x-ri-check-double-line class="h-4 w-4" />
-                    <span class="hidden lg:inline">{{ __('filament/pages/email-inbox.mark_all_read.label') }}</span>
-                </button>
-            @endif
         </div>
 
         <div class="flex flex-1 flex-col divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
             @forelse ($this->emails as $email)
-                <x-emails.list-row-wide :email="$email" :folder="$folder" :own-addresses="$this->ownEmailAddresses" />
+                <x-emails.list-row-wide :email="$email" />
             @empty
                 <x-emails.list-empty
                     class="flex-1"

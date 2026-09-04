@@ -194,7 +194,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                 ->compact()
                 ->visible(fn (): bool => $this->tab === 'visibility')
                 ->headerActions([
-                    fn (): Action => $this->addVisibilityContactAction(),
+                    $this->addVisibilityContactAction(...),
                 ])
                 ->schema([
                     View::make('email-integration::livewire.email-visibility-table-embed'),

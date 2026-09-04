@@ -96,7 +96,7 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
     }
 
     /**
-     * @return SupportCollection<string, array<string, mixed>>
+     * @return SupportCollection<string, array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}>
      */
     private function visibilityRecords(?string $search): SupportCollection
     {
@@ -105,7 +105,10 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             $this->customEntries(),
         );
 
-        $records = collect($rows)->keyBy('key');
+        /** @var SupportCollection<string, array{key: string, address: string, enforcement: string, enforcement_value: string, source: string, is_system: bool, entry_id?: string, updated_at?: string}> $records */
+        $records = collect($rows)->mapWithKeys(
+            fn (array $row): array => [(string) $row['key'] => $row],
+        );
 
         if (blank($search)) {
             return $records;

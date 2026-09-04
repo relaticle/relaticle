@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use RuntimeException;
@@ -80,9 +81,10 @@ final readonly class EmailThreadSummaryService
                 $lines[] = '(restricted)';
             }
 
-            $aiLabels = $email->labels->where('source', 'ai')->pluck('label')->implode(', ');
-            if (filled($aiLabels)) {
-                $lines[] = "Labels: {$aiLabels}";
+            $category = $email->categoryLabel();
+
+            if ($category instanceof EmailLabel) {
+                $lines[] = "Labels: {$category->label}";
             }
 
             $lines[] = '';
