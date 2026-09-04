@@ -25,7 +25,10 @@
          Livewire re-render (x-init does not re-run after a morph), which drops the
          pane back to its min-height mid-interaction. The subtraction is the chrome
          above it: topbar, record header and the resource tabs. --}}
-    <div class="flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10">
+    <div @class([
+        'flex h-[calc(100dvh-15rem)] min-h-[30rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-gray-950/5 dark:border-gray-800 dark:bg-gray-950 dark:ring-white/10',
+        'invisible' => $this->selectedEmail !== null,
+    ])>
 
         {{-- Toolbar: what you are looking at on the left, what you can do with it on
              the right, one control height throughout. Compose is the header action,
@@ -138,7 +141,7 @@
             }"
             wire:key="email-reader"
             x-on:keydown.escape.window="closeReader()"
-            class="fixed inset-0 z-30 flex items-center justify-center p-4 sm:p-6"
+            class="fixed inset-0 z-40 flex items-center justify-center p-4 sm:p-6"
         >
             <div
                 x-on:click="closeReader()"

@@ -37,7 +37,12 @@ trait HasEmailReaderActions
     {
         return ViewAction::make()
             ->modalHeading(__('filament/relation-managers/emails.actions.view.modal_heading'))
-            ->modalWidth(Width::FiveExtraLarge);
+            ->modalWidth(Width::FiveExtraLarge)
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('filament/emails/composer.actions.close'))
+            ->extraModalWindowAttributes([
+                'class' => 'fi-email-reader-modal',
+            ]);
     }
 
     public function emailReaderInfolist(Schema $schema): Schema

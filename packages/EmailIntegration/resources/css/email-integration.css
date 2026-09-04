@@ -114,3 +114,133 @@
         @apply min-h-0 flex-1;
     }
 }
+
+/* ── Email reader overlay ──────────────────────────────────────────────────
+   Mount animations only. The overlay is gated by a Livewire `@if`, so it is
+   removed from the DOM outright on close; an Alpine leave transition would need
+   visibility state that does not survive Livewire morphing the element. */
+@keyframes fi-email-reader-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes fi-email-reader-panel-in {
+    from { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fi-email-reader-backdrop {
+    animation: fi-email-reader-backdrop-in 200ms ease-out;
+}
+
+.fi-email-reader-panel {
+    animation: fi-email-reader-panel-in 200ms ease-out;
+}
+
+/* Relation-manager ViewAction: the reader is a tall flex column, not a form. */
+.fi-email-reader-modal.fi-modal-window {
+    display: flex;
+    max-height: calc(100dvh - 2rem);
+    flex-direction: column;
+}
+
+.fi-email-reader-modal .fi-modal-content {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.fi-email-reader-modal-content {
+    min-height: min(70dvh, 100%);
+    max-height: min(70dvh, calc(100dvh - 8rem));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-email-reader-backdrop,
+    .fi-email-reader-panel {
+        animation: none;
+    }
+}
+
+/* ── Action modals sit above the mail surfaces ─────────────────────────────
+   Filament paints a modal at z-40 (z-50 for one stacked on another). The reader
+   overlay and the composer window are z-40, and z-50 once the composer is
+   expanded, so an action opened from either (sharing, signatures, templates)
+   renders *underneath* an opaque panel: no error, no visible modal, and the
+   click reads as dead. A modal is always the topmost surface, so it is lifted
+   past both here, keeping Filament's own base/stacked ordering intact. */
+.fi-modal > .fi-modal-close-overlay,
+.fi-modal > .fi-modal-window-ctn {
+    z-index: 60;
+}
+
+.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-close-overlay,
+.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-window-ctn {
+    z-index: 70;
+}
+
+/* ── Docked draft: the writing area runs to the footer ─────────────────────
+   The dock has no height of its own (it grows with the draft), so the editor
+   cannot flex into it. Giving the container a min-height would just open a gap
+   below the editor's own box. The floor belongs on the editable area itself. */
+[data-composer-dock='inline'] .fi-fo-rich-editor-content {
+    min-height: 11rem;
+}
+
+/* ── Email reader: secondary icon actions ──────────────────────────────────
+   Sharing/Summarize/Request access are Filament actions, the reply icons are
+   plain buttons; left alone the two render at different sizes and weights and
+   the row stops reading as one group. This pins the Filament ones to the same
+   28px box, 16px glyph and gray-400 resting weight as their neighbours. */
+.fi-email-reader-action.fi-icon-btn {
+    block-size: calc(var(--spacing) * 7);
+    inline-size: calc(var(--spacing) * 7);
+    /* Filament offsets its own padding with a -6px margin. The padding is gone
+       here, so the margin has to go too. Left in, it eats the row's gap and the
+       buttons overlap. */
+    margin: 0;
+    padding: 0;
+    color: theme('colors.gray.400');
+}
+
+.fi-email-reader-action.fi-icon-btn .fi-icon {
+    block-size: calc(var(--spacing) * 4);
+    inline-size: calc(var(--spacing) * 4);
+}
+
+.fi-email-reader-action.fi-icon-btn:hover {
+    background-color: theme('colors.gray.100');
+    color: theme('colors.gray.600');
+}
+
+.dark .fi-email-reader-action.fi-icon-btn:hover {
+    background-color: theme('colors.gray.800');
+    color: theme('colors.gray.300');
+}
+
+/* ── Email visibility table (workspace privacy settings) ───────────────────
+   Custom Blade table with a described enforcement picker per row. */
+.ei-visibility-search {
+    display: flex;
+    justify-content: end;
+}
+
+.ei-visibility-search .fi-ta-search-field {
+    @apply w-full max-w-xs;
+}
+
+.ei-enforcement-picker-option[aria-selected='true'] {
+    @apply bg-gray-50 dark:bg-white/5;
+}
+
+/* ── Email list: direction badge ───────────────────────────────────────────
+   Filament's xs badge ships 2px of horizontal padding, which leaves the label
+   touching the pill edge at this size. A little room either side makes it read
+   as a tag rather than tinted text. */
+.fi-email-direction-badge.fi-badge {
+    padding-block: 1px;
+    padding-inline: calc(var(--spacing) * 1.5);
+}
