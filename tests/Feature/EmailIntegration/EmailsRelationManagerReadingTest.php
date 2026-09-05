@@ -6,8 +6,10 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -401,6 +403,65 @@ describe('shareAllOnRecord header action', function (): void {
             'pageClass' => ViewPeople::class,
         ])
             ->assertTableActionHidden('shareAllOnRecord');
+    });
+});
+
+describe('access request approve and deny from the reader modal', function (): void {
+    it('approves a pending request from the relation manager view modal', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->mountAction(TestAction::make('view')->table($email))
+            ->assertMountedActionModalSee($this->viewer->name)
+            ->assertMountedActionModalSee(__('filament/pages/email-inbox.pending_access.approve'))
+            ->callAction(TestAction::make('approveAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
+
+    it('denies a pending request from the relation manager view modal', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->mountAction(TestAction::make('view')->table($email))
+            ->assertMountedActionModalSee(__('filament/pages/email-inbox.pending_access.deny'))
+            ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
     });
 });
 

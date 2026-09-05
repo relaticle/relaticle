@@ -18,7 +18,7 @@
              * draft has to be persisted first, and awaited.
              */
             async closeReader() {
-                const dock = document.querySelector('[data-inline-composer][wire\\:id]')
+                const dock = $el.querySelector('[data-inline-composer][wire\\:id]')
 
                 if (dock) {
                     await window.Livewire.find(dock.getAttribute('wire:id')).call('close')

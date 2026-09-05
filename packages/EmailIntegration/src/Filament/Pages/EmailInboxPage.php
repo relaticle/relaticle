@@ -25,8 +25,6 @@ use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
@@ -513,74 +511,6 @@ final class EmailInboxPage extends Page
             ->filter()
             ->values()
             ->all();
-    }
-
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['email', 'owner', 'requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.approve_access_request.notifications.approved.title'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.deny_access_request.notifications.denied.title'))
-                    ->send();
-            });
     }
 
     /**

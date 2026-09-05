@@ -16,8 +16,6 @@ final class EmailAccessRequestedNotification extends Notification
 {
     use Queueable;
 
-    private const string DATABASE_NOTIFICATIONS_MODAL_ID = 'database-notifications';
-
     public function __construct(public readonly EmailAccessRequest $request) {}
 
     /**
@@ -39,57 +37,44 @@ final class EmailAccessRequestedNotification extends Notification
 
         $notification = FilamentNotification::make()
             ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
+            ->body($subject)
             ->warning()
             ->icon('heroicon-o-key');
 
         if ($email !== null) {
             $notification->actions([
                 Action::make('viewEmail')
-                    ->label($subject)
+                    ->label(__('filament/notifications/email-access-requested.actions.view'))
                     ->link()
-                    ->alpineClickHandler($this->viewEmailClickHandler($email->getKey())),
+                    ->color('info')
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'open-email-from-access-request',
+                        ['emailId' => $email->getKey()],
+                    ),
                 Action::make('accept')
                     ->label(__('filament/notifications/email-access-requested.actions.accept'))
-                    ->button()
+                    ->link()
                     ->color('success')
-                    ->alpineClickHandler($this->approveClickHandler($this->request->getKey())),
+                    ->markAsRead()
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'approve-email-access-request',
+                        ['requestId' => $this->request->getKey()],
+                    ),
                 Action::make('decline')
                     ->label(__('filament/notifications/email-access-requested.actions.decline'))
-                    ->color('gray')
-                    ->alpineClickHandler($this->denyClickHandler($this->request->getKey())),
+                    ->link()
+                    ->color('warning')
+                    ->markAsRead()
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'deny-email-access-request',
+                        ['requestId' => $this->request->getKey()],
+                    ),
             ]);
         }
 
         return $notification->getDatabaseMessage();
-    }
-
-    private function viewEmailClickHandler(string $emailId): string
-    {
-        return sprintf(
-            '$dispatch(\'close-modal\', { id: \'%s\' }); close(); setTimeout(() => window.Livewire.dispatchTo(\'%s\', \'open-email-from-access-request\', { emailId: \'%s\' }), 0)',
-            self::DATABASE_NOTIFICATIONS_MODAL_ID,
-            EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-            $emailId,
-        );
-    }
-
-    private function approveClickHandler(string $requestId): string
-    {
-        return sprintf(
-            'window.Livewire.dispatchTo(\'%s\', \'approve-email-access-request\', { requestId: \'%s\' }); close(); $dispatch(\'close-modal\', { id: \'%s\' })',
-            EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-            $requestId,
-            self::DATABASE_NOTIFICATIONS_MODAL_ID,
-        );
-    }
-
-    private function denyClickHandler(string $requestId): string
-    {
-        return sprintf(
-            'window.Livewire.dispatchTo(\'%s\', \'deny-email-access-request\', { requestId: \'%s\' }); close(); $dispatch(\'close-modal\', { id: \'%s\' })',
-            EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-            $requestId,
-            self::DATABASE_NOTIFICATIONS_MODAL_ID,
-        );
     }
 }

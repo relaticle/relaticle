@@ -5,29 +5,29 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Livewire;
 
 use App\Models\User;
-use Closure;
-use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Actions\ViewAction;
-use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
-use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Js;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 /**
- * Panel-wide handler for email access request notifications. Mounted once in the
- * app panel body so the shared email reader modal can open from the bell on any
- * page without navigating away.
+ * Panel-wide handler so the Emails-tab reader overlay can open from the bell on
+ * any page. It is the same `selectedEmailId` overlay as the person Emails tab,
+ * not a Filament ViewAction modal.
+ *
+ * @property-read Email|null $selectedEmail
+ * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
  */
 final class EmailAccessNotificationHandler extends Component implements HasActions, HasSchemas
 {
@@ -37,170 +37,107 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
 
     public const string LIVEWIRE_ALIAS = 'email-integration.access-request-handler';
 
+    private const string DATABASE_NOTIFICATIONS_MODAL_ID = 'database-notifications';
+
+    public ?string $selectedEmailId = null;
+
     #[On('open-email-from-access-request')]
-    public function openEmailFromAccessRequest(string $emailId): void
+    public function selectEmail(string $emailId): void
     {
-        $this->mountAction('view', ['emailId' => $emailId]);
+        $this->closeNotificationsPanel();
+
+        $this->selectedEmailId = $emailId;
+
+        $this->dispatch('composer:dismiss-inline');
+        $this->dispatch('composer:resume-draft', emailId: $emailId);
+
+        resolve(MarkEmailAsReadAction::class)->execute($emailId, $this->authUser());
+    }
+
+    /**
+     * Covers selection changes that come from the client (the mobile back button
+     * clears it) rather than from {@see deselectEmail()}.
+     */
+    public function updatedSelectedEmailId(): void
+    {
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    public function deselectEmail(): void
+    {
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
+
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    #[Computed]
+    public function selectedEmail(): ?Email
+    {
+        $email = $this->resolveTeamEmail($this->selectedEmailId, 'view');
+
+        if (! $email instanceof Email) {
+            return null;
+        }
+
+        $email->load(['body', 'participants', 'labels', 'attachments', 'from']);
+
+        return $email;
+    }
+
+    /**
+     * @return Collection<int, EmailAccessRequest>
+     */
+    #[Computed]
+    public function pendingAccessRequests(): Collection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
+            return collect();
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->where('email_id', $email->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->get();
     }
 
     #[On('approve-email-access-request')]
     public function approveFromNotification(string $requestId): void
     {
-        $accessRequest = $this->ownedPendingRequest($requestId);
-
-        if ($accessRequest === null) {
-            return;
-        }
-
-        resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-        Notification::make()
-            ->success()
-            ->title(__('filament/pages/email-access-requests.notifications.approved'))
-            ->send();
-
-        $this->unmountEmailReaderIfOpen();
+        $this->decideOwnedReaderAccessRequest($requestId, approve: true);
     }
 
     #[On('deny-email-access-request')]
     public function denyFromNotification(string $requestId): void
     {
-        $accessRequest = $this->ownedPendingRequest($requestId);
-
-        if ($accessRequest === null) {
-            return;
-        }
-
-        resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-        Notification::make()
-            ->success()
-            ->title(__('filament/pages/email-access-requests.notifications.denied'))
-            ->send();
-
-        $this->unmountEmailReaderIfOpen();
+        $this->decideOwnedReaderAccessRequest($requestId, approve: false);
     }
 
-    public function approveAccessRequestInline(string $requestId): void
+    protected function afterOwnedReaderAccessRequestDecided(bool $approved): void
     {
-        $this->approveFromNotification($requestId);
-        $this->unmountAction();
+        $this->deselectEmail();
+        $this->closeNotificationsPanel();
+        $this->notifyOwnedReaderAccessRequestDecision($approved);
     }
 
-    public function denyAccessRequestInline(string $requestId): void
+    private function closeNotificationsPanel(): void
     {
-        $this->denyFromNotification($requestId);
-        $this->unmountAction();
-    }
+        $this->dispatch('close-modal', id: self::DATABASE_NOTIFICATIONS_MODAL_ID);
 
-    public function getDefaultActionRecord(Action $action): ?Model
-    {
-        if ($action->getName() !== 'view') {
-            return null;
-        }
-
-        $emailId = $action->getArguments()['emailId'] ?? null;
-
-        if (! is_string($emailId)) {
-            return null;
-        }
-
-        return $this->resolveTeamEmail($emailId, 'view');
-    }
-
-    public function getDefaultActionSchemaResolver(Action $action): ?Closure
-    {
-        return match (true) {
-            $action instanceof ViewAction => fn (Schema $schema): Schema => $this->emailReaderInfolist($schema),
-            default => null,
-        };
-    }
-
-    protected function usesInlineAccessActionsInReader(): bool
-    {
-        return true;
-    }
-
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = $this->ownedPendingRequest($arguments['requestId'] ?? null);
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-access-requests.notifications.approved'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = $this->ownedPendingRequest($arguments['requestId'] ?? null);
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-access-requests.notifications.denied'))
-                    ->send();
-            });
-    }
-
-    private function ownedPendingRequest(?string $requestId): ?EmailAccessRequest
-    {
-        if ($requestId === null) {
-            return null;
-        }
-
-        return EmailAccessRequest::query()
-            ->with(['email', 'owner', 'requester'])
-            ->whereKey($requestId)
-            ->where('owner_id', $this->authUser()->getKey())
-            ->first();
+        // Livewire's default dispatch targets this component's element. Filament's
+        // slide-over listens on window, so close it there as well.
+        $this->js(
+            'window.dispatchEvent(new CustomEvent("close-modal", { bubbles: true, detail: '.Js::from(['id' => self::DATABASE_NOTIFICATIONS_MODAL_ID]).' }))',
+        );
     }
 
     private function authUser(): User
     {
         /** @var User */
         return auth()->user();
-    }
-
-    private function unmountEmailReaderIfOpen(): void
-    {
-        if ($this->getMountedAction()?->getName() === 'view') {
-            $this->unmountAction();
-        }
     }
 
     public function render(): View
