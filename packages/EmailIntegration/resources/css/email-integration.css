@@ -31,10 +31,6 @@
             @apply text-gray-700 dark:text-gray-200;
         }
     }
-
-    & .fi-tabs-item:not(.fi-active) .fi-tabs-item-label {
-        @apply text-gray-600 dark:text-gray-400;
-    }
 }
 
 /* Radio cards for the connected-account "Email sharing" tab. The selected state is
@@ -153,27 +149,6 @@
     animation: fi-email-reader-panel-in 200ms ease-out;
 }
 
-/* Relation-manager ViewAction: the reader is a tall flex column, not a form. */
-.fi-email-reader-modal.fi-modal-window {
-    display: flex;
-    max-height: calc(100dvh - 2rem);
-    flex-direction: column;
-}
-
-.fi-email-reader-modal .fi-modal-content {
-    display: flex;
-    min-height: 0;
-    flex: 1;
-    flex-direction: column;
-    overflow: hidden;
-    padding: 0;
-}
-
-.fi-email-reader-modal-content {
-    min-height: min(70dvh, 100%);
-    max-height: min(70dvh, calc(100dvh - 8rem));
-}
-
 @media (prefers-reduced-motion: reduce) {
     .fi-email-reader-backdrop,
     .fi-email-reader-panel {
@@ -250,4 +225,13 @@
 
 .ei-enforcement-picker-option[aria-selected='true'] {
     @apply bg-gray-50 dark:bg-white/5;
+}
+
+/* ── Email list: direction badge ───────────────────────────────────────────
+   Filament's xs badge ships 2px of horizontal padding, which leaves the label
+   touching the pill edge at this size. A little room either side makes it read
+   as a tag rather than tinted text. */
+.fi-email-direction-badge.fi-badge {
+    padding-block: 1px;
+    padding-inline: calc(var(--spacing) * 1.5);
 }

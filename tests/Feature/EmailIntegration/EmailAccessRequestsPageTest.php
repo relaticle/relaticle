@@ -10,6 +10,7 @@ use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 
 mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class);
 
@@ -123,9 +124,14 @@ describe('approveAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->user->notify(new EmailAccessRequestedNotification($request));
+
         livewire(AccessRequestsTable::class)
             ->callTableAction('approveAccessRequest', $request)
+            ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request approved.');
+
+        expect($this->user->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -161,9 +167,14 @@ describe('denyAccessRequest action', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->user->notify(new EmailAccessRequestedNotification($request));
+
         livewire(AccessRequestsTable::class)
             ->callTableAction('denyAccessRequest', $request)
+            ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request denied.');
+
+        expect($this->user->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('does nothing when a non-owner passes a request id', function (): void {
@@ -210,12 +221,16 @@ describe('cancelAccessRequest action', function (): void {
             'email_id' => $otherEmail->getKey(),
         ]);
 
+        $owner->notify(new EmailAccessRequestedNotification($request));
+
         livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
             ->callTableAction('cancelAccessRequest', $request)
+            ->assertDispatched('databaseNotificationsSent')
             ->assertNotified('Access request cancelled.');
 
-        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeFalse();
+        expect(EmailAccessRequest::query()->whereKey($request->id)->exists())->toBeFalse()
+            ->and($owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('does nothing when a non-requester passes a request id', function (): void {

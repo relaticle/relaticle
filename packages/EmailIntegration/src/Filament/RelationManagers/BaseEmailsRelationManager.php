@@ -13,23 +13,30 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
+/**
+ * @property-read Email|null $selectedEmail
+ * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
+ */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
     use HasEmailComposeActions;
@@ -38,6 +45,10 @@ abstract class BaseEmailsRelationManager extends RelationManager
     protected static string $relationship = 'emails';
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+
+    protected string $view = 'email-integration::filament.relation-managers.emails-relation-manager';
+
+    public ?string $selectedEmailId = null;
 
     protected function getCrmRecord(): Model
     {
@@ -64,6 +75,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 return $query;
             })
             ->recordTitleAttribute('subject')
+            ->recordAction('view')
             ->defaultSort('sent_at', 'desc')
             ->headerActions([
                 $composeEmail,
@@ -234,9 +246,64 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 ]);
     }
 
-    public function infolist(Schema $schema): Schema
+    protected function viewEmailAction(): Action
     {
-        return $this->emailReaderInfolist($schema);
+        return Action::make('view')
+            ->label(__('filament-actions::view.single.label'))
+            ->icon('heroicon-o-eye')
+            ->modal(false)
+            ->slideOver(false)
+            ->action(function (Email $record): void {
+                $this->selectEmail($record->getKey());
+            });
+    }
+
+    public function selectEmail(string $id): void
+    {
+        $this->selectedEmailId = $id;
+
+        $this->dispatch('composer:dismiss-inline');
+        $this->dispatch('composer:resume-draft', emailId: $id);
+
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+    }
+
+    public function deselectEmail(): void
+    {
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
+
+        $this->dispatch('composer:dismiss-inline');
+    }
+
+    #[Computed]
+    public function selectedEmail(): ?Email
+    {
+        if ($this->selectedEmailId === null || $this->hidesOwnerMailbox()) {
+            return null;
+        }
+
+        /** @var Email|null */
+        return $this->getRelationship()
+            ->with(['body', 'participants', 'labels', 'attachments', 'from'])
+            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
+            ->whereKey($this->selectedEmailId)
+            ->first();
+    }
+
+    /**
+     * @return Collection<int, EmailAccessRequest>
+     */
+    #[Computed]
+    public function pendingAccessRequests(): Collection
+    {
+        $email = $this->selectedEmail();
+
+        if (! $email instanceof Email) {
+            return collect();
+        }
+
+        return $this->pendingAccessRequestsFor($email);
     }
 
     private function hidesOwnerMailbox(): bool

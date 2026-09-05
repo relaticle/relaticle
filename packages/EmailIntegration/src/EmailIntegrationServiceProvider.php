@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
 use Relaticle\EmailIntegration\Livewire\MailboxConnectPrompt;
@@ -88,6 +89,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.email-visibility-table', EmailVisibilityTable::class);
         Livewire::component('email-integration.drafts-table', DraftsTable::class);
         Livewire::component('email-integration.access-requests-table', AccessRequestsTable::class);
+        Livewire::component(EmailAccessNotificationHandler::LIVEWIRE_ALIAS, EmailAccessNotificationHandler::class);
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.mailbox-import-status', MailboxImportStatus::class);
@@ -103,7 +105,8 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                     return '';
                 }
 
-                return Blade::render('@livewire(\'email-integration.composer\')');
+                return Blade::render('@livewire(\'email-integration.composer\')')
+                    .Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
             },
         );
 

@@ -69,7 +69,7 @@
              The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
         @if (property_exists($this, 'selectedEmailId'))
             <button
-                wire:click="$set('selectedEmailId', null)"
+                wire:click="deselectEmail"
                 type="button"
                 aria-label="{{ __('filament/pages/email-inbox.back_to_list') }}"
                 class="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:hidden"
