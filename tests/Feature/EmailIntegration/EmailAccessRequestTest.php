@@ -15,10 +15,11 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ApproveEmailAccessRequestAction::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class, RequestEmailAccessAction::class);
+mutates(ApproveEmailAccessRequestAction::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class, RequestEmailAccessAction::class, EmailAccessRequestedNotification::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -72,6 +73,22 @@ describe('ApproveEmailAccessRequestAction', function (): void {
         app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
+
+    it('removes the owner access-request notification when approved', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('sends a notification to the requester', function (): void {
@@ -151,6 +168,22 @@ describe('DenyEmailAccessRequestAction', function (): void {
         app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
+    });
+
+    it('removes the owner access-request notification when denied', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
+
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('sends a notification to the requester', function (): void {
