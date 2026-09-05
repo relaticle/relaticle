@@ -389,7 +389,11 @@
                     </p>
                 </div>
 
-                @if ($authUser->can('requestAccess', $record))
+                @if ($record->hasPendingAccessRequestFrom($authUser))
+                    <p class="text-xs text-gray-400 dark:text-gray-500">
+                        {{ __('filament/pages/email-inbox.privacy_gate.request_pending') }}
+                    </p>
+                @elseif ($authUser->can('requestAccess', $record))
                     <p class="text-xs text-gray-400 dark:text-gray-500">
                         {{ __('filament/pages/email-inbox.privacy_gate.request_hint', [
                             'action' => __('filament/pages/email-inbox.request_access.label'),

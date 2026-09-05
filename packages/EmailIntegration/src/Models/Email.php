@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -355,6 +356,14 @@ final class Email extends Model
     public function accessRequests(): HasMany
     {
         return $this->hasMany(EmailAccessRequest::class);
+    }
+
+    public function hasPendingAccessRequestFrom(User $viewer): bool
+    {
+        return $this->accessRequests()
+            ->where('requester_id', $viewer->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->exists();
     }
 
     /**

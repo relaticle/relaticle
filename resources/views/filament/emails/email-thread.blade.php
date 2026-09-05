@@ -236,7 +236,9 @@
                         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
                             {{ $canViewSubject ? 'Email body is restricted' : 'This email is private' }}
                         </p>
-                        @if ($authUser->can('requestAccess', $email))
+                        @if ($email->hasPendingAccessRequestFrom($authUser))
+                            <p class="text-xs text-gray-400">{{ __('filament/pages/email-inbox.privacy_gate.request_pending') }}</p>
+                        @elseif ($authUser->can('requestAccess', $email))
                             <p class="text-xs text-gray-400">Use <span class="font-semibold text-gray-600 dark:text-gray-300">Request Access</span> from the email list to ask for access.</p>
                         @endif
                     </div>

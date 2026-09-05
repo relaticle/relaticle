@@ -5,7 +5,9 @@
     $authUser         = auth()->user();
     $isOwner          = $email->user_id === $authUser->getKey();
     $canSummarize     = $isOwner || $authUser->can('viewBody', $email);
-    $canRequestAccess = $authUser->cannot('viewBody', $email) && $authUser->can('requestAccess', $email);
+    $canRequestAccess = $authUser->cannot('viewBody', $email)
+        && $authUser->can('requestAccess', $email)
+        && ! $email->hasPendingAccessRequestFrom($authUser);
 @endphp
 
 @if ($isOwner)
