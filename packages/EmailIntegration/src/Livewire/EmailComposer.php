@@ -632,7 +632,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
                     ['blockquote', 'codeBlock', 'bulletList', 'orderedList'],
                     ['undo', 'redo'],
-                    ['mergeTags'],
                 ])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],

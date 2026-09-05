@@ -116,23 +116,10 @@
     /* The unclassed div is the editor's own Alpine root. Without it in the
        chain the height stops one level above the ProseMirror surface. */
     & .fi-input-wrp-content-ctn,
-    & .fi-input-wrp-content-ctn > div:not([class]) {
-        @apply flex min-h-0 flex-1 flex-col;
-    }
-
-    /* Filament's merge-tags panel sits on the right from `@2xl` (42rem) on the
-       editor container. The docked composer is 38rem, so that query never
-       fires. Match the wide layout here so the list docks on the right. */
-    & .fi-fo-rich-editor-main {
-        @apply flex min-h-0 flex-1 flex-row;
-    }
-
+    & .fi-input-wrp-content-ctn > div:not([class]),
+    & .fi-fo-rich-editor-main,
     & .fi-fo-rich-editor-content {
         @apply flex min-h-0 flex-1 flex-col;
-    }
-
-    & .fi-fo-rich-editor-panels {
-        @apply max-w-3xs shrink-0 self-stretch rounded-ee-lg border-s border-b-0;
     }
 
     & .ProseMirror {

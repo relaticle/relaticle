@@ -8,6 +8,15 @@
     {{-- Inline: the draft is appended to the reading pane's scroll region, so it is
          simply as tall as its message; the region does the scrolling. --}}
     @class(['shrink-0' => $dock === 'inline'])
+    x-data="{
+        insertVariable(id) {
+            const editor = this.$root.querySelector('.email-composer-body [x-data^=\'richEditorFormComponent\']')
+
+            if (editor) {
+                Alpine.$data(editor).insertMergeTag(id)
+            }
+        },
+    }"
     @if ($dock === 'floating')
         x-on:keydown.window="(() => {
             if ($event.key === 'c'
@@ -234,6 +243,17 @@
                             :click="fn (?string $id): string => 'applyTemplate(\''.$id.'\')'"
                             :create-label="__('filament/emails/composer.actions.create_template')"
                             create-click="mountAction('createTemplate')"
+                        />
+
+                        {{-- Inserts a merge tag into the RichEditor via its own Alpine
+                             component (`insertMergeTag`), which is what the editor's
+                             native `{{` autocomplete calls too. --}}
+                        <x-emails.composer-picker-menu
+                            icon="heroicon-o-variable"
+                            handler="alpine"
+                            :label="__('filament/emails/composer.actions.variable')"
+                            :options="\Relaticle\EmailIntegration\Services\EmailTemplateRenderService::MERGE_TAGS"
+                            :click="fn (?string $id): string => 'insertVariable(\''.$id.'\')'"
                         />
 
                         <span wire:loading wire:target="attachments" class="pl-1 text-xs text-gray-400">{{ __('filament/emails/composer.actions.uploading') }}</span>
