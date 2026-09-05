@@ -56,6 +56,19 @@ it('opens via the composer:open event with the default account preselected', fun
         ->assertSet('accountId', $this->account->id);
 });
 
+it('puts merge tags last on the message toolbar instead of the footer', function (): void {
+    $html = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->html();
+
+    expect($html)
+        ->toContain("togglePanel('mergeTags')")
+        ->not->toContain(__('filament/emails/composer.actions.variable'));
+
+    expect(strpos($html, "togglePanel('mergeTags')"))
+        ->toBeGreaterThan(strpos($html, 'redo().run()'));
+});
+
 it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
     $this->account->update([
         'capabilities' => [
