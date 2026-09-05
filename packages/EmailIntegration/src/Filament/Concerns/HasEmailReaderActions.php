@@ -6,15 +6,12 @@ namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -36,50 +33,6 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
  */
 trait HasEmailReaderActions
 {
-    /**
-     * Filament only resolves `mountAction()` by `{name}Action()` methods when no
-     * parent action is open. The relation-manager reader is a ViewAction modal, so
-     * approve/deny must also be registered as nested modal actions.
-     */
-    public function cacheHasEmailReaderActions(): void
-    {
-        $this->cacheAction($this->approveAccessRequestAction());
-        $this->cacheAction($this->denyAccessRequestAction());
-    }
-
-    protected function viewEmailAction(): ViewAction
-    {
-        return ViewAction::make()
-            ->modalHeading(__('filament/relation-managers/emails.actions.view.modal_heading'))
-            ->modalWidth(Width::FiveExtraLarge)
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('filament/emails/composer.actions.close'))
-            ->extraModalWindowAttributes([
-                'class' => 'fi-email-reader-modal',
-            ])
-            ->registerModalActions([
-                $this->approveAccessRequestAction(),
-                $this->denyAccessRequestAction(),
-            ]);
-    }
-
-    public function emailReaderInfolist(Schema $schema): Schema
-    {
-        return $schema
-            ->schema([
-                ViewEntry::make('email')
-                    ->hiddenLabel()
-                    ->view('filament.emails.email-view')
-                    ->viewData(fn (?Email $record): array => [
-                        'pendingAccessRequests' => $record instanceof Email
-                            ? $this->pendingAccessRequestsFor($record)
-                            : collect(),
-                    ])
-                    ->columnSpanFull(),
-            ])
-            ->columns(1);
-    }
-
     /**
      * @return Collection<int, EmailAccessRequest>
      */

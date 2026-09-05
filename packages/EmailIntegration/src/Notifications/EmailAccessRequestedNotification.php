@@ -50,8 +50,8 @@ final class EmailAccessRequestedNotification extends Notification
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'open-email-from-access-request',
-                        ['emailId' => $email->getKey()],
-                    ),
+                    )
+                    ->eventData(['emailId' => $email->getKey()]),
                 Action::make('accept')
                     ->label(__('filament/notifications/email-access-requested.actions.accept'))
                     ->link()
@@ -60,8 +60,8 @@ final class EmailAccessRequestedNotification extends Notification
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'approve-email-access-request',
-                        ['requestId' => $this->request->getKey()],
-                    ),
+                    )
+                    ->eventData(['requestId' => $this->request->getKey()]),
                 Action::make('decline')
                     ->label(__('filament/notifications/email-access-requested.actions.decline'))
                     ->link()
@@ -70,8 +70,8 @@ final class EmailAccessRequestedNotification extends Notification
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'deny-email-access-request',
-                        ['requestId' => $this->request->getKey()],
-                    ),
+                    )
+                    ->eventData(['requestId' => $this->request->getKey()]),
             ]);
         }
 

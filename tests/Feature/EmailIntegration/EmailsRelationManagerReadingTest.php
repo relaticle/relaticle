@@ -406,8 +406,8 @@ describe('shareAllOnRecord header action', function (): void {
     });
 });
 
-describe('access request approve and deny from the reader modal', function (): void {
-    it('approves a pending request from the relation manager view modal', function (): void {
+describe('access request approve and deny from the reader overlay', function (): void {
+    it('approves a pending request from the relation manager overlay', function (): void {
         $email = Email::factory()->private()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -427,16 +427,18 @@ describe('access request approve and deny from the reader modal', function (): v
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->mountAction(TestAction::make('view')->table($email))
-            ->assertMountedActionModalSee($this->viewer->name)
-            ->assertMountedActionModalSee(__('filament/pages/email-inbox.pending_access.approve'))
+            ->callTableAction('view', $email)
+            ->assertSet('selectedEmailId', $email->getKey())
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee($this->viewer->name)
+            ->assertSee(__('filament/pages/email-inbox.pending_access.approve'))
             ->callAction(TestAction::make('approveAccessRequest')->arguments(['requestId' => $request->getKey()]))
             ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
 
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
     });
 
-    it('denies a pending request from the relation manager view modal', function (): void {
+    it('denies a pending request from the relation manager overlay', function (): void {
         $email = Email::factory()->private()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->owner->id,
@@ -456,8 +458,9 @@ describe('access request approve and deny from the reader modal', function (): v
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->mountAction(TestAction::make('view')->table($email))
-            ->assertMountedActionModalSee(__('filament/pages/email-inbox.pending_access.deny'))
+            ->callTableAction('view', $email)
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee(__('filament/pages/email-inbox.pending_access.deny'))
             ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
             ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
 
