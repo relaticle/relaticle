@@ -123,7 +123,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
         'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
-        'press', 'compare', 'alternatives', 'ai', 'self-hosted',
+        'press', 'compare', 'alternatives', 'ai', 'ai-native-crm', 'self-hosted',
 
         // Communication
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
