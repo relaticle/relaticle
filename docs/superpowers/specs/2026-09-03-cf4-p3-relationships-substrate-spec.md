@@ -10,7 +10,9 @@ Host consumption: the phase 5 spec.
 
 1. Storage: a typed edge ledger in a shared link table. Not jsonb sync, not dynamic DDL.
    Scored 90% vs 52% against dynamic DDL for our shared-table tenancy model.
-2. Cardinality: all four options, enforced in the database on Postgres.
+2. Cardinality: all four options, enforced on every driver inside the writer transaction (a
+   definition-row lock) with a static duplicate-edge index as the wall; section 1.2 has the
+   mechanics and the MySQL caveat.
 3. One-way Record fields remain a first-class concept beside paired relationships, matching
    the leading relationship-first CRMs.
 4. Ownership: layered-A. The package stays standalone and owns the substrate. Relaticle core
@@ -190,7 +192,8 @@ purge step, idempotency; the stock record-config form round-trip.
 ## Open item
 
 The single-value Record filter bug is untracked and unreproduced. It dies in 4.0, but 3.x
-users keep it. Decide whether to reproduce and fix in a 3.x patch or document it as known.
+users keep it. Decide whether to reproduce and fix in a 3.x patch or document it as known
+before Plan 3.1 opens, since 3.1 Task 9 rewrites the filter this bug lives in.
 
 ## Exit criterion
 
