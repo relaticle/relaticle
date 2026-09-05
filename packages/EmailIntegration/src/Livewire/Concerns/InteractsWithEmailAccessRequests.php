@@ -201,6 +201,7 @@ trait InteractsWithEmailAccessRequests
                 resolve(CancelEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.cancelled'))->send();
             });

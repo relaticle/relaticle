@@ -57,7 +57,6 @@ final class EmailAccessRequestedNotification extends Notification
                     ->label(__('filament/notifications/email-access-requested.actions.accept'))
                     ->link()
                     ->color('success')
-                    ->close()
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'approve-email-access-request',
@@ -67,7 +66,6 @@ final class EmailAccessRequestedNotification extends Notification
                     ->label(__('filament/notifications/email-access-requested.actions.decline'))
                     ->link()
                     ->color('warning')
-                    ->close()
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'deny-email-access-request',

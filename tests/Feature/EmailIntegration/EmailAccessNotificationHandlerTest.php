@@ -60,10 +60,10 @@ describe('EmailAccessRequestedNotification', function (): void {
             ->and($actions['viewEmail']['event'])->toBe('open-email-from-access-request')
             ->and($actions['viewEmail']['eventData'])->toBe(['emailId' => $this->email->getKey()])
             ->and($actions['accept']['event'])->toBe('approve-email-access-request')
-            ->and($actions['accept']['shouldClose'])->toBeTrue()
+            ->and($actions['accept']['shouldClose'] ?? false)->toBeFalse()
             ->and($actions['accept']['shouldMarkAsRead'] ?? false)->toBeFalse()
             ->and($actions['decline']['event'])->toBe('deny-email-access-request')
-            ->and($actions['decline']['shouldClose'])->toBeTrue()
+            ->and($actions['decline']['shouldClose'] ?? false)->toBeFalse()
             ->and($actions['decline']['shouldMarkAsRead'] ?? false)->toBeFalse();
 
         $this->owner->notify(new EmailAccessRequestedNotification($request));
@@ -206,14 +206,16 @@ describe('EmailAccessNotificationHandler', function (): void {
     });
 
     it('ignores approve for requests the viewer does not own', function (): void {
-        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
-        $this->actingAs($intruder);
-
         $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
             'requester_id' => $this->requester->id,
             'owner_id' => $this->owner->id,
             'email_id' => $this->email->getKey(),
         ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
+        $this->actingAs($intruder);
 
         NotificationFacade::fake();
 
@@ -221,18 +223,21 @@ describe('EmailAccessNotificationHandler', function (): void {
             ->dispatch('approve-email-access-request', requestId: $request->getKey())
             ->assertNotNotified();
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('ignores deny for requests the viewer does not own', function (): void {
-        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
-        $this->actingAs($intruder);
-
         $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
             'requester_id' => $this->requester->id,
             'owner_id' => $this->owner->id,
             'email_id' => $this->email->getKey(),
         ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
+        $this->actingAs($intruder);
 
         NotificationFacade::fake();
 
@@ -240,7 +245,8 @@ describe('EmailAccessNotificationHandler', function (): void {
             ->dispatch('deny-email-access-request', requestId: $request->getKey())
             ->assertNotNotified();
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('does not claim success when accepting a request that is no longer pending', function (): void {
@@ -250,6 +256,7 @@ describe('EmailAccessNotificationHandler', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
         NotificationFacade::fake();
 
         Livewire::test(EmailAccessNotificationHandler::class)
@@ -258,7 +265,8 @@ describe('EmailAccessNotificationHandler', function (): void {
             ->assertSet('selectedEmailId', $this->email->getKey())
             ->assertNotNotified();
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('dismisses the inline composer when selectedEmailId is cleared', function (): void {

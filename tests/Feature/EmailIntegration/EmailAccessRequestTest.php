@@ -222,6 +222,36 @@ describe('DenyEmailAccessRequestAction', function (): void {
         expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
+    it('leaves other pending access-request notifications in place', function (): void {
+        $otherEmail = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $otherRequest = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+        $this->owner->notify(new EmailAccessRequestedNotification($otherRequest));
+
+        app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        $remaining = $this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->get();
+
+        expect($remaining)->toHaveCount(1)
+            ->and($remaining->first()->data['viewData']['request_id'])->toBe((string) $otherRequest->getKey());
+    });
+
     it('sends a notification to the requester', function (): void {
         $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
             'requester_id' => $this->requester->id,
@@ -314,6 +344,20 @@ describe('CancelEmailAccessRequestAction', function (): void {
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeFalse();
     });
 
+    it('removes the owner access-request notification when cancelled', function (): void {
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        app(CancelEmailAccessRequestAction::class)->execute($request, $this->requester);
+
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+    });
+
     it('does nothing when request is already approved', function (): void {
         $request = EmailAccessRequest::factory()->approved()->forTier(EmailPrivacyTier::FULL)->create([
             'requester_id' => $this->requester->id,
@@ -321,10 +365,13 @@ describe('CancelEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         app(CancelEmailAccessRequestAction::class)->execute($request, $this->requester);
 
         expect(EmailAccessRequest::query()->whereKey($request->getKey())->exists())->toBeTrue();
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('does nothing when request is already denied', function (): void {
