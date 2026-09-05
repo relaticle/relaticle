@@ -7,6 +7,7 @@ return [
     'no_subject' => '(no subject)',
 
     'actions' => [
+        'view' => 'View',
         'accept' => 'Accept',
         'decline' => 'Decline',
     ],

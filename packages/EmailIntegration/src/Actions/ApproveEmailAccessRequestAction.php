@@ -8,6 +8,7 @@ use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 
@@ -39,6 +40,8 @@ final readonly class ApproveEmailAccessRequestAction
         $this->sharingService->shareEmail($email, $owner, $requester, $tier);
 
         $accessRequest->update(['status' => EmailAccessRequestStatus::APPROVED]);
+
+        EmailAccessRequestedNotification::dismissFor($accessRequest);
 
         $requester->notify(new EmailAccessRespondedNotification($accessRequest));
     }

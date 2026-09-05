@@ -6,18 +6,17 @@ namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
-use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -34,41 +33,6 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
  */
 trait HasEmailReaderActions
 {
-    protected function viewAction(): ViewAction
-    {
-        return $this->viewEmailAction();
-    }
-
-    protected function viewEmailAction(): ViewAction
-    {
-        return ViewAction::make()
-            ->modalHeading(__('filament/relation-managers/emails.actions.view.modal_heading'))
-            ->modalWidth(Width::FiveExtraLarge)
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('filament/emails/composer.actions.close'))
-            ->extraModalWindowAttributes([
-                'class' => 'fi-email-reader-modal',
-            ]);
-    }
-
-    public function emailReaderInfolist(Schema $schema): Schema
-    {
-        return $schema
-            ->schema([
-                ViewEntry::make('email')
-                    ->hiddenLabel()
-                    ->view('filament.emails.email-view')
-                    ->viewData(fn (?Email $record): array => [
-                        'pendingAccessRequests' => $record instanceof Email
-                            ? $this->pendingAccessRequestsFor($record)
-                            : collect(),
-                        'inlineAccessActions' => $this->usesInlineAccessActionsInReader(),
-                    ])
-                    ->columnSpanFull(),
-            ])
-            ->columns(1);
-    }
-
     /**
      * @return Collection<int, EmailAccessRequest>
      */
@@ -83,11 +47,6 @@ trait HasEmailReaderActions
             ->where('email_id', $email->getKey())
             ->where('status', EmailAccessRequestStatus::PENDING)
             ->get();
-    }
-
-    protected function usesInlineAccessActionsInReader(): bool
-    {
-        return false;
     }
 
     protected function manageSharingAction(): Action
@@ -423,16 +382,125 @@ trait HasEmailReaderActions
         return view('filament.actions.ai-summary', ['summary' => $summary]);
     }
 
-    protected function requesterNameForOwnedRequest(?string $requestId): string
+    protected function approveAccessRequestAction(): Action
+    {
+        return Action::make('approveAccessRequest')
+            ->requiresConfirmation()
+            ->modalIcon('heroicon-o-check-circle')
+            ->modalIconColor('success')
+            ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
+            ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.approve.modal_description', [
+                'name' => $this->requesterNameForOwnedRequest($this->readerAccessRequestId($arguments)),
+            ]))
+            ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.approve.modal_submit_label'))
+            ->color('success')
+            ->action(function (array $arguments): void {
+                $this->decideOwnedReaderAccessRequest($this->readerAccessRequestId($arguments), approve: true);
+            });
+    }
+
+    protected function denyAccessRequestAction(): Action
+    {
+        return Action::make('denyAccessRequest')
+            ->requiresConfirmation()
+            ->modalHeading(__('filament/pages/email-access-requests.actions.deny.modal_heading'))
+            ->modalDescription(fn (array $arguments): string => __('filament/pages/email-access-requests.actions.deny.modal_description', [
+                'name' => $this->requesterNameForOwnedRequest($this->readerAccessRequestId($arguments)),
+            ]))
+            ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.deny.modal_submit_label'))
+            ->color('danger')
+            ->action(function (array $arguments): void {
+                $this->decideOwnedReaderAccessRequest($this->readerAccessRequestId($arguments), approve: false);
+            });
+    }
+
+    protected function decideOwnedReaderAccessRequest(?string $requestId, bool $approve): void
+    {
+        $accessRequest = $this->ownedPendingRequest($requestId);
+
+        if ($accessRequest === null) {
+            return;
+        }
+
+        if ($approve) {
+            resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->readerUser());
+        } else {
+            resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->readerUser());
+        }
+
+        $accessRequest->refresh();
+
+        $expected = $approve
+            ? EmailAccessRequestStatus::APPROVED
+            : EmailAccessRequestStatus::DENIED;
+
+        if ($accessRequest->status !== $expected) {
+            return;
+        }
+
+        $this->afterOwnedReaderAccessRequestDecided($approve);
+    }
+
+    protected function afterOwnedReaderAccessRequestDecided(bool $approved): void
+    {
+        $this->notifyOwnedReaderAccessRequestDecision($approved);
+        $this->refreshDatabaseNotifications();
+    }
+
+    protected function refreshDatabaseNotifications(): void
+    {
+        $this->dispatch('databaseNotificationsSent');
+    }
+
+    protected function notifyOwnedReaderAccessRequestDecision(bool $approved): void
+    {
+        Notification::make()
+            ->success()
+            ->title($approved
+                ? __('filament/pages/email-access-requests.notifications.approved')
+                : __('filament/pages/email-access-requests.notifications.denied'))
+            ->send();
+    }
+
+    protected function ownedPendingRequest(?string $requestId): ?EmailAccessRequest
     {
         if ($requestId === null) {
-            return 'this user';
+            return null;
         }
 
         return EmailAccessRequest::query()
+            ->with(['email', 'owner', 'requester'])
             ->whereKey($requestId)
             ->where('owner_id', $this->readerUser()->getKey())
-            ->first()?->requester->name ?? 'this user';
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    private function readerAccessRequestId(array $arguments): ?string
+    {
+        $requestId = $arguments['requestId'] ?? null;
+
+        if (is_string($requestId) || is_int($requestId)) {
+            return (string) $requestId;
+        }
+
+        return null;
+    }
+
+    protected function requesterNameForOwnedRequest(?string $requestId): string
+    {
+        if ($requestId === null) {
+            return __('filament/pages/email-access-requests.actions.fallback_user');
+        }
+
+        return EmailAccessRequest::query()
+            ->with('requester')
+            ->whereKey($requestId)
+            ->where('owner_id', $this->readerUser()->getKey())
+            ->first()?->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user');
     }
 
     private function readerUser(): User

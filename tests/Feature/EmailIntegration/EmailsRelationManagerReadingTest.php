@@ -6,8 +6,10 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -368,6 +370,76 @@ describe('shareAllOnRecord header action', function (): void {
             'pageClass' => ViewPeople::class,
         ])
             ->assertTableActionHidden('shareAllOnRecord');
+    });
+});
+
+describe('access request approve and deny from the reader overlay', function (): void {
+    it('approves a pending request from the relation manager overlay', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('view', $email)
+            ->assertSet('selectedEmailId', $email->getKey())
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee($this->viewer->name)
+            ->assertSee(__('filament/pages/email-inbox.pending_access.approve'))
+            ->callAction(TestAction::make('approveAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+    });
+
+    it('denies a pending request from the relation manager overlay', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('view', $email)
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee(__('filament/pages/email-inbox.pending_access.deny'))
+            ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 });
 

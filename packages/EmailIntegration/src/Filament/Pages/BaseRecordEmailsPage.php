@@ -8,7 +8,6 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -19,8 +18,6 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -315,74 +312,6 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->resetPage();
         unset($this->emails);
-    }
-
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/record-emails.actions.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['email', 'owner', 'requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/record-emails.notifications.access_request_approved.title'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/record-emails.actions.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/record-emails.notifications.access_request_denied.title'))
-                    ->send();
-            });
     }
 
     private function authUser(): User
