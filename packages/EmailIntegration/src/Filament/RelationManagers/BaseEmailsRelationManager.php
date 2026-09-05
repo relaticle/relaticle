@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Filament\RelationManagers;
 
 use App\Models\Company;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -49,6 +50,26 @@ abstract class BaseEmailsRelationManager extends RelationManager
     protected string $view = 'email-integration::filament.relation-managers.emails-relation-manager';
 
     public ?string $selectedEmailId = null;
+
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        if (! $ownerRecord instanceof Company && ! $ownerRecord instanceof Opportunity && ! $ownerRecord instanceof People) {
+            return null;
+        }
+
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
+    }
+
+    public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
+    {
+        return static::getBadge($ownerRecord, $pageClass) === null ? null : 'primary';
+    }
 
     protected function getCrmRecord(): Model
     {

@@ -6,6 +6,7 @@ use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 use App\Enums\TeamRole;
 use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -267,6 +268,34 @@ it('hides the emails tab on a company whose domain is protected', function (): v
     livewire(CompanyEmailsPage::class, ['record' => $company->getKey()])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertDontSee('Should not appear on the protected company');
+});
+
+it('omits the emails header badge on a company whose domain is protected', function (): void {
+    $company = Company::factory()->create([
+        'team_id' => $this->team->id,
+        'creator_id' => $this->user->id,
+        'email_count' => 4,
+    ]);
+    writeCompanyDomain($company, 'https://secret.example');
+
+    TeamEmailBlocklist::factory()->protected()->domain('secret.example')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'is_internal' => false,
+    ]);
+    $company->emails()->attach($email->getKey());
+
+    expect(
+        livewire(ViewCompany::class, ['record' => $company->getKey()])
+            ->instance()
+            ->getAction('viewEmails', isMounting: false)
+            ?->getBadge()
+    )->toBeNull();
 });
 
 it('hides the emails tab from a teammate when the company domain is protected', function (): void {

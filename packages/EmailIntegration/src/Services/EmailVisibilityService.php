@@ -8,6 +8,7 @@ use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -23,6 +24,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 final class EmailVisibilityService
@@ -102,6 +104,37 @@ final class EmailVisibilityService
         }
 
         return $this->allAddressesAreProtected($attendeeAddresses, (string) $meeting->team_id);
+    }
+
+    /**
+     * Emails this viewer may see on the record. The denormalized `email_count`
+     * column is unscoped and would leak private mail.
+     */
+    public function visibleEmailCount(Company|Opportunity|People $record, User $viewer): int
+    {
+        if ($this->hidesRecordMailbox($record)) {
+            return 0;
+        }
+
+        return $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->count();
+    }
+
+    public function visibleEmailCountBadge(Company|Opportunity|People $record, User $viewer): ?string
+    {
+        $count = $this->visibleEmailCount($record, $viewer);
+
+        if ($count < 1) {
+            return null;
+        }
+
+        if ($count > 99) {
+            return '99+';
+        }
+
+        return (string) $count;
     }
 
     /**

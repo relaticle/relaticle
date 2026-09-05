@@ -248,3 +248,15 @@
     padding-block: 1px;
     padding-inline: calc(var(--spacing) * 1.5);
 }
+
+/* ── Record header: emails count badge ─────────────────────────────────────
+   Filament hangs action badges off the top-end corner of the button. That
+   overlay is clipped by `.fi-layout { overflow-y-auto }` and sits on top of
+   the next header action. Keep the count in the label row instead. */
+.fi-header-actions-ctn .fi-btn .fi-btn-badge-ctn {
+    @apply static inset-auto w-auto translate-x-0 translate-y-0 bg-transparent rtl:translate-x-0;
+}
+
+.fi-header-actions-ctn .fi-btn .fi-btn-badge-ctn .fi-badge {
+    @apply min-w-5 px-1.5 py-0.5;
+}

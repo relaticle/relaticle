@@ -17,8 +17,9 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseEmailsRelationManager::class);
+mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -481,4 +482,46 @@ describe('subject column privacy enforcement', function (): void {
         ])
             ->assertTableColumnStateSet('subject', 'Real Subject', $email);
     });
+});
+
+it('badges the emails tab with the visible count for the record', function (): void {
+    $this->person->forceFill(['email_count' => 99])->save();
+
+    $visible = Email::factory()->count(2)->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($visible->modelKeys());
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('2');
+});
+
+it('caps the emails tab badge at 99+', function (): void {
+    $emails = Email::factory()->count(100)->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($emails->modelKeys());
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('99+');
+});
+
+it('omits the emails tab badge when the viewer cannot see the linked mail', function (): void {
+    $this->person->forceFill(['email_count' => 2])->save();
+
+    $private = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($private->getKey());
+
+    $this->actingAs($this->viewer);
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBeNull();
 });
