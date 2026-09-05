@@ -62,7 +62,6 @@ trait HasEmailReaderActions
                         'pendingAccessRequests' => $record instanceof Email
                             ? $this->pendingAccessRequestsFor($record)
                             : collect(),
-                        'inlineAccessActions' => $this->usesInlineAccessActionsInReader(),
                     ])
                     ->columnSpanFull(),
             ])
@@ -83,11 +82,6 @@ trait HasEmailReaderActions
             ->where('email_id', $email->getKey())
             ->where('status', EmailAccessRequestStatus::PENDING)
             ->get();
-    }
-
-    protected function usesInlineAccessActionsInReader(): bool
-    {
-        return false;
     }
 
     protected function manageSharingAction(): Action
