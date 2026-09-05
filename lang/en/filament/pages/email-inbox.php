@@ -107,6 +107,7 @@ return [
             'description' => 'Only the email owner can view this content.',
         ],
         'request_hint' => 'Select :action on the email list to ask for expanded access.',
+        'request_pending' => 'Your access request is pending.',
     ],
     'reader' => [
         'heading' => 'View email',

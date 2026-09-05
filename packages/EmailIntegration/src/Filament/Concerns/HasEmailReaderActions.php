@@ -235,34 +235,16 @@ trait HasEmailReaderActions
             ->tooltip(__('filament/pages/record-emails.actions.request_access.label'))
             ->modalHeading(__('filament/pages/record-emails.actions.request_access.modal_heading'))
             ->modalWidth(Width::Large)
-            ->visible(function (mixed $record = null): bool {
-                if (! $record instanceof Email) {
-                    return true;
-                }
-
-                return $this->readerUser()->cannot('viewBody', $record)
-                    && $this->readerUser()->can('requestAccess', $record);
-            })
-            ->fillForm(function (array $arguments, mixed $record = null): array {
-                $email = $this->emailForReaderAction($record instanceof Email ? $record : null, $arguments, 'requestAccess');
+            ->visible(function (mixed $record = null, array $arguments = []): bool {
+                $email = $record instanceof Email
+                    ? $record
+                    : $this->emailForReaderAction(null, $arguments, 'requestAccess');
 
                 if (! $email instanceof Email) {
-                    return [];
+                    return ! array_key_exists('emailId', $arguments);
                 }
 
-                $pendingRequest = EmailAccessRequest::query()
-                    ->where('email_id', $email->getKey())
-                    ->where('requester_id', $this->readerUser()->getKey())
-                    ->where('status', EmailAccessRequestStatus::PENDING)
-                    ->first();
-
-                if ($pendingRequest === null) {
-                    return [];
-                }
-
-                return [
-                    'tier_requested' => $pendingRequest->tier_requested,
-                ];
+                return $this->canOpenRequestAccess($email);
             })
             ->schema([
                 Radio::make('tier_requested')
@@ -304,6 +286,15 @@ trait HasEmailReaderActions
                     ->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))
                     ->send();
             });
+    }
+
+    private function canOpenRequestAccess(Email $email): bool
+    {
+        $user = $this->readerUser();
+
+        return $user->cannot('viewBody', $email)
+            && $user->can('requestAccess', $email)
+            && ! $email->hasPendingAccessRequestFrom($user);
     }
 
     /**

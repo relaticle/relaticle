@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -294,6 +295,25 @@ describe('RequestEmailAccessAction', function (): void {
         expect($request)->not->toBeNull()
             ->and($request->status)->toBe(EmailAccessRequestStatus::PENDING)
             ->and($request->owner_id)->toBe($this->owner->id);
+    });
+
+    it('does not create a second pending request for the same email', function (): void {
+        $this->team->users()->attach($this->requester, ['role' => 'editor']);
+
+        Notification::fake();
+
+        $first = app(RequestEmailAccessAction::class)
+            ->execute($this->email, $this->requester, EmailPrivacyTier::FULL);
+
+        $second = app(RequestEmailAccessAction::class)
+            ->execute($this->email, $this->requester, EmailPrivacyTier::SUBJECT);
+
+        expect($first)->not->toBeNull()
+            ->and($second)->toBeNull()
+            ->and(EmailAccessRequest::query()->where('email_id', $this->email->getKey())->count())->toBe(1)
+            ->and($first?->fresh()?->tier_requested)->toBe(EmailPrivacyTier::FULL->value);
+
+        Notification::assertSentToTimes($this->owner, EmailAccessRequestedNotification::class, 1);
     });
 
     it('aborts with 403 when the requester is not in the email\'s team', function (): void {

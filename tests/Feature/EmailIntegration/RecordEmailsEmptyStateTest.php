@@ -615,8 +615,5 @@ it('shows a requested label on the list pill when an access request is pending',
     livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
         ->assertSee(__('filament/pages/email-inbox.list_row.requested'))
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
-        ->mountAction('requestAccess', arguments: ['emailId' => $email->getKey()])
-        ->assertSchemaStateSet([
-            'tier_requested' => EmailPrivacyTier::FULL->value,
-        ]);
+        ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);
 });
