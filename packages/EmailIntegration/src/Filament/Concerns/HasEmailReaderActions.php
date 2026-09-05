@@ -453,6 +453,12 @@ trait HasEmailReaderActions
     protected function afterOwnedReaderAccessRequestDecided(bool $approved): void
     {
         $this->notifyOwnedReaderAccessRequestDecision($approved);
+        $this->refreshDatabaseNotifications();
+    }
+
+    protected function refreshDatabaseNotifications(): void
+    {
+        $this->dispatch('databaseNotificationsSent');
     }
 
     protected function notifyOwnedReaderAccessRequestDecision(bool $approved): void

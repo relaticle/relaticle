@@ -140,6 +140,7 @@ trait InteractsWithEmailAccessRequests
                 unset($this->pendingIncomingCount);
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.approved'))->send();
             });
@@ -170,6 +171,7 @@ trait InteractsWithEmailAccessRequests
                 unset($this->pendingIncomingCount);
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.denied'))->send();
             });

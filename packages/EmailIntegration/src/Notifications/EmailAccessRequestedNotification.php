@@ -39,7 +39,8 @@ final class EmailAccessRequestedNotification extends Notification
             ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
             ->body($subject)
             ->warning()
-            ->icon('heroicon-o-key');
+            ->icon('heroicon-o-key')
+            ->viewData(['request_id' => (string) $this->request->getKey()]);
 
         if ($email !== null) {
             $notification->actions([
@@ -56,25 +57,43 @@ final class EmailAccessRequestedNotification extends Notification
                     ->label(__('filament/notifications/email-access-requested.actions.accept'))
                     ->link()
                     ->color('success')
-                    ->markAsRead()
+                    ->close()
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'approve-email-access-request',
                     )
-                    ->eventData(['requestId' => $this->request->getKey()]),
+                    ->eventData(['requestId' => (string) $this->request->getKey()]),
                 Action::make('decline')
                     ->label(__('filament/notifications/email-access-requested.actions.decline'))
                     ->link()
                     ->color('warning')
-                    ->markAsRead()
+                    ->close()
                     ->dispatchTo(
                         EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
                         'deny-email-access-request',
                     )
-                    ->eventData(['requestId' => $this->request->getKey()]),
+                    ->eventData(['requestId' => (string) $this->request->getKey()]),
             ]);
         }
 
         return $notification->getDatabaseMessage();
+    }
+
+    /**
+     * Delete the owner's bell row for this request. Same outcome as the
+     * notification close (X) action: the row is removed, not marked read.
+     */
+    public static function dismissFor(EmailAccessRequest $request): void
+    {
+        $owner = $request->owner ?? User::query()->whereKey($request->owner_id)->first();
+
+        if (! $owner instanceof User) {
+            return;
+        }
+
+        $owner->notifications()
+            ->where('type', self::class)
+            ->where('data->viewData->request_id', (string) $request->getKey())
+            ->delete();
     }
 }

@@ -121,6 +121,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $this->deselectEmail();
         $this->closeNotificationsPanel();
         $this->notifyOwnedReaderAccessRequestDecision($approved);
+        $this->refreshDatabaseNotifications();
     }
 
     private function closeNotificationsPanel(): void

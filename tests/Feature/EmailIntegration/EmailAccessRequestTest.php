@@ -91,6 +91,36 @@ describe('ApproveEmailAccessRequestAction', function (): void {
         expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
+    it('leaves other pending access-request notifications in place', function (): void {
+        $otherEmail = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        $otherRequest = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+        $this->owner->notify(new EmailAccessRequestedNotification($otherRequest));
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        $remaining = $this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->get();
+
+        expect($remaining)->toHaveCount(1)
+            ->and($remaining->first()->data['viewData']['request_id'])->toBe((string) $otherRequest->getKey());
+    });
+
     it('sends a notification to the requester', function (): void {
         $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
             'requester_id' => $this->requester->id,
@@ -112,12 +142,15 @@ describe('ApproveEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         Notification::fake();
 
         app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
-        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('does nothing when request is already denied', function (): void {
@@ -144,6 +177,8 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         $intruder = User::factory()->create(['current_team_id' => $this->team->id]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         Notification::fake();
 
         expect(fn () => app(ApproveEmailAccessRequestAction::class)->execute($request, $intruder))
@@ -151,7 +186,8 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
         Notification::assertNothingSent();
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
-        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 });
 
@@ -236,11 +272,14 @@ describe('DenyEmailAccessRequestAction', function (): void {
             'email_id' => $this->email->getKey(),
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         Notification::fake();
 
         app(DenyEmailAccessRequestAction::class)->execute($request, $this->owner);
 
         Notification::assertNothingSent();
+        expect($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
     });
 
     it('aborts with 403 when actor is not the owner', function (): void {

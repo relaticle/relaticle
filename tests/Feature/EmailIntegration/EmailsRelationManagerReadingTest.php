@@ -423,6 +423,8 @@ describe('access request approve and deny from the reader overlay', function ():
             'owner_id' => $this->owner->id,
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
@@ -433,9 +435,11 @@ describe('access request approve and deny from the reader overlay', function ():
             ->assertSee($this->viewer->name)
             ->assertSee(__('filament/pages/email-inbox.pending_access.approve'))
             ->callAction(TestAction::make('approveAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
             ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 
     it('denies a pending request from the relation manager overlay', function (): void {
@@ -454,6 +458,8 @@ describe('access request approve and deny from the reader overlay', function ():
             'owner_id' => $this->owner->id,
         ]);
 
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
@@ -462,9 +468,11 @@ describe('access request approve and deny from the reader overlay', function ():
             ->assertSee('fi-email-reader-panel')
             ->assertSee(__('filament/pages/email-inbox.pending_access.deny'))
             ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
             ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
     });
 });
 
