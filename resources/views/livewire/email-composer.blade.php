@@ -154,7 +154,7 @@
 
                     <x-emails.composer-field :label="__('filament/emails/composer.fields.to')">
                         <div class="min-w-0 flex-1">
-                            <x-emails.recipient-chips wire:model="to" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" />
+                            <x-emails.recipient-chips wire:model="to" :autofocus="true" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" />
                         </div>
                         <span class="shrink-0 space-x-2 text-xs font-medium text-gray-400">
                             <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
