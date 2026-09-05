@@ -65,6 +65,7 @@ final class GenerateSitemapCommand extends Command
     {
         $this->ensureUrl($sitemap, route('help.index'));
         $this->ensureUrl($sitemap, route('documentation.index'));
+        $this->ensureUrl($sitemap, route('aiNativeCrm'));
 
         $docsRepository->categories()
             ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
