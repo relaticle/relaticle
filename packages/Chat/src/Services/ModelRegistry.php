@@ -104,7 +104,7 @@ final readonly class ModelRegistry
     /**
      * What the product offers, whether or not this install holds the key.
      *
-     * `available()` answers a different question — servable HERE — and the public
+     * `available()` answers a different question, servable HERE, and the public
      * pricing and AI pages must not be answering that one. A rotated key is an
      * outage, not a change to what a plan includes, and routing marketing copy
      * through it renders "Every plan can use  and any self-hosted model you connect

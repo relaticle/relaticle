@@ -54,7 +54,7 @@ final readonly class CustomFieldValueObserver
         $old = $value->getOriginal($column);
 
         // A normalization-only rewrite (e.g. a link field stripping its URL scheme on
-        // save) is not a user edit — comparing the field-type-normalized old and new
+        // save) is not a user edit. Comparing the field-type-normalized old and new
         // values keeps the timeline from attributing a change the user never made.
         if ($this->normalize($value->customField, $old) === $this->normalize($value->customField, $value->getValue())) {
             return;
@@ -135,7 +135,7 @@ final readonly class CustomFieldValueObserver
 
         $labels = $ids
             // Arbitrary-value fields (link, tags-input) store raw strings rather than
-            // option IDs, so no option matches — fall back to the value itself instead
+            // option IDs, so no option matches. Fall back to the value itself instead
             // of leaking escaped JSON.
             ->map(fn (mixed $id): string => $this->optionLabel($field, $id) ?? (string) $id)
             ->filter(fn (string $label): bool => $label !== '')

@@ -295,9 +295,7 @@ final class EntityLinkResolver
             foreach ($rows as $row) {
                 $key = mb_strtolower((string) $row->matched_value);
 
-                if (! isset($results[$key])) {
-                    $results[$key] = $row->entity_id;
-                }
+                $results[$key] ??= $row->entity_id;
             }
         }
 

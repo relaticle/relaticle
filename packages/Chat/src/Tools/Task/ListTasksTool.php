@@ -14,7 +14,7 @@ final class ListTasksTool extends BaseReadListTool
 {
     public function description(): string
     {
-        return 'List tasks with optional search, pagination, sorting, and filtering — by custom field values, by the tasks attached to a specific company, person, or opportunity, or by who they are assigned to. Use assigned_to_me for "my tasks"/"tasks assigned to me", and assignee_ids for anyone else (resolve the name with ListTeamMembersTool first); without either, the result is every task in the workspace.';
+        return 'List tasks with optional search, pagination, sorting, and filtering: by custom field values, by the tasks attached to a specific company, person, or opportunity, or by who they are assigned to. Use assigned_to_me for "my tasks"/"tasks assigned to me", and assignee_ids for anyone else (resolve the name with ListTeamMembersTool first); without either, the result is every task in the workspace.';
     }
 
     protected function actionClass(): string
@@ -32,7 +32,7 @@ final class ListTasksTool extends BaseReadListTool
     {
         return [
             'assigned_to_me' => $schema->boolean()->description('Restrict to tasks assigned to the current user. Set this for "my tasks" or "tasks assigned to me".'),
-            'assignee_ids' => $schema->array()->description('Restrict to tasks assigned to any of these user ULIDs. Use this for "tasks assigned to <someone else>" — call ListTeamMembersTool first to turn the name into an id.'),
+            'assignee_ids' => $schema->array()->description('Restrict to tasks assigned to any of these user ULIDs. Use this for "tasks assigned to <someone else>"; call ListTeamMembersTool first to turn the name into an id.'),
             'company_id' => $schema->string()->description('Restrict to tasks attached to this company ID.'),
             'people_id' => $schema->string()->description('Restrict to tasks attached to this person ID.'),
             'opportunity_id' => $schema->string()->description('Restrict to tasks attached to this opportunity ID.'),

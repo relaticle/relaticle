@@ -113,10 +113,10 @@ final readonly class RecordReferenceResolver
 
         try {
             return match ($entityType) {
-                // Custom field definitions have no per-record route — the management page
+                // Custom field definitions have no per-record route. The management page
                 // is the destination, deep-linked to the tab the field lives on.
                 'custom_field' => $this->customFieldUrl($recordId, $team),
-                // Team invitations have no per-record view either — the pending invitation
+                // Team invitations have no per-record view either. The pending invitation
                 // lives in the Members page's list, so every invitation resolves there
                 // regardless of id.
                 'team_invitations' => Members::getUrl(panel: 'app', tenant: $team),

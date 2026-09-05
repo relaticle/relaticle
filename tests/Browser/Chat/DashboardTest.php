@@ -11,10 +11,7 @@ it('can load the dashboard with chat input', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->assertSourceHas('placeholder="Ask anything..."');
 });
@@ -23,10 +20,7 @@ it('uses a white composer surface in light mode', function (): void {
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->assertNoJavaScriptErrors();
 
@@ -54,10 +48,7 @@ it('shows greeting on the dashboard', function (): void {
     $user = User::factory()->withTeam()->create(['timezone' => 'UTC']);
     $team = $user->ownedTeams()->first();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->assertSee('Good');
 });
@@ -76,10 +67,7 @@ it('seeds the chat composer from the ask_rela checklist step without sending', f
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->click('[data-step="ask_rela"] a')
         ->assertPathBeginsWith("/app/{$team->slug}/chats")

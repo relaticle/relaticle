@@ -37,10 +37,12 @@ use App\Services\GitHubService;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\BrandColors;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
@@ -75,6 +77,8 @@ use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
 use Spatie\Onboard\OnboardingSteps;
 
@@ -100,26 +104,26 @@ final class AppServiceProvider extends ServiceProvider
         // Cashier attaches signature verification only when the webhook secret
         // happens to be set, and also exposes an unauthenticated payment route
         // this app never links to. Register the webhook ourselves instead so
-        // verification is unconditional — see routes/web.php.
+        // verification is unconditional. See routes/web.php.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between
-        // them — the key the activity timeline groups a single save's rows on.
+        // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
 
         // Caches creation-source facts per team for the lifetime of a
-        // request/job — scoped so a queue worker resets it between jobs.
+        // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()
         // memoizes through once(), keyed on that shared object rather than the
         // model, so the first team evaluated in a process poisons the answer for
-        // every later one — wrong onboarding state in any request or Horizon
+        // every later one, giving wrong onboarding state in any request or Horizon
         // worker that touches two workspaces. Rebinding per resolve gives each
         // lookup its own step objects, so once() memoizes within one lookup as
         // intended. Registration lives here because a fresh registry starts empty.
-        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+        $this->app->bind(function (): OnboardingSteps {
             $steps = new OnboardingSteps;
 
             ActivationSteps::registerOn($steps);
@@ -149,11 +153,18 @@ final class AppServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Panels register their own palette on boot and override this, so it only
+        // takes effect where no panel is active: the invitation, join, and
+        // scheduled-deletion interstitials, which would otherwise render
+        // Filament's default amber instead of the brand color.
+        FilamentColor::register(['primary' => BrandColors::primary()]);
+
         Event::listen(Login::class, RecordLoginTimestampListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
         Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
+        Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
@@ -189,7 +200,7 @@ final class AppServiceProvider extends ServiceProvider
             $parameters['teams'] = $teams;
             $parameters['pausedTeamIds'] = $pausedTeamIds;
 
-            // Never preselect a workspace the connector could not use — the user would
+            // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
             $currentTeamId = $user?->currentTeam?->getKey();
 
@@ -244,7 +255,7 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         // HasSEO creates a row per post but never removes it. A soft delete should
-        // keep it — the post can come back — but a force delete from the panel
+        // keep it, because the post can come back, but a force delete from the panel
         // would otherwise leave the seo row behind for good.
         Post::forceDeleted(fn (Post $post) => $post->seo()->delete());
     }
@@ -482,7 +493,7 @@ final class AppServiceProvider extends ServiceProvider
     /**
      * The AI list tools memoise which custom fields are filterable, per tenant and
      * entity, for a minute. Hooking the model rather than the actions keeps the
-     * Filament management page — which writes definitions directly — from leaving
+     * Filament management page, which writes definitions directly, from leaving
      * the assistant insisting a field the user just added does not exist.
      */
     private function configureCustomFieldSchemaInvalidation(): void
@@ -534,8 +545,8 @@ final class AppServiceProvider extends ServiceProvider
          * signed-in account's chosen zone. Read by both table/infolist output and
          * DateTimePicker input, so one closure keeps display and entry symmetrical.
          *
-         * TimezoneManager is a single global slot, so this must stay the only writer
-         * — a second FilamentTimezone::set() anywhere would silently replace it, and
+         * TimezoneManager is a single global slot, so this must stay the only writer.
+         * A second FilamentTimezone::set() anywhere would silently replace it, and
          * which one survived would depend on service provider boot order. It lives
          * here rather than in a panel provider for the same reason: the resolution
          * spans every panel.

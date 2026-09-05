@@ -175,7 +175,7 @@ def _is_infra_only_path(path: str) -> bool:
 def _detect_critical_signals(path: str, hunk_text: str) -> set[str]:
     """Return set of critical signal names matched by path or added-line content.
 
-    Markdown files are documentation — their path and content are never scanned
+    Markdown files are documentation, so their path and content are never scanned
     for critical signals (documentation may mention sensitive terms in prose).
     """
     if path.endswith(".md"):
@@ -530,7 +530,7 @@ def _run_tests() -> int:
             tier_data = json.loads((d / "tier.json").read_text())
             assert_eq("T10 compute_tier: tier key present", "tier" in tier_data, True)
 
-    # T11: Blade template (Laravel) — checkout summary view
+    # T11: Blade template (Laravel), checkout summary view
     diff = (
         "diff --git a/resources/views/checkout/summary.blade.php b/resources/views/checkout/summary.blade.php\n"
         "index a..b 100644\n--- a/x\n+++ b/x\n@@ -1,2 +1,3 @@\n"
@@ -539,7 +539,7 @@ def _run_tests() -> int:
     r = classify_diff(diff)
     assert_in("T11 blade: template in change_types", "template", r["change_types"])
     assert_in("T11 blade: file in surfaces", "resources/views/checkout/summary.blade.php", r["surfaces"])
-    # checkout/summary.blade.php path contains no payment/billing/charge keywords — no payment signal
+    # checkout/summary.blade.php path contains no payment/billing/charge keywords, so no payment signal
     assert_eq("T11 blade: no payment signal (no payment keyword in path or content)", "payment" in r["critical_signals"], False)
 
     # T11b: Blade view with billing keyword in added content -> payment signal

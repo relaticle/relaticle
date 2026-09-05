@@ -8,14 +8,14 @@ related: [help/import/prepare-your-csv, help/import/update-existing-records, hel
 
 Import brings in existing companies, people, or opportunities from a
 spreadsheet instead of typing them in one at a time. Upload a CSV, map its
-columns to Relaticle fields, review the values, then commit — Relaticle shows
+columns to Relaticle fields, review the values, then commit. Relaticle shows
 you exactly how many records will be created or updated before anything
 changes.
 
 1. Click **Companies**, **People**, or **Opportunities** in the sidebar.
 2. Click **Import / Export**, then click **Import companies** (the label
    matches whichever list you're on).
-3. Click **Choose a .CSV file**, or drop it onto the upload area — up to
+3. Click **Choose a .CSV file**, or drop it onto the upload area, up to
    10,000 rows and 10MB.
 4. Click **Continue**.
 
@@ -42,7 +42,7 @@ to correct it, or skip a row you don't want imported.
 ![The Import Complete summary showing 2 created, 0 updated, and 0 failed](/help-assets/getting-started/import-your-existing-data-2.png)
 
 Every past import is listed on the **Import History** page, under your
-workspace name — including how many rows were created, updated, skipped, or
+workspace name, including how many rows were created, updated, skipped, or
 failed.
 
 ## If a column doesn't map automatically, then set it by hand

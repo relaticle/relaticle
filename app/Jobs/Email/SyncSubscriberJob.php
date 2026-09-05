@@ -8,14 +8,11 @@ use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use App\Support\Email\SubscriberProfile;
 use App\Support\Email\SubscriberProfileDeriver;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
 use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
@@ -32,7 +29,7 @@ use Spatie\MailcoachSdk\Resources\Subscriber;
 #[Backoff(60, 300, 900, 3600)]
 final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Queueable;
 
     /**
      * Bounds the uniqueness lock. Completion and failure both release it, but a

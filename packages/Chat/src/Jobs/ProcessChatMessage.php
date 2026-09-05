@@ -498,7 +498,7 @@ final class ProcessChatMessage implements ShouldQueue
     /**
      * The provider surfaces a 429 as a typed RateLimitedException on its wrapped
      * (non-streaming) path, but as a raw HTTP-client RequestException on the
-     * streaming path. Treat both — plus overloaded (529/503) — as retryable.
+     * streaming path. Treat both, plus overloaded (529/503), as retryable.
      */
     public function isRateLimited(?Throwable $e): bool
     {
@@ -562,7 +562,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
 
         if ($this->isRateLimited($exception)) {
-            return __('The assistant is being rate-limited. Please try again in a moment — anything you already approved was saved.');
+            return __('The assistant is being rate-limited. Please try again in a moment. Anything you already approved was saved.');
         }
 
         return __('The assistant encountered an error. Please try again.');
@@ -578,7 +578,7 @@ final class ProcessChatMessage implements ShouldQueue
      * back-to-back, only once the stream fully succeeds. `handle()`'s
      * post-stream `then()` callback (settleReservation / persistMentions /
      * persistUserDocument / materializeAssistantDocument / maybeTitleFromTurn)
-     * then runs synchronously and un-guarded — if any of those steps throws,
+     * then runs synchronously and un-guarded. If any of those steps throws,
      * the job still fails even though both real rows already exist. Inspecting
      * only the single latest row can't tell that case apart from "the stream
      * died before the store wrote anything": the latest row would be the
@@ -596,8 +596,8 @@ final class ProcessChatMessage implements ShouldQueue
      * turn for that identical message: its `[user, assistant-note]` pair is
      * indistinguishable from a completed one, so a second failure in a row
      * is likewise skipped. Both degrade to the pre-existing "message lost"
-     * behavior for that one edge case — never a duplicate or a false error
-     * note — and are accepted rather than solved with more machinery.
+     * behavior for that one edge case, never a duplicate or a false error
+     * note, and are accepted rather than solved with more machinery.
      */
     private function persistFailedTurn(?Throwable $exception): void
     {
@@ -673,7 +673,7 @@ final class ProcessChatMessage implements ShouldQueue
      * Distinct records referenced earlier in this conversation, most recent first.
      *
      * Unlike a typed @mention, a page-context record's name never enters the message
-     * text — so once it falls off this ledger the agent loses it entirely (no id, no
+     * text, so once it falls off this ledger the agent loses it entirely (no id, no
      * name, nothing left to fall back on). The conversation's OLDEST page_context row
      * is therefore exempt from the recency cap: it reserves the ledger's last slot
      * instead of being evicted by more recent records, so the total handed to the
@@ -797,7 +797,7 @@ final class ProcessChatMessage implements ShouldQueue
      *
      * Runs in the post-stream `then()` callback after the agent's ConversationStore
      * has inserted the user message row. If this UPDATE fails (DB blip), the row
-     * keeps its column DEFAULT of `{"type":"doc","content":[]}` — the user message
+     * keeps its column DEFAULT of `{"type":"doc","content":[]}`. The user message
      * is still readable, just without mention-chip rendering.
      */
     private function persistUserDocument(): void
@@ -818,7 +818,7 @@ final class ProcessChatMessage implements ShouldQueue
      * latest assistant message row. Runs after the agent's ConversationStore
      * has persisted the assistant message with its plain text `content`.
      *
-     * v1 emits no mention chips in assistant prose — future work can extract
+     * v1 emits no mention chips in assistant prose. Future work can extract
      * structured entity references from tool results.
      */
     private function materializeAssistantDocument(StreamedAgentResponse $streamedResponse, float $startedAt): void

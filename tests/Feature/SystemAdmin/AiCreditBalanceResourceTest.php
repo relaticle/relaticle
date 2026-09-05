@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\BillingStatus;
+use App\Enums\Plan;
 use App\Models\Team;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -104,4 +106,18 @@ it('renders the period dates on the administrator calendar day, not the server o
 
     livewire(ListAiCreditBalances::class)
         ->assertTableColumnFormattedStateSet('period_starts_at', 'Jun 10, 2026', $balance);
+});
+
+it('explains an allowance with the workspace billing badge, not a vocabulary of its own', function (): void {
+    $team = Team::factory()->create();
+    $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
+    $balance = AiCreditBalance::factory()->create(['team_id' => $team->getKey()]);
+
+    livewire(ListAiCreditBalances::class)
+        ->assertCanSeeTableRecords([$balance])
+        ->assertCanRenderTableColumn('billing_status')
+        ->assertSee(BillingStatus::Trialing->getLabel())
+        ->assertSeeHtml(BillingStatus::Trialing->getDescription());
 });

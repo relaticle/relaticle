@@ -15,8 +15,8 @@ use Spatie\LaravelSettings\Settings;
  * ModelRegistry at read time, so `.env` remains their single source of truth.
  *
  * `toConfig()` is pushed into `config()` at boot (ChatServiceProvider), so every
- * existing reader — ModelRegistry, AiModelResolver, the sysadmin spend widget,
- * CrmAssistant::anthropicEffort() — keeps reading config and needs no changes.
+ * existing reader (ModelRegistry, AiModelResolver, the sysadmin spend widget,
+ * CrmAssistant::anthropicEffort()) keeps reading config and needs no changes.
  * The config values remain the seed defaults and the fallback when the table is
  * not there yet.
  *

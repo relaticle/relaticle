@@ -15,7 +15,7 @@ return new class extends Migration
 
             // One SEO row per model. HasSEO::addSEO() is public and also fires on
             // `created`, and morphOne()->withDefault() silently returns the first
-            // match — so a duplicate would let the panel edit one row while the
+            // match, so a duplicate would let the panel edit one row while the
             // site renders another, with nothing to surface the split.
             $table->morphs('model');
             $table->unique(['model_type', 'model_id']);

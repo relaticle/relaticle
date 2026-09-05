@@ -123,7 +123,7 @@ trait HasPeriodComparison
     /**
      * The shared "did something real" filter behind activation metrics: a
      * non-null creator, a non-system creation source, within the period, on a
-     * non-deleted row — applied across every entity table and unioned.
+     * non-deleted row, applied across every entity table and unioned.
      *
      * $column selects the grain (e.g. `creator_id` for active users,
      * `team_id` for active teams); it is only ever a trusted internal literal,

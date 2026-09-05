@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
@@ -33,6 +35,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Jetstream\Jetstream;
@@ -79,7 +83,7 @@ use Laravel\Sanctum\HasApiTokens;
     'subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -90,6 +94,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use HasTeams;
     use HasUlids;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
     /**
@@ -100,6 +105,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
@@ -120,7 +126,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * The zone this user's calendar is expressed in. `timezone` is nullable: a user
      * who never chose one and whose browser was never detected falls back to the app
      * default, so every caller that turns a stored UTC value into a wall clock reads
      * it from here rather than repeating the fallback.
@@ -141,6 +147,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function hasPassword(): bool
     {
         return $this->password !== null;
+    }
+
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
     }
 
     public function isScheduledForDeletion(): bool
@@ -200,7 +211,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
-     * verified — every framework, Filament, and policy check that reads
+     * verified, so every framework, Filament, and policy check that reads
      * hasVerifiedEmail() honors the flag uniformly through this single override.
      */
     public function hasVerifiedEmail(): bool
@@ -267,7 +278,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * The ids of every team the user can reach, owned or joined.
      *
      * Authorization runs once per table row, so resolving a record's `team`
-     * relation inside a policy costs a query per row — and throws once a query
+     * relation inside a policy costs a query per row, and throws once a query
      * hydrates more than one row, because that is when Eloquent arms its strict
      * lazy-loading guard. Matching the record's foreign key against this set
      * keeps authorization off the record's relations entirely.
@@ -321,5 +332,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         }
 
         return Jetstream::findRole($membershipRole)?->key === $role;
+    }
+
+    // Ownership outranks the pivot role, so an owner row carrying a stale
+    // viewer value cannot lock them out of their own workspace.
+    public function isViewerOnTeamId(?string $teamId): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return false;
+        }
+
+        return $this->hasTeamRoleForTeamId($teamId, TeamRole::Viewer->value);
     }
 }

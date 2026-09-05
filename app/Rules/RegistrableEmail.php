@@ -10,7 +10,7 @@ namespace App\Rules;
  *
  * The DNS check is opt-out because it performs a live lookup: registration can
  * afford it, but the invitation and social paths sit in request paths where a
- * lookup buys nothing — every disposable provider publishes valid MX records.
+ * lookup buys nothing. Every disposable provider publishes valid MX records.
  */
 final readonly class RegistrableEmail
 {

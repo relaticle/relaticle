@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * Read model over the laravel/ai message store — backs the SystemAdmin
+ * Read model over the laravel/ai message store. Backs the SystemAdmin
  * Messages resource. Writes happen through laravel/ai's own persistence.
  *
  * @property string $id

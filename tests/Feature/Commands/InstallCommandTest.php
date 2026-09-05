@@ -12,7 +12,7 @@ mutates(InstallCommand::class);
 
 beforeEach(function (): void {
     // The command shells out to composer, pnpm and vite for real. Unfaked, this
-    // file rebuilds public/build and re-runs `composer install` on every run —
+    // file rebuilds public/build and re-runs `composer install` on every run:
     // ~110s, and it mutates the working tree of whoever runs the suite. Assert
     // the right commands are issued instead of executing them.
     Process::fake();

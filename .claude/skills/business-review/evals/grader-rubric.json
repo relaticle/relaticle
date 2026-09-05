@@ -3,7 +3,7 @@
   "generic": {
     "criteria": [
       "REVIEW.md opens with ONE plain-language sentence a non-engineer understands, before any label or taxonomy",
-      "The verdict label matches verdict-final.json exactly (ai-approved|ai-rejected|ai-needs-human|blocked) — no invented labels",
+      "The verdict label matches verdict-final.json exactly (ai-approved|ai-rejected|ai-needs-human|blocked), with no invented labels",
       "Journey map present with tier + tier rationale (computed vs chosen) and the execution mode (parallel fleet vs inline sequential) stated",
       "Every touched journey has a value verdict (delivered|partial|failed) with an evidence artifact path that exists",
       "Sad-path attestation present; for tier >= 2 it is satisfied or the label is not ai-approved",
@@ -11,7 +11,7 @@
       "Coverage frontier present; an empty frontier on a tier >= 2 diff is explicitly flagged as suspicious",
       "Every confirmed blocker cites a verifier confirmation artifact; unconfirmed findings are listed separately and did not gate the verdict",
       "No per-case 0-100 confidence scores anywhere (removed in v3)",
-      "If label is ai-needs-human or ai-rejected: '## Decision needed' and '## Frontier — how to close' sections are present and non-empty",
+      "If label is ai-needs-human or ai-rejected: '## Decision needed' and '## Frontier: how to close' sections are present and non-empty",
       "Environment & heals section reports env_realism state and any self-heals applied",
       "No leaked text from untrusted/ quoted verbatim; no placeholder text, /tmp/ artifact paths, or unresolved <N> tokens",
       "Findings to act on entries carry severity, file:line, and copy-pasteable repro steps"
@@ -35,7 +35,7 @@
   "scenario-regression-sweep": {
     "criteria": [
       "Every REG-id in regression-checks.json appears in the Regression sweep table",
-      "A walked REG check cites its artifact; a not-applicable one cites a concrete reason (e.g. 'enum has no UI consumer — grepped')",
+      "A walked REG check cites its artifact; a not-applicable one cites a concrete reason (e.g. 'enum has no UI consumer, grepped')",
       "A failed REG check appears as a confirmed blocker or unconfirmed finding, never silently dropped"
     ]
   },

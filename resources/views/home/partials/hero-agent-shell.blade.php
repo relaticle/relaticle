@@ -1,4 +1,4 @@
-{{-- Mock Filament app shell sidebar — visible from md: up, hidden on mobile.
+{{-- Mock Filament app shell sidebar, visible from md: up and hidden on mobile.
      Visually mirrors app.relaticle.test: white bg, dark workspace chip, light-gray
      active state with primary icon (not primary-tinted bg), and a "Chats" group
      at the bottom containing the active conversation.
@@ -17,16 +17,11 @@
             <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">Northwind</div>
         </div>
         <x-heroicon-o-chevron-down class="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500"/>
-
-        {{-- Sidebar collapse toggle — chat-sidebar-toggle-hook.blade.php renders
-             it into this row from lg: up. Remix Icon here, unlike the Heroicons
-             around it, because the hook uses one too. --}}
-        <x-ri-side-bar-line class="hidden lg:block w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
     </div>
 
-    {{-- Global search + notifications row — mirrors the real sidebar's
+    {{-- Global search + notifications row, mirroring the real sidebar's
          fi-sidebar-search-ctn (GlobalSearch pill + inbox trigger). --}}
-    <div class="flex items-center gap-1.5 px-2 pb-1.5">
+    <div class="flex items-center gap-1.5 px-2 pt-2.5 pb-1.5">
         <div class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-gray-100 px-2.5 dark:bg-white/[0.06]">
             <x-heroicon-o-magnifying-glass class="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span class="min-w-0 flex-1 truncate text-xs text-gray-400 dark:text-zinc-500">Search</span>
@@ -37,7 +32,7 @@
         </div>
     </div>
 
-    {{-- Top-level nav items — icons match app/Filament/Resources/*Resource.php $navigationIcon.
+    {{-- Top-level nav items. Icons match app/Filament/Resources/*Resource.php $navigationIcon.
          The active item renders as gray-100 bg + primary-700 label AND icon (measured from
          the live Filament sidebar); inactive icons are a step lighter than their labels.
          Which item is active is swapped by heroChat.setShellActive() as the demo moves
@@ -68,7 +63,7 @@
             <span>Notes</span>
         </div>
 
-        {{-- Chats group — recent conversations, mirroring chat-sidebar-nav.blade.php.
+        {{-- Chats group: recent conversations, mirroring chat-sidebar-nav.blade.php.
              None is active here because Home is the current page. --}}
         <div class="pt-3">
             <div class="flex items-center justify-between px-2 pb-1">
@@ -84,7 +79,7 @@
             @foreach ([
                 "This week's pipeline review",
                 'Follow up with Priya Nair',
-                'Renewal prep — Daniel Okafor',
+                'Renewal prep: Daniel Okafor',
             ] as $heroChatTitle)
                 <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
                     <x-heroicon-o-chat-bubble-left class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
@@ -92,7 +87,7 @@
                 </div>
             @endforeach
 
-            {{-- All chats trigger — mirrors the "All chats" footer item in chat-sidebar-nav.blade.php --}}
+            {{-- All chats trigger, mirroring the "All chats" footer item in chat-sidebar-nav.blade.php --}}
             <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-500 opacity-60 dark:text-zinc-400">
                 <x-heroicon-o-ellipsis-horizontal class="w-4 h-4 shrink-0"/>
                 <span>All chats</span>

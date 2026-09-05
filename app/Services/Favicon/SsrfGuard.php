@@ -32,7 +32,7 @@ final readonly class SsrfGuard
      * The underlying client follows redirects by default, so validating only the
      * initial URL would let an attacker-controlled public host redirect the request
      * to an internal address (SSRF, CWE-918). Callers must still validate the initial
-     * URL with {@see self::isAllowed()} — the guard below only covers redirect hops.
+     * URL with {@see self::isAllowed()}. The guard below only covers redirect hops.
      */
     public static function guardedHttpClient(): PendingRequest
     {

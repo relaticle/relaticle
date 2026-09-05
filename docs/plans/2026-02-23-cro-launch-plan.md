@@ -1,4 +1,4 @@
-# CRO-First Agent-Native Launch — Implementation Plan
+# CRO-First Agent-Native Launch: Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -120,7 +120,7 @@ git commit -m "feat: rewrite features section header and CTA for agent-native po
 
 **Step 1: Replace the entire `$features` array**
 
-Replace the `$features` array (lines 23-75) with the following. Changes apply the "so what" test to every description — each now connects to an outcome, not just a capability. The first 3 features (agent-native differentiators) stay at the top.
+Replace the `$features` array (lines 23-75) with the following. Changes apply the "so what" test to every description. Each now connects to an outcome, not just a capability. The first 3 features (agent-native differentiators) stay at the top.
 
 ```php
 $features = [
@@ -167,7 +167,7 @@ $features = [
     ],
     [
         'title' => 'Import & Export',
-        'description' => 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime — your data is yours.',
+        'description' => 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime. Your data is yours.',
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />'
     ],
     [
@@ -284,7 +284,7 @@ git commit -m "feat: update community section with agent-native voice and concre
 
 **Files:**
 - Modify: `resources/views/home/index.blade.php` (add @push('header') block)
-- Modify: `resources/views/layouts/guest.blade.php` (verify `@stack('header')` exists — it does at line 38)
+- Modify: `resources/views/layouts/guest.blade.php` (verify `@stack('header')` exists; it does at line 38)
 
 **Step 1: Add JSON-LD schema to the homepage**
 
@@ -405,7 +405,7 @@ git commit -m "feat: add explicit AI crawler allows and sitemap to robots.txt"
 Create `docs/launch/product-hunt.md` with:
 
 ```markdown
-# Product Hunt Listing — Relaticle
+# Product Hunt Listing for Relaticle
 
 ## Tagline (60 chars max)
 Open-source CRM with 20 MCP tools for AI agents
@@ -421,11 +421,11 @@ Relaticle is a self-hosted, open-source CRM built from the ground up for AI agen
 - Companies needing self-hosted CRM for data sovereignty (EU, healthcare, finance)
 
 ### What makes it different?
-- **Agent-native**: MCP server with 20 tools — more than HubSpot's 9. AI agents get full CRUD, schema discovery, and custom field support out of the box.
+- **Agent-native**: MCP server with 20 tools, more than HubSpot's 9. AI agents get full CRUD, schema discovery, and custom field support out of the box.
 - **Self-hosted**: Deploy on your infrastructure. Your data never leaves your servers.
 - **Open source**: AGPL-3.0. No per-seat pricing. Free forever.
 - **Modern stack**: Laravel 12, Filament 5, PHP 8.4, PostgreSQL 17.
-- **22 custom field types**: Entity relationships, conditional visibility, per-field encryption — no code or migrations needed.
+- **22 custom field types**: Entity relationships, conditional visibility, and per-field encryption, with no code or migrations needed.
 
 ### Key numbers
 - 20 MCP tools (vs HubSpot's 9)
@@ -437,11 +437,11 @@ Relaticle is a self-hosted, open-source CRM built from the ground up for AI agen
 
 Hey Product Hunt! I'm Manuk, the maker of Relaticle.
 
-I built Relaticle because I was frustrated with CRMs that couldn't talk to AI agents. HubSpot has 9 MCP tools. Salesforce is adding Agentforce. But if you want an open-source, self-hosted CRM that your AI agents can actually operate — nothing existed.
+I built Relaticle because I was frustrated with CRMs that couldn't talk to AI agents. HubSpot has 9 MCP tools. Salesforce is adding Agentforce. But if you want an open-source, self-hosted CRM that your AI agents can actually operate, nothing existed.
 
 So I built one.
 
-Relaticle ships with a production MCP server (20 tools), a REST API, and 22 custom field types. Your AI agent can create contacts, update deals, log notes, and query CRM data — all through the standard MCP protocol.
+Relaticle ships with a production MCP server (20 tools), a REST API, and 22 custom field types. Your AI agent can create contacts, update deals, log notes, and query CRM data, all through the standard MCP protocol.
 
 The entire thing is AGPL-3.0 open source. No per-seat pricing. Deploy it on your infrastructure or use our managed hosting at app.relaticle.com.
 
@@ -481,25 +481,25 @@ git commit -m "docs: draft Product Hunt listing for agent-native CRM launch"
 Create `docs/launch/twitter-thread.md`:
 
 ```markdown
-# Twitter/X Launch Thread — Relaticle
+# Twitter/X Launch Thread for Relaticle
 
 ## Thread (8 tweets)
 
-### 1/8 — Hook
+### 1/8 · Hook
 I built an open-source CRM with 20 MCP tools so AI agents can manage your customer data.
 
 HubSpot has 9. Salesforce is still figuring it out. Relaticle ships 20 today.
 
 Here's what it does and why it matters:
 
-### 2/8 — The Problem
+### 2/8 · The Problem
 Every CRM was built for humans clicking buttons.
 
 But AI agents don't click buttons. They need APIs. They need structured schemas. They need tools.
 
 Most CRMs bolt on AI features as an afterthought. We built ours agent-native from day one.
 
-### 3/8 — What's Agent-Native Mean?
+### 3/8 · What's Agent-Native Mean?
 Agent-native = MCP server and REST API are first-class citizens, not afterthoughts.
 
 Your AI agent can:
@@ -510,14 +510,14 @@ Your AI agent can:
 
 All through standard MCP protocol.
 
-### 4/8 — The Numbers
+### 4/8 · The Numbers
 - 20 MCP tools (full CRUD for 5 entity types)
 - 22 custom field types (no code, no migrations)
 - REST API with JSON:API format
 - 900+ automated tests
 - 5-layer authorization with multi-team isolation
 
-### 5/8 — Self-Hosted & Open Source
+### 5/8 · Self-Hosted & Open Source
 AGPL-3.0. Deploy on your infrastructure.
 
 No per-seat pricing that scales badly.
@@ -526,7 +526,7 @@ No vendor deciding your AI strategy.
 
 Your CRM. Your data. Your agents.
 
-### 6/8 — The Stack
+### 6/8 · The Stack
 Built with modern tools:
 - Laravel 12 + PHP 8.4
 - Filament 5 for the admin UI
@@ -535,13 +535,13 @@ Built with modern tools:
 
 Not a weekend project. Production-grade with 900+ tests.
 
-### 7/8 — Who's This For?
+### 7/8 · Who's This For?
 - Developer-led teams who want AI in their CRM
 - Startups tired of paying per-seat for HubSpot
 - Companies that need self-hosted for compliance
 - Anyone building AI workflows that touch customer data
 
-### 8/8 — Try It
+### 8/8 · Try It
 Star on GitHub: github.com/relaticle/relaticle
 
 Try the managed version free: app.relaticle.com
@@ -570,13 +570,13 @@ git commit -m "docs: draft Twitter/X launch thread"
 Create `docs/launch/reddit-posts.md`:
 
 ```markdown
-# Reddit Launch Posts — Relaticle
+# Reddit Launch Posts for Relaticle
 
 ---
 
 ## Post 1: r/selfhosted
 
-**Title:** Relaticle — open-source CRM with MCP server for AI agents (self-hosted, Docker)
+**Title:** Relaticle: open-source CRM with MCP server for AI agents (self-hosted, Docker)
 
 **Body:**
 
@@ -586,7 +586,7 @@ I've been building an open-source CRM called Relaticle that I wanted to share. T
 
 **What it is:**
 - Self-hosted CRM for managing contacts, companies, opportunities, tasks, and notes
-- MCP server with 20 tools — any MCP-compatible AI agent can operate it
+- MCP server with 20 tools, so any MCP-compatible AI agent can operate it
 - REST API with Sanctum auth, JSON:API format
 - 22 custom field types (no code changes needed)
 - Multi-team support with role-based permissions
@@ -626,7 +626,7 @@ Sharing an open-source project I've been working on. Relaticle is a CRM built fr
 The CRM space has a gap: HubSpot and Salesforce are closed-source with expensive per-seat pricing. SuiteCRM and EspoCRM are open source but have dated UIs and no AI/MCP integration. There's nothing open-source that treats AI agents as first-class users.
 
 **What Relaticle does differently:**
-- Ships with an MCP server (20 tools) — AI agents can create contacts, update deals, log notes
+- Ships with an MCP server (20 tools), so AI agents can create contacts, update deals, and log notes
 - REST API with JSON:API format, Sanctum auth, Spatie QueryBuilder
 - 22 custom field types with conditional visibility and per-field encryption
 - Modern UI built with Filament 5
@@ -640,7 +640,7 @@ We chose AGPL because we believe CRM data is sensitive and the software managing
 - Star and fork: github.com/relaticle/relaticle
 - Report issues on GitHub
 - Join the Discord for discussion
-- PRs welcome — we have 900+ tests and CI
+- PRs welcome. We have 900+ tests and CI
 
 Looking for feedback, feature requests, and contributors.
 
@@ -648,27 +648,27 @@ Looking for feedback, feature requests, and contributors.
 
 ## Post 3: r/laravel
 
-**Title:** Built a CRM with Laravel 12, Filament 5, and a production MCP server — here's the architecture
+**Title:** Built a CRM with Laravel 12, Filament 5, and a production MCP server: here's the architecture
 
 **Body:**
 
 Hey r/laravel,
 
-I wanted to share the architecture of Relaticle, an open-source CRM I've been building with Laravel 12 and Filament 5. The interesting part is the MCP server integration — 20 tools that let AI agents operate the CRM.
+I wanted to share the architecture of Relaticle, an open-source CRM I've been building with Laravel 12 and Filament 5. The interesting part is the MCP server integration: 20 tools that let AI agents operate the CRM.
 
 **Architecture highlights:**
 
-1. **Shared Actions layer** — Business logic lives in `app/Actions/` (CreateCompany, ListPeople, etc.). Both the REST API controllers and MCP tools call the same actions. No logic duplication.
+1. **Shared Actions layer.** Business logic lives in `app/Actions/` (CreateCompany, ListPeople, etc.). Both the REST API controllers and MCP tools call the same actions. No logic duplication.
 
-2. **MCP server** — Uses `laravel/mcp` package. 20 tools registered on `RelaticleServer`. Per-entity schema resources expose custom field definitions dynamically.
+2. **MCP server.** Uses the `laravel/mcp` package. 20 tools registered on `RelaticleServer`. Per-entity schema resources expose custom field definitions dynamically.
 
-3. **REST API** — Versioned under `/api/v1/`. Sanctum auth. JSON:API format using Laravel 12's native `JsonApiResource`. Spatie QueryBuilder for filtering/sorting.
+3. **REST API.** Versioned under `/api/v1/`. Sanctum auth. JSON:API format using Laravel 12's native `JsonApiResource`. Spatie QueryBuilder for filtering/sorting.
 
-4. **Custom fields** — 22 field types via a custom package (`relaticle/custom-fields`). Uses EAV pattern. No migrations needed when users add fields. Conditional visibility and per-field encryption supported.
+4. **Custom fields.** 22 field types via a custom package (`relaticle/custom-fields`). Uses EAV pattern. No migrations needed when users add fields. Conditional visibility and per-field encryption supported.
 
-5. **Team-scoped tokens** — API tokens are permanently scoped to a team at creation time (like GitHub PATs). The `SetApiTeamContext` middleware bridges Sanctum auth to the web guard so model observers and global scopes work unchanged.
+5. **Team-scoped tokens.** API tokens are permanently scoped to a team at creation time (like GitHub PATs). The `SetApiTeamContext` middleware bridges Sanctum auth to the web guard so model observers and global scopes work unchanged.
 
-6. **API docs** — Scribe + Scalar UI. Custom strategy auto-documents Spatie QueryBuilder parameters.
+6. **API docs.** Scribe + Scalar UI. Custom strategy auto-documents Spatie QueryBuilder parameters.
 
 **Stack:** Laravel 12, Filament 5, Livewire 4, PHP 8.4, PostgreSQL 17, 900+ tests.
 
@@ -699,7 +699,7 @@ git commit -m "docs: draft Reddit posts for r/selfhosted, r/opensource, r/larave
 Create `docs/launch/show-hn.md`:
 
 ```markdown
-# Show HN Post — Relaticle
+# Show HN Post for Relaticle
 
 **Title:** Show HN: Relaticle – Open-source CRM with 20 MCP tools for AI agents
 
@@ -707,7 +707,7 @@ Create `docs/launch/show-hn.md`:
 
 Relaticle is an open-source CRM (AGPL-3.0) with a production MCP server that lets AI agents manage customer data. Self-hosted, built with Laravel 12 and PHP 8.4.
 
-**The problem:** CRMs weren't built for AI agents. Adding an MCP server to existing CRMs is like bolting a API onto software designed for mouse clicks. Schema discovery, custom fields, authorization — all break down.
+**The problem:** CRMs weren't built for AI agents. Adding an MCP server to existing CRMs is like bolting a API onto software designed for mouse clicks. Schema discovery, custom fields, and authorization all break down.
 
 **The approach:** Build the MCP server and REST API as first-class citizens from the start. The same Actions layer powers both the web UI and the agent interface.
 
@@ -719,8 +719,8 @@ Relaticle is an open-source CRM (AGPL-3.0) with a production MCP server that let
 - 900+ automated tests
 
 **Technical details:**
-- Shared Actions pattern — `CreateCompany`, `ListPeople`, etc. called by both API controllers and MCP tools
-- Team-scoped API tokens (like GitHub PATs) — tokens are permanently bound to a team
+- Shared Actions pattern: `CreateCompany`, `ListPeople`, and friends called by both API controllers and MCP tools
+- Team-scoped API tokens (like GitHub PATs), permanently bound to a team
 - Custom field schema exposed as MCP resources so agents can discover what fields exist
 - Built on Laravel 12, Filament 5, PostgreSQL 17
 
@@ -733,9 +733,9 @@ Try free: https://app.relaticle.com
 Create `docs/launch/github-release.md`:
 
 ```markdown
-# GitHub Release Notes — v3.1.0
+# GitHub Release Notes for v3.1.0
 
-## Relaticle v3.1.0 — Agent-Native CRM
+## Relaticle v3.1.0: Agent-Native CRM
 
 Relaticle is now agent-native. This release introduces a production MCP server, REST API, and positions Relaticle as the open-source CRM built for AI agents.
 
@@ -756,7 +756,7 @@ Relaticle is now agent-native. This release introduces a production MCP server, 
 
 ### Access Tokens
 - Renamed from "API Tokens" to "Access Tokens" (used for both REST API and MCP)
-- Team-scoped tokens — permanently bound to a specific team at creation time
+- Team-scoped tokens, permanently bound to a specific team at creation time
 - Token expiration support (30 days, 60 days, 90 days, 1 year, no expiration)
 - Filament-based management UI with permissions
 

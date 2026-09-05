@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Actions\Jetstream\InviteTeamMember;
+use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\TeamRole;
@@ -120,7 +121,7 @@ final class CreateTeam extends RegisterTenant
 
     /**
      * Where "Cancel" returns to when the user backs out of creating another
-     * workspace. Null during first-run onboarding — a user with no workspace
+     * workspace. Null during first-run onboarding: a user with no workspace
      * has nowhere to go back to, so no cancel affordance is offered.
      */
     public function getCancelUrl(): ?string
@@ -440,12 +441,24 @@ final class CreateTeam extends RegisterTenant
         $appHost = parse_url(url()->getAppUrl(), PHP_URL_HOST);
 
         return [
+            TextInput::make('user_name')
+                ->label(__('filament/pages/teams.create_team.form.your_name.label'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('filament/pages/teams.create_team.form.your_name.placeholder'))
+                ->autofocus()
+                ->default(function (): string {
+                    /** @var User $user */
+                    $user = auth('web')->user();
+
+                    return $user->name;
+                }),
+
             TextInput::make('name')
                 ->label(__('filament/pages/teams.create_team.form.workspace_name.label'))
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/teams.create_team.form.workspace_name.placeholder'))
-                ->autofocus()
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
@@ -551,9 +564,11 @@ final class CreateTeam extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
+        $this->updateUserNameIfChanged($user, $data);
+
         // The tenant may already be set if the user clicked "Copy invite link" earlier
         // in the wizard, which pre-creates the team so the invite URL can exist.
-        // Reconcile name/slug here so later edits don't silently disappear — a regression
+        // Reconcile name/slug here so later edits don't silently disappear. This is a regression
         // the UI currently blocks via ->hiddenHeader(), but kept as defense-in-depth.
         if ($this->tenant instanceof Team) {
             $team = $this->tenant;
@@ -578,6 +593,20 @@ final class CreateTeam extends RegisterTenant
         $this->sendOnboardingInvites($user, $team, $data);
 
         return $team;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function updateUserNameIfChanged(User $user, array $data): void
+    {
+        $name = $data['user_name'] ?? null;
+
+        if (! is_string($name) || $name === $user->name) {
+            return;
+        }
+
+        resolve(UpdateUserName::class)->execute($user, $name);
     }
 
     /**

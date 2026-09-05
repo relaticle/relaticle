@@ -70,6 +70,90 @@ it('resets an Enterprise team to 10000 credits when the scheduled reset runs', f
     expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Enterprise->credits());
 });
 
+it('refills a past-due Pro team at the Free allowance, not the one it stopped paying for', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro->value])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_reset_past_due',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    AiCreditBalance::query()
+        ->where('team_id', $team->getKey())
+        ->update([
+            'credits_remaining' => 0,
+            'credits_used' => 2_000,
+            'period_starts_at' => now()->subMonth(),
+            'period_ends_at' => now()->subDay(),
+        ]);
+
+    Artisan::call('chat:reset-credits');
+
+    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Free->credits());
+});
+
+it('leaves purchased packs intact when a past-due team refills', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro->value])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_reset_past_due_packs',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    AiCreditBalance::query()
+        ->where('team_id', $team->getKey())
+        ->update([
+            'credits_remaining' => 500,
+            'credits_used' => 2_000,
+            'purchased_credits' => 500,
+            'period_starts_at' => now()->subMonth(),
+            'period_ends_at' => now()->subDay(),
+        ]);
+
+    Artisan::call('chat:reset-credits');
+
+    $balance = $team->fresh()->aiCreditBalance;
+
+    expect($balance->purchased_credits)->toBe(500)
+        ->and($balance->credits_remaining)->toBe(Plan::Free->credits() + 500);
+});
+
+it('restores the Pro allowance once the past-due charge clears', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $team->forceFill(['plan' => Plan::Pro->value])->save();
+    $subscription = $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_reset_recovered',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $subscription->forceFill(['stripe_status' => 'active'])->save();
+
+    AiCreditBalance::query()
+        ->where('team_id', $team->getKey())
+        ->update([
+            'credits_remaining' => 0,
+            'credits_used' => 300,
+            'period_starts_at' => now()->subMonth(),
+            'period_ends_at' => now()->subDay(),
+        ]);
+
+    Artisan::call('chat:reset-credits');
+
+    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Pro->credits());
+});
+
 it('skips teams whose period has not yet expired', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;

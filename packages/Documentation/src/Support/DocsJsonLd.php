@@ -12,7 +12,7 @@ use Spatie\SchemaOrg\Schema;
 
 /**
  * `/help` bypasses `<x-documentation::layout>` (see HelpController), which is
- * the only place `/docs` gets its BreadcrumbList from — so without this,
+ * the only place `/docs` gets its BreadcrumbList from, so without this,
  * `/help` pages carry zero structured data. Views call this directly, inline,
  * the same way the marketing pages build their own Graph
  * (resources/views/home/index.blade.php).

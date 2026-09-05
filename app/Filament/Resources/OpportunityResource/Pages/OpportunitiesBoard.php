@@ -30,6 +30,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
@@ -115,6 +116,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             })
             ->columnActions([
                 CreateAction::make()
+                    ->authorize(fn (): bool => Gate::allows('create', Opportunity::class))
                     ->label(__('filament/pages/boards.opportunities.actions.add'))
                     ->icon('heroicon-o-plus')
                     ->iconButton()
@@ -163,6 +165,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('update', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ExtraLarge)
@@ -177,6 +180,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                         $record->update($data);
                     }),
                 Action::make('delete')
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -225,6 +229,8 @@ final class OpportunitiesBoard extends BoardResourcePage
         $card = (clone $query)->find($cardId);
         throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
 
+        abort_unless(Gate::allows('update', $card), 403);
+
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
         DB::transaction(function () use ($card, $board, $targetColumnId, $newPosition): void {
@@ -262,11 +268,11 @@ final class OpportunitiesBoard extends BoardResourcePage
 
     /**
      * "Today" and "tomorrow" are questions about the viewer's calendar, so the boundary
-     * moves into their zone — but the close date itself must not. Unlike the tasks
+     * moves into their zone, but the close date itself must not. Unlike the tasks
      * board's due date, this is a plain calendar date the package stores at midnight
      * UTC: converting it into a negative-offset zone walks it back past midnight and
      * the card reads a day early. Move only the "today" it is measured against, and
-     * compare the two as dates rather than instants — midnight UTC and midnight in
+     * compare the two as dates rather than instants. Midnight UTC and midnight in
      * Los Angeles are the same calendar day but seven hours apart, so an instant
      * comparison would call a date closing today overdue.
      */

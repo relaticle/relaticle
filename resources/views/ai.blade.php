@@ -122,13 +122,18 @@
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="#demo">
                     {{ __('See it work') }}
                 </x-marketing.button>
             </div>
+
+            <a href="{{ route('aiNativeCrm') }}" class="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
+                {{ __('What makes a CRM AI-native?') }}
+                <x-ri-arrow-right-line class="w-3.5 h-3.5"/>
+            </a>
         </div>
     </section>
 
@@ -447,7 +452,7 @@
                 {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
             </p>
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="{{ route('pricing') }}">

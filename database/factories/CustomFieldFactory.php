@@ -18,10 +18,10 @@ final class CustomFieldFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => $this->faker->unique()->word(),
-            'name' => $this->faker->name(),
-            'type' => $this->faker->randomElement(['text', 'number', 'link', 'textarea', 'date', 'select']),
-            'entity_type' => $this->faker->randomElement(['company', 'people', 'opportunity', 'task', 'note']),
+            'code' => fake()->unique()->word(),
+            'name' => fake()->name(),
+            'type' => fake()->randomElement(['text', 'number', 'link', 'textarea', 'date', 'select']),
+            'entity_type' => fake()->randomElement(['company', 'people', 'opportunity', 'task', 'note']),
             'sort_order' => 1,
             'validation_rules' => [],
             'active' => true,

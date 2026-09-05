@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
+use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
@@ -15,7 +16,7 @@ use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
-mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class);
+mutates(CreateTeam::class, CreateTeamAction::class, StartProTrial::class, UpdateUserName::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.
@@ -67,12 +68,22 @@ it('resolves every wizard form label from translations', function (): void {
 
     livewire(CreateTeam::class)
         ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.form.your_name.label'))
         ->assertSee(__('filament/pages/teams.create_team.form.workspace_name.label'))
         ->assertSee(__('filament/pages/teams.create_team.form.workspace_handle.label'))
         ->assertSee(__('filament/pages/teams.create_team.form.use_case_label'))
         ->assertSee(__('filament/pages/teams.create_team.form.invite_email_label'))
         ->assertSee(__('filament/pages/teams.create_team.form.invite_role_label'))
         ->assertDontSee('filament/pages/teams.create_team.form');
+});
+
+it('prefills the workspace step with the current user name', function (): void {
+    $user = User::factory()->create(['name' => 'Ada Lovelace']);
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertFormSet(['user_name' => 'Ada Lovelace']);
 });
 
 it('renders wizard for users who already have a team', function (): void {
@@ -296,6 +307,41 @@ it('requires a team name', function (): void {
         ])
         ->call('register')
         ->assertHasFormErrors(['name']);
+});
+
+it('updates the user name when corrected during onboarding', function (): void {
+    $user = User::factory()->create(['name' => 'Guessed Name']);
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'user_name' => 'Corrected Name',
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['product_led'],
+            'name' => 'Acme Corp',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->name)->toBe('Corrected Name');
+});
+
+it('requires your name', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'name' => 'Acme Corp',
+            'user_name' => '',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['user_name']);
+
+    expect(Team::query()->where('name', 'Acme Corp')->exists())->toBeFalse();
 });
 
 it('marks first team as personal team', function (): void {

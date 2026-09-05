@@ -20,7 +20,7 @@ use Throwable;
  *
  * Both directions live here on purpose: the MCP search tool publishes these URLs as
  * citations and the fetch tool has to resolve the same strings back to a record. When
- * the two were written independently they disagreed — search emitted a tenant-less
+ * the two were written independently they disagreed. Search emitted a tenant-less
  * path that 404s in a browser, and fetch rejected the real URL a user copies from the
  * address bar.
  *
