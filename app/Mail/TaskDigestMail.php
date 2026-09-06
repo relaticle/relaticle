@@ -7,6 +7,7 @@ namespace App\Mail;
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestTeamSection;
+use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
@@ -15,7 +16,9 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\URL;
 
 final class TaskDigestMail extends Mailable implements ShouldQueue
 {
@@ -31,6 +34,22 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
         return new Envelope(subject: __('mail.task_digest.subject', [
             'date' => now($this->user->effectiveTimezone())->format('M j'),
         ]));
+    }
+
+    public function headers(): Headers
+    {
+        return new Headers(text: [
+            'List-Unsubscribe' => "<{$this->unsubscribeUrl()}>",
+            'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+        ]);
+    }
+
+    public function unsubscribeUrl(): string
+    {
+        return URL::signedRoute('mail.unsubscribe', [
+            'user' => $this->user->id,
+            'type' => NotificationType::TaskDigest->value,
+        ]);
     }
 
     public function content(): Content
@@ -60,6 +79,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                     panel: 'app',
                 ),
                 'settingsUrl' => NotificationPreferences::getUrl(panel: 'app', tenant: $tenant),
+                'unsubscribeUrl' => $this->unsubscribeUrl(),
             ],
         );
     }

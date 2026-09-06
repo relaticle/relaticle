@@ -46,3 +46,19 @@ it('never leaks a lang key into the rendered digest', function (): void {
 
     expect((new TaskDigestMail($user, $payload))->render())->not->toContain('mail.');
 });
+
+it('carries rfc 8058 one-click unsubscribe headers pointing at the app host', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $payload = new DigestPayload([
+        new DigestTeamSection('Acme', [], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]),
+    ]);
+
+    $mail = new TaskDigestMail($user, $payload);
+    $headers = $mail->headers()->text;
+
+    expect($headers['List-Unsubscribe-Post'])->toBe('List-Unsubscribe=One-Click')
+        ->and($headers['List-Unsubscribe'])->toStartWith('<'.rtrim((string) config('app.url'), '/').'/mail/unsubscribe/'.$user->id.'/task_digest?')
+        ->and($headers['List-Unsubscribe'])->toEndWith('>')
+        ->and($mail->render())->toContain(trim($headers['List-Unsubscribe'], '<>'))
+        ->and($mail->render())->toContain(__('mail.footer.unsubscribe'));
+});

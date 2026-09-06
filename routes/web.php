@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Notifications\NotificationType;
 use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
+use App\Http\Controllers\Mail\UnsubscribeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
@@ -67,6 +69,16 @@ Route::get('/.well-known/security.txt', function (): Response {
         'Cache-Control' => 'public, max-age=86400',
     ]);
 })->name('securityTxt');
+
+Route::middleware(['signed', 'throttle:30,1,mail-unsubscribe', 'no-referrer'])->group(function (): void {
+    Route::get('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'show'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe');
+
+    Route::post('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'store'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe.store');
+});
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);

@@ -22,6 +22,16 @@ return [
         ],
     ],
 
+    'unsubscribe' => [
+        'title' => 'Unsubscribe',
+        'heading' => 'Stop the daily digest?',
+        'body' => 'You will no longer receive the morning task digest at :email. You can turn it back on in notification settings.',
+        'confirm' => 'Unsubscribe',
+        'done_heading' => 'You are unsubscribed',
+        'done_body' => 'The daily digest is off for :email.',
+        'settings' => 'Notification settings',
+    ],
+
     'trial_ending' => [
         'subject' => 'Your Pro trial ends in 3 days',
         'preheader' => 'Keep every AI model and 2,000 credits for one flat price',
