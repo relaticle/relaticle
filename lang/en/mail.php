@@ -12,6 +12,7 @@ return [
         'reason' => [
             'owner' => 'You received this because you own the :team workspace.',
             'member' => 'You received this because you are a member of :team.',
+            'former_member' => 'You received this because you were a member of :team.',
             'digest' => 'You received this because you enabled the daily digest.',
             'assignee' => 'You received this because a task in :team was assigned to you.',
             'invitee' => 'You received this because :email was invited to :team.',
@@ -70,6 +71,66 @@ return [
         'expiry' => 'This invitation expires :expiry.',
         'ignore' => 'Not expecting this? Ignore this email.',
         'cta' => 'Accept invitation',
+    ],
+
+    'team_deletion_scheduled' => [
+        'subject' => ':team is scheduled for deletion',
+        'preheader' => 'Deletes on :date. Cancel any time before then',
+        'heading' => ':team will be deleted on :date',
+        'removes' => 'Contacts, companies, tasks, opportunities, notes, and every other record in :team are removed after that date.',
+        'cancel' => 'You can cancel from the workspace settings at any time before then.',
+        'cta' => 'Cancel deletion',
+    ],
+
+    'team_deletion_reminder' => [
+        'subject' => ':team deletes in :days day|:team deletes in :days days',
+        'preheader' => 'Last reminder before :date',
+        'heading' => ':days day until :team is deleted|:days days until :team is deleted',
+        'final' => 'This is the last reminder. Everything in :team is removed after :date.',
+        'cancel' => 'You can cancel from the workspace settings at any time before then.',
+        'cta' => 'Cancel deletion',
+    ],
+
+    'team_deletion_cancelled' => [
+        'subject' => ':team deletion cancelled',
+        'preheader' => 'Your data is safe',
+        'heading' => ':team is staying',
+        'body' => 'The scheduled deletion of :team was cancelled. Nothing was removed.',
+        'cta' => 'Open :team',
+    ],
+
+    'team_member_removed' => [
+        'subject' => 'You were removed from :team',
+        'preheader' => 'You no longer have access to this workspace',
+        'heading' => 'You were removed from :team',
+        'body' => 'Your access to :team and its records ended. Your other workspaces are unaffected.',
+        'cta' => 'Open Relaticle',
+    ],
+
+    'account_deletion_scheduled' => [
+        'subject' => 'Your account is scheduled for deletion',
+        'preheader' => 'Deletes on :date. Sign in to cancel',
+        'heading' => 'Your account will be deleted on :date',
+        'removes' => 'Your profile and every workspace you own are removed after that date.',
+        'cancel' => 'Changed your mind? Sign in before then and the deletion is cancelled.',
+        'cta' => 'Keep my account',
+    ],
+
+    'account_deletion_reminder' => [
+        'subject' => 'Your account deletes in :days day|Your account deletes in :days days',
+        'preheader' => 'Last reminder before :date',
+        'heading' => ':days day until your account is deleted|:days days until your account is deleted',
+        'final' => 'This is the last reminder. Your account and its data are removed after :date.',
+        'cancel' => 'Sign in before then and the deletion is cancelled.',
+        'cta' => 'Keep my account',
+    ],
+
+    'account_deletion_cancelled' => [
+        'subject' => 'Your account is staying',
+        'preheader' => 'Deletion cancelled, data untouched',
+        'heading' => 'Welcome back, :name',
+        'body' => 'The scheduled deletion of your account was cancelled. Nothing was removed.',
+        'cta' => 'Open Relaticle',
     ],
 
     'contact_submission' => [
