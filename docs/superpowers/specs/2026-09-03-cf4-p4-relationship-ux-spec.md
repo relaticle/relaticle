@@ -17,6 +17,14 @@ Tracking: relaticle/custom-fields#210.
    being redefined. Bulk paste has no such dependency; it rides the major by decision, so the
    whole options editor changes once (with the phase 2 category column).
 
+## Amendment 2026-09-06: two field types
+
+Sections 3.1 and 3.2 apply to the new `relationship` field type only. The Record field keeps
+its 3.x configuration (target entity, allow multiple) and its select-based input; it gains
+sorting and searching from the ledger and nothing else visible. The type picker lists both
+types with a description of when to pick each. Plan 4.4 carries the split; plans 4.1 and 4.2
+stand as written for the Relationship type.
+
 ## 3.1 Relationship creation
 
 Create-attribute flow, type Relationship: two entity cards with the cardinality selector
