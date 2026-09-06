@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Models\User;
+use App\Notifications\Auth\VerifyEmail;
 use App\Providers\FortifyServiceProvider;
-use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 

@@ -10,9 +10,12 @@ use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Notifications\Auth\ResetPassword;
+use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
 use Database\Factories\UserFactory;
 use Exception;
+use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Models\Contracts\HasDefaultTenant;
@@ -123,6 +126,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function wantsNotification(NotificationType $type, NotificationChannel $channel): bool
     {
         return $this->notificationPreferences()->wants($type, $channel);
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $notification = resolve(VerifyEmail::class);
+        $notification->url = Filament::getVerifyEmailUrl($this);
+
+        $this->notify($notification);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $notification = resolve(ResetPassword::class, ['token' => $token]);
+        $notification->url = Filament::getResetPasswordUrl($token, $this);
+
+        $this->notify($notification);
     }
 
     /**

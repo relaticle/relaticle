@@ -133,6 +133,42 @@ return [
         'cta' => 'Open Relaticle',
     ],
 
+    'verify_email' => [
+        'subject' => 'Verify your email',
+        'preheader' => 'One click finishes signing up',
+        'heading' => 'Verify your email address',
+        'body' => 'Confirm this address to finish setting up your Relaticle account.',
+        'ignore' => 'Did not sign up? Ignore this email.',
+        'cta' => 'Verify email',
+    ],
+
+    'verify_email_change' => [
+        'subject' => 'Confirm your new email',
+        'preheader' => 'Confirm :email to finish the change',
+        'heading' => 'Confirm :email',
+        'body' => 'You asked to use :email for your :company account. Confirm it to finish the change. This link expires in :count minutes.',
+        'ignore' => 'Did not ask for this? Ignore this email and your current address stays.',
+        'cta' => 'Confirm new email',
+    ],
+
+    'email_change_notice' => [
+        'subject' => 'Email change requested',
+        'preheader' => 'Was this you? Block it if not',
+        'heading' => 'Someone asked to change your email to :email',
+        'body' => 'Someone signed in to your account asked to change its email. Once :email is confirmed, it becomes the address on your account.',
+        'block' => 'If this was not you, block the change now, then sign out of other sessions and change your password.',
+        'cta' => 'Block this change',
+    ],
+
+    'reset_password' => [
+        'subject' => 'Reset your password',
+        'preheader' => 'This link expires in :count minutes',
+        'heading' => 'Reset your password',
+        'body' => 'Choose a new password for your Relaticle account. This link expires in :count minutes.',
+        'ignore' => 'Did not ask for a reset? Ignore this email and your password stays.',
+        'cta' => 'Reset password',
+    ],
+
     'contact_submission' => [
         'subject' => 'New contact: :name',
         'preheader' => ':company, :email',
