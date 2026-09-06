@@ -50,7 +50,7 @@
 
         <div class="flex flex-1 flex-col divide-y divide-gray-100 overflow-y-auto bg-white dark:divide-gray-800 dark:bg-gray-950">
             @forelse ($this->emails as $email)
-                <x-emails.list-row-wide :email="$email" />
+                <x-emails.list-row-wide :email="$email" wire:key="email-list-row-{{ $email->id }}" />
             @empty
                 <x-emails.list-empty
                     class="flex-1"

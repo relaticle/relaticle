@@ -374,6 +374,34 @@ describe('shareAllOnRecord header action', function (): void {
     });
 });
 
+describe('view table action', function (): void {
+    it('stays hidden when the viewer cannot read the body', function (EmailPrivacyTier $tier): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => $tier,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertTableActionHidden('view', $email)
+            ->assertTableActionVisible('requestAccess', $email)
+            ->call('selectEmail', $email->getKey())
+            ->assertSet('selectedEmailId', null)
+            ->assertDontSee('fi-email-reader-panel');
+    })->with([
+        EmailPrivacyTier::METADATA_ONLY,
+        EmailPrivacyTier::SUBJECT,
+    ]);
+});
+
 describe('access request approve and deny from the reader overlay', function (): void {
     it('approves a pending request from the relation manager overlay', function (): void {
         $email = Email::factory()->private()->create([

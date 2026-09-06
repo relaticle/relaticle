@@ -14,6 +14,7 @@ beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
     $this->viewer = User::factory()->create(['current_team_id' => $this->owner->currentTeam->id]);
     $this->team = $this->owner->currentTeam;
+    $this->team->users()->attach($this->viewer, ['role' => 'editor']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,

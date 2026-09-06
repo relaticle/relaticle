@@ -21,6 +21,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -30,7 +31,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailVisibilityService::class);
+mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailVisibilityService::class, HasEmailReaderActions::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -563,7 +564,8 @@ it('shows the imported mailbox name on record email list rows', function (): voi
     $this->person->emails()->attach($email->getKey());
 
     livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertSee(__('filament/pages/email-inbox.list_row.via', ['name' => 'Sales Inbox']));
+        ->assertSee(__('filament/pages/email-inbox.list_row.via', ['name' => 'Sales Inbox']))
+        ->assertSee(__('filament/pages/email-inbox.list_row.opening'));
 });
 
 it('shows a request access pill on record mailbox rows without body access', function (): void {
@@ -601,6 +603,11 @@ it('shows a request access pill on record mailbox rows without body access', fun
     livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
         ->assertSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
         ->assertDontSee('Secret preview text')
+        ->assertDontSeeHtml("selectEmail('{$email->getKey()}')")
+        ->assertDontSee(__('filament/pages/email-inbox.list_row.opening'))
+        ->call('selectEmail', $email->getKey())
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSee('fi-email-reader-panel')
         ->mountAction('requestAccess', arguments: ['emailId' => $email->getKey()])
         ->setActionData(['tier_requested' => EmailPrivacyTier::FULL->value])
         ->callMountedAction()

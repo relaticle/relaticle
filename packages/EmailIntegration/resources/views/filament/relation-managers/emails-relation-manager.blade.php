@@ -1,4 +1,4 @@
-<div class="fi-resource-relation-manager">
+<div class="fi-resource-relation-manager ei-emails-relation-manager">
     {{ $this->content }}
 
     <x-filament-panels::unsaved-action-changes-alert />

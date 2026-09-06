@@ -73,6 +73,7 @@ return [
         'timestamp_yesterday' => 'Yesterday, :time',
         'request_access' => 'Request access from :name',
         'requested' => 'Requested',
+        'opening' => 'Opening…',
     ],
     'detail_empty' => [
         'heading' => 'Select an email to read',

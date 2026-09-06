@@ -260,3 +260,8 @@
 .fi-header-actions-ctn .fi-btn .fi-btn-badge-ctn .fi-badge {
     @apply min-w-5 px-1.5 py-0.5;
 }
+
+.ei-emails-relation-manager .fi-ta-row[data-loading] {
+    cursor: wait;
+    opacity: 0.6;
+}
