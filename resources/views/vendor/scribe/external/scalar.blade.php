@@ -1,7 +1,8 @@
 <!doctype html>
 <html>
 <head>
-    <title>{{ config('scribe.title') }} - {{ config('app.name') }}</title>
+    {{-- Not config('scribe.title'): that one names the API for OpenAPI and Postman. --}}
+    <title>{{ __('REST API Reference for CRM Records') }} - {{ config('app.name') }}</title>
     <meta charset="utf-8"/>
     <meta name="description" content="{{ config('scribe.description') }}"/>
     <meta
