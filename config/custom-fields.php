@@ -32,6 +32,8 @@ return [
         ->models([
             EntityModel::configure(
                 modelClass: People::class,
+                labelSingular: 'Person',
+                labelPlural: 'People',
                 primaryAttribute: 'name',
                 resourceClass: PeopleResource::class,
                 avatarConfiguration: EntityModel::avatar(attribute: 'avatar'),
