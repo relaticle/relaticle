@@ -27,7 +27,7 @@ final readonly class AutoCreateCompanyAction
      * advisory lock so two StoreEmailJob/calendar workers processing the first
      * email from a brand-new domain in parallel can't both miss the match and
      * create duplicate companies: the first holder creates, the rest re-check
-     * inside the lock and reuse it. The lock key is the full host www.
+     * inside the lock and reuse it. The lock key is the full host (www.
      * stripped). Distinct hosts such as accounts.printtest.com and
      * ideas.printtest.com do not share a lock.
      */
