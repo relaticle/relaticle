@@ -496,7 +496,7 @@ final class EmailInboxPage extends Page
             ->whereKey($data['connected_account_id'] ?? null)
             ->first();
 
-        if (! $account instanceof ConnectedAccount || ! $account->hasSend()) {
+        if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
             $this->redirectToGrantSend($account);
 
             return;

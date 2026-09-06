@@ -50,13 +50,13 @@ trait RedirectsToGrantSend
     private function mailboxMissingSend(): ?ConnectedAccount
     {
         return $this->connectedMailboxes()
-            ->first(fn (ConnectedAccount $account): bool => ! $account->hasSend());
+            ->first(fn (ConnectedAccount $account): bool => ! $account->isSendable());
     }
 
     private function sendableMailbox(): ?ConnectedAccount
     {
         return $this->connectedMailboxes()
-            ->first(fn (ConnectedAccount $account): bool => $account->hasSend());
+            ->first(fn (ConnectedAccount $account): bool => $account->isSendable());
     }
 
     /**
@@ -65,7 +65,7 @@ trait RedirectsToGrantSend
     private function sendableAccountOptions(): array
     {
         return $this->connectedMailboxes()
-            ->filter(fn (ConnectedAccount $account): bool => $account->hasSend())
+            ->filter(fn (ConnectedAccount $account): bool => $account->isSendable())
             ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
             ->all();
     }
