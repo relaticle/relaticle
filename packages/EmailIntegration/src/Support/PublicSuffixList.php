@@ -39,31 +39,73 @@ final class PublicSuffixList
     }
 
     /**
+     * The organisational domain (eTLD+1). Used only to pick a default company
+     * name: email.anthropic.com → Anthropic, mail.acme.co.uk → Acme. Company
+     * identity is the full host, not this value.
+     */
+    public function registrableDomain(string $host): ?string
+    {
+        $labels = $this->labels($host);
+
+        if ($labels === []) {
+            return null;
+        }
+
+        $suffixStart = $this->publicSuffixStart($labels);
+
+        if ($suffixStart < 1) {
+            return null;
+        }
+
+        return implode('.', array_slice($labels, $suffixStart - 1));
+    }
+
+    /**
      * The label immediately to the left of the public suffix, the part a company
      * registered. Null when the host is itself a public suffix or has no
      * registrable label.
      */
     public function registrableLabel(string $host): ?string
     {
-        $host = trim(mb_strtolower($host), '.');
+        $domain = $this->registrableDomain($host);
 
-        if ($host === '') {
+        if ($domain === null) {
             return null;
         }
 
-        $labels = explode('.', $host);
-        $count = count($labels);
+        return explode('.', $domain)[0];
+    }
 
-        // Exception rules win outright: the suffix is the rule minus its leftmost
-        // label, so that leftmost label IS the registrable one.
-        for ($i = 0; $i < $count; $i++) {
-            if (isset($this->exceptions[implode('.', array_slice($labels, $i))])) {
-                return $labels[$i];
-            }
+    /**
+     * @return list<string>
+     */
+    private function labels(string $host): array
+    {
+        $host = trim(mb_strtolower($host), '.');
+
+        if ($host === '') {
+            return [];
         }
 
-        // Longest matching normal/wildcard rule = smallest start index.
-        $suffixStart = null;
+        return explode('.', $host);
+    }
+
+    /**
+     * Index of the first label of the public suffix. Exception rules win: the
+     * suffix is the rule minus its leftmost label, so that leftmost label is
+     * registrable.
+     *
+     * @param  list<string>  $labels
+     */
+    private function publicSuffixStart(array $labels): int
+    {
+        $count = count($labels);
+
+        for ($i = 0; $i < $count; $i++) {
+            if (isset($this->exceptions[implode('.', array_slice($labels, $i))])) {
+                return $i + 1;
+            }
+        }
 
         for ($i = 0; $i < $count; $i++) {
             $rest = implode('.', array_slice($labels, $i + 1));
@@ -71,15 +113,11 @@ final class PublicSuffixList
             if (isset($this->rules[implode('.', array_slice($labels, $i))])
                 || ($rest !== '' && isset($this->wildcards[$rest]))
             ) {
-                $suffixStart = $i;
-                break;
+                return $i;
             }
         }
 
-        // No rule matched → implicit "*" default: the rightmost label is the suffix.
-        $suffixStart ??= $count - 1;
-
-        return $suffixStart >= 1 ? $labels[$suffixStart - 1] : null;
+        return $count - 1;
     }
 
     private function load(string $path): void
