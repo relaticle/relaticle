@@ -11,6 +11,7 @@ use Filament\Auth\Notifications\NoticeOfEmailChangeRequest as FilamentNoticeOfEm
 use Filament\Auth\Notifications\ResetPassword as FilamentResetPassword;
 use Filament\Auth\Notifications\VerifyEmail as FilamentVerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange as FilamentVerifyEmailChange;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 
 mutates(VerifyEmail::class);
@@ -75,22 +76,30 @@ it('renders the reset password mail with the expiry', function (): void {
         ->and((string) $message->render())->toContain(__('mail.reset_password.body', ['count' => 45]));
 });
 
-it('sends the branded verify mail through the model method', function (): void {
+it('sends the branded verify mail through the model method with the panel verification url', function (): void {
     Notification::fake();
 
     $user = User::factory()->unverified()->create();
 
     $user->sendEmailVerificationNotification();
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTo(
+        $user,
+        VerifyEmail::class,
+        fn (VerifyEmail $notification): bool => $notification->url === Filament::getVerifyEmailUrl($user),
+    );
 });
 
-it('sends the branded reset mail through the model method', function (): void {
+it('sends the branded reset mail through the model method with the panel reset url', function (): void {
     Notification::fake();
 
     $user = User::factory()->create();
 
     $user->sendPasswordResetNotification('token');
 
-    Notification::assertSentTo($user, ResetPassword::class);
+    Notification::assertSentTo(
+        $user,
+        ResetPassword::class,
+        fn (ResetPassword $notification): bool => $notification->url === Filament::getResetPasswordUrl('token', $user),
+    );
 });

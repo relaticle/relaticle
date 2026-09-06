@@ -42,6 +42,15 @@ it('turns the digest off on a one-click post', function (): void {
     expect($user->fresh()->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email))->toBeFalse();
 });
 
+it('returns the confirmation page when the post is not a one-click unsubscribe', function (): void {
+    $user = User::factory()->create(['email' => 'ada@example.com']);
+
+    $this->post(digestUnsubscribeUrl($user))
+        ->assertOk()
+        ->assertSee(__('mail.unsubscribe.done_heading'))
+        ->assertSee(__('mail.unsubscribe.done_body', ['email' => 'ada@example.com']));
+});
+
 it('is idempotent', function (): void {
     $user = User::factory()->create();
 
