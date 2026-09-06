@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\Mail\UnsubscribeController;
@@ -164,3 +165,8 @@ if (Feature::active(Documentation::class)) {
 Route::get('/discord', function () {
     return redirect()->away(config('services.discord.invite_url'));
 })->name('discord');
+
+if (app()->environment('local')) {
+    Route::get('/dev/mail', [MailPreviewController::class, 'index'])->name('dev.mail.index');
+    Route::get('/dev/mail/{mail}', [MailPreviewController::class, 'show'])->name('dev.mail.show');
+}
