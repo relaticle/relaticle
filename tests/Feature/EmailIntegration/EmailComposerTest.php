@@ -34,7 +34,7 @@ use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -106,6 +106,47 @@ it('opens the composer when a sync-error mailbox cannot send', function (): void
         ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]));
 });
 
+it('opens the grant permission empty state when a sync-error mailbox still has send', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'));
+});
+
+it('redirects to oauth when grant permission is clicked on a mailbox that needs reconnect', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('does not queue mail from send when the mailbox has a sync error', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
 it('redirects to oauth when grant permission is clicked', function (): void {
     $this->account->update([
         'capabilities' => [
@@ -147,6 +188,45 @@ it('opens from a sendable mailbox when another connected account cannot send', f
         ->dispatch('composer:open')
         ->assertSet('isOpen', true)
         ->assertSet('accountId', $sendable->id);
+});
+
+it('opens from a sendable mailbox when the default mailbox has a sync error', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        ...ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
+it('does not queue mail from send when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
 });
 
 it('queues an email through SendEmailAction on send with the persisted body and undo-send window', function (): void {

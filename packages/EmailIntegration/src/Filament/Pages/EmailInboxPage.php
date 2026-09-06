@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -35,6 +36,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Concerns\RedirectsToGrantSend;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -49,6 +51,7 @@ final class EmailInboxPage extends Page
 {
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
+    use RedirectsToGrantSend;
     use WithPagination;
 
     protected string $view = 'filament.pages.email-inbox';
@@ -93,7 +96,6 @@ final class EmailInboxPage extends Page
     {
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
-
     }
 
     /**
@@ -150,6 +152,12 @@ final class EmailInboxPage extends Page
 
     public function openReplyModal(string $emailId, string $mode): void
     {
+        if (! $this->sendableMailbox() instanceof ConnectedAccount) {
+            $this->mountAction('grantSendPermission');
+
+            return;
+        }
+
         $this->mountAction('replyForwardEmail', [
             'emailId' => $emailId,
             'mode' => $mode,
@@ -427,11 +435,7 @@ final class EmailInboxPage extends Page
 
         $user = $this->authUser();
 
-        $account = ConnectedAccount::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->first();
+        $account = $this->sendableMailbox();
 
         $toParticipants = match ($mode) {
             'forward' => [],
@@ -481,6 +485,23 @@ final class EmailInboxPage extends Page
             default => EmailCreationSource::REPLY,
         };
 
+        $team = filament()->getTenant();
+
+        if (! $team instanceof Team) {
+            return;
+        }
+
+        $account = ConnectedAccount::query()
+            ->ownedBy($this->authUser(), $team)
+            ->whereKey($data['connected_account_id'] ?? null)
+            ->first();
+
+        if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
+            $this->redirectToGrantSend($account);
+
+            return;
+        }
+
         resolve(SendEmailAction::class)->execute(
             data: $this->buildSendData($data, $source),
         );
@@ -519,7 +540,7 @@ final class EmailInboxPage extends Page
         return [
             Select::make('connected_account_id')
                 ->label(__('filament/pages/email-inbox.reply_form.from.label'))
-                ->options(fn (): array => $this->activeAccountOptions())
+                ->options(fn (): array => $this->sendableAccountOptions())
                 ->required(),
 
             TagsInput::make('to')

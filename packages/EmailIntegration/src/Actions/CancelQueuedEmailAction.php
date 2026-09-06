@@ -11,6 +11,10 @@ use RuntimeException;
 
 final readonly class CancelQueuedEmailAction
 {
+    public function __construct(
+        private SyncEmailBatchCountersAction $syncEmailBatchCounters,
+    ) {}
+
     public function execute(Email $email): Email
     {
         return DB::transaction(function () use ($email): Email {
@@ -30,6 +34,8 @@ final readonly class CancelQueuedEmailAction
             }
 
             $lockedEmail->update(['status' => EmailStatus::CANCELLED]);
+
+            $this->syncEmailBatchCounters->execute($lockedEmail->batch_id);
 
             return $lockedEmail->refresh();
         });

@@ -392,6 +392,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public function send(): void
     {
+        if (! $this->canSendFromSelectedAccount()) {
+            return;
+        }
+
         $this->validate([
             'accountId' => ['required'],
             'to' => ['required', 'array', 'min:1'],
@@ -1031,7 +1035,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->action(function (): void {
                 $account = $this->selectedAccount();
 
-                if (! $account instanceof ConnectedAccount || $account->hasSend()) {
+                if (! $account instanceof ConnectedAccount || $account->isSendable()) {
                     return;
                 }
 
@@ -1484,13 +1488,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public function canSendFromSelectedAccount(): bool
     {
-        return $this->selectedAccount()?->hasSend() ?? false;
+        return $this->selectedAccount()?->isSendable() ?? false;
     }
 
     private function sendableAccount(): ?ConnectedAccount
     {
         return $this->activeAccounts()
-            ->first(fn (ConnectedAccount $account): bool => $account->hasSend());
+            ->first(fn (ConnectedAccount $account): bool => $account->isSendable());
     }
 
     private function selectedAccount(): ?ConnectedAccount

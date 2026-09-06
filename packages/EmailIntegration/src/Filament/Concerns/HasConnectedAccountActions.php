@@ -19,7 +19,6 @@ use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -60,7 +59,7 @@ trait HasConnectedAccountActions
      * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
      * @param  bool  $includeSettings  whether to show the Settings link (hidden on the settings page itself)
      */
-    public function accountActions(string $accountId, EmailAccountStatus $status, array $extraActions = [], bool $includeSettings = true): ActionGroup
+    public function accountActions(string $accountId, array $extraActions = [], bool $includeSettings = true): ActionGroup
     {
         $arguments = ['account_id' => $accountId];
 
@@ -73,11 +72,7 @@ trait HasConnectedAccountActions
         return ActionGroup::make([
             ...$settingsAction,
             ($this->setDefaultAction())($arguments),
-            ($this->reAuthAction())($arguments)
-                ->visible(in_array($status, [
-                    EmailAccountStatus::REAUTH_REQUIRED,
-                    EmailAccountStatus::ERROR,
-                ], true)),
+            ($this->reconnectAction())($arguments),
             ($this->syncCalendarNowAction())($arguments),
             ($this->reimportHistoryAction())($arguments),
             ($this->syncCalendarAction())($arguments),
@@ -103,13 +98,14 @@ trait HasConnectedAccountActions
             ]));
     }
 
-    public function reAuthAction(): Action
+    public function reconnectAction(): Action
     {
-        return Action::make('reAuth')
-            ->label(__('filament/pages/email-accounts.actions.re_auth'))
+        return Action::make('reconnect')
+            ->label(__('filament/pages/email-accounts.actions.reconnect'))
             ->icon('heroicon-o-arrow-path')
-            ->color('warning')
+            ->color('gray')
             ->size(Size::Small)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
             ->url(fn (array $arguments): string => route('email-accounts.redirect', [
                 'provider' => $this->findAccount($arguments)?->provider->value,
             ]), true);

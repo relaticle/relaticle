@@ -259,7 +259,7 @@ final class ConnectedAccount extends Model
             ->ownedBy($user, $team)
             ->active()
             ->get()
-            ->contains(fn (ConnectedAccount $account): bool => $account->hasSend());
+            ->contains(fn (ConnectedAccount $account): bool => $account->isSendable());
     }
 
     public function isTokenExpired(): bool
@@ -346,6 +346,15 @@ final class ConnectedAccount extends Model
     public function hasSend(): bool
     {
         return (bool) ($this->capabilities['send'] ?? true);
+    }
+
+    /**
+     * Whether this mailbox is safe to send through Relaticle. Requires a working
+     * token and a send grant. Sync-error and reauth-required accounts are not.
+     */
+    public function isSendable(): bool
+    {
+        return $this->isActive() && $this->hasSend();
     }
 
     public function capabilitiesLabel(): string

@@ -8,11 +8,14 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
+use Relaticle\EmailIntegration\Filament\Concerns\RedirectsToGrantSend;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -20,7 +23,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
-mutates(EmailsRelationManager::class);
+mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -328,4 +331,138 @@ it('reply_all persists a queued Email with REPLY_ALL creation_source', function 
         ->where('direction', EmailDirection::OUTBOUND)
         ->where('creation_source', EmailCreationSource::REPLY_ALL)
         ->exists())->toBeTrue();
+});
+
+it('does not queue a reply when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['sender@contact.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Re: Original Subject',
+                'body_html' => '<p>Reply body</p>',
+                'in_reply_to_email_id' => $this->inboundEmail->id,
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply'],
+        )
+        ->assertNotNotified();
+
+    expect(Email::query()->where('direction', EmailDirection::OUTBOUND)->exists())->toBeFalse();
+});
+
+it('opens grant permission instead of reply when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->call('openReplyModal', $this->inboundEmail->id, 'reply')
+        ->assertActionMounted('grantSendPermission');
+
+    livewire(EmailInboxPage::class)
+        ->call('openReplyModal', $this->inboundEmail->id, 'reply')
+        ->assertActionMounted('grantSendPermission');
+});
+
+it('redirects to oauth when grant permission is confirmed from a record emails page', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('opens the grant permission empty state when replying from a mailbox that cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('isOpen', true)
+        ->assertSee(__('filament/emails/composer.grant_send.description'))
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('direction', EmailDirection::OUTBOUND)->exists())->toBeFalse();
+});
+
+it('opens grant permission instead of reply when the mailbox is not active', function (EmailAccountStatus $status): void {
+    $this->account->update(['status' => $status]);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->call('openReplyModal', $this->inboundEmail->id, 'reply')
+        ->assertActionMounted('grantSendPermission');
+
+    livewire(EmailInboxPage::class)
+        ->call('openReplyModal', $this->inboundEmail->id, 'reply')
+        ->assertActionMounted('grantSendPermission');
+})->with([
+    'error' => EmailAccountStatus::ERROR,
+    'reauth required' => EmailAccountStatus::REAUTH_REQUIRED,
+]);
+
+it('does not queue a reply when the mailbox has a sync error', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['sender@contact.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Re: Original Subject',
+                'body_html' => '<p>Reply body</p>',
+                'in_reply_to_email_id' => $this->inboundEmail->id,
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply'],
+        )
+        ->assertNotNotified();
+
+    expect(Email::query()->where('direction', EmailDirection::OUTBOUND)->exists())->toBeFalse();
+});
+
+it('redirects to oauth when grant permission is confirmed for a mailbox that needs reconnect', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
 });

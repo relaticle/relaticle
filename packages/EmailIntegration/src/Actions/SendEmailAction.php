@@ -59,7 +59,7 @@ final readonly class SendEmailAction
             ->whereKey($data['connected_account_id'])
             ->firstOrFail();
 
-        abort_unless($account->hasSend(), 403);
+        abort_unless($account->isSendable(), 403);
 
         $priority = $data['priority'] ?? EmailPriority::BULK;
 

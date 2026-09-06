@@ -38,6 +38,8 @@ use RuntimeException;
 
 trait HasEmailComposeActions
 {
+    use RedirectsToGrantSend;
+
     /**
      * Return the CRM record these emails belong to (People, Company, or Opportunity)
      */
@@ -45,6 +47,12 @@ trait HasEmailComposeActions
 
     public function openReplyModal(string $emailId, string $mode): void
     {
+        if (! $this->sendableMailbox() instanceof ConnectedAccount) {
+            $this->mountAction('grantSendPermission');
+
+            return;
+        }
+
         $this->mountAction('replyForwardEmail', [
             'emailId' => $emailId,
             'mode' => $mode,
@@ -120,12 +128,7 @@ trait HasEmailComposeActions
 
         $user = $this->getAuthenticatedUser();
 
-        $account = ConnectedAccount::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->defaultFirst()
-            ->first();
+        $account = $this->sendableMailbox();
 
         $toParticipants = match ($mode) {
             'forward' => [],
@@ -175,6 +178,23 @@ trait HasEmailComposeActions
             default => EmailCreationSource::REPLY,
         };
 
+        $team = filament()->getTenant();
+
+        if (! $team instanceof Team) {
+            return;
+        }
+
+        $account = ConnectedAccount::query()
+            ->ownedBy($this->getAuthenticatedUser(), $team)
+            ->whereKey($data['connected_account_id'] ?? null)
+            ->first();
+
+        if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
+            $this->redirectToGrantSend($account);
+
+            return;
+        }
+
         $record = $this->getCrmRecord();
 
         $email = resolve(SendEmailAction::class)->execute(
@@ -220,7 +240,7 @@ trait HasEmailComposeActions
         return [
             Select::make('connected_account_id')
                 ->label(__('filament/concerns/email-compose.fields.from.label'))
-                ->options(fn (): array => $this->activeAccountOptions())
+                ->options(fn (): array => $this->sendableAccountOptions())
                 ->required(),
 
             TagsInput::make('to')
@@ -386,21 +406,6 @@ trait HasEmailComposeActions
     private function contactEmailSuggestions(): array
     {
         return resolve(RecipientSuggestionService::class)->addressesFor($this->getAuthenticatedUser());
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function activeAccountOptions(): array
-    {
-        return ConnectedAccount::query()
-            ->where('user_id', $this->getAuthenticatedUser()->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->defaultFirst()
-            ->get()
-            ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
-            ->all();
     }
 
     /**
