@@ -116,7 +116,7 @@ return [
     ],
     'record_creation' => [
         'heading' => 'Automatic record creation',
-        'description' => 'Applies to every connected mailbox and calendar in the workspace. Changing this setting only affects newly synced emails and events. To apply it to mail already in Relaticle, open Email → Accounts and choose Re-import history on each mailbox.',
+        'description' => 'Applies to every connected mailbox and calendar in the workspace. Changing this setting only affects newly synced emails and events.',
         'recommended' => 'Recommended',
         'modes' => [
             'all' => [
@@ -134,7 +134,7 @@ return [
         ],
         'companies' => [
             'label' => 'Automatically create company records',
-            'description' => 'Company records will be automatically created based on the domain in a person\'s email address.',
+            'description' => 'When enabled, a company is created from a person\'s email domain. This follows the contact setting above. It is unavailable when record creation is None.',
         ],
     ],
     'notifications' => [
