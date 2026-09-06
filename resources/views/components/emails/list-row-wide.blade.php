@@ -62,12 +62,13 @@
         type="button"
         wire:click="selectEmail('{{ $email->id }}')"
         wire:loading.attr="disabled"
+        wire:target="selectEmail('{{ $email->id }}')"
     @endif
-    @class([
+    {{ $attributes->class([
         'ei-email-list-row group relative flex w-full items-start gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:bg-gray-950 dark:hover:!bg-gray-900 sm:px-6',
         'cursor-pointer data-[loading]:cursor-wait data-[loading]:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:data-[loading]:bg-gray-900' => $canViewBody,
         'cursor-default' => ! $canViewBody,
-    ])
+    ]) }}
 >
     @if ($canViewBody)
         <span
