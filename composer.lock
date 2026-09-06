@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6cd72fc29d96967aa8d20f07b809b12a",
+    "content-hash": "fe171a29da2fba27cc8b0683550c0aac",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10073,10 +10073,16 @@
         {
             "name": "relaticle/custom-fields",
             "version": "dev-feat/4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/relaticle/custom-fields.git",
+                "reference": "107418146d2aa92d1d2691d897ea2a5f6121f21c"
+            },
             "dist": {
-                "type": "path",
-                "url": "/Users/manuk/Herd/custom-fields-4x",
-                "reference": "d797cbed2acf1746084e9943fc9b8df89652f28e"
+                "type": "zip",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/107418146d2aa92d1d2691d897ea2a5f6121f21c",
+                "reference": "107418146d2aa92d1d2691d897ea2a5f6121f21c",
+                "shasum": ""
             },
             "require": {
                 "filament/filament": "^5.0",
@@ -10104,12 +10110,12 @@
             "type": "library",
             "extra": {
                 "laravel": {
-                    "providers": [
-                        "Relaticle\\CustomFields\\CustomFieldsServiceProvider"
-                    ],
                     "aliases": {
                         "CustomFields": "Relaticle\\CustomFields\\Facades\\CustomFields"
-                    }
+                    },
+                    "providers": [
+                        "Relaticle\\CustomFields\\CustomFieldsServiceProvider"
+                    ]
                 }
             },
             "autoload": {
@@ -10118,48 +10124,7 @@
                     "Relaticle\\CustomFields\\Database\\Factories\\": "database/factories/"
                 }
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "Relaticle\\CustomFields\\Tests\\": "tests/",
-                    "Relaticle\\CustomFields\\Tests\\Database\\Factories\\": "tests/database/factories/"
-                }
-            },
-            "scripts": {
-                "post-autoload-dump": [
-                    "@php ./vendor/bin/testbench package:discover --ansi"
-                ],
-                "lint": [
-                    "rector && pint --parallel"
-                ],
-                "test:lint": [
-                    "pint --test"
-                ],
-                "test:refactor": [
-                    "rector --dry-run"
-                ],
-                "test:types": [
-                    "phpstan analyse"
-                ],
-                "test:arch": [
-                    "pest --filter=arch"
-                ],
-                "test:type-coverage": [
-                    "pest --type-coverage --min=100.0"
-                ],
-                "test:pest": [
-                    "pest --parallel"
-                ],
-                "test": [
-                    "@test:lint",
-                    "@test:refactor",
-                    "@test:types",
-                    "@test:type-coverage",
-                    "@test:pest"
-                ],
-                "test-coverage": [
-                    "vendor/bin/pest --coverage"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "AGPL-3.0"
             ],
@@ -10173,6 +10138,8 @@
             "description": "User Defined Custom Fields for Laravel Filament",
             "homepage": "https://github.com/relaticle/custom-fields",
             "keywords": [
+                "Forms",
+                "Relaticle",
                 "admin-panel",
                 "conditional-fields",
                 "csv-export",
@@ -10186,23 +10153,18 @@
                 "filamentphp",
                 "form-builder",
                 "form-fields",
-                "forms",
                 "laravel",
                 "laravel-package",
                 "manukminasyan",
                 "multi-tenancy",
                 "no-migration",
-                "relaticle",
                 "validation"
             ],
             "support": {
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "transport-options": {
-                "symlink": true,
-                "relative": false
-            }
+            "time": "2026-09-06T15:23:31+00:00"
         },
         {
             "name": "relaticle/flowforge",

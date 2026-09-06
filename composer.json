@@ -211,13 +211,5 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true,
-    "repositories": [{
-        "name": "custom-fields-4x",
-        "type": "path",
-        "url": "/Users/manuk/Herd/custom-fields-4x",
-        "options": {
-            "symlink": true
-        }
-    }]
+    "prefer-stable": true
 }
