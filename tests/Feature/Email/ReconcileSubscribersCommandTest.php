@@ -59,6 +59,30 @@ test('dispatches for verified users who never received a subscriber uuid', funct
     Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
 });
 
+test('does not re-dispatch a user whose unchanged profile Mailcoach already rejected', function (): void {
+    $rejected = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $rejected->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($rejected)->hash()])->save();
+
+    $this->artisan('subscribers:reconcile')
+        ->expectsOutputToContain('Dispatched 0 sync jobs.')
+        ->assertSuccessful();
+
+    Queue::assertNotPushed(SyncSubscriberJob::class);
+});
+
+test('re-dispatches a rejected user once the derived profile differs from the rejected one', function (): void {
+    $user = User::factory()->withTeam()->create([
+        'email_verified_at' => now(),
+        'rejected_subscriber_profile_hash' => 'hash-of-the-old-dead-address',
+    ]);
+
+    $this->artisan('subscribers:reconcile')
+        ->expectsOutputToContain('Dispatched 1 sync jobs.')
+        ->assertSuccessful();
+
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
+});
+
 test('skips unverified users', function (): void {
     User::factory()->withTeam()->create(['email_verified_at' => null]);
 

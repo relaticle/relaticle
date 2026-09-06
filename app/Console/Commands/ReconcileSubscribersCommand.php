@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * The convergence backstop: re-derives every verified user's subscriber
  * profile and syncs the ones that drifted, whatever the cause (a missed
- * event, a failed job, recency decay, a deleted team).
+ * event, a failed job, recency decay, a deleted team). The one exception is
+ * a profile Mailcoach already rejected, which waits until it changes.
  */
 #[Description('Sync Mailcoach subscriber profiles for verified users whose derived profile changed')]
 #[Signature('subscribers:reconcile
@@ -47,7 +48,7 @@ final class ReconcileSubscribersCommand extends Command
 
                     $profile = $deriver->derive($user);
 
-                    if ($profile->matchesStored($user)) {
+                    if (! $profile->needsSync($user)) {
                         continue;
                     }
 
