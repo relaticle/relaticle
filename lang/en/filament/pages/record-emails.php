@@ -18,6 +18,7 @@ return [
         ],
         'request_access' => [
             'label' => 'Request Access',
+            'modal_heading' => 'Request access',
         ],
         'approve_access_request' => [
             'modal_heading' => 'Approve access request',
@@ -43,6 +44,19 @@ return [
             'label' => 'Access level requested',
         ],
     ],
+    'empty' => [
+        'description' => 'This record doesn\'t have any emails, or they may be hidden due to permissions.',
+        'compose' => 'Compose email',
+    ],
+    'protected' => [
+        'heading' => 'Nothing to show here',
+        'description' => 'This record is Protected. Communications stay hidden on this page to protect their privacy.',
+    ],
+    'blocked' => [
+        'heading' => 'Nothing to show here',
+        'description' => 'This record is Blocked. Communications stay hidden on this page.',
+    ],
+
     'notifications' => [
         'sharing_saved' => [
             'title' => 'Sharing settings saved.',

@@ -1,43 +1,33 @@
-@props(['email', 'folder', 'ownAddresses' => []])
+@props(['email'])
 
-{{-- The full-width row: one line per email, the way a mail list is meant to scan.
-     Used by every mail list: the inbox board and the record pages. --}}
+{{-- Record mailbox row: subject, participants, snippet, via the connected
+     mailbox that imported the email, and an AI category pill. When the viewer
+     lacks body access, the snippet is replaced by a request-access pill. --}}
 @php
-    use Relaticle\EmailIntegration\Enums\EmailDirection;
     use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 
-    // `is_read` is a per-viewer flag set by the withReadStateFor() query scope.
-    $isUnread   = ! $email->is_read && $email->direction === EmailDirection::INBOUND;
     $from       = $email->from->first();
     $senderName = $from?->name ?: $from?->email_address ?: '?';
     $authUser   = auth()->user();
+    $categoryLabel = $email->categoryLabel();
+    $isReply    = filled($email->in_reply_to);
+    $mailboxViaName = $email->mailboxViaName();
 
-    $canViewSubject   = $authUser->can('viewSubject', $email);
-    $isOwner          = $email->user_id === $authUser->getKey();
-    $canSummarize     = $isOwner || $authUser->can('viewBody', $email);
+    $canViewSubject = $authUser->can('viewSubject', $email);
+    $canViewBody    = $authUser->can('viewBody', $email);
     $canRequestAccess = $authUser->cannot('viewBody', $email) && $authUser->can('requestAccess', $email);
-    $hasActions       = $isOwner || $canSummarize || $canRequestAccess;
+    $hasPendingAccessRequest = (bool) ($email->viewer_has_pending_access_request ?? false);
+    $ownerName = $email->user?->name ?: $email->user?->email ?: __('filament/pages/email-inbox.pending_access.unknown_user');
 
-    // A column of "1 day ago" is unscannable; mail lists read by clock, weekday, date.
     $sentAt = $email->sent_at;
     $timestamp = match (true) {
         $sentAt === null          => null,
         $sentAt->isToday()        => $sentAt->format('g:i A'),
-        $sentAt->isYesterday()    => 'Yesterday',
+        $sentAt->isYesterday()    => __('filament/pages/email-inbox.list_row.timestamp_yesterday', ['time' => $sentAt->format('g:i A')]),
         $sentAt->diffInDays() < 7 => $sentAt->format('D'),
         $sentAt->isCurrentYear()  => $sentAt->format('M j'),
         default                   => $sentAt->format('M j, Y'),
     };
-
-    // Filament's palette, picked by a stable hash of the sender so the same
-    // correspondent keeps the same colour between renders and pages.
-    $avatarColor = ['primary', 'success', 'warning', 'danger', 'info'][crc32(mb_strtolower($senderName)) % 5];
-
-    $initials = collect(explode(' ', trim($senderName)))
-        ->filter()
-        ->take(2)
-        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
-        ->implode('');
 
     $participantLine = collect([EmailParticipantRole::FROM, EmailParticipantRole::TO])
         ->flatMap(fn (EmailParticipantRole $role) => $email->participants->where('role', $role))
@@ -49,100 +39,116 @@
 
     $participantLine = $participantLine ?: $senderName;
 
-    // Snippets and subjects arrive holding HTML entities from the source message.
-    // Blade escapes on output, so without decoding first the row literally reads
-    // "You&#39;ve found" instead of "You've found".
+    $avatarColor = ['primary', 'success', 'warning', 'danger', 'info'][crc32(mb_strtolower($senderName)) % 5];
+
+    $initials = collect(explode(' ', trim($senderName)))
+        ->filter()
+        ->take(2)
+        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
+        ->implode('');
+
     $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
     $subject = $decode($email->subject);
 
-    // Provider snippets open with preheader text, most often the recipient's own
-    // address, so the preview began by telling the reader their own email instead
-    // of the first words of the message.
-    $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($email->snippet)) ?? '');
+    $snippet = $canViewBody
+        ? trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($email->snippet)) ?? '')
+        : '';
 
+    $rowTag = $canViewBody ? 'button' : 'div';
 @endphp
-
-<div class="group relative">
-
-    <button
-        wire:click="selectEmail('{{ $email->id }}')"
+<{{ $rowTag }}
+    @if ($canViewBody)
         type="button"
-        @if ($isUnread) data-unread-indicator @endif
+        wire:click="selectEmail('{{ $email->id }}')"
+        wire:loading.attr="disabled"
+        wire:target="selectEmail('{{ $email->id }}')"
+    @endif
+    {{ $attributes->class([
+        'ei-email-list-row relative flex w-full items-start gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:bg-gray-950 dark:hover:!bg-gray-900 sm:px-6',
+        'cursor-pointer data-[loading]:cursor-wait data-[loading]:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:data-[loading]:bg-gray-900' => $canViewBody,
+        'cursor-default' => ! $canViewBody,
+    ]) }}
+>
+    @if ($canViewBody)
+        <span
+            wire:loading.flex
+            wire:target="selectEmail('{{ $email->id }}')"
+            class="pointer-events-none absolute inset-0 z-10 items-center justify-center bg-white/70 dark:bg-gray-950/70"
+            role="status"
+            aria-label="{{ __('filament/pages/email-inbox.list_row.opening') }}"
+        >
+            <x-filament::loading-indicator class="h-5 w-5 text-primary-500" />
+        </span>
+    @endif
+
+    <span
         @class([
-            'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors sm:px-6',
-            // Keyboard users need to see where they are; the row is the primary control.
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
-            'bg-primary-50/40 hover:bg-primary-50 dark:bg-primary-950 dark:hover:!bg-primary-900' => $isUnread,
-            'bg-white hover:bg-gray-50 dark:bg-gray-950 dark:hover:!bg-gray-900' => ! $isUnread,
+            'flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset ring-white/60 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/10',
+            '[background-color:color-mix(in_oklab,var(--color-500)_14%,transparent)] [color:var(--color-600)]',
+            'fi-color-'.$avatarColor,
         ])
     >
-        <span class="mt-2 flex h-2 w-2 shrink-0 items-center justify-center">
-            @if ($isUnread)
-                <span class="h-2 w-2 rounded-full bg-primary-500 dark:bg-primary-400"></span>
-            @endif
-        </span>
+        {{ $initials ?: '?' }}
+    </span>
 
-        {{-- Sender avatar --}}
-        <span
-            @class([
-                'flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset ring-white/60 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/10',
-                '[background-color:color-mix(in_oklab,var(--color-500)_14%,transparent)] [color:var(--color-600)]',
-                'fi-color-'.$avatarColor,
-            ])
-        >
-            {{ $initials ?: '?' }}
-        </span>
+    <span class="min-w-0 flex-1">
+        <span class="flex items-center justify-between gap-3">
+            <span class="min-w-0 flex-1 truncate text-sm font-medium leading-5 text-gray-800 dark:text-gray-200">
+                {{ $canViewSubject ? ($subject ?: '(no subject)') : '(subject hidden)' }}
+            </span>
 
-        <span class="min-w-0 flex-1">
-            {{-- Subject first: it is what the row is actually about --}}
-            <span class="flex items-start gap-3">
-                <span @class([
-                    'min-w-0 flex-1 truncate text-sm leading-5',
-                    'font-semibold text-gray-900 dark:text-white' => $isUnread,
-                    'font-medium text-gray-800 dark:text-gray-200' => ! $isUnread,
-                ])>
-                    {{ $canViewSubject ? ($subject ?: '(no subject)') : '(subject hidden)' }}
-                </span>
-
-                {{-- Only the All folder mixes directions. The badge sits with the
-                     subject it describes; in the timestamp cluster it read as another
-                     date-ish token. --}}
-                @if ($folder->value === 'all')
-                    @php $isOutbound = $email->direction === EmailDirection::OUTBOUND; @endphp
-
-                    <x-filament::badge
-                        :color="$isOutbound ? 'info' : 'success'"
-                        size="xs"
-                        class="fi-email-direction-badge hidden shrink-0 sm:inline-flex"
-                    >
-                        {{ $isOutbound
-                            ? __('filament/pages/email-inbox.folders.sent')
-                            : __('filament/pages/email-inbox.folders.inbox') }}
-                    </x-filament::badge>
+            <span class="flex shrink-0 items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                @if (filled($mailboxViaName))
+                    <span class="flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400">
+                        <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <span class="max-w-[7rem] truncate">{{ __('filament/pages/email-inbox.list_row.via', ['name' => $mailboxViaName]) }}</span>
+                    </span>
                 @endif
 
-                <span class="flex shrink-0 items-center gap-2 pt-0.5 text-xs text-gray-400 dark:text-gray-400">
+                <span class="flex items-center gap-1.5 whitespace-nowrap">
                     @if ($email->has_attachments)
-                        <x-heroicon-m-paper-clip class="h-3.5 w-3.5" />
+                        <x-heroicon-m-paper-clip class="h-3.5 w-3.5" aria-hidden="true" />
                     @endif
-                    <time class="w-[4.5rem] shrink-0 text-right tabular-nums max-sm:w-auto" title="{{ $sentAt?->format('M j, Y · g:i A') }}">{{ $timestamp }}</time>
+                    <time
+                        class="tabular-nums"
+                        title="{{ $sentAt?->format('M j, Y · g:i A') }}"
+                    >{{ $timestamp }}</time>
                 </span>
             </span>
-
-            {{-- Participants sit directly below the subject, Gmail-style: compact
-                 context without turning each row into a labeled detail view. --}}
-            <span class="mt-0.5 block truncate text-xs font-medium text-gray-500 dark:text-gray-400">
-                {{ $participantLine }}
-            </span>
-
-            {{-- Preview --}}
-            @if (filled($snippet))
-                <span class="mt-0.5 block truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
-                    {{ $snippet }}
-                </span>
-            @endif
         </span>
-    </button>
 
-</div>
+        <span class="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+            {{ $participantLine }}
+        </span>
+
+        @if ($canViewBody && (filled($snippet) || $categoryLabel !== null))
+            <span class="mt-0.5 flex items-center justify-between gap-3">
+                @if (filled($snippet))
+                    <span class="flex min-w-0 items-center gap-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
+                        @if ($isReply)
+                            <x-ri-reply-line class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        @else
+                            <x-ri-file-text-line class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        @endif
+                        <span class="truncate">{{ $snippet }}</span>
+                    </span>
+                @else
+                    <span class="min-w-0 flex-1"></span>
+                @endif
+
+                @if ($categoryLabel !== null)
+                    <x-emails.category-badge :label="$categoryLabel->label" class="ml-auto" />
+                @endif
+            </span>
+        @endif
+
+        @if ($canRequestAccess)
+            <x-emails.request-access-list-pill
+                :email="$email"
+                :owner-name="$ownerName"
+                :requested="$hasPendingAccessRequest"
+            />
+        @endif
+    </span>
+</{{ $rowTag }}>

@@ -1,5 +1,6 @@
 <div>
-    <x-filament::tabs :label="__('filament/pages/email-access-requests.tabs.aria')" class="ei-tabs-segmented">
+    <div class="-mt-2 mb-4">
+        <x-filament::tabs :label="__('filament/pages/email-access-requests.tabs.aria')" class="ei-tabs-segmented">
         <x-filament::tabs.item
             :active="$tab === 'incoming'"
             :icon="\Filament\Support\Icons\Heroicon::OutlinedInboxArrowDown"
@@ -17,7 +18,8 @@
         >
             {{ __('filament/pages/email-access-requests.tabs.outgoing') }}
         </x-filament::tabs.item>
-    </x-filament::tabs>
+        </x-filament::tabs>
+    </div>
 
     <div wire:loading.class="pointer-events-none opacity-50" wire:target="setTab">
         {{ $this->table }}

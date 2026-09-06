@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -27,7 +28,7 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 3;
 
-    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
+    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider */
     public array $backoff = [60, 300, 900];
 
     public function __construct(
@@ -45,7 +46,15 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $service = $mailFactory->make($account);
-        $delta = $service->fetchDelta($account->sync_cursor);
+
+        try {
+            $delta = $service->fetchDelta($account->sync_cursor);
+        } catch (MailHistoryExpired) {
+            $account->update(['sync_cursor' => null]);
+            dispatch(new InitialEmailSyncJob($account));
+
+            return;
+        }
 
         $allIds = $delta->messageIds->all();
 

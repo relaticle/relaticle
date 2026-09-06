@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeet
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 
 final class MeetingResource extends Resource
 {
@@ -155,7 +156,7 @@ final class MeetingResource extends Resource
         /** @var Team|null $team */
         $team = filament()->getTenant();
 
-        return $user instanceof User && ConnectedAccount::hasActiveFor($user, $team);
+        return $user instanceof User && ConnectedAccount::hasConnectedFor($user, $team);
     }
 
     #[Override]
@@ -168,7 +169,15 @@ final class MeetingResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->with(['connectedAccount', 'team']);
+
+        $user = auth()->user();
+
+        if ($user instanceof User) {
+            $query->withGlobalScope('visible', new VisibleMeetingScope($user));
+        }
+
+        return $query;
     }
 }

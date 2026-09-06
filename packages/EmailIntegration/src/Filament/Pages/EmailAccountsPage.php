@@ -13,12 +13,15 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final class EmailAccountsPage extends Page
 {
-    use HasConnectedAccountActions, HasEmailFeatureFlag;
+    use HasConnectedAccountActions;
+    use HasConnectMailboxActions;
+    use HasEmailFeatureFlag;
 
     protected string $view = 'email-integration::filament.pages.email-accounts';
 
@@ -87,28 +90,6 @@ final class EmailAccountsPage extends Page
     private function getAccounts(): Collection
     {
         return $this->ownedAccountsQuery()->defaultFirst()->get();
-    }
-
-    public function connectGmailAction(): Action
-    {
-        return Action::make('connectGmail')
-            ->label(__('filament/pages/email-accounts.actions.connect_gmail'))
-            ->icon('icon-google')
-            ->color('gray')
-            ->outlined()
-            ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'gmail']), true);
-    }
-
-    public function connectAzureAction(): Action
-    {
-        return Action::make('connectAzure')
-            ->label(__('filament/pages/email-accounts.actions.connect_azure'))
-            ->icon('heroicon-o-envelope')
-            ->color('gray')
-            ->outlined()
-            // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
-            ->hidden()
-            ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
     }
 
     public function editSettingsAction(): Action

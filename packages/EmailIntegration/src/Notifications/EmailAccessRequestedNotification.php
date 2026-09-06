@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
-use App\Models\Team;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 final class EmailAccessRequestedNotification extends Notification
@@ -34,39 +32,66 @@ final class EmailAccessRequestedNotification extends Notification
     public function toDatabase(User $notifiable): array
     {
         $email = $this->request->email;
-        $team = $email !== null ? Team::query()->find($email->team_id) : null;
-
-        $subject = $email !== null ? ($email->subject ?? '(subject hidden)') : '(subject hidden)';
         $requesterName = $this->request->requester->name;
+        $subject = $email !== null ? ($email->subject ?? __('filament/notifications/email-access-requested.no_subject')) : __('filament/notifications/email-access-requested.no_subject');
 
         $notification = FilamentNotification::make()
             ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))
-            ->body(__('filament/notifications/email-access-requested.body', ['subject' => $subject]))
+            ->body($subject)
             ->warning()
-            ->icon('heroicon-o-key');
+            ->icon('heroicon-o-key')
+            ->viewData(['request_id' => (string) $this->request->getKey()]);
 
-        if ($team !== null) {
-            $actions = [
-                Action::make('review')
-                    ->label(__('filament/notifications/email-access-requested.actions.review'))
-                    ->url(EmailAccessRequestsPage::getUrl(
-                        parameters: ['request' => $this->request->getKey()],
-                        tenant: $team,
-                    ))
-                    ->button(),
-            ];
-
-            $actions[] = Action::make('view')
-                ->label(__('filament/notifications/email-access-requested.actions.view'))
-                ->url(EmailInboxPage::getUrl(
-                    parameters: ['email' => $email->getKey()],
-                    tenant: $team,
-                ))
-                ->color('gray');
-
-            $notification->actions($actions);
+        if ($email !== null) {
+            $notification->actions([
+                Action::make('viewEmail')
+                    ->label(__('filament/notifications/email-access-requested.actions.view'))
+                    ->link()
+                    ->color('info')
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'open-email-from-access-request',
+                    )
+                    ->eventData(['emailId' => $email->getKey()]),
+                Action::make('accept')
+                    ->label(__('filament/notifications/email-access-requested.actions.accept'))
+                    ->link()
+                    ->color('success')
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'approve-email-access-request',
+                    )
+                    ->eventData(['requestId' => (string) $this->request->getKey()]),
+                Action::make('decline')
+                    ->label(__('filament/notifications/email-access-requested.actions.decline'))
+                    ->link()
+                    ->color('warning')
+                    ->dispatchTo(
+                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                        'deny-email-access-request',
+                    )
+                    ->eventData(['requestId' => (string) $this->request->getKey()]),
+            ]);
         }
 
         return $notification->getDatabaseMessage();
+    }
+
+    /**
+     * Delete the owner's bell row for this request. Same outcome as the
+     * notification close (X) action: the row is removed, not marked read.
+     */
+    public static function dismissFor(EmailAccessRequest $request): void
+    {
+        $owner = $request->owner ?? User::query()->whereKey($request->owner_id)->first();
+
+        if (! $owner instanceof User) {
+            return;
+        }
+
+        $owner->notifications()
+            ->where('type', self::class)
+            ->where('data->viewData->request_id', (string) $request->getKey())
+            ->delete();
     }
 }

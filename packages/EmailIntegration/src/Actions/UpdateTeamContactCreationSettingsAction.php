@@ -24,7 +24,9 @@ final readonly class UpdateTeamContactCreationSettingsAction
 
         $team->update([
             'contact_creation_mode' => $contactCreationMode,
-            'auto_create_companies' => $autoCreateCompanies,
+            'auto_create_companies' => $contactCreationMode === ContactCreationMode::None
+                ? false
+                : $autoCreateCompanies,
         ]);
     }
 }

@@ -11,6 +11,10 @@ use RuntimeException;
 
 final readonly class CancelQueuedEmailAction
 {
+    public function __construct(
+        private SyncEmailBatchCountersAction $syncEmailBatchCounters,
+    ) {}
+
     public function execute(Email $email): Email
     {
         return DB::transaction(function () use ($email): Email {
@@ -18,7 +22,7 @@ final readonly class CancelQueuedEmailAction
             $lockedEmail = Email::query()->lockForUpdate()->findOrFail($email->getKey());
 
             // Only QUEUED mail is cancellable. The undo window keeps the email QUEUED
-            // (scheduled_for ~30s out) until the dispatcher claims it, so undo always
+            // (scheduled_for a few seconds out) until the dispatcher claims it, so undo always
             // races against the QUEUED state. Once claimed to SENDING a worker is
             // actively delivering it: send() calls the provider OUTSIDE any row lock,
             // so a "SENDING && provider_message_id === null" check is not a reliable
@@ -30,6 +34,8 @@ final readonly class CancelQueuedEmailAction
             }
 
             $lockedEmail->update(['status' => EmailStatus::CANCELLED]);
+
+            $this->syncEmailBatchCounters->execute($lockedEmail->batch_id);
 
             return $lockedEmail->refresh();
         });
