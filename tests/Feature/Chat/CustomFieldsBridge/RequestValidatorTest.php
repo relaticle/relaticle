@@ -177,3 +177,14 @@ it('rejects clearing a required choice field with a truthful validation error', 
     expect($result->error)->toContain('custom_fields validation failed')
         ->and($result->error)->not->toContain('option label string');
 });
+
+it('rejects an option label carrying its bracketed category', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $validator = resolve(CustomFieldsRequestValidator::class);
+
+    expect($validator->validate($user, 'task', ['status' => 'Done [completed]'])->error)
+        ->toContain('Done [completed]')
+        ->and($validator->validate($user, 'task', ['status' => 'Done'])->error)
+        ->toBeNull();
+});

@@ -8,8 +8,17 @@ use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 
+mutates(CustomFieldsSchemaDescriber::class);
+
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
+});
+
+it('says a bracketed category is metadata, not part of the value', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    expect(resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, 'task'))
+        ->toContain('never part of its value');
 });
 
 it('describes the system-seeded task custom fields with type hints', function (): void {

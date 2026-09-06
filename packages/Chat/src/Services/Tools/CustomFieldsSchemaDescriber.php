@@ -47,6 +47,9 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         $lines[] = '';
+        $lines[] = 'A category in square brackets after an option label, such as [completed], is what that '
+            .'option means, never part of its value: write the label exactly as quoted, brackets excluded.';
+        $lines[] = '';
         $lines[] = 'Only include codes you want to set. Omit fields you do not want to change. '
             .'To clear a value, pass null (for a multi-value field, null or []). '
             .'If a field is required the write is rejected with a validation error naming it, '
