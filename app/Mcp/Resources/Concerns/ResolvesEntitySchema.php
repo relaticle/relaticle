@@ -39,7 +39,7 @@ trait ResolvesEntitySchema
         return (object) (new CustomFieldFilterSchema)->build($user, $entityType);
     }
 
-    private const CHOICE_TYPES = ['select', 'radio', 'multi-select', 'checkbox-list', 'tags-input', 'toggle-buttons'];
+    private const CHOICE_TYPES = ['select', 'status', 'radio', 'multi-select', 'checkbox-list', 'tags-input', 'toggle-buttons'];
 
     /**
      * @param  Collection<int, CustomField>  $fields
@@ -93,7 +93,7 @@ trait ResolvesEntitySchema
             'link' => ['format' => 'array of URL strings', 'example' => ['https://example.com']],
             'email' => ['format' => 'array of email strings', 'example' => ['user@example.com']],
             'phone' => ['format' => 'array of phone strings', 'example' => ['+1234567890']],
-            'select', 'radio', 'toggle-buttons' => ['format' => 'option ID string (see options)', 'example' => 'option-id-here'],
+            'select', 'status', 'radio', 'toggle-buttons' => ['format' => 'option ID string (see options)', 'example' => 'option-id-here'],
             'multi-select', 'checkbox-list' => ['format' => 'array of option ID strings', 'example' => ['option-id-1', 'option-id-2']],
             'tags-input' => ['format' => 'array of arbitrary string values', 'example' => ['priority', 'customer']],
             'toggle' => ['format' => 'boolean', 'example' => true],

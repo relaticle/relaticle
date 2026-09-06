@@ -55,7 +55,8 @@ enum TaskField: string
     public function getFieldType(): string
     {
         return match ($this) {
-            self::STATUS, self::PRIORITY => CustomFieldType::SELECT->value,
+            self::STATUS => CustomFieldType::STATUS->value,
+            self::PRIORITY => CustomFieldType::SELECT->value,
             self::DESCRIPTION => CustomFieldType::RICH_EDITOR->value,
             self::DUE_DATE => CustomFieldType::DATE_TIME->value,
         };

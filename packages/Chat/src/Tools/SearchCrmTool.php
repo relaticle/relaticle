@@ -27,6 +27,7 @@ final class SearchCrmTool implements Tool
      */
     private const array EXCLUDED_CUSTOM_FIELD_TYPES = [
         'select',
+        'status',
         'multi-select',
         'radio',
         'checkbox-list',

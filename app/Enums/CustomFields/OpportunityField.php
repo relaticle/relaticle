@@ -42,7 +42,7 @@ enum OpportunityField: string
         return match ($this) {
             self::AMOUNT => CustomFieldType::CURRENCY->value,
             self::CLOSE_DATE => CustomFieldType::DATE->value,
-            self::STAGE => CustomFieldType::SELECT->value,
+            self::STAGE => CustomFieldType::STATUS->value,
         };
     }
 

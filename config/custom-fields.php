@@ -94,9 +94,6 @@ return [
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
 
-            // Adds an optional category to single-choice options; every existing option
-            // starts uncategorised, so nothing reads differently until one is set.
-            CustomFieldsFeature::FIELD_OPTION_CATEGORIES,
             // Creates the two relationship tables and lets the upgrade command run. Record
             // fields store their targets as links from 4.0 on, so this is not optional here.
             CustomFieldsFeature::SYSTEM_RELATIONSHIPS,

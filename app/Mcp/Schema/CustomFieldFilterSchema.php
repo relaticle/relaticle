@@ -90,7 +90,7 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
             CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
-            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
+            CustomFieldType::SELECT, CustomFieldType::STATUS, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
                 self::buildOperators(['eq'], 'string'),
                 ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
             ),
