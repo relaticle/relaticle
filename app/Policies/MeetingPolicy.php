@@ -9,10 +9,13 @@ use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 final readonly class MeetingPolicy
 {
     use HandlesAuthorization;
+
+    public function __construct(private EmailVisibilityService $visibility) {}
 
     public function viewAny(User $user): bool
     {
@@ -25,6 +28,10 @@ final readonly class MeetingPolicy
 
     public function view(User $user, Meeting $meeting): bool
     {
-        return $user->belongsToTeamId($meeting->team_id);
+        if (! $user->belongsToTeamId($meeting->team_id)) {
+            return false;
+        }
+
+        return ! $this->visibility->isMeetingHiddenFromViewer($meeting, $user);
     }
 }

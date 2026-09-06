@@ -36,7 +36,6 @@ it('shows the page tabs and configure empty state when no account is connected',
         ->assertSee(__('filament/pages/email-inbox.tabs.outbox'))
         ->assertSee(__('filament/pages/email-inbox.tabs.failed'))
         ->assertSee(__('filament/pages/email-inbox.tabs.templates'))
-        ->assertSee(__('filament/pages/email-inbox.tabs.requests'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.action'))
         ->assertSeeHtml(EmailAccountsPage::getUrl());

@@ -26,10 +26,7 @@ use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -99,7 +96,6 @@ final class EmailInboxPage extends Page
     {
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
-
     }
 
     /**
@@ -146,7 +142,6 @@ final class EmailInboxPage extends Page
             // component, so the tab badges have to be told when those counts move.
             'drafts:changed' => 'refreshTabCounts',
             'outbox:changed' => 'refreshTabCounts',
-            'access-requests:changed' => 'refreshTabCounts',
         ];
     }
 
@@ -228,13 +223,19 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        /** @var Email|null */
-        return Email::query()
+        /** @var Email|null $email */
+        $email = Email::query()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->forTeam($this->authUser()->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     /**
@@ -287,16 +288,9 @@ final class EmailInboxPage extends Page
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        // A reply answers the message that was open; it cannot stay docked under a
-        // different one. The composer saves whatever was typed as a draft.
-        $this->dispatch('composer:dismiss-inline');
-
-        // ...and if this message already has an unfinished reply, bring it back up.
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        if (! $this->openEmailReader($id)) {
+            return;
+        }
 
         unset($this->inboxUnreadCount);
     }
@@ -352,11 +346,6 @@ final class EmailInboxPage extends Page
                 ->where(fn (Builder $q): Builder => $q
                     ->where('is_shared', true)
                     ->orWhere('created_by', $user->getKey()))
-                ->count(),
-            EmailPageTab::REQUESTS->value => EmailAccessRequest::query()
-                ->where('owner_id', $user->getKey())
-                ->whereHas('email', fn (Builder $query): Builder => $query->where('team_id', $teamId))
-                ->where('status', EmailAccessRequestStatus::PENDING)
                 ->count(),
         ];
     }
@@ -541,74 +530,6 @@ final class EmailInboxPage extends Page
             ->filter()
             ->values()
             ->all();
-    }
-
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['email', 'owner', 'requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.approve_access_request.notifications.approved.title'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.deny_access_request.notifications.denied.title'))
-                    ->send();
-            });
     }
 
     /**

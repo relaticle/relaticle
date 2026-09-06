@@ -6,8 +6,10 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -15,8 +17,9 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseEmailsRelationManager::class);
+mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -74,10 +77,8 @@ describe('requestAccess table action', function (): void {
         Notification::assertSentTo($this->owner, EmailAccessRequestedNotification::class);
     });
 
-    it('shows a warning notification when a pending request already exists', function (): void {
+    it('is hidden when a pending request already exists', function (): void {
         $this->actingAs($this->viewer);
-
-        Notification::fake();
 
         $email = Email::factory()->create([
             'team_id' => $this->team->id,
@@ -98,10 +99,7 @@ describe('requestAccess table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('requestAccess', $email, data: [
-                'tier_requested' => EmailPrivacyTier::FULL->value,
-            ])
-            ->assertNotified('You already have a pending request for this email.');
+            ->assertTableActionHidden('requestAccess', $email);
 
         expect(
             EmailAccessRequest::where('email_id', $email->getKey())
@@ -376,6 +374,104 @@ describe('shareAllOnRecord header action', function (): void {
     });
 });
 
+describe('view table action', function (): void {
+    it('stays hidden when the viewer cannot read the body', function (EmailPrivacyTier $tier): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => $tier,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertTableActionHidden('view', $email)
+            ->assertTableActionVisible('requestAccess', $email)
+            ->call('selectEmail', $email->getKey())
+            ->assertSet('selectedEmailId', null)
+            ->assertDontSee('fi-email-reader-panel');
+    })->with([
+        EmailPrivacyTier::METADATA_ONLY,
+        EmailPrivacyTier::SUBJECT,
+    ]);
+});
+
+describe('access request approve and deny from the reader overlay', function (): void {
+    it('approves a pending request from the relation manager overlay', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('view', $email)
+            ->assertSet('selectedEmailId', $email->getKey())
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee($this->viewer->name)
+            ->assertSee(__('filament/pages/email-inbox.pending_access.approve'))
+            ->callAction(TestAction::make('approveAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+    });
+
+    it('denies a pending request from the relation manager overlay', function (): void {
+        $email = Email::factory()->private()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Deal terms',
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $this->owner->notify(new EmailAccessRequestedNotification($request));
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->callTableAction('view', $email)
+            ->assertSee('fi-email-reader-panel')
+            ->assertSee(__('filament/pages/email-inbox.pending_access.deny'))
+            ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
+            ->assertDispatched('databaseNotificationsSent')
+            ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
+            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+    });
+});
+
 describe('subject column privacy enforcement', function (): void {
     it('shows (subject hidden) when the viewer cannot view the subject', function (): void {
         $this->actingAs($this->viewer);
@@ -414,4 +510,46 @@ describe('subject column privacy enforcement', function (): void {
         ])
             ->assertTableColumnStateSet('subject', 'Real Subject', $email);
     });
+});
+
+it('badges the emails tab with the visible count for the record', function (): void {
+    $this->person->forceFill(['email_count' => 99])->save();
+
+    $visible = Email::factory()->count(2)->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($visible->modelKeys());
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('2');
+});
+
+it('caps the emails tab badge at 99+', function (): void {
+    $emails = Email::factory()->count(100)->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($emails->modelKeys());
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('99+');
+});
+
+it('omits the emails tab badge when the viewer cannot see the linked mail', function (): void {
+    $this->person->forceFill(['email_count' => 2])->save();
+
+    $private = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $this->person->emails()->attach($private->getKey());
+
+    $this->actingAs($this->viewer);
+
+    expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBeNull();
 });

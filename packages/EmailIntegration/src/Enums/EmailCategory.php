@@ -56,4 +56,12 @@ enum EmailCategory: string implements HasColor, HasIcon, HasLabel
             self::Other => Heroicon::Tag,
         };
     }
+
+    /**
+     * Other is the unmatched fallback. It is stored, not shown.
+     */
+    public function isVisible(): bool
+    {
+        return $this !== self::Other;
+    }
 }

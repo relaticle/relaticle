@@ -11,7 +11,6 @@ return [
         'connect_azure' => 'Connect Microsoft Account',
         'manage' => 'Manage',
         're_auth' => 'Re-authenticate',
-        'edit_settings' => 'Settings',
         'set_default' => 'Set as default',
         'disconnect' => 'Disconnect',
         'sync_calendar' => [

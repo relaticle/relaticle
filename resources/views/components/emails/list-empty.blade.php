@@ -1,13 +1,35 @@
-@props(['search', 'folder'])
+@props([
+    'search',
+    'folder',
+    'canCompose' => false,
+])
 
-<div class="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
+<div {{ $attributes->class(['flex min-h-full flex-col items-center justify-center']) }}>
     @if (filled($search))
-        <x-heroicon-o-magnifying-glass class="h-8 w-8 text-gray-300 dark:text-gray-600" />
-        <p class="text-sm text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.list_empty.no_results', ['search' => $search]) }}</p>
+        <x-filament::empty-state
+            :heading="__('filament/pages/email-inbox.list_empty.no_results', ['search' => $search])"
+            icon="heroicon-o-magnifying-glass"
+            icon-color="gray"
+            :contained="false"
+        />
     @else
-        <x-heroicon-o-envelope class="h-8 w-8 text-gray-300 dark:text-gray-600" />
-        <p class="text-sm text-gray-400 dark:text-gray-500">
-            {{ __('filament/pages/email-inbox.list_empty.'.$folder->value) }}
-        </p>
+        <x-filament::empty-state
+            :heading="__('filament/pages/email-inbox.list_empty.'.$folder->value)"
+            :description="__('filament/pages/record-emails.empty.description')"
+            icon="heroicon-o-envelope"
+            icon-color="gray"
+            :contained="false"
+        >
+            @if ($canCompose)
+                <x-slot:footer>
+                    <x-filament::button
+                        icon="heroicon-o-envelope"
+                        wire:click="$dispatch('composer:open')"
+                    >
+                        {{ __('filament/pages/record-emails.empty.compose') }}
+                    </x-filament::button>
+                </x-slot:footer>
+            @endif
+        </x-filament::empty-state>
     @endif
 </div>

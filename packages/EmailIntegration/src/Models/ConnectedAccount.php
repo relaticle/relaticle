@@ -210,6 +210,14 @@ final class ConnectedAccount extends Model
         return $this->hasMany(EmailSignature::class);
     }
 
+    /**
+     * @return HasMany<EmailBlocklist, $this>
+     */
+    public function blocklist(): HasMany
+    {
+        return $this->hasMany(EmailBlocklist::class);
+    }
+
     // Helpers
 
     /**

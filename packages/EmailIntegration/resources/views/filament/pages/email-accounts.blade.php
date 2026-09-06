@@ -59,7 +59,7 @@
                             />
                         @endif
 
-                        {{ $this->accountActions($account->getKey(), $account->status, [$this->editSettingsAction()]) }}
+                        {{ $this->accountActions($account->getKey(), $account->status) }}
                     </div>
                 </div>
             @endforeach

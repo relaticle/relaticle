@@ -16,8 +16,10 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 mutates(LinkEmailAction::class);
 mutates(AutoCreatePersonAction::class);
@@ -476,6 +478,117 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
     app(LinkEmailAction::class)->execute($email);
 
     expect(People::where('team_id', $this->team->id)->where('name', 'New Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a person for a workspace-blocked address', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@partner.com',
+        'name' => 'Blocked Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Blocked Contact')->exists())->toBeFalse();
+});
+
+it('still auto-creates a person for a protected address', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->protected()->email('vip@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'vip@partner.com',
+        'name' => 'Protected Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Protected Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a person for a mailbox-blocklisted address', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'spam@badactor.com',
+        'name' => 'Spam Sender',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Spam Sender')->exists())->toBeFalse();
+});
+
+it('auto-creates other participants when one address is blocked', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@partner.com',
+        'name' => 'Blocked Contact',
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'customer@acme.com',
+        'name' => 'Real Customer',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Blocked Contact')->exists())->toBeFalse()
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Real Customer')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company for a workspace-blocked domain', function (): void {
+    $this->team->update(['auto_create_companies' => true]);
+
+    TeamEmailBlocklist::factory()->blocked()->domain('blockedcorp.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'anyone@blockedcorp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Blockedcorp')->exists())->toBeFalse();
 });
 
 it('creates distinct people for participants sharing a display name but different emails', function (): void {

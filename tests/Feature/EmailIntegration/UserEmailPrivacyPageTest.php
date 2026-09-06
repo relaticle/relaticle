@@ -6,10 +6,8 @@ use App\Livewire\App\Email\UserEmailPrivacySettings;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Actions\UpdateUserEmailPrivacySettingsAction;
-use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
-use Relaticle\EmailIntegration\Models\EmailBlocklist;
 
 mutates(UserEmailPrivacyPage::class, UserEmailPrivacySettings::class, UpdateUserEmailPrivacySettingsAction::class);
 
@@ -41,61 +39,12 @@ it('persists the user default sharing tier when a member saves their preference'
     expect($member->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-it('shows existing blocked addresses and domains as separate tag inputs', function (): void {
-    $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-
-    EmailBlocklist::factory()->create([
-        'user_id' => $this->owner->id,
-        'team_id' => $this->team->id,
-        'type' => EmailBlocklistType::EMAIL,
-        'value' => 'noisy@example.com',
-    ]);
-
-    EmailBlocklist::factory()->create([
-        'user_id' => $this->owner->id,
-        'team_id' => $this->team->id,
-        'type' => EmailBlocklistType::DOMAIN,
-        'value' => 'spammy.com',
-    ]);
-
-    livewire(UserEmailPrivacySettings::class)
-        ->assertSet('data.blocklist_emails', ['noisy@example.com'])
-        ->assertSet('data.blocklist_domains', ['spammy.com']);
-});
-
-it('renders the sharing cards and separate blocklist tag inputs', function (): void {
+it('renders the sharing cards without blocklist controls', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->team);
 
     livewire(UserEmailPrivacySettings::class)
         ->assertSee('Use workspace default')
-        ->assertSee('Blocked addresses')
-        ->assertSee('Emails involving these addresses are hidden from your view.')
-        ->assertSee('Blocked domains')
-        ->assertSee('Emails involving any address at these domains are hidden from your view.');
-});
-
-it('saves addresses and domains from the separate tag inputs', function (): void {
-    $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-
-    livewire(UserEmailPrivacySettings::class)
-        ->set('data.blocklist_emails', ['NOISY@Example.com'])
-        ->set('data.blocklist_domains', ['Spammy.com'])
-        ->call('save');
-
-    $this->assertDatabaseHas(EmailBlocklist::class, [
-        'user_id' => $this->owner->id,
-        'team_id' => $this->team->id,
-        'type' => EmailBlocklistType::EMAIL->value,
-        'value' => 'noisy@example.com',
-    ]);
-
-    $this->assertDatabaseHas(EmailBlocklist::class, [
-        'user_id' => $this->owner->id,
-        'team_id' => $this->team->id,
-        'type' => EmailBlocklistType::DOMAIN->value,
-        'value' => 'spammy.com',
-    ]);
+        ->assertDontSee('Blocked addresses')
+        ->assertDontSee('Blocked domains');
 });

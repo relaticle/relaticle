@@ -15,6 +15,19 @@ final readonly class EmailPolicy
 {
     public function __construct(private PrivacyService $privacyService) {}
 
+    /**
+     * Tenant isolation for every instance ability. Return null so viewAny (class
+     * argument) and same-team viewers still reach the method.
+     */
+    public function before(User $user, string $ability, mixed $email = null): ?bool
+    {
+        if (! $email instanceof Email) {
+            return null;
+        }
+
+        return $user->belongsToTeamId($email->team_id) ? null : false;
+    }
+
     public function viewAny(User $user): bool
     {
         if (! Feature::active(EmailIntegration::class)) {

@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 
 final readonly class CancelEmailAccessRequestAction
 {
@@ -18,6 +19,8 @@ final readonly class CancelEmailAccessRequestAction
         if ($accessRequest->status !== EmailAccessRequestStatus::PENDING) {
             return;
         }
+
+        EmailAccessRequestedNotification::dismissFor($accessRequest);
 
         $accessRequest->delete();
     }

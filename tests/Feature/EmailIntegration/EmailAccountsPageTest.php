@@ -32,10 +32,10 @@ beforeEach(function (): void {
     ]));
 });
 
-it('links editSettings to the per-account settings page', function (): void {
+it('links accountSettings to the per-account settings page', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertActionHasUrl(
-            TestAction::make('editSettings')->arguments(['account_id' => $this->account->id]),
+            TestAction::make('accountSettings')->arguments(['account_id' => $this->account->id]),
             EmailAccountSettingsPage::getUrl(['account' => $this->account->id]),
         );
 });

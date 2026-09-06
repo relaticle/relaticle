@@ -29,7 +29,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 
 use function Pest\Laravel\actingAs;
@@ -54,6 +54,19 @@ it('opens via the composer:open event with the default account preselected', fun
         ->dispatch('composer:open')
         ->assertSet('isOpen', true)
         ->assertSet('accountId', $this->account->id);
+});
+
+it('puts merge tags last on the message toolbar instead of the footer', function (): void {
+    $html = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->html();
+
+    expect($html)
+        ->toContain("togglePanel('mergeTags')")
+        ->not->toContain(__('filament/emails/composer.actions.variable'));
+
+    expect(strpos($html, "togglePanel('mergeTags')"))
+        ->toBeGreaterThan(strpos($html, 'redo().run()'));
 });
 
 it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
@@ -520,7 +533,7 @@ it('excludes a teammate\'s private mail recipients from recipient suggestions', 
 it('excludes protected-recipient addresses from recipient suggestions', function (): void {
     $address = 'vip@protected.example';
 
-    ProtectedRecipient::factory()->email($address)->create([
+    TeamEmailBlocklist::factory()->protected()->email($address)->create([
         'team_id' => $this->user->current_team_id,
         'created_by' => $this->user->id,
     ]);
@@ -545,7 +558,7 @@ it('excludes a teammate\'s internal mail recipients from recipient suggestions',
 });
 
 it('includes recipients from a teammate\'s workspace-visible mail in recipient suggestions', function (): void {
-    $address = 'shared-to@example.com';
+    $address = 'shared-to@acme.test';
     teammateSentEmail($this->user, EmailPrivacyTier::METADATA_ONLY, $address, EmailParticipantRole::TO);
 
     expect(composerRecipientSuggestions())->toContain($address);
