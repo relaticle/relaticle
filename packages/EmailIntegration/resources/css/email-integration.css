@@ -261,15 +261,6 @@
     @apply min-w-5 px-1.5 py-0.5;
 }
 
-/* ── Record mailbox list: opening overlay ──────────────────────────────────
-   Livewire 4 marks the clicked row button with `data-loading` for the round
-   trip that mounts the reader. Show a spinner over that row so the click is
-   not silent until the overlay arrives. */
-.ei-email-list-row[data-loading] .ei-email-list-row-opening,
-.ei-email-list-row:has([data-loading]) .ei-email-list-row-opening {
-    display: flex;
-}
-
 .ei-emails-relation-manager .fi-ta-row[data-loading] {
     cursor: wait;
     opacity: 0.6;
