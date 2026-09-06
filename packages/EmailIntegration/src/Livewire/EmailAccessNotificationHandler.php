@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Livewire;
 use App\Models\User;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\View\View;
@@ -15,15 +16,18 @@ use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use RuntimeException;
 
 /**
- * Panel-wide handler so the Emails-tab reader overlay can open from the bell on
- * any page. It is the same `selectedEmailId` overlay as the person Emails tab,
- * not a Filament ViewAction modal.
+ * Panel-wide handler for notification clicks: the Emails-tab reader overlay
+ * from the bell, and Undo on the queued-send toast. It is the same
+ * `selectedEmailId` overlay as the person Emails tab, not a Filament
+ * ViewAction modal.
  *
  * @property-read Email|null $selectedEmail
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
@@ -108,6 +112,36 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     public function denyFromNotification(string $requestId): void
     {
         $this->decideOwnedReaderAccessRequest($requestId, approve: false);
+    }
+
+    #[On('undo-queued-send')]
+    public function undoQueuedSend(string $emailId): void
+    {
+        $user = $this->authUser();
+
+        $email = Email::query()
+            ->whereKey($emailId)
+            ->where('user_id', $user->getKey())
+            ->where('team_id', $user->current_team_id)
+            ->first();
+
+        if (! $email instanceof Email) {
+            return;
+        }
+
+        try {
+            resolve(CancelQueuedEmailAction::class)->execute($email);
+            $this->dispatch('outbox:changed');
+            Notification::make()
+                ->title(__('filament/concerns/email-compose.notifications.cancelled.title'))
+                ->success()
+                ->send();
+        } catch (RuntimeException) {
+            Notification::make()
+                ->title(__('filament/concerns/email-compose.notifications.too_late.title'))
+                ->danger()
+                ->send();
+        }
     }
 
     protected function afterOwnedReaderAccessRequestDecided(bool $approved): void

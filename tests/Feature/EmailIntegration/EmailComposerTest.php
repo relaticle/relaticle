@@ -22,6 +22,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -31,10 +32,11 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -246,6 +248,31 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         // Interactive sends must keep the priority queue's undo-send window
         // (EmailPriority::PRIORITY), not fall back to the bulk default.
         ->and($email->scheduled_for)->not->toBeNull();
+});
+
+it('offers undo on the queued toast for the undo window', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Undo me')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Undo me')->sole();
+    $notification = collect(session('filament.claimed_notifications'))
+        ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
+
+    expect($notification)->not->toBeNull()
+        ->and($notification['duration'])->toBe(5_000)
+        ->and(collect($notification['actions'])->pluck('name')->all())->toContain('undo');
+
+    expect(collect($notification['actions'])->firstWhere('name', 'undo'))
+        ->toMatchArray([
+            'label' => __('filament/concerns/email-compose.actions.undo.label'),
+            'event' => 'undo-queued-send',
+            'eventData' => ['emailId' => (string) $email->getKey()],
+            'dispatchToComponent' => EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+        ]);
 });
 
 it('includes the default signature content in the sent body_html', function (): void {

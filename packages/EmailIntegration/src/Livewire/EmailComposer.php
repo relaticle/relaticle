@@ -57,6 +57,7 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 /**
  * @property-read Action $createSignatureAction
@@ -425,7 +426,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachmentPaths = [...$pendingPaths, ...$copiedPaths];
         $attachmentNames = [...$pendingNames, ...$copiedNames];
 
-        resolve(SendEmailAction::class)->execute([
+        $email = resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
             'subject' => $renderer->renderContent((string) $this->subject),
             'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
@@ -453,10 +454,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
         }
 
-        Notification::make()
-            ->success()
-            ->title(__('filament/emails/composer.notifications.queued.title'))
-            ->send();
+        resolve(QueuedSendNotifier::class)->send($email);
 
         $this->closeComposer();
         $this->dispatch('composer:sent');
