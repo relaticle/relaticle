@@ -132,7 +132,7 @@ final readonly class ProposalFieldSchemaDescriber
         return $field->type === CustomFieldType::FILE_UPLOAD->value
             || $dataType === FieldDataType::FILE
             || $field->type === CustomFieldType::RECORD->value
-            || $field->lookup_type !== null;
+            || $field->relationshipDefinition() !== null;
     }
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string

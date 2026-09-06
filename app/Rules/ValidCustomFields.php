@@ -101,7 +101,8 @@ final readonly class ValidCustomFields implements ValidationRule
      *
      * For single-choice fields (select, radio): validates the scalar value.
      * For multi-choice fields (multi_select, checkbox_list): validates each array element.
-     * Skips fields that accept arbitrary values (e.g., tags) or use a lookup_type.
+     * Skips fields that accept arbitrary values (e.g., tags) and record fields, whose
+     * payload holds target record ids rather than option ids.
      *
      * @param  array<string, array<int, mixed>>  $rules
      */
@@ -121,7 +122,7 @@ final readonly class ValidCustomFields implements ValidationRule
             return;
         }
 
-        if ($customField->lookup_type !== null) {
+        if ($customField->relationshipDefinition() !== null) {
             return;
         }
 

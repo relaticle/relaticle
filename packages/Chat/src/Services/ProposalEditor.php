@@ -194,7 +194,7 @@ final readonly class ProposalEditor
             if ($dataType === null
                 || ! $dataType->isChoiceField()
                 || $typeData->acceptsArbitraryValues
-                || $field->lookup_type !== null) {
+                || $field->relationshipDefinition() !== null) {
                 $converted[$code] = $value;
 
                 continue;

@@ -117,7 +117,7 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
-            if ($typeData->acceptsArbitraryValues || $field->lookup_type !== null) {
+            if ($typeData->acceptsArbitraryValues || $field->relationshipDefinition() !== null) {
                 $clean[$code] = $value;
 
                 continue;
