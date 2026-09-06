@@ -6,6 +6,7 @@ namespace App\Actions\Crm;
 
 use App\Actions\Opportunity\AggregateOpportunities;
 use App\Enums\CrmEntity;
+use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\Note;
@@ -65,12 +66,85 @@ final readonly class GetCrmSummary
                     'total' => $opportunities['total_count'],
                     'by_stage' => $byStage,
                     'total_pipeline_value' => $opportunities['total_amount'],
+                    ...$this->outcomeValues($teamId),
                     'truncated' => $opportunities['truncated'],
                 ],
                 'tasks' => $this->taskSummary($teamId, $today->clone()->utc(), $today->clone()->addDays(7)->utc()),
                 'notes' => ['total' => Note::query()->where('team_id', $teamId)->count()],
             ];
         });
+    }
+
+    /**
+     * Amount closed, split by how the stage ended: won is a completed stage option,
+     * lost a cancelled one. Reporting on the category is what makes the figure survive
+     * a renamed or translated stage.
+     *
+     * @return array{total_won_value: float, total_lost_value: float}
+     */
+    private function outcomeValues(string $teamId): array
+    {
+        $fields = $this->opportunityFieldMetadata($teamId);
+        $wonOptionIds = OptionsInCategory::ids($fields['stage_field_id'], OptionCategory::Completed);
+        $lostOptionIds = OptionsInCategory::ids($fields['stage_field_id'], OptionCategory::Cancelled);
+        $closedOptionIds = [...$wonOptionIds, ...$lostOptionIds];
+
+        if ($fields['amount_field_id'] === null || $closedOptionIds === []) {
+            return ['total_won_value' => 0.0, 'total_lost_value' => 0.0];
+        }
+
+        $rows = DB::table('opportunities as opp')
+            ->join('custom_field_values as stage_cfv', function (JoinClause $join) use ($fields): void {
+                $join->on('stage_cfv.entity_id', '=', 'opp.id')
+                    ->where('stage_cfv.entity_type', 'opportunity')
+                    ->where('stage_cfv.custom_field_id', $fields['stage_field_id']);
+            })
+            ->leftJoin('custom_field_values as amount_cfv', function (JoinClause $join) use ($fields): void {
+                $join->on('amount_cfv.entity_id', '=', 'opp.id')
+                    ->where('amount_cfv.entity_type', 'opportunity')
+                    ->where('amount_cfv.custom_field_id', $fields['amount_field_id']);
+            })
+            ->where('opp.team_id', $teamId)
+            ->whereNull('opp.deleted_at')
+            ->whereIn('stage_cfv.string_value', $closedOptionIds)
+            ->groupBy('stage_cfv.string_value')
+            ->selectRaw('stage_cfv.string_value as stage_option_id, COALESCE(SUM(amount_cfv.float_value), 0) as total_amount')
+            ->get();
+
+        $won = 0.0;
+        $lost = 0.0;
+
+        foreach ($rows as $row) {
+            if (in_array((string) $row->stage_option_id, $wonOptionIds, true)) {
+                $won += (float) $row->total_amount;
+
+                continue;
+            }
+
+            $lost += (float) $row->total_amount;
+        }
+
+        return ['total_won_value' => $won, 'total_lost_value' => $lost];
+    }
+
+    /** @return array{stage_field_id: ?string, amount_field_id: ?string} */
+    private function opportunityFieldMetadata(string $teamId): array
+    {
+        $row = DB::table('custom_fields as field')
+            ->where('field.tenant_id', $teamId)
+            ->where('field.entity_type', 'opportunity')
+            ->where('field.active', true)
+            ->whereIn('field.code', [OpportunityField::STAGE->value, OpportunityField::AMOUNT->value])
+            ->selectRaw(implode(', ', [
+                'MAX(CASE WHEN field.code = ? THEN field.id END) AS stage_field_id',
+                'MAX(CASE WHEN field.code = ? THEN field.id END) AS amount_field_id',
+            ]), [OpportunityField::STAGE->value, OpportunityField::AMOUNT->value])
+            ->first();
+
+        return [
+            'stage_field_id' => $row?->stage_field_id !== null ? (string) $row->stage_field_id : null,
+            'amount_field_id' => $row?->amount_field_id !== null ? (string) $row->amount_field_id : null,
+        ];
     }
 
     /** @return array{total: int, overdue: int, due_this_week: int} */
