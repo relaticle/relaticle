@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class CompleteTask
@@ -32,15 +33,15 @@ final readonly class CompleteTask
                 ->where('code', TaskField::STATUS)
                 ->first();
 
-            $done = $status?->options->firstWhere('name', 'Done');
+            $completed = $status?->optionsInCategory(OptionCategory::Completed)->first();
 
             abort_unless(
-                $status instanceof CustomField && $done instanceof CustomFieldOption,
+                $status instanceof CustomField && $completed instanceof CustomFieldOption,
                 422,
-                __('This workspace has no Done task status.'),
+                __('This workspace has no completed task status.'),
             );
 
-            $task->saveCustomFieldValue($status, $done->getKey());
+            $task->saveCustomFieldValue($status, $completed->getKey());
         } finally {
             TenantContextService::setTenantId($previousTenantId);
         }

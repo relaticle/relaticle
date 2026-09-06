@@ -10,11 +10,13 @@ use App\Data\DigestTeamSection;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\OptionsInCategory;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 final readonly class DigestService
 {
@@ -57,14 +59,14 @@ final readonly class DigestService
             ->whereNull('t.deleted_at')
             ->whereNotNull('due.datetime_value')
             ->where('due.datetime_value', '<', $windowEnd)
-            ->when($meta['done_option_id'] !== null, function (Builder $query) use ($meta): void {
+            ->when($meta['completed_option_ids'] !== [], function (Builder $query) use ($meta): void {
                 $query->whereNotExists(function (Builder $sub) use ($meta): void {
                     $sub->select(DB::raw(1))
                         ->from('custom_field_values as st')
                         ->whereColumn('st.entity_id', 't.id')
                         ->where('st.entity_type', 'task')
                         ->where('st.custom_field_id', $meta['status_field_id'])
-                        ->where('st.string_value', $meta['done_option_id']);
+                        ->whereIn('st.string_value', $meta['completed_option_ids']);
                 });
             })
             ->orderBy('due.datetime_value')
@@ -99,29 +101,26 @@ final readonly class DigestService
     }
 
     /**
-     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string}
+     * @return array{due_field_id: ?string, status_field_id: ?string, completed_option_ids: list<string>}
      */
     private function resolveFieldMetadata(Team $team): array
     {
         $row = DB::table('custom_fields as cf')
-            ->leftJoin('custom_field_options as opt', function (JoinClause $join): void {
-                $join->on('opt.custom_field_id', '=', 'cf.id')
-                    ->where('opt.name', '=', 'Done');
-            })
             ->where('cf.tenant_id', $team->getKey())
             ->where('cf.entity_type', 'task')
             ->whereIn('cf.code', ['due_date', 'status'])
             ->selectRaw(implode(', ', [
                 "MAX(CASE WHEN cf.code = 'due_date' THEN cf.id END) AS due_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
-                "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
             ]))
             ->first();
 
+        $statusFieldId = $row?->status_field_id !== null ? (string) $row->status_field_id : null;
+
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
-            'status_field_id' => $row?->status_field_id !== null ? (string) $row->status_field_id : null,
-            'done_option_id' => $row?->done_option_id !== null ? (string) $row->done_option_id : null,
+            'status_field_id' => $statusFieldId,
+            'completed_option_ids' => OptionsInCategory::ids($statusFieldId, OptionCategory::Completed),
         ];
     }
 }

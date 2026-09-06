@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -25,14 +26,15 @@ function digestDueField(string $teamId): string
 }
 
 /** @return array{0: string, 1: string} */
-function digestStatusDoneOption(string $teamId): array
+function digestStatusCompletedOption(string $teamId): array
 {
     $field = DB::table('custom_fields')->where('tenant_id', $teamId)
         ->where('entity_type', 'task')->where('code', 'status')->first();
     $fieldId = trim((string) $field->id);
-    $done = DB::table('custom_field_options')->where('custom_field_id', $fieldId)->where('name', 'Done')->first();
+    $completed = DB::table('custom_field_options')->where('custom_field_id', $fieldId)
+        ->where('settings->category', OptionCategory::Completed->value)->first();
 
-    return [$fieldId, trim((string) $done->id)];
+    return [$fieldId, trim((string) $completed->id)];
 }
 
 function digestSetDue(Task $task, string $fieldId, DateTimeInterface $dueAt): void
@@ -87,7 +89,7 @@ it('excludes done tasks and tasks without a due date', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->currentTeam;
     $field = digestDueField($team->id);
-    [$statusField, $doneOption] = digestStatusDoneOption($team->id);
+    [$statusField, $doneOption] = digestStatusCompletedOption($team->id);
 
     $done = Task::factory()->for($team)->create(['title' => 'done']);
     $done->assignees()->attach($user);
@@ -142,4 +144,27 @@ it('computes the digest window in the recipient timezone, not the app timezone',
 
     expect($payload->taskCount())->toBe(1)
         ->and(collect($payload->teams[0]->upcoming)->pluck('title')->all())->toBe(['tokyo_evening']);
+});
+
+it('excludes a task whose completed status option was renamed', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $field = digestDueField($team->id);
+    [$statusField, $completedOption] = digestStatusCompletedOption($team->id);
+
+    DB::table('custom_field_options')->where('id', $completedOption)->update(['name' => 'Shipped']);
+
+    $shipped = Task::factory()->for($team)->create(['title' => 'shipped']);
+    $shipped->assignees()->attach($user);
+    digestSetDue($shipped, $field, now()->subHour());
+    digestSetStatus($shipped, $statusField, $completedOption);
+
+    $open = Task::factory()->for($team)->create(['title' => 'open']);
+    $open->assignees()->attach($user);
+    digestSetDue($open, $field, now()->subDay());
+
+    $payload = resolve(DigestService::class)->forUser($user);
+
+    expect($payload->taskCount())->toBe(1)
+        ->and(collect($payload->teams[0]->overdue)->pluck('title')->all())->toBe(['open']);
 });

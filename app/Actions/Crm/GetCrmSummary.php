@@ -12,6 +12,7 @@ use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\OptionsInCategory;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
@@ -19,6 +20,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 final readonly class GetCrmSummary
 {
@@ -90,14 +92,14 @@ final readonly class GetCrmSummary
             })
             ->where('task.team_id', $teamId)
             ->whereNull('task.deleted_at')
-            ->when($fields['done_option_id'] !== null, function (QueryBuilder $query) use ($fields): void {
+            ->when($fields['completed_option_ids'] !== [], function (QueryBuilder $query) use ($fields): void {
                 $query->whereNotExists(function (QueryBuilder $status) use ($fields): void {
                     $status->select(DB::raw(1))
                         ->from('custom_field_values as status_cfv')
                         ->whereColumn('status_cfv.entity_id', 'task.id')
                         ->where('status_cfv.entity_type', 'task')
                         ->where('status_cfv.custom_field_id', $fields['status_field_id'])
-                        ->where('status_cfv.string_value', $fields['done_option_id']);
+                        ->whereIn('status_cfv.string_value', $fields['completed_option_ids']);
                 });
             })
             ->selectRaw(
@@ -114,14 +116,10 @@ final readonly class GetCrmSummary
         ];
     }
 
-    /** @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string} */
+    /** @return array{due_field_id: ?string, status_field_id: ?string, completed_option_ids: list<string>} */
     private function taskFieldMetadata(string $teamId): array
     {
         $row = DB::table('custom_fields as field')
-            ->leftJoin('custom_field_options as option', function (JoinClause $join): void {
-                $join->on('option.custom_field_id', '=', 'field.id')
-                    ->where('option.name', 'Done');
-            })
             ->where('field.tenant_id', $teamId)
             ->where('field.entity_type', 'task')
             ->where('field.active', true)
@@ -129,14 +127,15 @@ final readonly class GetCrmSummary
             ->selectRaw(implode(', ', [
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS due_field_id',
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS status_field_id',
-                'MAX(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
-            ]), [TaskField::DUE_DATE->value, TaskField::STATUS->value, TaskField::STATUS->value])
+            ]), [TaskField::DUE_DATE->value, TaskField::STATUS->value])
             ->first();
+
+        $statusFieldId = $row?->status_field_id !== null ? (string) $row->status_field_id : null;
 
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
-            'status_field_id' => $row?->status_field_id !== null ? (string) $row->status_field_id : null,
-            'done_option_id' => $row?->done_option_id !== null ? (string) $row->done_option_id : null,
+            'status_field_id' => $statusFieldId,
+            'completed_option_ids' => OptionsInCategory::ids($statusFieldId, OptionCategory::Completed),
         ];
     }
 }

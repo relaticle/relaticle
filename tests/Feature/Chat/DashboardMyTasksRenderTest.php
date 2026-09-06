@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 mutates(CompleteTask::class, Dashboard::class, NotifyTaskAssignees::class);
 
@@ -225,4 +226,57 @@ it('writes the Done option of the task team, not the ambient tenant, when the us
 
     expect($written->tenant_id)->toBe($other->currentTeam->getKey())
         ->and($written->string_value)->toBe($doneOfTaskTeam);
+});
+
+it('completes a task through a renamed completed status option', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task->assignees()->attach($user);
+
+    $completedId = trim((string) DB::table('custom_field_options as o')
+        ->join('custom_fields as f', 'f.id', '=', 'o.custom_field_id')
+        ->where('f.tenant_id', $team->id)
+        ->where('f.entity_type', 'task')
+        ->where('f.code', 'status')
+        ->where('o.settings->category', OptionCategory::Completed->value)
+        ->value('o.id'));
+
+    DB::table('custom_field_options')->where('id', $completedId)->update(['name' => 'Shipped']);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    livewire(Dashboard::class)
+        ->assertSee('Ship the widget')
+        ->call('completeTask', $task->id)
+        ->assertDontSee('Ship the widget')
+        ->assertSee(__('filament/pages/dashboard.tasks.empty.title'));
+
+    expect(DB::table('custom_field_values')->where('entity_id', $task->id)->value('string_value'))
+        ->toBe($completedId);
+});
+
+it('hides the completion control when no status option carries the completed category', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task->assignees()->attach($user);
+
+    DB::table('custom_field_options')
+        ->whereIn('custom_field_id', DB::table('custom_fields')
+            ->where('tenant_id', $team->id)
+            ->where('entity_type', 'task')
+            ->where('code', 'status')
+            ->select('id'))
+        ->update(['settings' => json_encode(['color' => null, 'category' => null])]);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    livewire(Dashboard::class)
+        ->assertSee('Ship the widget')
+        ->assertDontSeeHtml('role="checkbox"');
 });

@@ -112,7 +112,7 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
         $team = $user->currentTeam;
 
-        return $team !== null && resolve(MyTasksService::class)->hasDoneOption($team);
+        return $team !== null && resolve(MyTasksService::class)->hasCompletedStatusOption($team);
     }
 
     public function completeTask(string $taskId): void
