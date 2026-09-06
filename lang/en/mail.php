@@ -49,7 +49,7 @@ return [
         'preheader' => 'One step gets :team working: :step',
         'heading' => ':name, :team is still empty',
         'step' => 'Next step: :step.',
-        'cta' => 'Continue in Rela',
+        'cta' => 'Continue in :assistant',
     ],
 
     'task_assigned' => [

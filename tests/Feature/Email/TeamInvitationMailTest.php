@@ -56,7 +56,7 @@ it('mentions the team name and the expires-in phrase when expires_at is set', fu
     $rendered = (new TeamInvitationMail($invitation, $rawToken))->render();
 
     expect($rendered)->toContain('Acme Co')
-        ->and($rendered)->toContain('expires');
+        ->and($rendered)->toContain(__('mail.team_invitation.expiry', ['expiry' => '1 week from now']));
 });
 
 it('omits the expiry phrase when expires_at is null', function (): void {

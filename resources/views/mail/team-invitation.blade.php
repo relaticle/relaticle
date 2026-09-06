@@ -1,3 +1,4 @@
+@use('Carbon\CarbonInterface')
 <x-mail::message :reason="__('mail.footer.reason.invitee', ['email' => $invitation->email, 'team' => $teamName])">
 <x-slot:preheader>{{ __('mail.team_invitation.preheader', ['team' => $teamName, 'role' => $roleName]) }}</x-slot:preheader>
 # {{ __('mail.team_invitation.heading', ['team' => $teamName]) }}
@@ -13,7 +14,7 @@
 </x-mail::button>
 
 @if($invitation->expires_at)
-{{ __('mail.team_invitation.expiry', ['expiry' => $invitation->expires_at->diffForHumans()]) }}
+{{ __('mail.team_invitation.expiry', ['expiry' => $invitation->expires_at->diffForHumans(['options' => CarbonInterface::ROUND])]) }}
 @endif
 
 {{ __('mail.team_invitation.ignore') }}

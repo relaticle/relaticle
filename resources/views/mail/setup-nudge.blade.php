@@ -5,6 +5,6 @@
 {{ __('mail.setup_nudge.step', ['step' => $stepLabel]) }} {{ $stepDescription }}.
 
 <x-mail::button :url="$conversationUrl">
-{{ __('mail.setup_nudge.cta') }}
+{{ __('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]) }}
 </x-mail::button>
 </x-mail::message>
