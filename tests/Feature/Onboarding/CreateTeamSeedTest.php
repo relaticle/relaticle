@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
+use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\CreateTeam;
 use App\Listeners\CreateTeamCustomFields;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -16,7 +19,9 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Pennant\Feature;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
@@ -166,6 +171,85 @@ it('creates all custom fields for the first team', function (): void {
         ->and($fields->get('opportunity'))->toHaveCount(3)
         ->and($fields->get('task'))->toHaveCount(4)
         ->and($fields->get('note'))->toHaveCount(1);
+});
+
+it('categorises every seeded status and stage option', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['product_led'],
+            'name' => 'Categories Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $categories = fn (string $entityType, string $code): array => CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->with(['options' => fn (HasMany $query) => $query->withoutGlobalScopes()])
+        ->firstOrFail()
+        ->options
+        ->mapWithKeys(fn (CustomFieldOption $option): array => [$option->name => $option->settings->category])
+        ->all();
+
+    expect($categories('task', TaskField::STATUS->value))->toBe([
+        'To do' => OptionCategory::Unstarted,
+        'In progress' => OptionCategory::Started,
+        'Done' => OptionCategory::Completed,
+    ])
+        ->and($categories('task', TaskField::PRIORITY->value))->toBe([
+            'Low' => null,
+            'Medium' => null,
+            'High' => null,
+        ])
+        ->and($categories('opportunity', OpportunityField::STAGE->value))->toBe([
+            'Prospecting' => OptionCategory::Unstarted,
+            'Qualification' => OptionCategory::Started,
+            'Needs Analysis' => OptionCategory::Started,
+            'Value Proposition' => OptionCategory::Started,
+            'Id. Decision Makers' => OptionCategory::Started,
+            'Perception Analysis' => OptionCategory::Started,
+            'Proposal/Price Quote' => OptionCategory::Started,
+            'Negotiation/Review' => OptionCategory::Started,
+            'Closed Won' => OptionCategory::Completed,
+            'Closed Lost' => OptionCategory::Cancelled,
+        ]);
+});
+
+it('keeps the seeded option colors alongside the category', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['product_led'],
+            'name' => 'Colors Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $status = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->where('entity_type', 'task')
+        ->where('code', TaskField::STATUS->value)
+        ->with(['options' => fn (HasMany $query) => $query->withoutGlobalScopes()])
+        ->firstOrFail();
+
+    $done = $status->optionsInCategory(OptionCategory::Completed)->sole();
+
+    expect($done->name)->toBe('Done')
+        ->and($done->settings->color)->toBe('#2A9764');
 });
 
 it('seeds people linked to their correct companies for sales', function (): void {

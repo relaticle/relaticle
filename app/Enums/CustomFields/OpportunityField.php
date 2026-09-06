@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 enum OpportunityField: string
 {
@@ -83,6 +84,30 @@ enum OpportunityField: string
                 'Negotiation/Review' => '#f97316',    // Electric Coral - Dynamic energy
                 'Closed Won' => '#059669',            // Victory Emerald - Success celebration
                 'Closed Lost' => '#6b7280',           // Silver Acceptance - Respectful closure
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * Get category mapping for single-choice field options
+     *
+     * @return array<string, OptionCategory>|null Array of option => category mappings or null if not applicable
+     */
+    public function getOptionCategories(): ?array
+    {
+        return match ($this) {
+            self::STAGE => [
+                'Prospecting' => OptionCategory::Unstarted,
+                'Qualification' => OptionCategory::Started,
+                'Needs Analysis' => OptionCategory::Started,
+                'Value Proposition' => OptionCategory::Started,
+                'Id. Decision Makers' => OptionCategory::Started,
+                'Perception Analysis' => OptionCategory::Started,
+                'Proposal/Price Quote' => OptionCategory::Started,
+                'Negotiation/Review' => OptionCategory::Started,
+                'Closed Won' => OptionCategory::Completed,
+                'Closed Lost' => OptionCategory::Cancelled,
             ],
             default => null,
         };

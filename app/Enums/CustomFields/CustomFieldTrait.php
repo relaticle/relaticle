@@ -6,6 +6,7 @@ namespace App\Enums\CustomFields;
 
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 /**
  * Trait for custom field enums to provide configuration data
@@ -92,6 +93,16 @@ trait CustomFieldTrait
      * @return array<int|string, string>|null Array of option => color mappings or null if not applicable
      */
     public function getOptionColors(): ?array
+    {
+        return null;
+    }
+
+    /**
+     * Get category mapping for single-choice field options
+     *
+     * @return array<string, OptionCategory>|null Array of option => category mappings or null if not applicable
+     */
+    public function getOptionCategories(): ?array
     {
         return null;
     }
