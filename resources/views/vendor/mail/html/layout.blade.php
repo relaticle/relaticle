@@ -95,6 +95,10 @@ border-top-color: #3f3f46 !important;
 color: #fafafa !important;
 }
 
+.list-value {
+color: #e4e4e7 !important;
+}
+
 .list-meta {
 color: #a1a1aa !important;
 }
@@ -162,6 +166,10 @@ border-top-color: #3f3f46 !important;
 
 [data-ogsc] .list-title, [data-ogsc] .list-label, [data-ogsc] .list-label a {
 color: #fafafa !important;
+}
+
+[data-ogsc] .list-value {
+color: #e4e4e7 !important;
 }
 
 [data-ogsc] .list-meta, [data-ogsc] .subcopy p {
