@@ -681,16 +681,12 @@ final class ResetDemoAccountCommand extends Command
 
     private function field(Team $team, string $entityType, string $code): CustomField
     {
-        $field = CustomField::query()
+        return CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $team->getKey())
             ->where('entity_type', $entityType)
             ->where('code', $code)
             ->with(['options' => fn (Relation $query): Relation => $query->withoutGlobalScopes()])
             ->firstOrFail();
-
-        throw_unless($field instanceof CustomField, RuntimeException::class, "Custom field {$entityType}.{$code} is missing from the reviewer workspace.");
-
-        return $field;
     }
 }
