@@ -131,6 +131,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'list_activity' => __('Reading recent activity…'),
             'list_team_members' => __('Looking up team members…'),
             'list_custom_fields' => __('Reading custom fields…'),
+            'get_related_records' => __('Following the links between records…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
             'create_company' => __('Drafting a company…'),
