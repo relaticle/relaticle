@@ -20,12 +20,12 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
 use Relaticle\CustomFields\Data\CustomFieldData;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSectionData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\CustomFieldSectionType;
+use Relaticle\CustomFields\Filament\Integration\Migrations\CustomFieldsMigrator;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\OnboardSeed\OnboardSeeder;
@@ -42,7 +42,7 @@ final readonly class CreateTeamCustomFields
     ];
 
     public function __construct(
-        private CustomsFieldsMigrators $migrator,
+        private CustomFieldsMigrator $migrator,
         private OnboardSeeder $onboardSeeder,
     ) {}
 

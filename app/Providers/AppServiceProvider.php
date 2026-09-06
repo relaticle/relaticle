@@ -21,7 +21,9 @@ use App\Livewire\FilamentNotifications;
 use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
@@ -473,6 +475,8 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+        CustomFields::useRelationshipModel(CustomFieldRelationship::class);
+        CustomFields::useLinkModel(CustomFieldLink::class);
 
         // Replaces the package's definitions so custom-field dates read the same as the
         // native columns beside them: `date-time` swaps the table column, which otherwise

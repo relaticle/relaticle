@@ -43,7 +43,7 @@
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
-        "relaticle/custom-fields": "^3.8.0",
+        "relaticle/custom-fields": "dev-feat/4.0",
         "relaticle/flowforge": "^4.0",
         "relaticle/ink": "^2.3",
         "scalar/laravel": "^0.2.0",
@@ -211,5 +211,13 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [{
+        "name": "custom-fields-4x",
+        "type": "path",
+        "url": "/Users/manuk/Herd/custom-fields-4x",
+        "options": {
+            "symlink": true
+        }
+    }]
 }

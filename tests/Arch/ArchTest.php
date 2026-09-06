@@ -299,13 +299,17 @@ arch('must not use custom-fields package models directly')
     ->not
     ->toUse([
         'Relaticle\CustomFields\Models\CustomField',
+        'Relaticle\CustomFields\Models\CustomFieldLink',
         'Relaticle\CustomFields\Models\CustomFieldOption',
+        'Relaticle\CustomFields\Models\CustomFieldRelationship',
         'Relaticle\CustomFields\Models\CustomFieldSection',
         'Relaticle\CustomFields\Models\CustomFieldValue',
     ])
     ->ignoring([
         'App\Models\CustomField',
+        'App\Models\CustomFieldLink',
         'App\Models\CustomFieldOption',
+        'App\Models\CustomFieldRelationship',
         'App\Models\CustomFieldSection',
         'App\Models\CustomFieldValue',
     ]);
