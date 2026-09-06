@@ -10,15 +10,19 @@ use App\Mail\TaskAssignedMail;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\OptionsInCategory;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Services\MyTasksService;
 use Relaticle\CustomFields\Enums\OptionCategory;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(CompleteTask::class, Dashboard::class, NotifyTaskAssignees::class);
+mutates(CompleteTask::class, Dashboard::class, MyTasksService::class, NotifyTaskAssignees::class, OptionsInCategory::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -279,4 +283,146 @@ it('hides the completion control when no status option carries the completed cat
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
         ->assertDontSeeHtml('role="checkbox"');
+});
+
+function taskStatusFieldId(string $teamId): string
+{
+    return trim((string) DB::table('custom_fields')
+        ->where('tenant_id', $teamId)
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->value('id'));
+}
+
+function taskStatusOptionId(string $statusFieldId, ?OptionCategory $category): string
+{
+    return trim((string) DB::table('custom_field_options')
+        ->where('custom_field_id', $statusFieldId)
+        ->where('settings->category', $category?->value)
+        ->value('id'));
+}
+
+function addTaskStatusOption(string $teamId, string $statusFieldId, string $name, OptionCategory $category, int $sortOrder): string
+{
+    $id = (string) Str::ulid();
+
+    DB::table('custom_field_options')->insert([
+        'id' => $id,
+        'tenant_id' => $teamId,
+        'custom_field_id' => $statusFieldId,
+        'name' => $name,
+        'sort_order' => $sortOrder,
+        'settings' => json_encode(['color' => null, 'category' => $category->value]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $id;
+}
+
+function setTaskStatus(Task $task, string $statusFieldId, string $optionId): void
+{
+    CustomFieldValue::query()->create([
+        'id' => (string) Str::ulid(),
+        'entity_type' => 'task',
+        'entity_id' => $task->id,
+        'custom_field_id' => $statusFieldId,
+        'tenant_id' => $task->team_id,
+        'string_value' => $optionId,
+    ]);
+}
+
+it('keeps listing a finished task and warns when no status option is categorised', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $statusFieldId = taskStatusFieldId($team->id);
+    $doneId = taskStatusOptionId($statusFieldId, OptionCategory::Completed);
+
+    DB::table('custom_field_options')
+        ->where('custom_field_id', $statusFieldId)
+        ->update(['settings' => json_encode(['color' => null, 'category' => null])]);
+
+    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task->assignees()->attach($user);
+    setTaskStatus($task, $statusFieldId, $doneId);
+
+    Log::spy();
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    livewire(Dashboard::class)
+        ->assertSee('Ship the widget')
+        ->assertDontSeeHtml('role="checkbox"');
+
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => $context['team_id'] === $team->id
+            && $context['field_code'] === 'status');
+});
+
+it('refuses to complete a task when no status option carries the completed category', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+
+    DB::table('custom_field_options')
+        ->where('custom_field_id', taskStatusFieldId($team->id))
+        ->update(['settings' => json_encode(['color' => null, 'category' => null])]);
+
+    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task->assignees()->attach($user);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    expect(fn () => resolve(CompleteTask::class)->execute($user, $task))
+        ->toThrow(fn (HttpException $e) => expect($e->getStatusCode())->toBe(422));
+});
+
+it('hides a cancelled task from the list without completing it', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $statusFieldId = taskStatusFieldId($team->id);
+    $wontDoId = addTaskStatusOption($team->id, $statusFieldId, "Won't do", OptionCategory::Cancelled, 4);
+
+    $abandoned = Task::factory()->for($team)->create(['title' => 'Abandon the widget']);
+    $abandoned->assignees()->attach($user);
+    setTaskStatus($abandoned, $statusFieldId, $wontDoId);
+
+    $open = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $open->assignees()->attach($user);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    livewire(Dashboard::class)
+        ->assertSee('Ship the widget')
+        ->assertDontSee('Abandon the widget');
+});
+
+it('excludes both completed statuses and completes into the first by sort order', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $statusFieldId = taskStatusFieldId($team->id);
+    $doneId = taskStatusOptionId($statusFieldId, OptionCategory::Completed);
+    $shippedId = addTaskStatusOption($team->id, $statusFieldId, 'Shipped', OptionCategory::Completed, 5);
+
+    $shipped = Task::factory()->for($team)->create(['title' => 'Already shipped']);
+    $shipped->assignees()->attach($user);
+    setTaskStatus($shipped, $statusFieldId, $shippedId);
+
+    $open = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $open->assignees()->attach($user);
+
+    $this->actingAs($user);
+    Filament::setTenant($team);
+
+    livewire(Dashboard::class)
+        ->assertSee('Ship the widget')
+        ->assertDontSee('Already shipped')
+        ->call('completeTask', $open->id)
+        ->assertDontSee('Ship the widget');
+
+    expect(DB::table('custom_field_values')->where('entity_id', $open->id)->value('string_value'))
+        ->toBe($doneId);
 });

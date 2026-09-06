@@ -166,14 +166,14 @@ final readonly class GetCrmSummary
             })
             ->where('task.team_id', $teamId)
             ->whereNull('task.deleted_at')
-            ->when($fields['completed_option_ids'] !== [], function (QueryBuilder $query) use ($fields): void {
+            ->when($fields['terminal_option_ids'] !== [], function (QueryBuilder $query) use ($fields): void {
                 $query->whereNotExists(function (QueryBuilder $status) use ($fields): void {
                     $status->select(DB::raw(1))
                         ->from('custom_field_values as status_cfv')
                         ->whereColumn('status_cfv.entity_id', 'task.id')
                         ->where('status_cfv.entity_type', 'task')
                         ->where('status_cfv.custom_field_id', $fields['status_field_id'])
-                        ->whereIn('status_cfv.string_value', $fields['completed_option_ids']);
+                        ->whereIn('status_cfv.string_value', $fields['terminal_option_ids']);
                 });
             })
             ->selectRaw(
@@ -190,7 +190,7 @@ final readonly class GetCrmSummary
         ];
     }
 
-    /** @return array{due_field_id: ?string, status_field_id: ?string, completed_option_ids: list<string>} */
+    /** @return array{due_field_id: ?string, status_field_id: ?string, terminal_option_ids: list<string>} */
     private function taskFieldMetadata(string $teamId): array
     {
         $row = DB::table('custom_fields as field')
@@ -209,7 +209,7 @@ final readonly class GetCrmSummary
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             'status_field_id' => $statusFieldId,
-            'completed_option_ids' => OptionsInCategory::ids($statusFieldId, OptionCategory::Completed),
+            'terminal_option_ids' => OptionsInCategory::terminalIds($teamId, TaskField::STATUS->value, $statusFieldId),
         ];
     }
 }

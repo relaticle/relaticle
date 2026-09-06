@@ -15,7 +15,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Data\MyTaskItem;
-use Relaticle\CustomFields\Enums\OptionCategory;
 
 final readonly class MyTasksService
 {
@@ -48,14 +47,14 @@ final readonly class MyTasksService
             ->where('t.team_id', $team->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
-            ->when($meta->completedOptionIds !== [], function (Builder $query) use ($meta): void {
+            ->when($meta->terminalOptionIds !== [], function (Builder $query) use ($meta): void {
                 $query->whereNotExists(function (Builder $sub) use ($meta): void {
                     $sub->select(DB::raw(1))
                         ->from('custom_field_values as st')
                         ->whereColumn('st.entity_id', 't.id')
                         ->where('st.entity_type', 'task')
                         ->where('st.custom_field_id', $meta->statusFieldId)
-                        ->whereIn('st.string_value', $meta->completedOptionIds);
+                        ->whereIn('st.string_value', $meta->terminalOptionIds);
                 });
             });
 
@@ -103,18 +102,19 @@ final readonly class MyTasksService
      * Whether the tenant still has a completed status option to complete a task into.
      *
      * Reuses the same memoized lookup as the list query, so the dashboard can hide
-     * a completion control that would fail on every click.
+     * a completion control that would fail on every click: a field with no completed
+     * option carries no terminal ids either.
      */
     public function hasCompletedStatusOption(Team $team): bool
     {
-        return $this->resolveFieldMetadata($team)->completedOptionIds !== [];
+        return $this->resolveFieldMetadata($team)->terminalOptionIds !== [];
     }
 
     /**
      * Resolves the per-tenant custom-field IDs the main query needs.
      *
      * One round-trip pulls both the `due_date` and `status` field IDs, and a second
-     * reads the status options carrying the `completed` category. Memoized on the
+     * reads the status options that close a task. Memoized on the
      * application container so concurrent dashboard renders within the same
      * request reuse the result instead of refiring the lookups each time.
      */
@@ -144,7 +144,7 @@ final readonly class MyTasksService
         $meta = new MyTasksFieldMetadata(
             dueFieldId: $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             statusFieldId: $statusFieldId,
-            completedOptionIds: OptionsInCategory::ids($statusFieldId, OptionCategory::Completed),
+            terminalOptionIds: OptionsInCategory::terminalIds($team->getKey(), 'status', $statusFieldId),
         );
 
         app()->instance($cacheKey, $meta);
@@ -171,10 +171,10 @@ final readonly class MyTasksService
  */
 final readonly class MyTasksFieldMetadata
 {
-    /** @param list<string> $completedOptionIds */
+    /** @param list<string> $terminalOptionIds */
     public function __construct(
         public ?string $dueFieldId,
         public ?string $statusFieldId,
-        public array $completedOptionIds,
+        public array $terminalOptionIds,
     ) {}
 }

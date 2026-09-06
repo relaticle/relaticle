@@ -16,7 +16,6 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Relaticle\CustomFields\Enums\OptionCategory;
 
 final readonly class DigestService
 {
@@ -59,14 +58,14 @@ final readonly class DigestService
             ->whereNull('t.deleted_at')
             ->whereNotNull('due.datetime_value')
             ->where('due.datetime_value', '<', $windowEnd)
-            ->when($meta['completed_option_ids'] !== [], function (Builder $query) use ($meta): void {
+            ->when($meta['terminal_option_ids'] !== [], function (Builder $query) use ($meta): void {
                 $query->whereNotExists(function (Builder $sub) use ($meta): void {
                     $sub->select(DB::raw(1))
                         ->from('custom_field_values as st')
                         ->whereColumn('st.entity_id', 't.id')
                         ->where('st.entity_type', 'task')
                         ->where('st.custom_field_id', $meta['status_field_id'])
-                        ->whereIn('st.string_value', $meta['completed_option_ids']);
+                        ->whereIn('st.string_value', $meta['terminal_option_ids']);
                 });
             })
             ->orderBy('due.datetime_value')
@@ -101,7 +100,7 @@ final readonly class DigestService
     }
 
     /**
-     * @return array{due_field_id: ?string, status_field_id: ?string, completed_option_ids: list<string>}
+     * @return array{due_field_id: ?string, status_field_id: ?string, terminal_option_ids: list<string>}
      */
     private function resolveFieldMetadata(Team $team): array
     {
@@ -120,7 +119,7 @@ final readonly class DigestService
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
             'status_field_id' => $statusFieldId,
-            'completed_option_ids' => OptionsInCategory::ids($statusFieldId, OptionCategory::Completed),
+            'terminal_option_ids' => OptionsInCategory::terminalIds($team->getKey(), 'status', $statusFieldId),
         ];
     }
 }

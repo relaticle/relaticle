@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Enums\OptionCategory;
 
+mutates(DigestService::class);
+
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 });
@@ -158,6 +160,39 @@ it('excludes a task whose completed status option was renamed', function (): voi
     $shipped->assignees()->attach($user);
     digestSetDue($shipped, $field, now()->subHour());
     digestSetStatus($shipped, $statusField, $completedOption);
+
+    $open = Task::factory()->for($team)->create(['title' => 'open']);
+    $open->assignees()->attach($user);
+    digestSetDue($open, $field, now()->subDay());
+
+    $payload = resolve(DigestService::class)->forUser($user);
+
+    expect($payload->taskCount())->toBe(1)
+        ->and(collect($payload->teams[0]->overdue)->pluck('title')->all())->toBe(['open']);
+});
+
+it('excludes a task parked in a cancelled status', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $team = $user->currentTeam;
+    $field = digestDueField($team->id);
+    [$statusField] = digestStatusCompletedOption($team->id);
+
+    $wontDo = (string) Str::ulid();
+    DB::table('custom_field_options')->insert([
+        'id' => $wontDo,
+        'tenant_id' => $team->id,
+        'custom_field_id' => $statusField,
+        'name' => "Won't do",
+        'sort_order' => 4,
+        'settings' => json_encode(['color' => null, 'category' => OptionCategory::Cancelled->value]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $abandoned = Task::factory()->for($team)->create(['title' => 'abandoned']);
+    $abandoned->assignees()->attach($user);
+    digestSetDue($abandoned, $field, now()->subHour());
+    digestSetStatus($abandoned, $statusField, $wontDo);
 
     $open = Task::factory()->for($team)->create(['title' => 'open']);
     $open->assignees()->attach($user);
