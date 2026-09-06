@@ -118,9 +118,16 @@ img {
 }
 
 .logo {
+    display: block;
     height: 45px;
     max-height: 45px;
     width: 140px;
+}
+
+.logo-pill {
+    background-color: #f4f4f5;
+    border-radius: 8px;
+    padding: 6px 12px;
 }
 
 /* Preheader */
@@ -235,6 +242,11 @@ img {
     text-align: start;
     width: 100%;
     float: unset;
+}
+
+.button-wrap {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
 }
 
 .button {

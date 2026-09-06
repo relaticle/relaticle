@@ -26,7 +26,14 @@ padding: 24px !important;
 }
 
 @media only screen and (max-width: 500px) {
+.button-wrap {
+width: 100% !important;
+}
+
 .button {
+box-sizing: border-box !important;
+display: block !important;
+text-align: center !important;
 width: 100% !important;
 }
 }
@@ -49,6 +56,10 @@ border-color: #18181b !important;
 .inner-body {
 background-color: #27272a !important;
 border-color: #3f3f46 !important;
+}
+
+.logo-pill {
+background-color: #fafafa !important;
 }
 
 h1, h2, h3 {
@@ -128,6 +139,10 @@ border-color: #18181b !important;
 [data-ogsc] .inner-body {
 background-color: #27272a !important;
 border-color: #3f3f46 !important;
+}
+
+[data-ogsc] .logo-pill {
+background-color: #fafafa !important;
 }
 
 [data-ogsc] h1, [data-ogsc] h2, [data-ogsc] h3 {
