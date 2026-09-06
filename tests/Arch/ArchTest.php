@@ -124,6 +124,9 @@ arch('avoid mutation')
         // RequestActivityBatch above: mutable by design, reset per request/job
         // via the scoped container binding in AppServiceProvider.
         'App\Services\WorkspaceActivationFacts',
+        // Holds the actor a write names for itself, put back by the caller's finally
+        // block. Same shape again: a scoped holder, not a service.
+        'App\Support\LinkActorResolver',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
