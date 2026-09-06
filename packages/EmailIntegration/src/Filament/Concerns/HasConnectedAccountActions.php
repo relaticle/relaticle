@@ -56,8 +56,8 @@ trait HasConnectedAccountActions
      * Native Filament dropdown grouping the per-account actions. Arguments are baked onto
      * each child action so the group can be rendered once per account in the blade.
      *
-     * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
-     * @param  bool  $includeSettings  whether to show the Settings link (hidden on the settings page itself)
+     * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect Mailbox
+     * @param  bool  $includeSettings  whether to show Manage (hidden on the settings page itself)
      */
     public function accountActions(string $accountId, array $extraActions = [], bool $includeSettings = true): ActionGroup
     {
@@ -71,11 +71,7 @@ trait HasConnectedAccountActions
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
             ...$settingsAction,
-            ($this->setDefaultAction())($arguments),
             ($this->reconnectAction())($arguments),
-            ($this->syncCalendarNowAction())($arguments),
-            ($this->reimportHistoryAction())($arguments),
-            ($this->syncCalendarAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
             ($this->disconnectAction())($arguments),
         ])
