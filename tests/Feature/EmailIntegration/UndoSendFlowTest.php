@@ -17,7 +17,7 @@ use Relaticle\EmailIntegration\Models\EmailBatch;
 
 mutates(CancelQueuedEmailAction::class, SyncEmailBatchCountersAction::class);
 
-it('cancels a single send within the 30s undo window', function (): void {
+it('cancels a single send within the 5s undo window', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $this->actingAs($user);
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->for($user)->create([
@@ -40,7 +40,7 @@ it('cancels a single send within the 30s undo window', function (): void {
         'in_reply_to_email_id' => null,
     ]);
 
-    expect((int) round(abs($email->scheduled_for?->diffInSeconds(now()) ?? 0.0)))->toBe(30);
+    expect((int) round(abs($email->scheduled_for?->diffInSeconds(now()) ?? 0.0)))->toBe(5);
 
     resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
 

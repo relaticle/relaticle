@@ -22,8 +22,9 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
-mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class);
+mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -107,6 +108,35 @@ it('reply persists a queued Email with REPLY creation_source', function (): void
     expect($reply->status)->toBe(EmailStatus::QUEUED)
         ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id)
         ->and($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id);
+});
+
+it('keeps the undo window when a thread reply is queued from the inbox', function (): void {
+    livewire(EmailInboxPage::class)
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['sender@contact.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Re: Original Subject',
+                'body_html' => '<p>Inbox reply</p>',
+                'in_reply_to_email_id' => $this->inboundEmail->id,
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'reply'],
+        );
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->firstOrFail();
+
+    $notification = collect(session('filament.claimed_notifications'))
+        ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
+
+    expect($reply->scheduled_for)->not->toBeNull()
+        ->and($notification)->not->toBeNull()
+        ->and(collect($notification['actions'])->pluck('name')->all())->toContain('undo');
 });
 
 it('forward persists a queued Email with FORWARD creation_source', function (): void {

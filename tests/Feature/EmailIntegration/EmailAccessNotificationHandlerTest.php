@@ -7,16 +7,18 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 
-mutates(EmailAccessNotificationHandler::class, EmailAccessRequestedNotification::class, RequestEmailAccessAction::class);
+mutates(EmailAccessNotificationHandler::class, EmailAccessRequestedNotification::class, RequestEmailAccessAction::class, CancelQueuedEmailAction::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -275,5 +277,61 @@ describe('EmailAccessNotificationHandler', function (): void {
             ->assertSet('selectedEmailId', $this->email->getKey())
             ->set('selectedEmailId', null)
             ->assertDispatched('composer:dismiss-inline');
+    });
+});
+
+describe('undo queued send', function (): void {
+    it('cancels the sender\'s queued email from the undo toast', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'scheduled_for' => now()->addSeconds(5),
+        ]);
+
+        Livewire::test(EmailAccessNotificationHandler::class)
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
+            ->assertDispatched('outbox:changed');
+
+        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+    });
+
+    it('does not cancel another user\'s queued email from the undo toast', function (): void {
+        $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+        $theirAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ]));
+        $theirs = Email::factory()->outbound()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+            'connected_account_id' => $theirAccount->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'scheduled_for' => now()->addSeconds(5),
+        ]);
+
+        Livewire::test(EmailAccessNotificationHandler::class)
+            ->dispatch('undo-queued-send', emailId: (string) $theirs->getKey())
+            ->assertNotNotified();
+
+        expect($theirs->refresh()->status)->toBe(EmailStatus::QUEUED);
+    });
+
+    it('notifies too late when the queued email has already started sending', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'status' => EmailStatus::SENDING,
+            'scheduled_for' => now()->subSecond(),
+        ]);
+
+        Livewire::test(EmailAccessNotificationHandler::class)
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
+
+        expect($email->refresh()->status)->toBe(EmailStatus::SENDING);
     });
 });
