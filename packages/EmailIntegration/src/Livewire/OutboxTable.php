@@ -92,6 +92,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                     ->schema([
                         DateTimePicker::make('scheduled_for')
                             ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
+                            ->native(false)
                             ->seconds(false)
                             ->minDate(now())
                             ->required(),

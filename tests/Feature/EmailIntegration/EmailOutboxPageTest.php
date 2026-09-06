@@ -68,7 +68,7 @@ it('shows a just-sent email in the queued tab during the undo window', function 
 
     $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
         'subject' => 'Just composed',
-        'scheduled_for' => now()->addSeconds(30),
+        'scheduled_for' => now()->addSeconds(5),
     ]);
 
     livewire(OutboxTable::class)
@@ -82,7 +82,7 @@ it('refreshes the queued list when a send is queued', function (): void {
 
     $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
         'subject' => 'Arrived after render',
-        'scheduled_for' => now()->addSeconds(30),
+        'scheduled_for' => now()->addSeconds(5),
     ]);
 
     $component
@@ -94,8 +94,8 @@ it('keeps a later send on the scheduled tab instead of queued', function (): voi
     $this->travelTo(now()->startOfSecond());
 
     $undoWindow = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
-        'subject' => 'Sending in 30 seconds',
-        'scheduled_for' => now()->addSeconds(30),
+        'subject' => 'Sending in 5 seconds',
+        'scheduled_for' => now()->addSeconds(5),
     ]);
     $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
         'subject' => 'Send tomorrow',
