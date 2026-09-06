@@ -112,7 +112,10 @@ it('skips person creation when contact_creation_mode=None', function (): void {
         'team_id' => $team->id,
         'user_id' => $user->id,
     ]));
-    $team->update(['contact_creation_mode' => ContactCreationMode::None]);
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::None,
+        'auto_create_companies' => true,
+    ]);
 
     $meeting = Meeting::factory()->create([
         'team_id' => $account->team_id,
