@@ -9,14 +9,17 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Support\PlanReference;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -166,7 +169,7 @@ it('links a record through the update tool and its approval', function (): void 
     $company = Company::factory()->for($this->team)->create(['name' => 'Acme Robotics']);
 
     $tool = new UpdatePersonTool;
-    $tool->handle(new Laravel\Ai\Tools\Request([
+    $tool->handle(new Request([
         'records' => [[
             'id' => (string) $person->getKey(),
             'custom_fields' => ['vendors' => [(string) $company->getKey()]],
@@ -188,5 +191,54 @@ it('links a record through the update tool and its approval', function (): void 
     $link = CustomFieldLink::query()->sole();
 
     expect($link->from_entity_id)->toBe($person->getKey())
+        ->and($link->to_entity_id)->toBe($company->getKey());
+});
+
+it('links a person to a company proposed in the same turn, and approves both', function (): void {
+    $field = RecordFieldFixture::record($this->team, 'people', 'company', 'vendors', RelationshipCardinality::ManyToMany);
+    $person = People::factory()->for($this->team)->create(['name' => 'Alice Doe']);
+
+    $conversationId = '019dfa11-6666-7000-8000-000000000001';
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'team_id' => $this->team->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = '01TURNBBBBBBBBBBBBBBBBBBBB';
+
+    $create = new CreateCompanyTool;
+    $create->setConversationId($conversationId);
+    $create->setTurnId($turnId);
+    $create->handle(new Request(['records' => [['name' => 'Acme Robotics']]]));
+
+    $companyStep = PendingAction::query()->where('entity_type', 'company')->latest('id')->firstOrFail();
+
+    $update = new UpdatePersonTool;
+    $update->setConversationId($conversationId);
+    $update->setTurnId($turnId);
+    $update->handle(new Request([
+        'records' => [[
+            'id' => (string) $person->getKey(),
+            'custom_fields' => [$field->code => [PlanReference::to((string) $companyStep->getKey())]],
+        ]],
+    ]));
+
+    $personStep = PendingAction::query()->where('entity_type', 'people')->latest('id')->firstOrFail();
+
+    expect($personStep->display_data['fields'][0]['values'])->toBe(['Acme Robotics (step 1)']);
+
+    $result = resolve(ProposalPlanService::class)->approveAll($companyStep, $this->user);
+
+    $company = Company::query()->where('name', 'Acme Robotics')->sole();
+    $link = CustomFieldLink::query()->sole();
+
+    expect($result['failed'])->toBeNull()
+        ->and($result['approved'])->toBe(2)
+        ->and($link->from_entity_id)->toBe($person->getKey())
         ->and($link->to_entity_id)->toBe($company->getKey());
 });

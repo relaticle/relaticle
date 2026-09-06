@@ -127,6 +127,9 @@ arch('avoid mutation')
         // Holds the actor a write names for itself, put back by the caller's finally
         // block. Same shape again: a scoped holder, not a service.
         'App\Support\LinkActorResolver',
+        // Remembers which fields of an entity read the link ledger, for the lifetime of
+        // one request: a lookup cache, not a service.
+        'App\Support\RecordLinkFields',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
