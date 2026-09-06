@@ -47,7 +47,7 @@ final class SearchTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and searchable custom-field values). Max 255 chars.')->required(),
+            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and searchable custom-field values). Fields that link records are not searched here: filter a list tool by the link field instead, which matches the linked record by name. Max 255 chars.')->required(),
             'limit' => $schema->integer()->description('Max results per entity (default 5, max 20). Total payload up to 5×limit across companies, people, opportunities, tasks, and notes.')->default(5),
         ];
     }
@@ -59,6 +59,24 @@ final class SearchTool extends Tool
             'count' => $schema->integer()->required(),
             'truncated' => $schema->object()->required(),
         ];
+    }
+
+    /**
+     * A field that links records keeps its targets in the edge ledger, and what a value
+     * row would hold there is a record id, which no one searches for by typing it. The
+     * field is left out by its definition rather than by its type key: two field types
+     * link records, and a check on one of them would miss the other.
+     */
+    private function relationshipSlot(QueryBuilder $query): QueryBuilder
+    {
+        $table = (string) config('custom-fields.database.table_names.custom_field_relationships');
+
+        return $query->selectRaw('1')
+            ->from($table)
+            ->where(function (QueryBuilder $slot) use ($table): void {
+                $slot->whereColumn("{$table}.from_field_id", 'cf.id')
+                    ->orWhereColumn("{$table}.to_field_id", 'cf.id');
+            });
     }
 
     public function handle(Request $request): Response|ResponseFactory
@@ -109,6 +127,7 @@ final class SearchTool extends Tool
                             ->where('cfv.tenant_id', (string) $team->getKey())
                             ->where('cf.active', true)
                             ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
+                            ->whereNotExists(fn (QueryBuilder $slot): QueryBuilder => $this->relationshipSlot($slot))
                             ->where(function (QueryBuilder $values) use ($query): void {
                                 $values->where('cfv.text_value', 'ilike', "%{$query}%")
                                     ->orWhere('cfv.string_value', 'ilike', "%{$query}%")

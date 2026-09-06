@@ -18,7 +18,6 @@ final readonly class CustomFieldFilterSchema
     /** @var array<int, string> */
     private const array EXCLUDED_TYPES = [
         CustomFieldType::FILE_UPLOAD->value,
-        CustomFieldType::RECORD->value,
         CustomFieldType::TEXTAREA->value,
         CustomFieldType::RICH_EDITOR->value,
         CustomFieldType::MARKDOWN_EDITOR->value,
@@ -35,6 +34,9 @@ final readonly class CustomFieldFilterSchema
 
     /** @var array<int, string> */
     private const array MULTI_OPERATORS = ['has_any'];
+
+    /** @var array<int, string> */
+    private const array LINK_OPERATORS = ['eq', 'contains'];
 
     /**
      * @return array<string, array<string, mixed>>
@@ -95,6 +97,12 @@ final readonly class CustomFieldFilterSchema
                 ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
             ),
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            // A link field filters on the records it points at: by id, or by the name of
+            // the record on the other end.
+            CustomFieldType::RECORD, CustomFieldType::RELATIONSHIP => array_merge(
+                self::buildOperators(self::LINK_OPERATORS, 'string'),
+                ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
+            ),
             default => [],
         };
     }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\V1\Concerns;
 
+use App\Support\RecordLinkFields;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Services\Relationships\LinkReader;
 
 trait FormatsCustomFields
 {
@@ -17,7 +19,9 @@ trait FormatsCustomFields
             return new \stdClass;
         }
 
-        $result = $record->getRelation('customFieldValues')
+        $result = $this->formatLinkFields($record);
+
+        $result += $record->getRelation('customFieldValues')
             // Skip orphaned values whose custom field was deleted: the eager-loaded relation is null.
             ->filter(fn (CustomFieldValue $fieldValue): bool => isset($fieldValue->getRelations()['customField']))
             ->mapWithKeys(fn (CustomFieldValue $fieldValue): array => [
@@ -26,6 +30,44 @@ trait FormatsCustomFields
             ->all();
 
         return (object) $result;
+    }
+
+    /**
+     * A field that links records keeps its targets in the edge ledger rather than in a
+     * value row, so it is read from the links and rendered in the shape every other
+     * multi-choice field uses.
+     *
+     * @return array<string, array<int, array{id: string, label: string}>>
+     */
+    private function formatLinkFields(Model $record): array
+    {
+        $tenantId = $record->getAttribute('team_id');
+
+        if (! is_string($tenantId)) {
+            return [];
+        }
+
+        $fields = resolve(RecordLinkFields::class)->forEntity($tenantId, $record->getMorphClass());
+
+        if ($fields === []) {
+            return [];
+        }
+
+        $record->loadMissing(['outgoingLinks', 'incomingLinks']);
+
+        $reader = resolve(LinkReader::class);
+        $formatted = [];
+
+        foreach ($fields as $field) {
+            $definition = $field->relationshipDefinitionOrFail();
+
+            $formatted[$field->code] = array_map(
+                static fn (int|string $id): array => ['id' => (string) $id, 'label' => (string) $id],
+                $reader->orderedIdsFor($record, $definition, $definition->readDirectionFor($field)),
+            );
+        }
+
+        return $formatted;
     }
 
     private function resolveFieldValue(CustomFieldValue $fieldValue): mixed

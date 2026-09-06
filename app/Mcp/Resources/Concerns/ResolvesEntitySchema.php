@@ -11,6 +11,7 @@ use App\Models\CustomFieldOption;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Services\ValidationService;
 
 trait ResolvesEntitySchema
@@ -63,6 +64,14 @@ trait ResolvesEntitySchema
                 'required' => $required,
             ];
 
+            $definition = $field->relationshipDefinition();
+
+            if ($definition instanceof CustomFieldRelationship) {
+                $result[$field->code] = [...$entry, ...$this->linkVocabulary($field, $definition)];
+
+                continue;
+            }
+
             $formatHint = $this->fieldFormatHint($field->type);
 
             if ($formatHint !== null) {
@@ -82,6 +91,41 @@ trait ResolvesEntitySchema
         }
 
         return $result;
+    }
+
+    /**
+     * What a link field points at, said in the relationship's own vocabulary so a client
+     * can reason about both ends: the entity, how many records this side holds, and the
+     * definition the far end reads the same edges through.
+     *
+     * @return array<string, mixed>
+     */
+    private function linkVocabulary(CustomField $field, CustomFieldRelationship $definition): array
+    {
+        $farFieldId = $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+            ? $definition->to_field_id
+            : $definition->from_field_id;
+
+        $farField = $farFieldId === null || (string) $farFieldId === (string) $field->getKey()
+            ? null
+            : CustomField::query()->withoutGlobalScopes()->find($farFieldId);
+
+        return [
+            'input_format' => $field->allowsMultipleRecords()
+                ? 'array of record IDs'
+                : 'array holding at most one record ID',
+            'example' => ['01JJXYZ123ABC456DEF789GHI'],
+            'target_entity' => $definition->targetEntityTypeFor($field),
+            'multiple' => $field->allowsMultipleRecords(),
+            'relationship' => [
+                'code' => $definition->code,
+                'cardinality' => $definition->cardinality->value,
+                'symmetric' => $definition->is_symmetric,
+                'from_entity' => $definition->from_entity_type,
+                'to_entity' => $definition->to_entity_type,
+                'other_end_field' => $farField?->code,
+            ],
+        ];
     }
 
     /**

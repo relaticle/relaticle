@@ -42,6 +42,7 @@ use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
 use App\Support\LinkActorResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
+use App\Support\RecordLinkFields;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
@@ -118,6 +119,10 @@ final class AppServiceProvider extends ServiceProvider
         // Caches creation-source facts per team for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
+
+        // Which custom fields of an entity read the link ledger. Same shape: one lookup
+        // per request rather than one per serialised record.
+        $this->app->scoped(RecordLinkFields::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()

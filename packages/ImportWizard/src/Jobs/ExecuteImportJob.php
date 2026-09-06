@@ -13,7 +13,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
@@ -332,10 +332,9 @@ final class ExecuteImportJob implements ShouldQueue
     /** @return Collection<string, CustomField> */
     private function loadCustomFieldDefinitions(BaseImporter $importer): Collection
     {
-        /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->with(['options' => fn (HasMany $q) => $q->withoutGlobalScopes()])
+            ->with(['options' => fn (Relation $q): Relation => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $importer->entityName())
             ->where('type', '!=', 'record')

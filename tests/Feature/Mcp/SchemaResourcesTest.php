@@ -17,6 +17,9 @@ use App\Models\CustomFieldSection;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
+use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(
     AppServiceProvider::class,
@@ -288,6 +291,29 @@ it('describes tags-input values as arbitrary strings instead of option IDs', fun
         ->resource(CompanySchemaResource::class)
         ->assertOk()
         ->assertSee($expected);
+});
+
+it('publishes the relationship vocabulary of a link field', function (): void {
+    $team = $this->user->personalTeam();
+
+    TenantContextService::setTenantId($team->getKey());
+    RecordFieldFixture::paired($team, 'people', 'company', 'employer', 'staff', RelationshipCardinality::ManyToOne);
+
+    $schema = resolve(PeopleSchemaResource::class)->toSchema($this->user);
+    $field = ((array) $schema['custom_fields'])['employer'];
+
+    expect($field['type'])->toBe('relationship')
+        ->and($field['target_entity'])->toBe('company')
+        ->and($field['multiple'])->toBeFalse()
+        ->and($field['input_format'])->toBe('array holding at most one record ID')
+        ->and($field['relationship'])->toBe([
+            'code' => 'people_employer',
+            'cardinality' => 'many_to_one',
+            'symmetric' => false,
+            'from_entity' => 'people',
+            'to_entity' => 'company',
+            'other_end_field' => 'staff',
+        ]);
 });
 
 it('serializes empty custom-field maps as objects in resources and tools', function (): void {
