@@ -12,7 +12,7 @@ return [
         'manage' => 'Manage',
         'reconnect' => 'Reconnect',
         'set_default' => 'Set as default',
-        'disconnect' => 'Disconnect',
+        'disconnect' => 'Disconnect Mailbox',
         'sync_calendar' => [
             'enable_label' => 'Sync calendar',
             'disable_label' => 'Disable calendar sync',
