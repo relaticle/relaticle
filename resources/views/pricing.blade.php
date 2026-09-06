@@ -128,9 +128,7 @@
                         'New Cloud workspaces start a :days-day Cloud Pro trial with :proCredits credits a month, and hosted access pauses when the trial ends without a subscription.',
                         ['days' => $trialDays, 'proCredits' => $proCredits]
                     );
-                }
 
-                if ($billingActive) {
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
                     $hostedPlanAnswer = __(

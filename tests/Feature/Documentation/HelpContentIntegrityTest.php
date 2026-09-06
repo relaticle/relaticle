@@ -26,6 +26,11 @@ function withoutFencedCodeBlocks(string $markdown): string
     return preg_replace('/```.*?```/s', '', $markdown) ?? $markdown;
 }
 
+function renderedTitleBudgetAfterBrandSuffix(): int
+{
+    return 60 - mb_strlen(' - '.config('app.name'));
+}
+
 it('resolves every related entry to a real page', function (): void {
     $repo = app(DocsRepository::class);
 
@@ -106,10 +111,7 @@ it('gives every page a unique, length-bounded title and description', function (
         ->map(fn (DocPage $page): string => "{$page->path} -> \"{$page->description}\"")
         ->values();
 
-    // The rendered <title> is "{title} - {brand}", so the front-matter title
-    // gets 60 minus the suffix. Descriptions under 70 chars get rewritten by
-    // search engines, so they are as much an offender as ones over 160.
-    $titleBudget = 60 - mb_strlen(' - '.config('app.name'));
+    $titleBudget = renderedTitleBudgetAfterBrandSuffix();
 
     $overLongTitles = $pages
         ->filter(fn (DocPage $page): bool => mb_strlen($page->title) > $titleBudget)
@@ -131,7 +133,7 @@ it('gives every category a unique, length-bounded title and description, distinc
     $repo = app(DocsRepository::class);
     $categories = $repo->categories();
 
-    $titleBudget = 60 - mb_strlen(' - '.config('app.name'));
+    $titleBudget = renderedTitleBudgetAfterBrandSuffix();
 
     $overLong = $categories
         ->filter(fn ($category): bool => mb_strlen($category->title) > $titleBudget || mb_strlen($category->description) < 70 || mb_strlen($category->description) > 160)
