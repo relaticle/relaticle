@@ -462,6 +462,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->dispatch('composer:sent');
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
+        $this->dispatch('outbox:changed');
     }
 
     private function creationSource(): EmailCreationSource

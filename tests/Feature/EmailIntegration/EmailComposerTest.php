@@ -236,7 +236,8 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->set('subject', 'Quarterly sync')
         ->set('bodyHtml', '<p>Hello there</p>')
         ->call('send')
-        ->assertSet('isOpen', false);
+        ->assertSet('isOpen', false)
+        ->assertDispatched('outbox:changed');
 
     $email = Email::query()->where('subject', 'Quarterly sync')->sole();
     expect($email->status)->toBe(EmailStatus::QUEUED)

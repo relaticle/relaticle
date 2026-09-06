@@ -63,6 +63,53 @@ it('queued tab shows only this user\'s queued OUTBOUND emails', function (): voi
         ->assertCanNotSeeTableRecords([$failed, $theirs]);
 });
 
+it('shows a just-sent email in the queued tab during the undo window', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Just composed',
+        'scheduled_for' => now()->addSeconds(30),
+    ]);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$justSent]);
+});
+
+it('refreshes the queued list when a send is queued', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $component = livewire(OutboxTable::class);
+
+    $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Arrived after render',
+        'scheduled_for' => now()->addSeconds(30),
+    ]);
+
+    $component
+        ->dispatch('outbox:changed')
+        ->assertCanSeeTableRecords([$justSent]);
+});
+
+it('keeps a later send on the scheduled tab instead of queued', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $undoWindow = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Sending in 30 seconds',
+        'scheduled_for' => now()->addSeconds(30),
+    ]);
+    $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Send tomorrow',
+        'scheduled_for' => now()->addDay(),
+    ]);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$undoWindow])
+        ->assertCanNotSeeTableRecords([$later])
+        ->filterTable('status_tab', 'scheduled')
+        ->assertCanSeeTableRecords([$later])
+        ->assertCanNotSeeTableRecords([$undoWindow]);
+});
+
 it('failed tab filters to failed emails', function (): void {
     $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED, [
