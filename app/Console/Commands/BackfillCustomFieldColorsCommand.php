@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\Task;
@@ -39,7 +40,7 @@ final class BackfillCustomFieldColorsCommand extends Command
         $query = CustomField::with('options')
             ->whereIn('name', ['Status', 'Priority', 'Stage'])
             ->whereIn('entity_type', [Task::class, Opportunity::class])
-            ->where('type', 'select');
+            ->whereIn('type', [CustomFieldType::SELECT->value, CustomFieldType::STATUS->value]);
 
         if ($specificTeam) {
             $query->where('tenant_id', $specificTeam);
