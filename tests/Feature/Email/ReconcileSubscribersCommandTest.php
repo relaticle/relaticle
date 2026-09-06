@@ -65,9 +65,28 @@ test('does not re-dispatch a user whose unchanged profile Mailcoach already reje
 
     $this->artisan('subscribers:reconcile')
         ->expectsOutputToContain('Dispatched 0 sync jobs.')
+        ->expectsOutputToContain('Skipped 1 profiles Mailcoach already rejected.')
         ->assertSuccessful();
 
     Queue::assertNotPushed(SyncSubscriberJob::class);
+});
+
+test('reports the rejected skip count on a dry run too', function (): void {
+    $rejected = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $rejected->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($rejected)->hash()])->save();
+
+    $this->artisan('subscribers:reconcile', ['--dry-run' => true])
+        ->expectsOutputToContain('Would sync 0 users.')
+        ->expectsOutputToContain('Skipped 1 profiles Mailcoach already rejected.')
+        ->assertSuccessful();
+});
+
+test('stays silent about rejected profiles when there are none', function (): void {
+    User::factory()->withTeam()->create(['email_verified_at' => now()]);
+
+    $this->artisan('subscribers:reconcile')
+        ->doesntExpectOutputToContain('Mailcoach already rejected')
+        ->assertSuccessful();
 });
 
 test('re-dispatches a rejected user once the derived profile differs from the rejected one', function (): void {
