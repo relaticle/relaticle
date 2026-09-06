@@ -32,6 +32,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -46,6 +47,7 @@ use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 final class EmailInboxPage extends Page
 {
@@ -502,11 +504,11 @@ final class EmailInboxPage extends Page
             return;
         }
 
-        resolve(SendEmailAction::class)->execute(
+        $email = resolve(SendEmailAction::class)->execute(
             data: $this->buildSendData($data, $source),
         );
 
-        Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
+        resolve(QueuedSendNotifier::class)->send($email);
     }
 
     /**
@@ -634,6 +636,7 @@ final class EmailInboxPage extends Page
      *     creation_source: EmailCreationSource,
      *     privacy_tier: EmailPrivacyTier,
      *     batch_id: null,
+     *     priority: EmailPriority,
      * }
      */
     private function buildSendData(array $data, EmailCreationSource $source): array
@@ -651,6 +654,7 @@ final class EmailInboxPage extends Page
             'creation_source' => $source,
             'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
+            'priority' => EmailPriority::PRIORITY,
             'attachments' => $data['attachments'] ?? [],
             'attachment_file_names' => $data['attachment_file_names'] ?? [],
         ];

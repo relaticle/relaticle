@@ -13,7 +13,6 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -22,7 +21,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
-use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
@@ -34,7 +32,7 @@ use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
-use RuntimeException;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 trait HasEmailComposeActions
 {
@@ -203,33 +201,7 @@ trait HasEmailComposeActions
             linkToId: $record->getKey(),
         );
 
-        $this->sendQueuedNotification($email);
-    }
-
-    private function sendQueuedNotification(Email $email): void
-    {
-        $notification = Notification::make()
-            ->title(__('filament/concerns/email-compose.notifications.queued.title'))
-            ->body(__('filament/concerns/email-compose.notifications.queued.body'))
-            ->success();
-
-        if ($email->scheduled_for !== null && $email->scheduled_for->isFuture()) {
-            $notification->actions([
-                Action::make('undo')
-                    ->label(__('filament/concerns/email-compose.actions.undo.label'))
-                    ->link()
-                    ->action(function () use ($email): void {
-                        try {
-                            resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
-                            Notification::make()->title(__('filament/concerns/email-compose.notifications.cancelled.title'))->success()->send();
-                        } catch (RuntimeException) {
-                            Notification::make()->title(__('filament/concerns/email-compose.notifications.too_late.title'))->danger()->send();
-                        }
-                    }),
-            ]);
-        }
-
-        $notification->send();
+        resolve(QueuedSendNotifier::class)->send($email);
     }
 
     /**

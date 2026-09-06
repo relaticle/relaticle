@@ -56,7 +56,7 @@ return [
         ],
         'scheduled_for' => [
             'label' => 'Send at',
-            'helper_text' => 'Leave blank to send with a 30-second undo window.',
+            'helper_text' => 'Leave blank to send with a 5-second undo window.',
         ],
         'signature' => [
             'label' => 'Signature',
