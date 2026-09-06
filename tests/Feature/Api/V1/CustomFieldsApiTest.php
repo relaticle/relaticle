@@ -207,7 +207,7 @@ it('includes options for select fields', function (): void {
         'entity_type' => 'company',
         'code' => 'cf_status',
         'name' => 'Status',
-        'type' => 'select',
+        'type' => 'status',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],

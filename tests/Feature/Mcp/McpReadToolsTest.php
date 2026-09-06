@@ -301,6 +301,11 @@ it('reports each stage separately so a caller can decide what counts as won', fu
             ->where('opportunities.by_stage.Closed Won.total_amount', 100)
             ->where('opportunities.by_stage.Unwon.total_amount', 500)
             ->etc());
+
+    $summary = resolve(GetCrmSummary::class)->execute($this->user);
+
+    expect($summary['opportunities']['total_won_value'])
+        ->toBe($summary['opportunities']['by_stage']['Closed Won']['total_amount']);
 });
 
 it('reports won and lost value on the stage category, not the stage name', function (): void {

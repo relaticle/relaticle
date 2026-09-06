@@ -12,6 +12,7 @@ use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Services\ValidationService;
 
 /**
@@ -132,7 +133,7 @@ final readonly class ProposalFieldSchemaDescriber
         return $field->type === CustomFieldType::FILE_UPLOAD->value
             || $dataType === FieldDataType::FILE
             || $field->type === CustomFieldType::RECORD->value
-            || $field->relationshipDefinition() !== null;
+            || $field->relationshipDefinition() instanceof CustomFieldRelationship;
     }
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string

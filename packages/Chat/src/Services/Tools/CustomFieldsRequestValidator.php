@@ -10,6 +10,7 @@ use App\Rules\ValidCustomFields;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Validator;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
 final readonly class CustomFieldsRequestValidator
 {
@@ -117,7 +118,7 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
-            if ($typeData->acceptsArbitraryValues || $field->relationshipDefinition() !== null) {
+            if ($typeData->acceptsArbitraryValues || $field->relationshipDefinition() instanceof CustomFieldRelationship) {
                 $clean[$code] = $value;
 
                 continue;

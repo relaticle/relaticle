@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -122,7 +123,7 @@ final readonly class ValidCustomFields implements ValidationRule
             return;
         }
 
-        if ($customField->relationshipDefinition() !== null) {
+        if ($customField->relationshipDefinition() instanceof CustomFieldRelationship) {
             return;
         }
 

@@ -250,6 +250,19 @@ it('keeps the seeded option colors alongside the category', function (): void {
 
     expect($done->name)->toBe('Done')
         ->and($done->settings->color)->toBe('#2A9764');
+
+    $colors = fn (string $entityType, string $code): array => CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->with(['options' => fn (HasMany $query) => $query->withoutGlobalScopes()])
+        ->firstOrFail()
+        ->options
+        ->mapWithKeys(fn (CustomFieldOption $option): array => [$option->name => $option->settings->color])
+        ->all();
+
+    expect($colors('task', TaskField::PRIORITY->value))->toBe(TaskField::PRIORITY->getOptionColors())
+        ->and($colors('opportunity', OpportunityField::STAGE->value))->toBe(OpportunityField::STAGE->getOptionColors());
 });
 
 it('seeds people linked to their correct companies for sales', function (): void {
