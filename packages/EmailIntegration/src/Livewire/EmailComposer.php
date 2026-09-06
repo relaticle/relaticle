@@ -279,7 +279,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->all()),
         };
 
-        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').($email->subject ?? '');
+        // Only prefill the original subject when the viewer is entitled to see it.
+        // `can('view')` is true at METADATA_ONLY; `viewSubject` is not.
+        $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
+        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').$originalSubject;
 
         // Only quote the original body when the viewer is entitled to read it.
         $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
