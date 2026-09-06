@@ -1,7 +1,7 @@
 <x-guest-layout
-    title="Contact Us - Relaticle"
+    title="Contact: Deployments and integrations - Relaticle"
     description="Get in touch with the Relaticle team. Questions about enterprise deployments, custom integrations, or partnerships."
-    ogTitle="Contact Us - Relaticle"
+    ogTitle="Contact: Deployments and integrations - Relaticle"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
         <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>

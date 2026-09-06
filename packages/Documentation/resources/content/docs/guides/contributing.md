@@ -1,6 +1,6 @@
 ---
 title: Contributing Guide
-description: Installation, architecture, and contributing.
+description: Get Relaticle development setup steps and a guide to its PHP 8.5, Laravel 13 and Filament 5 codebase.
 order: 3
 updated: "2026-08-13"
 ---

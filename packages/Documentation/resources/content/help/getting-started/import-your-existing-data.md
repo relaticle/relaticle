@@ -1,6 +1,6 @@
 ---
 title: Import your existing data
-description: Bring companies, people, or opportunities in from a CSV file.
+description: Get Relaticle CSV import steps for mapping columns and reviewing records, with file limits of 10,000 rows and 10 MB.
 order: 4
 updated: "2026-08-12"
 related: [help/import/prepare-your-csv, help/import/update-existing-records, help/getting-started/use-custom-fields]

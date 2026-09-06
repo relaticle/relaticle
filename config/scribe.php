@@ -17,11 +17,12 @@ if (! class_exists(AuthIn::class)) {
 // Only the most common configs are shown. See the https://scribe.knuckles.wtf/laravel/reference/config for all.
 
 return [
-    // The HTML <title> for the generated documentation.
+    // Also the OpenAPI `info.title` and the Postman collection name, so SDK
+    // generators name their clients from it. Keep it the API's identity, not copy.
     'title' => 'Relaticle API',
 
     // A short description of your API. Will be included in the docs webpage, Postman collection and OpenAPI spec.
-    'description' => 'REST API for managing CRM entities including companies, people, opportunities, tasks, and notes.',
+    'description' => 'REST API reference for Relaticle records and custom fields, with personal access token setup, filtering, sorting and request limits.',
 
     // Text to place in the "Introduction" section, right after the `description`. Markdown and HTML are supported.
     'intro_text' => <<<'INTRO'

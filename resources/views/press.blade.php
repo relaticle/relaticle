@@ -8,9 +8,9 @@
 @endphp
 
 <x-guest-layout
-    :title="__('Press Kit & Facts') . ' - Relaticle'"
+    :title="__('Press kit: License, stack and pricing') . ' - Relaticle'"
     :description="__('Relaticle press kit: founding date, license, GitHub stars, pricing, tech stack, and product screenshots for journalists covering open-source CRM.')"
-    :ogTitle="__('Press Kit & Facts') . ' - Relaticle'"
+    :ogTitle="__('Press kit: License, stack and pricing') . ' - Relaticle'"
     :ogDescription="__('Everything a listicle author or journalist needs to cover Relaticle in ten minutes: dated company facts, product screenshots, and logo downloads.')"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">

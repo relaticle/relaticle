@@ -119,11 +119,16 @@
                 );
 
                 $selfHostedCreditAnswer = __(
-                    'No. Self-hosting does not disable credit metering. Every workspace defaults to the Free plan\'s :credits-credit monthly allowance, whether self-hosted or hosted, and a brand-new Cloud signup gets exactly the same one. Self-hosters do have direct database access, so they can raise their own workspace\'s plan value, but no plan removes metering entirely (even the highest built-in plan caps out at :enterpriseCredits credits/month). Changing the plan value alone doesn\'t reset the current period\'s balance. That happens automatically once the existing period ends.',
+                    'No. Self-hosting does not disable credit metering. Self-hosted installs default to the Free plan\'s :credits-credit monthly allowance, and self-hosters can raise their own workspace\'s plan value in the database, but no plan removes metering entirely: the highest built-in plan caps at :enterpriseCredits credits a month. Changing the plan value alone doesn\'t reset the current period\'s balance. That happens once the existing period ends.',
                     ['credits' => $freeCredits, 'enterpriseCredits' => $enterpriseCredits]
                 );
 
                 if ($billingActive) {
+                    $selfHostedCreditAnswer .= ' '.__(
+                        'New Cloud workspaces start a :days-day Cloud Pro trial with :proCredits credits a month, and hosted access pauses when the trial ends without a subscription.',
+                        ['days' => $trialDays, 'proCredits' => $proCredits]
+                    );
+
                     $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
                     $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
                     $hostedPlanAnswer = __(

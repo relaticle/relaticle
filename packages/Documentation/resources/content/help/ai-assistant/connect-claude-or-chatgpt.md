@@ -1,6 +1,6 @@
 ---
-title: Connect Claude or ChatGPT to your workspace
-description: Add Relaticle to the AI assistant you already use. One URL, a consent screen, and no code involved.
+title: Connect Claude or ChatGPT to Relaticle
+description: Set up an AI connector to Relaticle with OAuth. This guide explains access and why MCP clients write directly to records.
 order: 5
 updated: "2026-08-13"
 related: [docs/guides/mcp, help/ai-assistant/ask-questions-about-your-data, help/ai-assistant/ai-credits-and-limits]

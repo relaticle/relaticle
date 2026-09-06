@@ -1,5 +1,3 @@
-# Privacy Policy
-
 **Effective date:** August 26, 2026
 
 This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.

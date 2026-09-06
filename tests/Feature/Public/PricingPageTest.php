@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\StartProTrial;
+use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\ModelRegistry;
@@ -161,10 +163,27 @@ it('does not contradict the credit-multiplier faq with a flat-allowance claim on
 });
 
 it('discloses that self-hosted installs are not exempt from the free-tier credit cap', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $html = $this->get('/pricing')->assertOk()->getContent();
+    $question = e(__('Are self-hosted installs exempt from AI credit limits?'));
+    $windows = collect(explode($question, $html))->skip(1)->map(fn (string $after): string => mb_substr($after, 0, 3000));
+
+    expect($windows)->not->toBeEmpty()
+        ->and($windows->contains(fn (string $answer): bool => str_contains($answer, (string) Plan::Free->credits())
+            && str_contains($answer, number_format(Plan::Pro->credits()))
+            && str_contains($answer, StartProTrial::TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must state the Free credits, the Pro credits and the trial length')
+        ->and($html)->not->toContain('brand-new Cloud signup gets exactly the same one')
+        ->and($html)->not->toContain("\u{2014}");
+});
+
+it('keeps the Cloud Pro trial out of the self-hosted credit answer when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('Are self-hosted installs exempt from AI credit limits?'))
-        ->assertSee('300-credit');
+        ->assertDontSee('Cloud Pro trial');
 });
 
 it('discloses the free-tier credit cap in the billing-off plan-limit answer', function (): void {

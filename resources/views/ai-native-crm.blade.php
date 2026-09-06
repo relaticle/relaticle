@@ -6,7 +6,7 @@
     $proCredits = number_format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
 
-    $title = __('AI-Native CRM: What It Means, and One You Can Self-Host').' - Relaticle';
+    $title = __('AI-native CRM: MCP, chat and self-hosting').' - Relaticle';
     $description = __(
         'What makes a CRM AI-native, five checks to run before you buy one, and how Relaticle passes each of them on your own server.'
     );
