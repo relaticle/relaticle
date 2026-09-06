@@ -929,6 +929,79 @@ describe('Hero AI tab: entry phase', function () {
     });
 });
 
+describe('Page metadata', function () {
+    it('keeps the title, description and heading of :path within search-result bounds', function (string $path, bool $expectsHeading) {
+        $html = $this->get($path)->assertOk()->getContent();
+
+        preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+        preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+
+        $titleText = html_entity_decode(trim($title[1] ?? ''));
+        $descriptionText = html_entity_decode($description[1] ?? '');
+
+        expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
+            ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$path} title: {$titleText}")
+            ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
+            ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}")
+            ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+
+        if ($expectsHeading) {
+            expect(substr_count($html, '<h1'))->toBe(1, "{$path} must render exactly one h1");
+        }
+    })->with([
+        ['/', true],
+        ['/pricing', true],
+        ['/ai', true],
+        ['/ai-native-crm', true],
+        ['/self-hosted', true],
+        ['/press', true],
+        ['/contact', true],
+        ['/help', true],
+        ['/developers', true],
+        ['/developers/api', false],
+        ['/blog', true],
+        ['/compare/relaticle-vs-twenty', true],
+        ['/compare/relaticle-vs-espocrm', true],
+        ['/alternatives/attio', true],
+        ['/alternatives/hubspot', true],
+        ['/privacy-policy', true],
+        ['/terms-of-service', true],
+    ]);
+
+    it('gives the blog index, a category and a tag page bounded titles and descriptions', function () {
+        $category = Category::factory()->create(['name' => 'Comparisons']);
+        $tag = Tag::factory()->create(['name' => 'self-hosting']);
+        Post::factory()->published()->create(['category_id' => $category->id]);
+
+        foreach (['/blog', "/blog/category/{$category->slug}", "/blog/tag/{$tag->slug}"] as $path) {
+            $html = $this->get($path)->assertOk()->getContent();
+
+            preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+            preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+
+            $titleText = html_entity_decode(trim($title[1] ?? ''));
+            $descriptionText = html_entity_decode($description[1] ?? '');
+
+            expect($titleText)->toEndWith(' - '.config('app.name'), $path)
+                ->and(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
+                ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(30, "{$path} title: {$titleText}")
+                ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
+                ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}");
+        }
+    });
+
+    it('renders one heading on each legal page and keeps it in the markdown version', function (string $path, string $heading) {
+        $html = $this->get($path)->assertOk()->getContent();
+        $markdown = $this->get($path, ['Accept' => 'text/markdown'])->assertOk()->getContent();
+
+        expect(substr_count($html, '<h1'))->toBe(1)
+            ->and(preg_match_all('/^\s*(# )?'.preg_quote($heading, '/').'\s*$/m', $markdown))->toBe(1);
+    })->with([
+        ['/privacy-policy', 'Privacy Policy'],
+        ['/terms-of-service', 'Terms of Service'],
+    ]);
+});
+
 describe('security.txt', function () {
     it('serves the security contact with a future expiry', function () {
         $response = $this->get('/.well-known/security.txt');

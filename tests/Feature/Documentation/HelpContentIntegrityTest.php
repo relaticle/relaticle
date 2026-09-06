@@ -106,28 +106,35 @@ it('gives every page a unique, length-bounded title and description', function (
         ->map(fn (DocPage $page): string => "{$page->path} -> \"{$page->description}\"")
         ->values();
 
+    // The rendered <title> is "{title} - {brand}", so the front-matter title
+    // gets 60 minus the suffix. Descriptions under 70 chars get rewritten by
+    // search engines, so they are as much an offender as ones over 160.
+    $titleBudget = 60 - mb_strlen(' - '.config('app.name'));
+
     $overLongTitles = $pages
-        ->filter(fn (DocPage $page): bool => mb_strlen($page->title) > 60)
+        ->filter(fn (DocPage $page): bool => mb_strlen($page->title) > $titleBudget)
         ->map(fn (DocPage $page): string => "{$page->path} -> {$page->title} (".mb_strlen($page->title).' chars)')
         ->values();
 
-    $overLongDescriptions = $pages
-        ->filter(fn (DocPage $page): bool => mb_strlen($page->description) > 160)
+    $descriptionsOutOfBounds = $pages
+        ->filter(fn (DocPage $page): bool => mb_strlen($page->description) < 70 || mb_strlen($page->description) > 160)
         ->map(fn (DocPage $page): string => "{$page->path} -> {$page->description} (".mb_strlen($page->description).' chars)')
         ->values();
 
     expect($duplicateTitleOffenders)->toBeEmpty(offendersMessage('Duplicate titles', $duplicateTitleOffenders))
         ->and($duplicateDescriptionOffenders)->toBeEmpty(offendersMessage('Duplicate descriptions', $duplicateDescriptionOffenders))
-        ->and($overLongTitles)->toBeEmpty(offendersMessage('Titles over 60 chars', $overLongTitles))
-        ->and($overLongDescriptions)->toBeEmpty(offendersMessage('Descriptions over 160 chars', $overLongDescriptions));
+        ->and($overLongTitles)->toBeEmpty(offendersMessage("Titles over {$titleBudget} chars", $overLongTitles))
+        ->and($descriptionsOutOfBounds)->toBeEmpty(offendersMessage('Descriptions outside 70 to 160 chars', $descriptionsOutOfBounds));
 });
 
 it('gives every category a unique, length-bounded title and description, distinct from every page', function (): void {
     $repo = app(DocsRepository::class);
     $categories = $repo->categories();
 
+    $titleBudget = 60 - mb_strlen(' - '.config('app.name'));
+
     $overLong = $categories
-        ->filter(fn ($category): bool => mb_strlen($category->title) > 60 || mb_strlen($category->description) > 160)
+        ->filter(fn ($category): bool => mb_strlen($category->title) > $titleBudget || mb_strlen($category->description) < 70 || mb_strlen($category->description) > 160)
         ->map(fn ($category): string => "{$category->path} (title ".mb_strlen($category->title).', desc '.mb_strlen($category->description).')')
         ->values();
 

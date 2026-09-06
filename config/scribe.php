@@ -18,10 +18,10 @@ if (! class_exists(AuthIn::class)) {
 
 return [
     // The HTML <title> for the generated documentation.
-    'title' => 'Relaticle API',
+    'title' => 'REST API Reference for CRM Records',
 
     // A short description of your API. Will be included in the docs webpage, Postman collection and OpenAPI spec.
-    'description' => 'REST API for managing CRM entities including companies, people, opportunities, tasks, and notes.',
+    'description' => 'REST API reference for Relaticle records and custom fields, with personal access token setup, filtering, sorting and request limits.',
 
     // Text to place in the "Introduction" section, right after the `description`. Markdown and HTML are supported.
     'intro_text' => <<<'INTRO'

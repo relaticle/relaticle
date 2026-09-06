@@ -1,6 +1,6 @@
 ---
 title: Add your first person
-description: Add a person record and link them to a company.
+description: Follow the steps to add a person in Relaticle, enter contact details and link the person to a company.
 order: 2
 updated: "2026-08-12"
 related: [help/getting-started/create-your-first-company, help/getting-started/track-a-deal-through-the-pipeline]

@@ -1,8 +1,9 @@
 <!doctype html>
 <html>
 <head>
-    <title>{!! $metadata['title'] !!}</title>
+    <title>{{ config('scribe.title') }} - {{ config('app.name') }}</title>
     <meta charset="utf-8"/>
+    <meta name="description" content="{{ config('scribe.description') }}"/>
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"/>
