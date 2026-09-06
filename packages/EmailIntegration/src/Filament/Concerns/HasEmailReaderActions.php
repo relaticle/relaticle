@@ -17,6 +17,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -30,9 +31,37 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 /**
  * Sharing, summarize, and request-access actions for `x-emails.email-view`,
  * used by the inbox, CRM record email pages, and the emails relation manager.
+ *
+ * @property ?string $selectedEmailId
+ *
+ * @method Email|null selectedEmail()
  */
 trait HasEmailReaderActions
 {
+    /**
+     * Open the reader overlay only when the viewer has full body access.
+     * Metadata and subject-only mail stay on the list with request-access.
+     */
+    protected function openEmailReader(string $id): bool
+    {
+        $this->selectedEmailId = $id;
+        unset($this->selectedEmail);
+
+        if (! $this->selectedEmail() instanceof Email) {
+            $this->selectedEmailId = null;
+            unset($this->selectedEmail);
+
+            return false;
+        }
+
+        $this->dispatch('composer:dismiss-inline');
+        $this->dispatch('composer:resume-draft', emailId: $id);
+
+        resolve(MarkEmailAsReadAction::class)->execute($id, $this->readerUser());
+
+        return true;
+    }
+
     /**
      * @return Collection<int, EmailAccessRequest>
      */

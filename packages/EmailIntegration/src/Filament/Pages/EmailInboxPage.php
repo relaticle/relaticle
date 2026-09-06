@@ -26,7 +26,6 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -216,13 +215,19 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        /** @var Email|null */
-        return Email::query()
+        /** @var Email|null $email */
+        $email = Email::query()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->forTeam($this->authUser()->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     /**
@@ -275,16 +280,9 @@ final class EmailInboxPage extends Page
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        // A reply answers the message that was open; it cannot stay docked under a
-        // different one. The composer saves whatever was typed as a draft.
-        $this->dispatch('composer:dismiss-inline');
-
-        // ...and if this message already has an unfinished reply, bring it back up.
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        if (! $this->openEmailReader($id)) {
+            return;
+        }
 
         unset($this->inboxUnreadCount);
     }

@@ -15,7 +15,6 @@ use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
@@ -46,12 +45,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     {
         $this->closeNotificationsPanel();
 
-        $this->selectedEmailId = $emailId;
-
-        $this->dispatch('composer:dismiss-inline');
-        $this->dispatch('composer:resume-draft', emailId: $emailId);
-
-        resolve(MarkEmailAsReadAction::class)->execute($emailId, $this->authUser());
+        $this->openEmailReader($emailId);
     }
 
     /**
@@ -74,7 +68,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     #[Computed]
     public function selectedEmail(): ?Email
     {
-        $email = $this->resolveTeamEmail($this->selectedEmailId, 'view');
+        $email = $this->resolveTeamEmail($this->selectedEmailId, 'viewBody');
 
         if (! $email instanceof Email) {
             return null;

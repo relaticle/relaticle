@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
@@ -274,6 +273,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->icon('heroicon-o-eye')
             ->modal(false)
             ->slideOver(false)
+            ->visible(fn (Email $record): bool => $this->authUser()->can('viewBody', $record))
             ->action(function (Email $record): void {
                 $this->selectEmail($record->getKey());
             });
@@ -281,12 +281,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        $this->dispatch('composer:dismiss-inline');
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        $this->openEmailReader($id);
     }
 
     public function deselectEmail(): void
@@ -304,12 +299,18 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
-        /** @var Email|null */
-        return $this->getRelationship()
+        /** @var Email|null $email */
+        $email = $this->getRelationship()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     /**

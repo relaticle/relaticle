@@ -19,7 +19,6 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
@@ -185,13 +184,19 @@ abstract class BaseRecordEmailsPage extends Page
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 
-        /** @var Email|null */
-        return $record
+        /** @var Email|null $email */
+        $email = $record
             ->emails()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     #[Computed]
@@ -213,17 +218,9 @@ abstract class BaseRecordEmailsPage extends Page
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        // A reply answers the message that was open; it cannot stay docked under a
-        // different one. The composer saves whatever was typed as a draft.
-        $this->dispatch('composer:dismiss-inline');
-
-        // ...and if this message already has an unfinished reply, bring it back up.
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        // Optimistically mark the email as read so the unread count updates immediately
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        if (! $this->openEmailReader($id)) {
+            return;
+        }
 
         unset($this->inboxUnreadCount);
     }
