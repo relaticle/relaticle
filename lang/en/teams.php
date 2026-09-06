@@ -252,18 +252,6 @@ return [
         ],
     ],
 
-    'mail' => [
-        'invitation' => [
-            'subject' => ':inviter invited you to :team on Relaticle',
-            'subject_without_inviter' => 'You\'ve been invited to join :team on Relaticle',
-            'line_with_inviter' => ':inviter has invited you to join the :team workspace on Relaticle with :role access.',
-            'line' => 'You\'ve been invited to join the :team workspace on Relaticle with :role access.',
-            'action' => 'Accept invitation',
-            'expiry' => 'This invitation expires :expiry.',
-            'ignore' => 'If you weren\'t expecting this, you can safely ignore this email.',
-        ],
-    ],
-
     'pending_for_user' => [
         'heading' => 'You have been invited to join :team',
         'detail_with_inviter' => ':inviter invited you with :role access.',

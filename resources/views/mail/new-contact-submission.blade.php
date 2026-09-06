@@ -1,20 +1,14 @@
-<x-mail::message>
-# New Contact Submission
+<x-mail::message :reason="__('mail.footer.reason.contact')">
+<x-slot:preheader>{{ $preheader }}</x-slot:preheader>
+# {{ __('mail.contact_submission.heading') }}
 
-**Name:** {{ $data['name'] }}
+<x-mail::list :rows="$rows" />
 
-**Email:** {{ $data['email'] }}
-
-@if($data['company'])
-**Company:** {{ $data['company'] }}
-@endif
-
-**Message:**
-
+<x-mail::panel>
 {{ $data['message'] }}
+</x-mail::panel>
 
-<x-mail::button :url="'mailto:' . $data['email']">
-Reply to {{ $data['name'] }}
+<x-mail::button :url="'mailto:'.$data['email']">
+{{ __('mail.contact_submission.cta', ['name' => $data['name']]) }}
 </x-mail::button>
-
 </x-mail::message>

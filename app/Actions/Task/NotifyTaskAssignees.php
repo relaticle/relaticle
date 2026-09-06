@@ -31,12 +31,13 @@ final readonly class NotifyTaskAssignees
         $taskTitle = $task->title;
         $taskId = $task->id;
         $taskUrl = $this->resolveTaskUrl($task);
+        $teamName = $task->team?->name;
 
-        defer(function () use ($assigneeIds, $taskTitle, $taskId, $taskUrl): void {
+        defer(function () use ($assigneeIds, $taskTitle, $taskId, $taskUrl, $teamName): void {
             User::query()
                 ->whereIn('id', $assigneeIds)
                 ->get()
-                ->each(function (User $recipient) use ($taskTitle, $taskId, $taskUrl): void {
+                ->each(function (User $recipient) use ($taskTitle, $taskId, $taskUrl, $teamName): void {
                     if ($recipient->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::InApp)) {
                         Notification::make()
                             ->title("New Task Assignment: {$taskTitle}")
@@ -54,7 +55,7 @@ final readonly class NotifyTaskAssignees
                     }
 
                     if ($recipient->wantsNotification(NotificationType::TaskAssigned, NotificationChannel::Email)) {
-                        Mail::to($recipient)->send(new TaskAssignedMail($taskTitle, $taskUrl));
+                        Mail::to($recipient)->send(new TaskAssignedMail($taskTitle, $taskUrl, $teamName));
                     }
                 });
         });

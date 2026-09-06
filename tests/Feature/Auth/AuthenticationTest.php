@@ -10,7 +10,7 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
-use Filament\Auth\Notifications\VerifyEmail;
+use App\Notifications\Auth\VerifyEmail;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;

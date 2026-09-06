@@ -14,27 +14,26 @@ use Illuminate\Support\Facades\Mail;
 it('renders the nudge naming the unfinished step', function (): void {
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
 
-    $mail = new SetupNudgeMail($owner, ActivationStep::FirstRecord->value, 'https://example.test/chat');
+    $mail = new SetupNudgeMail($owner, $owner->currentTeam, ActivationStep::FirstRecord->value, 'https://example.test/chat');
 
-    $rendered = $mail->render();
-
-    $mail->assertHasSubject('Your workspace is waiting');
-
-    expect($rendered)
-        ->toContain('Dana')
-        ->toContain('Add your first contact')
-        ->toContain('Put one real person in the CRM and the rest follows')
-        ->toContain('Continue in Rela')
-        ->toContain('https://example.test/chat')
-        ->not->toContain('filament/pages/dashboard.')
-        ->not->toContain('notifications.onboarding.');
+    $mail->assertHasSubject(__('mail.setup_nudge.subject'));
+    $mail->assertSeeInHtml(__('mail.setup_nudge.heading', ['name' => 'Dana', 'team' => $owner->currentTeam->name]), escape: false);
+    $mail->assertSeeInHtml('Add your first contact');
+    $mail->assertSeeInHtml('Put one real person in the CRM and the rest follows');
+    $mail->assertSeeInHtml(__('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]));
+    $mail->assertSeeInHtml('https://example.test/chat');
+    $mail->assertSeeInHtml(__('mail.footer.reason.onboarding', ['company' => config('relaticle.company.name')]));
+    $mail->assertSeeInHtml(__('mail.setup_nudge.preheader', ['team' => $owner->currentTeam->name, 'step' => 'Add your first contact']), escape: false);
+    $mail->assertSeeInText(__('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]).': https://example.test/chat');
+    $mail->assertDontSeeInHtml('filament/pages/dashboard.');
+    $mail->assertDontSeeInHtml('mail.setup_nudge.');
 });
 
 it('never lets an unresolved step label reach the rendered body', function (): void {
     $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
 
     foreach (ActivationStep::cases() as $step) {
-        $mail = new SetupNudgeMail($owner, $step->value, 'https://example.test/chat');
+        $mail = new SetupNudgeMail($owner, $owner->currentTeam, $step->value, 'https://example.test/chat');
 
         expect($mail->render())->not->toContain('filament/pages/dashboard.');
     }

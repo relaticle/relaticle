@@ -1,15 +1,10 @@
-<x-mail::message>
-# {{ __('notifications.onboarding.mail_heading', ['name' => $greetingName]) }}
+<x-mail::message :reason="__('mail.footer.reason.onboarding', ['company' => config('relaticle.company.name')])">
+<x-slot:preheader>{{ __('mail.setup_nudge.preheader', ['team' => $teamName, 'step' => $stepLabel]) }}</x-slot:preheader>
+# {{ __('mail.setup_nudge.heading', ['name' => $greetingName, 'team' => $teamName]) }}
 
-**{{ $stepLabel }}**
-
-{{ $stepDescription }}
+{{ __('mail.setup_nudge.step', ['step' => $stepLabel]) }} {{ $stepDescription }}.
 
 <x-mail::button :url="$conversationUrl">
-{{ __('notifications.onboarding.mail_button') }}
+{{ __('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]) }}
 </x-mail::button>
-
-<x-slot:subcopy>
-{{ $companyName }}@if($companyAddress !== '') · {{ $companyAddress }}@endif
-</x-slot:subcopy>
 </x-mail::message>
