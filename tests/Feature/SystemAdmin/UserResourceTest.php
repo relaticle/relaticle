@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\SocialiteProvider;
 use App\Enums\SubscriberTagEnum;
 use App\Models\Team;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
@@ -17,6 +19,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -194,6 +197,54 @@ describe('team relation managers', function (): void {
     });
 });
 
+describe('social providers relation manager', function (): void {
+    it('lists only the linked providers belonging to the user', function (): void {
+        $user = User::factory()->create();
+        $own = UserSocialAccount::factory()->for($user)->create(['provider_name' => 'google']);
+        $someoneElses = UserSocialAccount::factory()->create(['provider_name' => 'microsoft']);
+
+        livewire(SocialAccountsRelationManager::class, [
+            'ownerRecord' => $user,
+            'pageClass' => ViewUser::class,
+        ])
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$own])
+            ->assertCanNotSeeTableRecords([$someoneElses]);
+    });
+
+    it('renders a provider the SocialiteProvider enum no longer offers', function (): void {
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'facebook']);
+
+        expect(SocialiteProvider::tryFrom('facebook'))->toBeNull();
+
+        livewire(SocialAccountsRelationManager::class, [
+            'ownerRecord' => $user,
+            'pageClass' => ViewUser::class,
+        ])
+            ->assertSuccessful()
+            ->assertSee('Facebook');
+    });
+
+    it('is reachable from the user view page', function (): void {
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'google']);
+
+        livewire(ViewUser::class, ['record' => $user->getKey()])
+            ->assertSuccessful()
+            ->assertSee('Social Providers');
+    });
+
+    it('renders without a table when the user has linked nothing', function (): void {
+        livewire(SocialAccountsRelationManager::class, [
+            'ownerRecord' => User::factory()->create(),
+            'pageClass' => ViewUser::class,
+        ])
+            ->assertSuccessful()
+            ->assertSee('No social providers linked');
+    });
+});
+
 it('deletes a user through the Jetstream deleter so their workspaces are not orphaned', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
     $team = $user->ownedTeams()->firstOrFail();
@@ -231,6 +282,37 @@ it('renders the engagement badge derived from the last login timestamp', functio
         ->assertTableColumnStateSet('engagement', SubscriberTagEnum::Active7d->value, record: $active)
         ->assertTableColumnStateSet('engagement', SubscriberTagEnum::Dormant->value, record: $dormant)
         ->assertTableColumnStateSet('engagement', null, record: $never);
+});
+
+it('filters to exactly the users whose subscriber profile Mailcoach rejected', function (): void {
+    $rejected = User::factory()->create(['rejected_subscriber_profile_hash' => 'hash-of-a-dead-domain']);
+    $healthy = User::factory()->create(['rejected_subscriber_profile_hash' => null]);
+
+    livewire(ListUsers::class)
+        ->filterTable('rejected_subscriber_profile_hash', true)
+        ->assertCanSeeTableRecords([$rejected])
+        ->assertCanNotSeeTableRecords([$healthy]);
+
+    livewire(ListUsers::class)
+        ->filterTable('rejected_subscriber_profile_hash', false)
+        ->assertCanSeeTableRecords([$healthy])
+        ->assertCanNotSeeTableRecords([$rejected]);
+});
+
+it('flags rejected users in the Mailcoach column and leaves healthy ones unflagged', function (): void {
+    $rejected = User::factory()->create(['rejected_subscriber_profile_hash' => 'hash-of-a-dead-domain']);
+    $healthy = User::factory()->create(['rejected_subscriber_profile_hash' => null]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('rejected_subscriber_profile_hash', true, record: $rejected)
+        ->assertTableColumnStateSet('rejected_subscriber_profile_hash', false, record: $healthy);
+});
+
+it('shows both rejected and healthy users when the Mailcoach filter is unset', function (): void {
+    $rejected = User::factory()->create(['rejected_subscriber_profile_hash' => 'hash-of-a-dead-domain']);
+    $healthy = User::factory()->create(['rejected_subscriber_profile_hash' => null]);
+
+    livewire(ListUsers::class)->assertCanSeeTableRecords([$rejected, $healthy]);
 });
 
 it('lists exactly the users whose engagement badge matches the selected filter', function (): void {
