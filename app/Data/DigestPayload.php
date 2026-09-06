@@ -28,4 +28,14 @@ final readonly class DigestPayload
 
         return $count;
     }
+
+    public function overdueCount(): int
+    {
+        return array_sum(array_map(fn (DigestTeamSection $team): int => count($team->overdue), $this->teams));
+    }
+
+    public function upcomingCount(): int
+    {
+        return array_sum(array_map(fn (DigestTeamSection $team): int => count($team->upcoming), $this->teams));
+    }
 }

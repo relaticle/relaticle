@@ -124,7 +124,7 @@ final class SendSetupNudgeCommand extends Command
         $conversationUrl = $this->continueUrl($team);
 
         Mail::to($user)
-            ->send(new SetupNudgeMail($user, $stepKey->value, $conversationUrl));
+            ->send(new SetupNudgeMail($user, $team, $stepKey->value, $conversationUrl));
 
         $team->forceFill(['setup_nudge_sent_at' => now()])->save();
 

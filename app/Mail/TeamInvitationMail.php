@@ -35,15 +35,15 @@ final class TeamInvitationMail extends Mailable implements ShouldBeEncrypted, Sh
 
         return new Envelope(
             subject: $inviter === null
-                ? __('teams.mail.invitation.subject_without_inviter', ['team' => $team])
-                : __('teams.mail.invitation.subject', ['inviter' => $inviter, 'team' => $team]),
+                ? __('mail.team_invitation.subject_without_inviter', ['team' => $team])
+                : __('mail.team_invitation.subject', ['inviter' => $inviter, 'team' => $team]),
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.team-invitation',
+            markdown: 'mail.team-invitation',
             with: [
                 'acceptUrl' => route('team-invitations.token.accept', ['token' => $this->rawToken]),
                 'inviterName' => $this->invitation->inviter?->name,

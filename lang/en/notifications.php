@@ -11,12 +11,6 @@ return [
         'description' => 'Includes tasks overdue and due today. Sent every morning if any tasks are due or overdue.',
     ],
 
-    'onboarding' => [
-        'subject' => 'Your workspace is waiting',
-        'mail_heading' => ':name, your workspace is still waiting',
-        'mail_button' => 'Continue in Rela',
-    ],
-
     'collaboration' => [
         'heading' => 'Collaboration notifications',
         'notify_me_about' => 'Notify me about',
