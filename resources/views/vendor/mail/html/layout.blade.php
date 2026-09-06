@@ -58,8 +58,14 @@ background-color: #27272a !important;
 border-color: #3f3f46 !important;
 }
 
-.logo-pill {
-background-color: #fafafa !important;
+.logo-light {
+display: none !important;
+}
+
+.logo-dark-wrap {
+display: block !important;
+max-height: none !important;
+overflow: visible !important;
 }
 
 h1, h2, h3 {
@@ -141,8 +147,14 @@ background-color: #27272a !important;
 border-color: #3f3f46 !important;
 }
 
-[data-ogsc] .logo-pill {
-background-color: #fafafa !important;
+[data-ogsc] .logo-light {
+display: none !important;
+}
+
+[data-ogsc] .logo-dark-wrap {
+display: block !important;
+max-height: none !important;
+overflow: visible !important;
 }
 
 [data-ogsc] h1, [data-ogsc] h2, [data-ogsc] h3 {
