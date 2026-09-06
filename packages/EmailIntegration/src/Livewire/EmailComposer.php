@@ -56,10 +56,13 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 /**
  * @property-read Action $createSignatureAction
  * @property-read Action $createTemplateAction
+ * @property-read Action $grantSendPermissionAction
  */
 final class EmailComposer extends Component implements HasActions, HasSchemas
 {
@@ -199,9 +202,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $account = $this->activeAccounts()->first();
+        $account = $this->sendableAccount() ?? $this->activeAccounts()->first();
 
-        if ($account === null) {
+        if (! $account instanceof ConnectedAccount) {
             return;
         }
 
@@ -248,9 +251,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $account = $this->activeAccounts()->first();
+        $account = $this->sendableAccount() ?? $this->activeAccounts()->first();
 
-        if ($account === null) {
+        if (! $account instanceof ConnectedAccount) {
             return;
         }
 
@@ -393,6 +396,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public function send(): void
     {
+        if (! $this->canSendFromSelectedAccount()) {
+            return;
+        }
+
         $this->validate([
             'accountId' => ['required'],
             'to' => ['required', 'array', 'min:1'],
@@ -422,7 +429,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachmentPaths = [...$pendingPaths, ...$copiedPaths];
         $attachmentNames = [...$pendingNames, ...$copiedNames];
 
-        resolve(SendEmailAction::class)->execute([
+        $email = resolve(SendEmailAction::class)->execute([
             'connected_account_id' => (string) $this->accountId,
             'subject' => $renderer->renderContent((string) $this->subject),
             'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
@@ -450,15 +457,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
         }
 
-        Notification::make()
-            ->success()
-            ->title(__('filament/emails/composer.notifications.queued.title'))
-            ->send();
+        resolve(QueuedSendNotifier::class)->send($email);
 
         $this->closeComposer();
         $this->dispatch('composer:sent');
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
+        $this->dispatch('outbox:changed');
     }
 
     private function creationSource(): EmailCreationSource
@@ -633,6 +638,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
                     ['blockquote', 'codeBlock', 'bulletList', 'orderedList'],
                     ['undo', 'redo'],
+                    ['mergeTags'],
                 ])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],
@@ -647,23 +653,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     #[Computed]
     public function recipientSuggestions(): array
     {
-        $teamId = $this->authUser()->current_team_id;
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier). Without this, a
-            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
-            // everyone else's recipient autocomplete via this team-wide query.
-            ->whereHas('email', fn (Builder $q): Builder => $q
-                ->where('team_id', $teamId)
-                ->where('status', '!=', EmailStatus::DRAFT))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->authUser());
     }
 
     /**
@@ -1036,6 +1026,28 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
+     * Send the user back through OAuth when the selected mailbox cannot send.
+     */
+    public function grantSendPermissionAction(): Action
+    {
+        return Action::make('grantSendPermission')
+            ->label(__('filament/emails/composer.actions.grant_send.label'))
+            ->color('primary')
+            ->visible(fn (): bool => ! $this->canSendFromSelectedAccount())
+            ->action(function (): void {
+                $account = $this->selectedAccount();
+
+                if (! $account instanceof ConnectedAccount || $account->isSendable()) {
+                    return;
+                }
+
+                $this->redirect(route('email-accounts.redirect', [
+                    'provider' => $account->provider->value,
+                ]));
+            });
+    }
+
+    /**
      * Create a signature for the account currently selected in the "From" row and
      * apply it to the message immediately.
      */
@@ -1116,7 +1128,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * ULID. Reject anything that isn't one of this user's own active accounts so
      * every downstream read (signature options, the default signature, `send()`)
      * inherits ownership instead of re-deriving it. See {@see self::ownedAccountId()}.
-     * 
      */
     public function updatedAccountId(?string $value): void
     {
@@ -1471,10 +1482,31 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return once(fn (): Collection => ConnectedAccount::query()
             ->where('user_id', $this->authUser()->getKey())
             ->where('team_id', $this->authUser()->current_team_id)
-            ->where('status', 'active')
+            ->connected()
             ->orderByDesc('is_default')
             ->oldest()
             ->get());
+    }
+
+    public function canSendFromSelectedAccount(): bool
+    {
+        return $this->selectedAccount()?->isSendable() ?? false;
+    }
+
+    private function sendableAccount(): ?ConnectedAccount
+    {
+        return $this->activeAccounts()
+            ->first(fn (ConnectedAccount $account): bool => $account->isSendable());
+    }
+
+    private function selectedAccount(): ?ConnectedAccount
+    {
+        if ($this->accountId === null) {
+            return null;
+        }
+
+        return $this->activeAccounts()
+            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->accountId);
     }
 
     /**

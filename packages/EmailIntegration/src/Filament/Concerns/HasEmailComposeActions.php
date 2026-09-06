@@ -13,17 +13,14 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
-use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
-use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
@@ -31,21 +28,29 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
-use RuntimeException;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 trait HasEmailComposeActions
 {
+    use RedirectsToGrantSend;
+
     /**
-     * Return the CRM record these emails belong to (People, Company, or Opportunity).
+     * Return the CRM record these emails belong to (People, Company, or Opportunity)
      */
     abstract protected function getCrmRecord(): Model;
 
     public function openReplyModal(string $emailId, string $mode): void
     {
+        if (! $this->sendableMailbox() instanceof ConnectedAccount) {
+            $this->mountAction('grantSendPermission');
+
+            return;
+        }
+
         $this->mountAction('replyForwardEmail', [
             'emailId' => $emailId,
             'mode' => $mode,
@@ -121,12 +126,7 @@ trait HasEmailComposeActions
 
         $user = $this->getAuthenticatedUser();
 
-        $account = ConnectedAccount::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->defaultFirst()
-            ->first();
+        $account = $this->sendableMailbox();
 
         $toParticipants = match ($mode) {
             'forward' => [],
@@ -177,6 +177,23 @@ trait HasEmailComposeActions
             default => EmailCreationSource::REPLY,
         };
 
+        $team = filament()->getTenant();
+
+        if (! $team instanceof Team) {
+            return;
+        }
+
+        $account = ConnectedAccount::query()
+            ->ownedBy($this->getAuthenticatedUser(), $team)
+            ->whereKey($data['connected_account_id'] ?? null)
+            ->first();
+
+        if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
+            $this->redirectToGrantSend($account);
+
+            return;
+        }
+
         $record = $this->getCrmRecord();
 
         $email = resolve(SendEmailAction::class)->execute(
@@ -185,33 +202,7 @@ trait HasEmailComposeActions
             linkToId: $record->getKey(),
         );
 
-        $this->sendQueuedNotification($email);
-    }
-
-    private function sendQueuedNotification(Email $email): void
-    {
-        $notification = Notification::make()
-            ->title(__('filament/concerns/email-compose.notifications.queued.title'))
-            ->body(__('filament/concerns/email-compose.notifications.queued.body'))
-            ->success();
-
-        if ($email->scheduled_for !== null && $email->scheduled_for->isFuture()) {
-            $notification->actions([
-                Action::make('undo')
-                    ->label(__('filament/concerns/email-compose.actions.undo.label'))
-                    ->link()
-                    ->action(function () use ($email): void {
-                        try {
-                            resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
-                            Notification::make()->title(__('filament/concerns/email-compose.notifications.cancelled.title'))->success()->send();
-                        } catch (RuntimeException) {
-                            Notification::make()->title(__('filament/concerns/email-compose.notifications.too_late.title'))->danger()->send();
-                        }
-                    }),
-            ]);
-        }
-
-        $notification->send();
+        resolve(QueuedSendNotifier::class)->send($email);
     }
 
     /**
@@ -222,7 +213,7 @@ trait HasEmailComposeActions
         return [
             Select::make('connected_account_id')
                 ->label(__('filament/concerns/email-compose.fields.from.label'))
-                ->options(fn (): array => $this->activeAccountOptions())
+                ->options(fn (): array => $this->sendableAccountOptions())
                 ->required(),
 
             TagsInput::make('to')
@@ -377,7 +368,7 @@ trait HasEmailComposeActions
         /** @var Team|null $team */
         $team = filament()->getTenant();
 
-        return ConnectedAccount::hasActiveFor($this->getAuthenticatedUser(), $team);
+        return ConnectedAccount::hasConnectedFor($this->getAuthenticatedUser(), $team);
     }
 
     /**
@@ -387,34 +378,7 @@ trait HasEmailComposeActions
      */
     private function contactEmailSuggestions(): array
     {
-        $teamId = filament()->getTenant()?->getKey();
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            ->whereHas('email', fn (Builder $q): Builder => $q->where('team_id', $teamId))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function activeAccountOptions(): array
-    {
-        return ConnectedAccount::query()
-            ->where('user_id', $this->getAuthenticatedUser()->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->defaultFirst()
-            ->get()
-            ->mapWithKeys(fn (ConnectedAccount $account): array => [$account->getKey() => $account->label])
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->getAuthenticatedUser());
     }
 
     /**

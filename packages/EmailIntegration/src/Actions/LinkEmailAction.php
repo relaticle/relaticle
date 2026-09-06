@@ -17,6 +17,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
@@ -27,6 +28,7 @@ final readonly class LinkEmailAction
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
         private AutomatedSenderMatcher $automatedSender,
+        private EmailVisibilityService $visibility,
     ) {}
 
     /**
@@ -104,6 +106,11 @@ final readonly class LinkEmailAction
             // records but must never spawn a new Company/Person: there's no real
             // contact behind them.
             $isAutomatedSender = $this->automatedSender->matches($participant->email_address);
+            $suppressCreate = $this->visibility->suppressesRecordCreation(
+                $participant->email_address,
+                $teamId,
+                $email->connected_account_id,
+            );
 
             // 1. Try to match Company by email domain first, so the person can be born already linked.
             $company = null;
@@ -112,8 +119,17 @@ final readonly class LinkEmailAction
             if ($domain && $skippedDomains->doesntContain($domain)) {
                 $company = $this->domainMatcher->firstMatching($domain, $teamId);
 
-                // 2. Auto-create Company when no existing record found.
-                if (! $company && ! $isAutomatedSender && $team?->auto_create_companies) {
+                // 2. Auto-create Company when no existing record found. Blocked
+                // addresses must not spawn a company, and creation still follows
+                // the same All / Selective / None rule as people.
+                if (
+                    ! $company
+                    && ! $isAutomatedSender
+                    && ! $suppressCreate
+                    && $connectedAccount
+                    && $team
+                    && $this->shouldCreateCompany($team, $participant->email_address, $email)
+                ) {
                     $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
                 }
 
@@ -137,7 +153,7 @@ final readonly class LinkEmailAction
                 ->first();
 
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address, $email)) {
+            if (! $person && ! $isAutomatedSender && ! $suppressCreate && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address, $email)) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -191,6 +207,18 @@ final readonly class LinkEmailAction
                 || $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
         };
+    }
+
+    /**
+     * A company is created only when a person would be created for this address
+     * and the workspace company toggle is on. None never creates companies.
+     * Selective creates them only for addresses the workspace has emailed (or
+     * the outbound message being linked). All creates them for every eligible
+     * address.
+     */
+    private function shouldCreateCompany(Team $team, string $emailAddress, Email $email): bool
+    {
+        return $team->auto_create_companies && $this->shouldCreatePerson($team, $emailAddress, $email);
     }
 
     /**
@@ -265,6 +293,10 @@ final readonly class LinkEmailAction
      */
     private function incrementEmailMetrics(Model $record, Email $email): void
     {
+        if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
+            return;
+        }
+
         $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
 
         // Raw, parameterised UPDATE: counters increment atomically (no lost updates

@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Livewire\Concerns;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -35,6 +36,7 @@ trait InteractsWithEmailAccessRequests
         return $table
             ->query($this->requestsQuery())
             ->defaultSort('created_at', 'desc')
+            ->emptyStateIcon(Heroicon::OutlinedKey)
             ->columns([
                 TextColumn::make('requester.name')
                     ->label(__('filament/pages/email-access-requests.columns.requested_by'))
@@ -138,6 +140,7 @@ trait InteractsWithEmailAccessRequests
                 unset($this->pendingIncomingCount);
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.approved'))->send();
             });
@@ -168,6 +171,7 @@ trait InteractsWithEmailAccessRequests
                 unset($this->pendingIncomingCount);
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.denied'))->send();
             });
@@ -197,6 +201,7 @@ trait InteractsWithEmailAccessRequests
                 resolve(CancelEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
                 $this->resetTable();
                 $this->dispatch('access-requests:changed');
+                $this->dispatch('databaseNotificationsSent');
 
                 Notification::make()->success()->title(__('filament/pages/email-access-requests.notifications.cancelled'))->send();
             });

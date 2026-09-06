@@ -31,10 +31,15 @@ final class ConfigureMailboxAction extends Action
             ->visible(function (): bool {
                 /** @var User|null $user */
                 $user = auth()->user();
-                /** @var Team|null $team */
-                $team = filament()->getTenant();
 
-                return $user instanceof User && ! ConnectedAccount::hasActiveFor($user, $team);
+                if (! $user instanceof User) {
+                    return false;
+                }
+
+                $team = filament()->getTenant();
+                $team = $team instanceof Team ? $team : $user->currentTeam;
+
+                return ! ConnectedAccount::hasConnectedFor($user, $team instanceof Team ? $team : null);
             });
     }
 }

@@ -72,4 +72,15 @@ final class ConnectedAccountFactory extends Factory
             'daily_send_limit' => $daily,
         ]);
     }
+
+    public function withoutSend(): static
+    {
+        return $this->state(fn (): array => [
+            'capabilities' => [
+                'email' => true,
+                'send' => false,
+                'calendar' => false,
+            ],
+        ]);
+    }
 }

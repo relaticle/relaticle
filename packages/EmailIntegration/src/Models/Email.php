@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -247,9 +249,49 @@ final class Email extends Model
         return $this->participants->where('role', EmailParticipantRole::CC);
     }
 
-    public function aiLabel(): ?EmailLabel
+    /**
+     * The rule-based category stamped at sync. StoreEmailAction writes
+     * `source = system`. The unmatched Other fallback is stored, not shown.
+     */
+    public function categoryLabel(): ?EmailLabel
     {
-        return $this->labels->firstWhere('source', 'ai');
+        $label = $this->labels->firstWhere('source', 'system');
+
+        if (! $label instanceof EmailLabel) {
+            return null;
+        }
+
+        $category = EmailCategory::tryFrom($label->label);
+
+        if (! $category instanceof EmailCategory || ! $category->isVisible()) {
+            return null;
+        }
+
+        return $label;
+    }
+
+    /**
+     * Name of the mailbox that imported this email, for list-row "via …" copy.
+     * Prefer the provider display name on the connected account, then the
+     * teammate who linked that mailbox, then the address itself.
+     */
+    public function mailboxViaName(): ?string
+    {
+        $account = $this->connectedAccount;
+
+        if ($account !== null) {
+            if (filled($account->display_name)) {
+                return $account->display_name;
+            }
+
+            if (filled($account->user?->name)) {
+                return $account->user->name;
+            }
+
+            return $account->email_address ?: null;
+        }
+
+        return $this->user?->name;
     }
 
     /**
@@ -306,6 +348,22 @@ final class Email extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(EmailShare::class);
+    }
+
+    /**
+     * @return HasMany<EmailAccessRequest, $this>
+     */
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(EmailAccessRequest::class);
+    }
+
+    public function hasPendingAccessRequestFrom(User $viewer): bool
+    {
+        return $this->accessRequests()
+            ->where('requester_id', $viewer->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->exists();
     }
 
     /**

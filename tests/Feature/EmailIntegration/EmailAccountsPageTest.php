@@ -7,6 +7,9 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -18,7 +21,7 @@ use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
-mutates(EmailAccountsPage::class, ConnectedAccount::class);
+mutates(EmailAccountsPage::class, ConnectedAccount::class, HasConnectedAccountActions::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -32,10 +35,67 @@ beforeEach(function (): void {
     ]));
 });
 
-it('links editSettings to the per-account settings page', function (): void {
+it('links reconnect to the mailbox oauth redirect for the account provider', function (EmailProvider $provider): void {
+    $this->account->update(['provider' => $provider]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
+        ->assertActionHasUrl(
+            TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
+            route('email-accounts.redirect', ['provider' => $provider->value]),
+        )
+        ->assertActionDoesNotExist('reAuth');
+})->with([
+    'gmail' => EmailProvider::GMAIL,
+    'microsoft' => EmailProvider::AZURE,
+]);
+
+it('keeps reconnect visible when the mailbox cannot send', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->withoutSend()->make()->only(['capabilities']),
+    );
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]));
+});
+
+it('keeps reconnect available when the mailbox has a sync error', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
+        ->assertActionHasUrl(
+            TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
+            route('email-accounts.redirect', ['provider' => EmailProvider::GMAIL->value]),
+        )
+        ->assertActionDoesNotExist('reAuth');
+});
+
+it('keeps reconnect available when re-authentication is required', function (): void {
+    $this->account->update(['status' => EmailAccountStatus::REAUTH_REQUIRED]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
+        ->assertActionDoesNotExist('reAuth');
+});
+
+it('does not expose reconnect for another user\'s account', function (): void {
+    $otherUser = User::factory()->create(['current_team_id' => $this->team->id]);
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherUser->id,
+    ]));
+
+    livewire(EmailAccountsPage::class)
+        ->assertActionHidden(TestAction::make('reconnect')->arguments(['account_id' => $otherAccount->id]));
+});
+
+it('links accountSettings to the per-account settings page', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertActionHasUrl(
-            TestAction::make('editSettings')->arguments(['account_id' => $this->account->id]),
+            TestAction::make('accountSettings')->arguments(['account_id' => $this->account->id]),
             EmailAccountSettingsPage::getUrl(['account' => $this->account->id]),
         );
 });
@@ -187,6 +247,21 @@ it('does not re-import another user\'s account', function (): void {
 it('shows mailbox capabilities on each connected account', function (): void {
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.capabilities.email'));
+});
+
+it('warns when a connected mailbox cannot send', function (): void {
+    $this->account->update([
+        'sync_cursor' => 'done',
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.send_missing_tooltip'))
+        ->assertSee(__('filament/pages/email-accounts.in_sync'));
 });
 
 it('renders Connect Gmail and hides Connect Outlook for now', function (): void {

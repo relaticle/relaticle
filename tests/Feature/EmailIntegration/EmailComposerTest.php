@@ -18,18 +18,25 @@ use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -51,6 +58,179 @@ it('opens via the composer:open event with the default account preselected', fun
         ->assertSet('accountId', $this->account->id);
 });
 
+it('puts merge tags last on the message toolbar instead of the footer', function (): void {
+    $html = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->html();
+
+    expect($html)
+        ->toContain("togglePanel('mergeTags')")
+        ->not->toContain(__('filament/emails/composer.actions.variable'));
+
+    expect(strpos($html, "togglePanel('mergeTags')"))
+        ->toBeGreaterThan(strpos($html, 'redo().run()'));
+});
+
+it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.grant_send.description'))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'))
+        ->assertDontSee(__('filament/emails/composer.fields.subject_placeholder'));
+});
+
+it('opens the composer when a sync-error mailbox cannot send', function (): void {
+    $this->account->update([
+        'status' => EmailAccountStatus::ERROR,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]));
+});
+
+it('opens the grant permission empty state when a sync-error mailbox still has send', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'));
+});
+
+it('redirects to oauth when grant permission is clicked on a mailbox that needs reconnect', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('does not queue mail from send when the mailbox has a sync error', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
+it('redirects to oauth when grant permission is clicked', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('opens from a sendable mailbox when another connected account cannot send', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+        'capabilities' => [
+            'email' => true,
+            'send' => true,
+            'calendar' => false,
+        ],
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
+it('opens from a sendable mailbox when the default mailbox has a sync error', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        ...ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
+it('does not queue mail from send when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
 it('queues an email through SendEmailAction on send with the persisted body and undo-send window', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
@@ -58,7 +238,8 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->set('subject', 'Quarterly sync')
         ->set('bodyHtml', '<p>Hello there</p>')
         ->call('send')
-        ->assertSet('isOpen', false);
+        ->assertSet('isOpen', false)
+        ->assertDispatched('outbox:changed');
 
     $email = Email::query()->where('subject', 'Quarterly sync')->sole();
     expect($email->status)->toBe(EmailStatus::QUEUED)
@@ -67,6 +248,31 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         // Interactive sends must keep the priority queue's undo-send window
         // (EmailPriority::PRIORITY), not fall back to the bulk default.
         ->and($email->scheduled_for)->not->toBeNull();
+});
+
+it('offers undo on the queued toast for the undo window', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Undo me')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Undo me')->sole();
+    $notification = collect(session('filament.claimed_notifications'))
+        ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
+
+    expect($notification)->not->toBeNull()
+        ->and($notification['duration'])->toBe(5_000)
+        ->and(collect($notification['actions'])->pluck('name')->all())->toContain('undo');
+
+    expect(collect($notification['actions'])->firstWhere('name', 'undo'))
+        ->toMatchArray([
+            'label' => __('filament/concerns/email-compose.actions.undo.label'),
+            'event' => 'undo-queued-send',
+            'eventData' => ['emailId' => (string) $email->getKey()],
+            'dispatchToComponent' => EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+        ]);
 });
 
 it('includes the default signature content in the sent body_html', function (): void {
@@ -403,6 +609,78 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
         ->recipientSuggestions();
 
     expect($suggestions)->not->toContain('hidden-recipient@example.com');
+});
+
+it('excludes a teammate\'s private mail recipients from recipient suggestions', function (): void {
+    $address = 'private-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::PRIVATE, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes protected-recipient addresses from recipient suggestions', function (): void {
+    $address = 'vip@protected.example';
+
+    TeamEmailBlocklist::factory()->protected()->email($address)->create([
+        'team_id' => $this->user->current_team_id,
+        'created_by' => $this->user->id,
+    ]);
+
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes a teammate\'s BCC addresses from recipient suggestions', function (): void {
+    $bcc = 'secret-bcc@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $bcc, EmailParticipantRole::BCC);
+
+    expect(composerRecipientSuggestions())->not->toContain($bcc);
+});
+
+it('excludes a teammate\'s internal mail recipients from recipient suggestions', function (): void {
+    $address = 'internal-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO, isInternal: true);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('includes recipients from a teammate\'s workspace-visible mail in recipient suggestions', function (): void {
+    $address = 'shared-to@acme.test';
+    teammateSentEmail($this->user, EmailPrivacyTier::METADATA_ONLY, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->toContain($address);
+});
+
+it('includes the owner\'s own private and BCC addresses in recipient suggestions', function (): void {
+    $to = 'own-private@example.com';
+    $bcc = 'own-bcc@example.com';
+
+    $email = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'is_internal' => false,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $to,
+        'role' => EmailParticipantRole::TO,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $bcc,
+        'role' => EmailParticipantRole::BCC,
+    ]);
+
+    $suggestions = composerRecipientSuggestions();
+
+    expect($suggestions)->toContain($to)
+        ->and($suggestions)->toContain($bcc);
 });
 
 it('adds every company team member primary email to recipients', function (): void {
@@ -871,3 +1149,45 @@ it('drops a pending attachment when it is removed before sending', function (): 
     $email = Email::query()->where('subject', 'No attachment after all')->sole();
     expect($email->attachments()->pluck('filename')->all())->toBe(['keep.pdf']);
 });
+
+/**
+ * @return list<string>
+ */
+function composerRecipientSuggestions(): array
+{
+    return Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientSuggestions();
+}
+
+function teammateSentEmail(
+    User $viewer,
+    EmailPrivacyTier $privacyTier,
+    string $address,
+    EmailParticipantRole $role,
+    bool $isInternal = false,
+): void {
+    $teammate = User::factory()->create(['current_team_id' => $viewer->current_team_id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'team_id' => $viewer->current_team_id,
+        'status' => 'active',
+    ]));
+
+    $email = Email::factory()->create([
+        'team_id' => $viewer->current_team_id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => $privacyTier,
+        'is_internal' => $isInternal,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $address,
+        'role' => $role,
+    ]);
+}

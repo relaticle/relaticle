@@ -26,33 +26,34 @@ use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Concerns\RedirectsToGrantSend;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 final class EmailInboxPage extends Page
 {
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
+    use RedirectsToGrantSend;
     use WithPagination;
 
     protected string $view = 'filament.pages.email-inbox';
@@ -97,7 +98,6 @@ final class EmailInboxPage extends Page
     {
         $this->folder = EmailFolder::tryFrom((string) request()->query('folder', EmailFolder::Inbox->value)) ?? EmailFolder::Inbox;
         $this->accountId = $this->resolveInitialAccountId();
-
     }
 
     /**
@@ -144,7 +144,6 @@ final class EmailInboxPage extends Page
             // component, so the tab badges have to be told when those counts move.
             'drafts:changed' => 'refreshTabCounts',
             'outbox:changed' => 'refreshTabCounts',
-            'access-requests:changed' => 'refreshTabCounts',
         ];
     }
 
@@ -155,6 +154,12 @@ final class EmailInboxPage extends Page
 
     public function openReplyModal(string $emailId, string $mode): void
     {
+        if (! $this->sendableMailbox() instanceof ConnectedAccount) {
+            $this->mountAction('grantSendPermission');
+
+            return;
+        }
+
         $this->mountAction('replyForwardEmail', [
             'emailId' => $emailId,
             'mode' => $mode,
@@ -162,30 +167,8 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * @return array<int, Action>
-     */
-    protected function getHeaderActions(): array
-    {
-        return [
-            $this->composeEmailAction(),
-        ];
-    }
-
-    protected function composeEmailAction(): Action
-    {
-        return Action::make('composeEmail')
-            ->label(__('filament/concerns/email-compose.actions.compose.label'))
-            ->icon('heroicon-o-pencil-square')
-            ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
-            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
-            ->action(function (): void {
-                $this->dispatch('composer:open');
-            });
-    }
-
-    /**
-     * No page heading. The sidebar already marks Email as active; the header row
-     * carries only the compose action above the tab strip.
+     * No page heading. The sidebar already marks Email as active. Compose lives
+     * on the Drafts table so it does not appear on the other tabs.
      */
     public function getHeading(): string
     {
@@ -242,13 +225,19 @@ final class EmailInboxPage extends Page
             return null;
         }
 
-        /** @var Email|null */
-        return Email::query()
+        /** @var Email|null $email */
+        $email = Email::query()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->forTeam($this->authUser()->current_team_id)
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     /**
@@ -301,16 +290,9 @@ final class EmailInboxPage extends Page
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        // A reply answers the message that was open; it cannot stay docked under a
-        // different one. The composer saves whatever was typed as a draft.
-        $this->dispatch('composer:dismiss-inline');
-
-        // ...and if this message already has an unfinished reply, bring it back up.
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        if (! $this->openEmailReader($id)) {
+            return;
+        }
 
         unset($this->inboxUnreadCount);
     }
@@ -366,11 +348,6 @@ final class EmailInboxPage extends Page
                 ->where(fn (Builder $q): Builder => $q
                     ->where('is_shared', true)
                     ->orWhere('created_by', $user->getKey()))
-                ->count(),
-            EmailPageTab::REQUESTS->value => EmailAccessRequest::query()
-                ->where('owner_id', $user->getKey())
-                ->whereHas('email', fn (Builder $query): Builder => $query->where('team_id', $teamId))
-                ->where('status', EmailAccessRequestStatus::PENDING)
                 ->count(),
         ];
     }
@@ -460,11 +437,7 @@ final class EmailInboxPage extends Page
 
         $user = $this->authUser();
 
-        $account = ConnectedAccount::query()
-            ->where('user_id', $user->getKey())
-            ->where('team_id', filament()->getTenant()?->getKey())
-            ->where('status', 'active')
-            ->first();
+        $account = $this->sendableMailbox();
 
         $toParticipants = match ($mode) {
             'forward' => [],
@@ -515,11 +488,28 @@ final class EmailInboxPage extends Page
             default => EmailCreationSource::REPLY,
         };
 
-        resolve(SendEmailAction::class)->execute(
+        $team = filament()->getTenant();
+
+        if (! $team instanceof Team) {
+            return;
+        }
+
+        $account = ConnectedAccount::query()
+            ->ownedBy($this->authUser(), $team)
+            ->whereKey($data['connected_account_id'] ?? null)
+            ->first();
+
+        if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
+            $this->redirectToGrantSend($account);
+
+            return;
+        }
+
+        $email = resolve(SendEmailAction::class)->execute(
             data: $this->buildSendData($data, $source),
         );
 
-        Notification::make()->title(__('filament/pages/email-inbox.reply_forward.notifications.queued.title'))->success()->send();
+        resolve(QueuedSendNotifier::class)->send($email);
     }
 
     /**
@@ -545,74 +535,6 @@ final class EmailInboxPage extends Page
             ->all();
     }
 
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/email-inbox.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['email', 'owner', 'requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.approve_access_request.notifications.approved.title'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/email-inbox.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/email-inbox.deny_access_request.notifications.denied.title'))
-                    ->send();
-            });
-    }
-
     /**
      * @return array<int, mixed>
      */
@@ -621,7 +543,7 @@ final class EmailInboxPage extends Page
         return [
             Select::make('connected_account_id')
                 ->label(__('filament/pages/email-inbox.reply_form.from.label'))
-                ->options(fn (): array => $this->activeAccountOptions())
+                ->options(fn (): array => $this->sendableAccountOptions())
                 ->required(),
 
             TagsInput::make('to')
@@ -715,6 +637,7 @@ final class EmailInboxPage extends Page
      *     creation_source: EmailCreationSource,
      *     privacy_tier: EmailPrivacyTier,
      *     batch_id: null,
+     *     priority: EmailPriority,
      * }
      */
     private function buildSendData(array $data, EmailCreationSource $source): array
@@ -732,6 +655,7 @@ final class EmailInboxPage extends Page
             'creation_source' => $source,
             'privacy_tier' => $this->resolvePrivacyTier($data['privacy_tier'] ?? null),
             'batch_id' => null,
+            'priority' => EmailPriority::PRIORITY,
             'attachments' => $data['attachments'] ?? [],
             'attachment_file_names' => $data['attachment_file_names'] ?? [],
         ];
@@ -756,61 +680,11 @@ final class EmailInboxPage extends Page
     }
 
     /**
-     * Drives the "connect a mailbox" empty state, so it is read from the blade
-     * as a computed property.
-     */
-    #[Computed]
-    public function hasActiveConnectedAccount(): bool
-    {
-        /** @var Team|null $team */
-        $team = filament()->getTenant();
-
-        return ConnectedAccount::hasActiveFor($this->authUser(), $team);
-    }
-
-    /**
-     * Take the whole page over with the connect prompt only when the user has nothing
-     * to read here: teammates without a mailbox of their own still get the inbox for
-     * emails shared with them.
-     */
-    #[Computed]
-    public function showConnectPrompt(): bool
-    {
-        if ($this->hasActiveConnectedAccount()) {
-            return false;
-        }
-
-        $user = $this->authUser();
-
-        return Email::query()
-            ->forTeam($user->current_team_id)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->doesntExist();
-    }
-
-    /**
      * @return list<string>
      */
     private function contactEmailSuggestions(): array
     {
-        $teamId = filament()->getTenant()?->getKey();
-
-        /** @var list<string> */
-        return EmailParticipant::query()
-            // Drafts are private (never-sent, PRIVATE tier). Without this, a
-            // teammate's still-unsent draft leaks its to/cc/bcc addresses into
-            // everyone else's recipient autocomplete via this team-wide query.
-            ->whereHas('email', fn (Builder $q): Builder => $q
-                ->where('team_id', $teamId)
-                ->where('status', '!=', EmailStatus::DRAFT))
-            ->whereNotNull('email_address')
-            ->select('email_address')
-            ->distinct()
-            ->orderBy('email_address')
-            ->limit(300)
-            ->pluck('email_address')
-            ->values()
-            ->all();
+        return resolve(RecipientSuggestionService::class)->addressesFor($this->authUser());
     }
 
     /**

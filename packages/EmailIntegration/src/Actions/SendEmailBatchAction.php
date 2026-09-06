@@ -28,9 +28,9 @@ final readonly class SendEmailBatchAction
      * All-or-nothing: SendEmailAction throws once the per-user queue cap is hit.
      * Without a transaction a mid-loop failure would leave the batch with
      * total_recipients set to the full count but only some emails queued, so
-     * sent_count+failed_count can never reach total and the batch is stuck
-     * Queued forever. Wrap creation + every send so a failure rolls all of it
-     * back, leaving no orphaned batch.
+     * sent, failed, and cancelled counts can never reach total and the batch
+     * is stuck Queued forever. Wrap creation + every send so a failure rolls
+     * all of it back, leaving no orphaned batch.
      *
      * @param  list<array{person: People, email: string}>  $recipients
      * @param  array{connected_account_id: string, subject: string, body_html: string}  $payload

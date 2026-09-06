@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
-use App\Features\EmailIntegration;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
@@ -20,8 +19,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Js;
-use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
 
 final class ViewOpportunity extends ViewRecord
 {
@@ -30,11 +29,8 @@ final class ViewOpportunity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('viewEmails')
+            ViewRecordEmailsAction::make()
                 ->label(__('filament/resources/opportunity.pages.view.actions.view_emails.label'))
-                ->icon('heroicon-o-envelope')
-                ->color('gray')
-                ->visible(fn (): bool => Feature::active(EmailIntegration::class))
                 ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
             ActionGroup::make([

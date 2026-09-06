@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -19,8 +20,9 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, EmailSendingService::class);
+mutates(SendEmailAction::class, EmailSendingService::class, ConnectedAccount::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -60,6 +62,49 @@ it('persists a queued Email row for the outbox', function (): void {
         // A stable Message-ID is stamped at queue time for retry de-duplication.
         ->and($email->rfc_message_id)->toMatch('/^<[0-9A-Za-z]+@.+>$/');
 });
+
+it('forbids queuing mail when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello World',
+        'body_html' => '<p>Test</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]))->toThrow(HttpException::class);
+});
+
+it('forbids queuing mail when the mailbox is not active', function (EmailAccountStatus $status): void {
+    $this->account->update(['status' => $status]);
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello World',
+        'body_html' => '<p>Test</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]))->toThrow(HttpException::class);
+})->with([
+    'error' => EmailAccountStatus::ERROR,
+    'reauth required' => EmailAccountStatus::REAUTH_REQUIRED,
+]);
 
 it('ignores an in_reply_to_email_id that belongs to another team', function (): void {
     // An email owned by a different tenant, with its own active connected account so

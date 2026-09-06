@@ -80,7 +80,7 @@ return [
             'hourly_send_limit' => (int) env('EMAIL_DEFAULT_HOURLY_LIMIT', 12),
             'daily_send_limit' => (int) env('EMAIL_DEFAULT_DAILY_LIMIT', 200),
         ],
-        'undo_send_window_seconds' => (int) env('EMAIL_UNDO_SEND_WINDOW', 30),
+        'undo_send_window_seconds' => (int) env('EMAIL_UNDO_SEND_WINDOW', 5),
         'max_queued_per_user' => (int) env('EMAIL_MAX_QUEUED_PER_USER', 100),
 
         /*

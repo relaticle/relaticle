@@ -1,7 +1,3 @@
-@php
-    $sanitizer = app(\Relaticle\EmailIntegration\Services\HtmlSanitizerService::class);
-@endphp
-
 <div class="space-y-3">
     @forelse ($this->signatures as $signature)
         <div class="rounded-xl border border-gray-200 p-4 dark:border-white/10">
@@ -25,7 +21,7 @@
             </div>
 
             <div class="prose prose-sm dark:prose-invert mt-3 max-w-none rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
-                {!! $sanitizer->sanitizeRichText($signature->content_html) !!}
+                {!! app(\Relaticle\EmailIntegration\Services\HtmlSanitizerService::class)->sanitizeRichText($signature->content_html) !!}
             </div>
         </div>
     @empty
@@ -42,10 +38,4 @@
             </div>
         </div>
     @endforelse
-
-    @if ($this->signatures->isNotEmpty())
-        <div class="flex justify-center rounded-xl border border-dashed border-gray-300 p-3 dark:border-white/20">
-            {{ $this->createSignatureAction }}
-        </div>
-    @endif
 </div>

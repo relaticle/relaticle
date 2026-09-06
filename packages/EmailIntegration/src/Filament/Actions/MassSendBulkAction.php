@@ -44,7 +44,7 @@ final class MassSendBulkAction extends BulkAction
 
                 return Feature::active(EmailIntegration::class)
                     && $user instanceof User
-                    && ConnectedAccount::hasActiveFor($user, $team);
+                    && ConnectedAccount::hasSendableFor($user, $team);
             })
             ->schema([
                 Select::make('connected_account_id')
