@@ -33,4 +33,5 @@ enum CustomFieldType: string
     case MULTI_SELECT = 'multi-select';
     case FILE_UPLOAD = 'file-upload';
     case RECORD = 'record';
+    case RELATIONSHIP = 'relationship';
 }

@@ -31,6 +31,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\LinkActorResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -81,6 +82,10 @@ final readonly class PendingActionService
         AddCustomFieldOptions::class,
         CreateTeamInvitation::class,
     ];
+
+    public function __construct(
+        private LinkActorResolver $linkActor,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $actionData
@@ -178,6 +183,8 @@ final readonly class PendingActionService
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
 
+        $previousActor = $this->linkActor->override($this->actorFor($pendingAction, $user));
+
         try {
             $resolved = DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
                 /** @var PendingAction $pendingAction */
@@ -221,11 +228,27 @@ final readonly class PendingActionService
             });
         } finally {
             TenantContextService::setTenantId($previousTenantId);
+            $this->linkActor->override($previousActor);
         }
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
         return $resolved;
+    }
+
+    /**
+     * Who a link written by this approval is credited to. Nothing is signed in when the
+     * resolution runs from a queue or a command, and the proposal's own user is the
+     * answer there; the relation is never read, because a plan approval hydrates every
+     * step and strict lazy loading arms on the second row.
+     */
+    private function actorFor(PendingAction $pendingAction, User $user): User
+    {
+        if ((string) $user->getKey() === (string) $pendingAction->user_id) {
+            return $user;
+        }
+
+        return User::query()->find($pendingAction->user_id) ?? $user;
     }
 
     public function reject(PendingAction $pendingAction, User $user): PendingAction
@@ -304,6 +327,7 @@ final readonly class PendingActionService
 
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($pendingAction->team_id);
+        $previousActor = $this->linkActor->override($this->actorFor($pendingAction, $user));
 
         try {
             [$finalized, $record, $itemStatus] = DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
@@ -349,6 +373,7 @@ final readonly class PendingActionService
             });
         } finally {
             TenantContextService::setTenantId($previousTenantId);
+            $this->linkActor->override($previousActor);
         }
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);

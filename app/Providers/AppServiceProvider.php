@@ -40,6 +40,7 @@ use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\LinkActorResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
@@ -72,6 +73,7 @@ use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\CustomFields\Contracts\LinkActorResolverInterface;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\Ink\Filament\Resources\PostResource;
@@ -477,6 +479,14 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useValueModel(CustomFieldValue::class);
         CustomFields::useRelationshipModel(CustomFieldRelationship::class);
         CustomFields::useLinkModel(CustomFieldLink::class);
+
+        // Both bindings resolve one instance: a caller that names the actor for its own
+        // write reaches for the class, and the package's writer for the interface.
+        $this->app->singleton(LinkActorResolver::class);
+        $this->app->singleton(
+            LinkActorResolverInterface::class,
+            fn (Application $app): LinkActorResolver => $app->make(LinkActorResolver::class),
+        );
 
         // Replaces the package's definitions so custom-field dates read the same as the
         // native columns beside them: `date-time` swaps the table column, which otherwise
