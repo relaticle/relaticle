@@ -1,7 +1,8 @@
 # Custom Fields 4.0, Phase 1: Foundation
 
-Status: approved. Program: Custom Fields 4.0, five phases (1 foundation, 2 option semantics,
-3 relationship substrate, 4 relationship UX and tables, 5 host adoption and release).
+Status: approved. Program: Custom Fields 4.0, six phases (1 foundation, 2 option semantics,
+3 relationship substrate, 4 relationship UX and tables, 5 host adoption and release,
+6 AI autofill, draft).
 Plans for this phase: 2026-09-03-cf4-p1.1-housekeeping.md.
 Tracking: relaticle/custom-fields#210.
 

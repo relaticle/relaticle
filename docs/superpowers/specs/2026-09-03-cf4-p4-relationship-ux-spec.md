@@ -1,6 +1,6 @@
 # Custom Fields 4.0, Phase 4: Relationship UX and Table Surfaces
 
-Status: approved design. Program: Custom Fields 4.0 (phase 4 of 5).
+Status: approved design. Program: Custom Fields 4.0 (phase 4 of 6).
 Plans: 2026-09-03-cf4-p4.1-relationship-ux.md, 2026-09-03-cf4-p4.2-through-relations.md,
 2026-09-03-cf4-p4.3-bulk-paste.md. Depends on the phase 3 substrate.
 Tracking: relaticle/custom-fields#210.

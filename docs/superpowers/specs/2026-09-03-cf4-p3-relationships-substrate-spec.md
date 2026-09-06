@@ -1,6 +1,6 @@
 # Custom Fields 4.0, Phase 3: Relationship Substrate
 
-Status: approved design. Program: Custom Fields 4.0 (phase 3 of 5).
+Status: approved design. Program: Custom Fields 4.0 (phase 3 of 6).
 Plans: 2026-09-03-cf4-p3.1-substrate.md, 2026-09-03-cf4-p3.2-retirement.md.
 Origin: discussion relaticle/relaticle#469 and the brainstorm that followed it.
 Tracking: relaticle/custom-fields#210. UI for this substrate: the phase 4 spec.

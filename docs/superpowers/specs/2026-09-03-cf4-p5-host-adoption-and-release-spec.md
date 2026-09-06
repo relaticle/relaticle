@@ -1,6 +1,6 @@
 # Custom Fields 4.0, Phase 5: Host Adoption and Release
 
-Status: approved. Program: Custom Fields 4.0 (phase 5 of 5).
+Status: approved. Program: Custom Fields 4.0 (phase 5 of 6).
 Plans: 2026-09-03-cf4-p5.1-relaticle-adoption.md (relaticle/relaticle),
 2026-09-03-cf4-p5.2-release.md (package release). Depends on phases 1 through 4 tagged.
 Tracking: relaticle/custom-fields#210.
@@ -37,7 +37,8 @@ in 4.2 is ever packaged.
 ## 4.3 Deferred
 
 Inferred edges, confidence scoring, graph visualization, multi-hop UI. Gated on relaticle#91
-and relaticle#495.
+and relaticle#495. AI autofill of field values is phase 6
+(2026-09-06-cf4-p6-ai-autofill-spec.md), not part of this deferral.
 
 ## 5.2 Licensing
 

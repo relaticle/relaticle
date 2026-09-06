@@ -1,6 +1,6 @@
 # Custom Fields 4.0, Phase 2: Option Categories
 
-Status: approved. Program: Custom Fields 4.0 (phase 2 of 5).
+Status: approved. Program: Custom Fields 4.0 (phase 2 of 6).
 Plans: 2026-09-03-cf4-p2.1-option-categories-package.md (package),
 2026-09-03-cf4-p2.2-option-categories-host.md (Relaticle consumers).
 Closes relaticle/relaticle#556 once both plans land. Tracking: relaticle/custom-fields#210.
