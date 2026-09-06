@@ -968,12 +968,18 @@ describe('Page metadata', function () {
         ['/terms-of-service', true],
     ]);
 
-    it('gives the blog index, a category and a tag page bounded titles and descriptions', function () {
-        $category = Category::factory()->create(['name' => 'Comparisons']);
-        $tag = Tag::factory()->create(['name' => 'self-hosting']);
+    it('bounds the blog index metadata and names the taxonomy on a category and tag page', function () {
+        $category = Category::factory()->create(['name' => 'Guides']);
+        $tag = Tag::factory()->create(['name' => 'mcp']);
         Post::factory()->published()->create(['category_id' => $category->id]);
 
-        foreach (['/blog', "/blog/category/{$category->slug}", "/blog/tag/{$tag->slug}"] as $path) {
+        $listings = [
+            '/blog' => null,
+            "/blog/category/{$category->slug}" => $category->name,
+            "/blog/tag/{$tag->slug}" => $tag->name,
+        ];
+
+        foreach ($listings as $path => $taxonomy) {
             $html = $this->get($path)->assertOk()->getContent();
 
             preg_match('/<title>(.*?)<\/title>/s', $html, $title);
@@ -984,9 +990,17 @@ describe('Page metadata', function () {
 
             expect($titleText)->toEndWith(' - '.config('app.name'), $path)
                 ->and(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
-                ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(30, "{$path} title: {$titleText}")
                 ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
                 ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}");
+
+            if ($taxonomy !== null) {
+                expect($titleText)->toContain($taxonomy)
+                    ->and($descriptionText)->toContain($taxonomy);
+
+                continue;
+            }
+
+            expect(mb_strlen($titleText))->toBeGreaterThanOrEqual(30, "{$path} title: {$titleText}");
         }
     });
 
