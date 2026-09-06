@@ -27,7 +27,7 @@ trait ResolvesEntitySchema
                 ->where('entity_type', $entityType)
                 ->active()
                 ->select('id', 'code', 'name', 'type', 'validation_rules')
-                ->with(['options:id,custom_field_id,name'])
+                ->with(['options:id,custom_field_id,name,settings'])
                 ->get();
 
             return $this->formatCustomFields($fields);
@@ -74,6 +74,7 @@ trait ResolvesEntitySchema
                 $entry['options'] = $field->options->map(fn (CustomFieldOption $option): array => [
                     'id' => $option->id,
                     'label' => $option->name,
+                    'category' => $option->settings->category?->value,
                 ])->all();
             }
 

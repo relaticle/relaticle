@@ -341,6 +341,22 @@ it('reports won and lost value on the stage category, not the stage name', funct
             ->etc());
 });
 
+it('publishes the option category in the entity schema and the field listing', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => 'task'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('custom_fields.status.options.2.label', 'Done')
+            ->where('custom_fields.status.options.2.category', 'completed')
+            ->where('custom_fields.priority.options.0.category', null)
+            ->etc());
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListCustomFieldsTool::class, ['entity_type' => 'task'])
+        ->assertOk()
+        ->assertSee('"category":"completed"');
+});
+
 it('keeps custom-field definition reads scoped to the current team', function (): void {
     $other = User::factory()->withPersonalTeam()->create();
     $otherField = CustomField::query()

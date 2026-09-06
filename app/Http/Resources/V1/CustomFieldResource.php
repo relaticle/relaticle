@@ -35,6 +35,7 @@ final class CustomFieldResource extends JsonApiResource
             'options' => $this->whenLoaded('options', fn () => $this->options->map(fn (CustomFieldOption $option): array => [
                 'label' => $option->name,
                 'value' => $option->id,
+                'category' => $option->settings->category?->value,
             ])->all()),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

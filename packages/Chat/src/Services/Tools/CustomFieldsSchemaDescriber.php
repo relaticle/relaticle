@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\Team;
 use Relaticle\Chat\Support\PromptText;
 use Relaticle\CustomFields\Enums\FieldDataType;
+use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
@@ -27,7 +28,7 @@ final readonly class CustomFieldsSchemaDescriber
             ->where('entity_type', $entityType)
             ->orderByDesc('active')
             ->orderBy('code')
-            ->with(['options:id,custom_field_id,name'])
+            ->with(['options:id,custom_field_id,name,settings'])
             ->get();
 
         if ($fields->isEmpty()) {
@@ -85,7 +86,7 @@ final readonly class CustomFieldsSchemaDescriber
             // forge extra schema lines, so they go through the same sanitizer every
             // label in the system prompt already uses.
             $labels = $field->options
-                ->map(fn (CustomFieldOption $opt): string => '"'.PromptText::sanitize($opt->name, 120).'"')
+                ->map(fn (CustomFieldOption $opt): string => $this->describeOption($opt))
                 ->implode(', ');
             $base .= ", one of: {$labels}";
         }
@@ -96,6 +97,18 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         return $base.')';
+    }
+
+    /**
+     * The category is what the option means, so the assistant can pick the finished
+     * or cancelled state of a workflow without reading the tenant's wording.
+     */
+    private function describeOption(CustomFieldOption $option): string
+    {
+        $label = '"'.PromptText::sanitize($option->name, 120).'"';
+        $category = $option->settings->category;
+
+        return $category instanceof OptionCategory ? "{$label} [{$category->value}]" : $label;
     }
 
     private function humanType(?FieldDataType $dataType, string $rawType): string
