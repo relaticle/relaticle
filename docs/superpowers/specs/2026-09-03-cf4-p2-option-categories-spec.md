@@ -21,6 +21,16 @@ The change is additive, and it ships in 4.x only, no 3.x backport: the options e
 changes once (with bulk paste, phase 4) and the host sweep lands in the same Relaticle
 release as the substrate bump.
 
+## Amendment 2026-09-06: a Status field type
+
+The maintainer decided that Record, Relationship and Status are three distinct field types
+and are never combined. Option categories therefore belong to a dedicated `status` field
+type (a single-choice field whose options carry a category), not to every select. A plain
+Select never shows a category column, the `FIELD_OPTION_CATEGORIES` flag retires, and the
+host seeds its Task status and Opportunity stage fields as Status fields (converting the
+existing seeded selects in the backfill). Storage and the read API are unchanged. Plan 2.3
+carries the package half; plan 2.2 Tasks 1 and 2 follow it.
+
 ## Answers to the six deliverables #556 asked for
 
 1. Model: one category per option from a closed vocabulary, `OptionCategory`:
