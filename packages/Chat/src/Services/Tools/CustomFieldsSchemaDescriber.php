@@ -10,7 +10,9 @@ use Relaticle\Chat\Support\PromptText;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Enums\OptionCategory;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 
 final readonly class CustomFieldsSchemaDescriber
@@ -77,6 +79,12 @@ final readonly class CustomFieldsSchemaDescriber
 
     private function describeField(CustomField $field): string
     {
+        $definition = $field->relationshipDefinition();
+
+        if ($definition instanceof CustomFieldRelationship) {
+            return "{$field->code} (".$this->describeLink($field, $definition).')';
+        }
+
         $typeData = CustomFieldsType::getFieldType($field->type);
         $dataType = $typeData?->dataType;
 
@@ -100,6 +108,64 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         return $base.')';
+    }
+
+    /**
+     * A field that links records. The value is always a list of record ids, so the
+     * assistant is told what it points at, how many it may hold, and, where the far end
+     * holds one record at a time, the flag that confirms taking it from its current
+     * holder. Without that last part the write comes back as a validation error the
+     * model cannot act on.
+     */
+    private function describeLink(CustomField $field, CustomFieldRelationship $definition): string
+    {
+        $target = $definition->targetEntityTypeFor($field);
+
+        $parts = [$field->allowsMultipleRecords()
+            ? "links to {$target} records, an array of record ids"
+            : "links to one {$target} record, an array holding at most one record id"];
+
+        $parts[] = 'ids only, never names: look the record up first (SearchCrmTool or a list tool with lookup: true), '
+            .'or reference a record proposed earlier in this same turn as "$ref:<pending_action_id>"';
+
+        $farField = $this->farField($definition, $field);
+
+        if ($farField instanceof BaseCustomField) {
+            $parts[] = 'the same link reads back on the '.$target.' as "'.PromptText::sanitize($farField->name, 120).'"';
+        }
+
+        $parts[] = 'relationship "'.PromptText::sanitize($definition->code, 120).'", '.$definition->cardinality->value;
+
+        if ($this->farSideHoldsOne($definition, $field)) {
+            $parts[] = "a {$target} already linked to another record is only moved when you send "
+                .'{"ids": ["<id>"], "replace": true}';
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * The slot the far end renders, when the relationship is paired. A one-way link has
+     * none, and its target shows nothing at all.
+     */
+    private function farField(CustomFieldRelationship $definition, CustomField $field): ?BaseCustomField
+    {
+        $farId = $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+            ? $definition->to_field_id
+            : $definition->from_field_id;
+
+        if ($farId === null || (string) $farId === (string) $field->getKey()) {
+            return null;
+        }
+
+        return CustomField::query()->withoutGlobalScopes()->find($farId);
+    }
+
+    private function farSideHoldsOne(CustomFieldRelationship $definition, CustomField $field): bool
+    {
+        return $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+            ? $definition->cardinality->toSideIsSingle()
+            : $definition->cardinality->fromSideIsSingle();
     }
 
     /**

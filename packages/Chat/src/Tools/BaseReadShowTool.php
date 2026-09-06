@@ -40,6 +40,9 @@ abstract class BaseReadShowTool implements Tool
      */
     private const string CUSTOM_FIELD_RELATION = 'customFieldValues.customField.options';
 
+    /** @var list<string> */
+    private const array LINK_RELATIONS = ['outgoingLinks.toEntity', 'incomingLinks.fromEntity'];
+
     /**
      * Custom field types whose values are free-form prose that can run to
      * kilobytes of markup (rich text) or long paragraphs (plain long text).
@@ -84,7 +87,9 @@ abstract class BaseReadShowTool implements Tool
     /** @return array<int, string> */
     protected function eagerLoad(): array
     {
-        return [self::CUSTOM_FIELD_RELATION];
+        // The far end of every link comes with the link, so the card can name the records
+        // this one points at without a query per chip.
+        return [self::CUSTOM_FIELD_RELATION, ...self::LINK_RELATIONS];
     }
 
     /**

@@ -536,6 +536,11 @@ abstract class BaseReadListTool implements Tool
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
         $citationType = $this->citationType();
 
+        // One pass for the whole page: the link rows are already loaded, and their far
+        // ends load in one query per record type, which is what lets a link field render
+        // a chip per row without a query per row.
+        new Collection($records)->loadMissing(['outgoingLinks.toEntity', 'incomingLinks.fromEntity']);
+
         $rows = [];
 
         foreach ($records as $record) {

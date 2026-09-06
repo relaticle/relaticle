@@ -34,8 +34,21 @@ final readonly class RecordNameResolver
      */
     public function names(?array $ids, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
     {
+        return implode(', ', $this->labels($ids, $modelClass, $team, $nameAttribute));
+    }
+
+    /**
+     * The same names, one per record, for the surfaces that draw a chip each rather than
+     * one sentence.
+     *
+     * @param  array<array-key, mixed>|null  $ids
+     * @param  class-string<Model>  $modelClass
+     * @return list<string>
+     */
+    public function labels(?array $ids, string $modelClass, ?Team $team, string $nameAttribute = 'name'): array
+    {
         if ($ids === null || $ids === []) {
-            return '';
+            return [];
         }
 
         // One query for the stored ids, not one per id. This runs inside the
@@ -76,7 +89,7 @@ final readonly class RecordNameResolver
             }
         }
 
-        return implode(', ', $names);
+        return $names;
     }
 
     /**

@@ -61,6 +61,7 @@ final readonly class ValidCustomFields implements ValidationRule
                 }
 
                 $this->addChoiceFieldOptionRules($customField, $rules);
+                $this->addLinkTargetRules($customField, $rules);
             }
         }
 
@@ -95,6 +96,24 @@ final readonly class ValidCustomFields implements ValidationRule
         $unknownList = implode(', ', $unknownKeys);
 
         $fail("Unknown custom field keys: {$unknownList}.");
+    }
+
+    /**
+     * A link field's payload holds record ids, and nothing under the package checks that
+     * they belong to this workspace: its reachability query runs on the target model,
+     * which carries no team scope here.
+     *
+     * @param  array<string, array<int, mixed>>  $rules
+     */
+    private function addLinkTargetRules(BaseCustomField $customField, array &$rules): void
+    {
+        if (! $customField->relationshipDefinition() instanceof CustomFieldRelationship) {
+            return;
+        }
+
+        $ruleKey = "custom_fields.{$customField->code}";
+
+        $rules[$ruleKey] = array_merge($rules[$ruleKey] ?? [], [new OwnedLinkTargets($customField, $this->tenantId)]);
     }
 
     /**

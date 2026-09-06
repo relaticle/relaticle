@@ -12,7 +12,6 @@ use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
-use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Services\ValidationService;
 
 /**
@@ -132,8 +131,9 @@ final readonly class ProposalFieldSchemaDescriber
     {
         return $field->type === CustomFieldType::FILE_UPLOAD->value
             || $dataType === FieldDataType::FILE
-            || $field->type === CustomFieldType::RECORD->value
-            || $field->relationshipDefinition() instanceof CustomFieldRelationship;
+            // Every field type that points at records, whether or not a definition was
+            // ever created for this one: the picker behind it needs the record page.
+            || CustomFieldsType::getFieldType($field->type)?->requiresRelationship === true;
     }
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string

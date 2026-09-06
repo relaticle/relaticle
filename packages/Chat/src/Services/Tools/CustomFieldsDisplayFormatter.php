@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Support\RecordNameResolver;
+use Relaticle\CustomFields\Data\RecordLinkPayload;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomFieldLink;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Services\Relationships\LinkReader;
 
 final readonly class CustomFieldsDisplayFormatter
 {
@@ -47,6 +54,14 @@ final readonly class CustomFieldsDisplayFormatter
         foreach ($cleanFields as $code => $newValue) {
             $field = $fields->get($code);
             if (! $field instanceof CustomField) {
+                continue;
+            }
+
+            $definition = $field->relationshipDefinition();
+
+            if ($definition instanceof CustomFieldRelationship) {
+                $rows[] = $this->linkRow($user, $field, $definition, (string) $code, $newValue, $oldModel);
+
                 continue;
             }
 
@@ -114,6 +129,24 @@ final readonly class CustomFieldsDisplayFormatter
         $rows = [];
 
         foreach ($fields as $field) {
+            $definition = $field->relationshipDefinition();
+
+            if ($definition instanceof CustomFieldRelationship) {
+                $names = $this->loadedLinkNames($model, $field, $definition);
+
+                if ($names !== []) {
+                    $rows[] = [
+                        'label' => $field->name,
+                        'code' => $field->code,
+                        'value' => implode(', ', $names),
+                        'type' => 'badges',
+                        'values' => $names,
+                    ];
+                }
+
+                continue;
+            }
+
             $stored = $byFieldId->get($field->getKey());
 
             if (! $stored instanceof CustomFieldValue) {
@@ -207,6 +240,124 @@ final readonly class CustomFieldsDisplayFormatter
         $oneLine = Str::squish($value);
 
         return $limit === null ? $oneLine : Str::limit($oneLine, $limit);
+    }
+
+    /**
+     * A link field's proposal row: the records it will point at, as chips, beside the
+     * ones it points at now. A record proposed earlier in this turn resolves to its
+     * proposed name, so the card never shows an approval the user was not told about.
+     *
+     * @return array{label: string, code: string, new: string|null, type: string, values: list<string>, old?: string|null, _oldValue?: mixed, _newValue?: mixed}
+     */
+    private function linkRow(User $user, CustomField $field, CustomFieldRelationship $definition, string $code, mixed $newValue, ?Model $oldModel): array
+    {
+        $newIds = RecordLinkPayload::fromValue($newValue)->ids;
+        $names = $this->recordNames($user, $definition, $field, $newIds);
+
+        $row = [
+            'label' => $field->name,
+            'code' => $code,
+            'new' => $names === [] ? null : implode(', ', $names),
+            'type' => 'badges',
+            'values' => $names,
+        ];
+
+        if (! $oldModel instanceof Model) {
+            return $row;
+        }
+
+        // The current edges, not a value row: a link field has none. This is the same
+        // read the record page makes, so both sides of the diff agree.
+        $oldIds = $this->currentLinkIds($oldModel, $field);
+        $oldNames = $this->recordNames($user, $definition, $field, $oldIds);
+
+        $row['old'] = $oldNames === [] ? null : implode(', ', $oldNames);
+        $row['_oldValue'] = $oldIds;
+        $row['_newValue'] = $newIds;
+
+        return $row;
+    }
+
+    /**
+     * @param  array<int, int|string>  $ids
+     * @return list<string>
+     */
+    private function recordNames(User $user, CustomFieldRelationship $definition, CustomField $field, array $ids): array
+    {
+        $entityType = $definition->targetEntityTypeFor($field);
+        $modelClass = Relation::getMorphedModel($entityType);
+
+        if ($modelClass === null || ! is_subclass_of($modelClass, Model::class)) {
+            return [];
+        }
+
+        return resolve(RecordNameResolver::class)->labels(
+            $ids,
+            $modelClass,
+            $user->currentTeam,
+            CrmEntity::tryFrom($entityType)?->titleColumn() ?? 'name',
+        );
+    }
+
+    /**
+     * @return array<int, int|string>
+     */
+    private function currentLinkIds(Model $model, CustomField $field): array
+    {
+        if (! method_exists($model, 'getCustomFieldValue')) {
+            return [];
+        }
+
+        $ids = $model->getCustomFieldValue($field);
+
+        return is_array($ids) ? array_values($ids) : [];
+    }
+
+    /**
+     * The names a record's links already carry, read from the relations the caller
+     * loaded for the whole page. A display block is a summary, so an unloaded relation
+     * skips the field rather than paying a query per row for it.
+     *
+     * @return list<string>
+     */
+    private function loadedLinkNames(Model $model, CustomField $field, CustomFieldRelationship $definition): array
+    {
+        if (! $model->relationLoaded('outgoingLinks') || ! $model->relationLoaded('incomingLinks')) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach (resolve(LinkReader::class)->orderedLinksFor($model, $definition, $definition->readDirectionFor($field)) as $link) {
+            $relation = $this->farEndRelation($link, $model);
+
+            if (! $link->relationLoaded($relation)) {
+                return [];
+            }
+
+            $far = $link->getRelation($relation);
+
+            if (! $far instanceof Model) {
+                continue;
+            }
+
+            $column = CrmEntity::tryFrom($far->getMorphClass())?->titleColumn() ?? 'name';
+            $name = $far->getAttribute($column);
+
+            if (is_string($name) && $name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    private function farEndRelation(CustomFieldLink $link, Model $model): string
+    {
+        $isFromEnd = $link->from_entity_type === $model->getMorphClass()
+            && (string) $link->from_entity_id === (string) $model->getKey();
+
+        return $isFromEnd ? 'toEntity' : 'fromEntity';
     }
 
     private function renderValue(CustomField $field, mixed $value): ?string
