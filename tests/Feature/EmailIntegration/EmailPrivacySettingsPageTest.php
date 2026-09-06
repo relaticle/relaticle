@@ -299,6 +299,28 @@ it('saves auto_create_companies when the record creation tab is saved', function
     expect($this->team->fresh()->auto_create_companies)->toBeFalse();
 });
 
+it('turns off company creation when record creation is saved as None', function (): void {
+    $this->team->update(['auto_create_companies' => true]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->set('contact_creation_mode', ContactCreationMode::None->value)
+        ->assertSet('auto_create_companies', false)
+        ->callAction('save')
+        ->assertNotified('Privacy settings saved.');
+
+    expect($this->team->fresh()->contact_creation_mode)->toBe(ContactCreationMode::None)
+        ->and($this->team->fresh()->auto_create_companies)->toBeFalse();
+});
+
+it('disables the company creation switch when record creation is None', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::None]);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'record_creation')
+        ->assertSeeHtml('disabled');
+});
+
 it('does not save record creation settings when adding a visibility entry', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'record_creation')

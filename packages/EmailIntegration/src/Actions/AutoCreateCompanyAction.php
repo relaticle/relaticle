@@ -27,21 +27,25 @@ final readonly class AutoCreateCompanyAction
      * advisory lock so two StoreEmailJob/calendar workers processing the first
      * email from a brand-new domain in parallel can't both miss the match and
      * create duplicate companies: the first holder creates, the rest re-check
-     * inside the lock and reuse it.
+     * inside the lock and reuse it. The lock key is the full host www.
+     * stripped). Distinct hosts such as accounts.printtest.com and
+     * ideas.printtest.com do not share a lock.
      */
     public function execute(string $domain, string $teamId, Team $team): Company
     {
-        return $this->advisoryLock->transactional("auto-create-company:{$teamId}:{$domain}", function () use ($domain, $teamId, $team): Company {
+        $host = $this->domainMatcher->host($domain);
+
+        return $this->advisoryLock->transactional("auto-create-company:{$teamId}:{$host}", function () use ($host, $teamId, $team): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.
-            $existing = $this->domainMatcher->firstMatching($domain, $teamId);
+            $existing = $this->domainMatcher->firstMatching($host, $teamId);
 
             if ($existing instanceof Company) {
                 return $existing;
             }
 
-            return $this->createCompany($domain, $teamId, $team);
+            return $this->createCompany($host, $teamId, $team);
         });
     }
 
