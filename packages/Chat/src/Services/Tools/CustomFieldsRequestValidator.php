@@ -8,13 +8,19 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Validator;
+use Relaticle\Chat\Support\PlanReference;
+use Relaticle\CustomFields\Data\RecordLinkPayload;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
 final readonly class CustomFieldsRequestValidator
 {
     public function __construct(
         private CustomFieldOptionMap $optionMap,
+        private PlanReferenceValidator $planReferences,
     ) {}
 
     /**
@@ -28,8 +34,15 @@ final readonly class CustomFieldsRequestValidator
     /**
      * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null): CustomFieldsValidationResult
-    {
+    public function validate(
+        User $user,
+        string $entityType,
+        mixed $rawCustomFields,
+        bool $isUpdate = true,
+        string|int|null $ignoreEntityId = null,
+        ?string $conversationId = null,
+        ?string $turnId = null,
+    ): CustomFieldsValidationResult {
         $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
 
         // An update touches only the submitted codes; a create must also satisfy
@@ -48,10 +61,19 @@ final readonly class CustomFieldsRequestValidator
             return $translated;
         }
 
+        $referenceError = $this->planReferenceError($user, $translated->cleanFields, $fields, $conversationId, $turnId);
+
+        if ($referenceError !== null) {
+            return new CustomFieldsValidationResult(cleanFields: [], error: $referenceError);
+        }
+
         $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
             ->toRules($translated->cleanFields);
 
-        $validator = Validator::make(['custom_fields' => $translated->cleanFields], $rules);
+        // A reference stands for a record no step has created yet, so the field rules,
+        // which ask the database what a value points at, are run without it. It is put
+        // back into the stored payload: approval resolves it to the real id.
+        $validator = Validator::make(['custom_fields' => $this->withoutPlanReferences($translated->cleanFields, $fields)], $rules);
 
         if ($validator->fails()) {
             return new CustomFieldsValidationResult(
@@ -108,6 +130,14 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
+            // A link field's payload is record ids, in either the plain list or the map
+            // form that confirms a replacement, and neither is an option label.
+            if ($field->relationshipDefinition() instanceof CustomFieldRelationship) {
+                $clean[$code] = $value;
+
+                continue;
+            }
+
             $typeData = CustomFieldsType::getFieldType($field->type);
             $dataType = $typeData?->dataType;
 
@@ -117,7 +147,7 @@ final readonly class CustomFieldsRequestValidator
                 continue;
             }
 
-            if ($typeData->acceptsArbitraryValues || $field->lookup_type !== null) {
+            if ($typeData->acceptsArbitraryValues) {
                 $clean[$code] = $value;
 
                 continue;
@@ -169,5 +199,90 @@ final readonly class CustomFieldsRequestValidator
         }
 
         return new CustomFieldsValidationResult(cleanFields: $clean, error: null);
+    }
+
+    /**
+     * A link field may hold `$ref:<pending_action_id>` where a record proposed earlier in
+     * this turn will be. It is checked exactly as a native foreign key is: same turn, a
+     * still-pending create, of the entity this field points at.
+     *
+     * @param  array<string, mixed>  $fieldsPayload
+     * @param  Collection<int, CustomField>  $fields
+     */
+    private function planReferenceError(User $user, array $fieldsPayload, Collection $fields, ?string $conversationId, ?string $turnId): ?string
+    {
+        $byCode = $fields->keyBy('code');
+
+        foreach ($fieldsPayload as $code => $value) {
+            $field = $byCode->get((string) $code);
+
+            if (! $field instanceof CustomField) {
+                continue;
+            }
+
+            $definition = $field->relationshipDefinition();
+
+            if (! $definition instanceof CustomFieldRelationship) {
+                continue;
+            }
+
+            $modelClass = Relation::getMorphedModel($definition->targetEntityTypeFor($field));
+
+            if ($modelClass === null || ! is_subclass_of($modelClass, Model::class)) {
+                return "custom_fields.{$code} points at a record type this workspace does not have.";
+            }
+
+            foreach ($this->references($value) as $reference) {
+                $error = $this->planReferences->error($user, $reference, $modelClass, $conversationId, $turnId);
+
+                if ($error !== null) {
+                    return "custom_fields.{$code}: {$error}";
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $fieldsPayload
+     * @param  Collection<int, CustomField>  $fields
+     * @return array<string, mixed>
+     */
+    private function withoutPlanReferences(array $fieldsPayload, Collection $fields): array
+    {
+        $byCode = $fields->keyBy('code');
+
+        foreach ($fieldsPayload as $code => $value) {
+            $field = $byCode->get((string) $code);
+
+            if (! $field instanceof CustomField || ! $field->relationshipDefinition() instanceof CustomFieldRelationship) {
+                continue;
+            }
+
+            if ($this->references($value) === []) {
+                continue;
+            }
+
+            $kept = array_values(array_filter(
+                RecordLinkPayload::fromValue($value)->ids,
+                static fn (mixed $id): bool => ! PlanReference::is($id),
+            ));
+
+            $fieldsPayload[$code] = $kept;
+        }
+
+        return $fieldsPayload;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function references(mixed $value): array
+    {
+        return array_values(array_filter(
+            array_map(strval(...), RecordLinkPayload::fromValue($value)->ids),
+            PlanReference::is(...),
+        ));
     }
 }

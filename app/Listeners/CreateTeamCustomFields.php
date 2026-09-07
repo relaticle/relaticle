@@ -20,14 +20,12 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
 use Relaticle\CustomFields\Data\CustomFieldData;
-use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSectionData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\CustomFieldSectionType;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Enums\OptionCategory;
+use Relaticle\CustomFields\Filament\Integration\Migrations\CustomFieldsMigrator;
 use Relaticle\OnboardSeed\OnboardSeeder;
 
 final readonly class CreateTeamCustomFields
@@ -42,7 +40,7 @@ final readonly class CreateTeamCustomFields
     ];
 
     public function __construct(
-        private CustomsFieldsMigrators $migrator,
+        private CustomFieldsMigrator $migrator,
         private OnboardSeeder $onboardSeeder,
     ) {}
 
@@ -104,58 +102,28 @@ final readonly class CreateTeamCustomFields
 
         $options = $enum->getOptions();
         if ($options !== null) {
-            $migrator->options($options);
+            $migrator->options($this->optionPayload($enum, $options));
         }
 
-        $customField = $migrator->create();
-
-        $this->applyColorsToOptions($customField, $enum);
+        $migrator->create();
     }
 
-    private function applyColorsToOptions(CustomField $customField, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
+    /**
+     * @param  array<int|string, string>  $options
+     * @return list<string|array{name: string, color?: string, category?: OptionCategory}>
+     */
+    private function optionPayload(CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum, array $options): array
     {
-        $colorMapping = $enum->getOptionColors();
-        if ($colorMapping === null) {
-            return;
-        }
+        $colors = $enum->getOptionColors() ?? [];
+        $categories = $enum->getOptionCategories() ?? [];
 
-        $options = $customField->options()->withoutGlobalScopes()->get();
+        return array_values(array_map(function (string $name) use ($colors, $categories): string|array {
+            $settings = array_filter([
+                'color' => $colors[$name] ?? null,
+                'category' => $categories[$name] ?? null,
+            ], fn (string|OptionCategory|null $setting): bool => $setting !== null);
 
-        $updates = $options
-            ->filter(fn (CustomFieldOption $option): bool => isset($colorMapping[$option->name]))
-            ->map(fn (CustomFieldOption $option): array => [
-                'id' => $option->getKey(),
-                'settings' => json_encode(new CustomFieldOptionSettingsData(color: $colorMapping[$option->name])),
-            ])
-            ->values()
-            ->all();
-
-        if ($updates === []) {
-            return;
-        }
-
-        $table = $customField->options()->getModel()->getTable();
-        $ids = array_column($updates, 'id');
-        $cases = [];
-        $caseBindings = [];
-
-        foreach ($updates as $item) {
-            $cases[] = 'WHEN id = ? THEN ?';
-            $caseBindings[] = $item['id'];
-            $caseBindings[] = $item['settings'];
-        }
-
-        $casesSql = implode(' ', $cases);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-        $caseExpr = "(CASE {$casesSql} END)";
-        if (DB::getDriverName() === 'pgsql') {
-            $caseExpr .= '::json';
-        }
-
-        DB::update(
-            "UPDATE \"{$table}\" SET \"settings\" = {$caseExpr}, \"updated_at\" = ? WHERE \"id\" IN ({$placeholders})",
-            [...$caseBindings, now(), ...$ids],
-        );
+            return $settings === [] ? $name : ['name' => $name, ...$settings];
+        }, $options));
     }
 }

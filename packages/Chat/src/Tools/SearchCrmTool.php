@@ -27,6 +27,7 @@ final class SearchCrmTool implements Tool
      */
     private const array EXCLUDED_CUSTOM_FIELD_TYPES = [
         'select',
+        'status',
         'multi-select',
         'radio',
         'checkbox-list',
@@ -39,6 +40,8 @@ final class SearchCrmTool implements Tool
     {
         return 'Search across all CRM entity types (companies, people, opportunities, tasks, notes) by keyword. '
             .'Matches names, titles, and custom field values such as emails, phone numbers, and links. '
+            .'Fields that link records are not searched: to find records by what they link to, '
+            .'filter a list tool by that field, which matches the linked record by name. '
             .'Returns at most `limit` matches per entity type: when `truncated` is true for an entity there are more, '
             .'so never state a total from these results.';
     }
@@ -144,6 +147,19 @@ final class SearchCrmTool implements Tool
                 ->where('cfv.entity_type', $entityType)
                 ->where('cfv.tenant_id', $tenantId)
                 ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
+                // A field that links records keeps its targets in the edge ledger, and a
+                // value row there would hold a record id, which nobody searches by typing.
+                // Left out by its definition, not by a type key: two types link records.
+                ->whereNotExists(function (QueryBuilder $slot): void {
+                    $relationships = (string) config('custom-fields.database.table_names.custom_field_relationships');
+
+                    $slot->selectRaw('1')
+                        ->from($relationships)
+                        ->where(function (QueryBuilder $end) use ($relationships): void {
+                            $end->whereColumn("{$relationships}.from_field_id", 'cf.id')
+                                ->orWhereColumn("{$relationships}.to_field_id", 'cf.id');
+                        });
+                })
                 ->where(function (QueryBuilder $w) use ($query): void {
                     $w->where('cfv.text_value', 'ilike', "%{$query}%")
                         ->orWhere('cfv.string_value', 'ilike', "%{$query}%")

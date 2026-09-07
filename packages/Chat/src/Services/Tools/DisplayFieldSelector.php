@@ -6,7 +6,6 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\CustomField;
 use App\Models\Team;
-use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\QueryBuilders\CustomFieldQueryBuilder;
 
 /**
@@ -64,7 +63,7 @@ final readonly class DisplayFieldSelector
      * The tenant is always an explicit predicate: this runs inside the queued
      * chat job, where the package's TenantScope resolves to nothing.
      *
-     * @return CustomFieldQueryBuilder<BaseCustomField>
+     * @return CustomFieldQueryBuilder<CustomField>
      */
     private function baseQuery(Team $team, string $entityType): CustomFieldQueryBuilder
     {

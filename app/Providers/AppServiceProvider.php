@@ -21,7 +21,9 @@ use App\Livewire\FilamentNotifications;
 use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
@@ -38,7 +40,9 @@ use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\LinkActorResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
+use App\Support\RecordLinkFields;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
@@ -74,6 +78,7 @@ use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\CustomFields\Contracts\LinkActorResolverInterface;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\Ink\Filament\Resources\PostResource;
@@ -122,6 +127,10 @@ final class AppServiceProvider extends ServiceProvider
         // Caches creation-source facts per team for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
+
+        // Which custom fields of an entity read the link ledger. Same shape: one lookup
+        // per request rather than one per serialised record.
+        $this->app->scoped(RecordLinkFields::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()
@@ -481,6 +490,16 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+        CustomFields::useRelationshipModel(CustomFieldRelationship::class);
+        CustomFields::useLinkModel(CustomFieldLink::class);
+
+        // Both bindings resolve one instance: a caller that names the actor for its own
+        // write reaches for the class, and the package's writer for the interface.
+        $this->app->singleton(LinkActorResolver::class);
+        $this->app->singleton(
+            LinkActorResolverInterface::class,
+            fn (Application $app): LinkActorResolver => $app->make(LinkActorResolver::class),
+        );
 
         // Replaces the package's definitions so custom-field dates read the same as the
         // native columns beside them: `date-time` swaps the table column, which otherwise

@@ -29,7 +29,9 @@ enum CustomFieldType: string
     case DATE = 'date';
     case DATE_TIME = 'date-time';
     case SELECT = 'select';
+    case STATUS = 'status';
     case MULTI_SELECT = 'multi-select';
     case FILE_UPLOAD = 'file-upload';
     case RECORD = 'record';
+    case RELATIONSHIP = 'relationship';
 }

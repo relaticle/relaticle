@@ -8,12 +8,13 @@ use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\LinkActorResolver;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
@@ -27,7 +28,9 @@ use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
@@ -143,6 +146,13 @@ final class ExecuteImportJob implements ShouldQueue
             'creator_id' => $import->user_id,
         ];
 
+        // The job runs with no panel request, so the custom-fields package has no ambient
+        // tenant and no signed-in user: without both, its field lookups span every tenant
+        // and the links this import writes are credited to nobody.
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($this->teamId);
+        $previousActor = resolve(LinkActorResolver::class)->override($import->user);
+
         try {
             $store->query()
                 ->where('processed', false)
@@ -181,6 +191,9 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             throw $e;
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
+            resolve(LinkActorResolver::class)->override($previousActor);
         }
     }
 
@@ -332,15 +345,17 @@ final class ExecuteImportJob implements ShouldQueue
     /** @return Collection<string, CustomField> */
     private function loadCustomFieldDefinitions(BaseImporter $importer): Collection
     {
-        /** @phpstan-ignore return.type (App\Models\CustomField extends vendor class at runtime via model swapping) */
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->with(['options' => fn (HasMany $q) => $q->withoutGlobalScopes()])
+            ->with(['options' => fn (Relation $q): Relation => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $importer->entityName())
-            ->where('type', '!=', 'record')
             ->active()
             ->get()
+            // A field that links records is written through the ledger by the importer's
+            // own pass, not upserted as a value row here. Two field types link records,
+            // so the slot decides, never the type key.
+            ->reject(fn (CustomField $field): bool => $field->relationshipDefinition() instanceof CustomFieldRelationship)
             ->keyBy('code');
     }
 

@@ -18,6 +18,11 @@ use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Relaticle\CustomFields\Data\FieldSlotData;
+use Relaticle\CustomFields\Data\RelationshipDefinitionData;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
+use Relaticle\CustomFields\Services\Relationships\CreateRelationshipDefinition;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -214,23 +219,32 @@ it('omits deferred custom fields (file upload, record lookup) from the editable 
         'system_defined' => false,
     ]);
 
-    // A record-lookup field resolves to a MULTI_CHOICE data type, so kindFor()
-    // would otherwise admit it as a 'multiselect'. Only isDeferred()'s RECORD /
-    // lookup_type branch keeps it out. This is the row that makes the deferral
-    // load-bearing (the file-upload type is disabled in config, so it is excluded
-    // by the kindFor() fallback regardless).
+    // A record field resolves to a MULTI_CHOICE data type, so kindFor() would
+    // otherwise admit it as a 'multiselect'. Only isDeferred()'s RECORD /
+    // relationship-definition branch keeps it out. This is the row that makes the
+    // deferral load-bearing (the file-upload type is disabled in config, so it is
+    // excluded by the kindFor() fallback regardless).
     $recordField = CustomField::query()->create([
         'tenant_id' => $this->team->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
         'type' => CustomFieldType::RECORD->value,
-        'lookup_type' => 'company',
         'sort_order' => 91,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    TenantContextService::setTenantId($this->team->getKey());
+
+    resolve(CreateRelationshipDefinition::class)->execute(new RelationshipDefinitionData(
+        code: 'task_related_company',
+        fromEntityType: 'task',
+        toEntityType: 'company',
+        cardinality: RelationshipCardinality::ManyToOne,
+        fromField: new FieldSlotData(name: 'Related Company', fieldId: $recordField->getKey()),
+    ));
 
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => []]);
 

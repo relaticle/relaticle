@@ -124,6 +124,12 @@ arch('avoid mutation')
         // RequestActivityBatch above: mutable by design, reset per request/job
         // via the scoped container binding in AppServiceProvider.
         'App\Services\WorkspaceActivationFacts',
+        // Holds the actor a write names for itself, put back by the caller's finally
+        // block. Same shape again: a scoped holder, not a service.
+        'App\Support\LinkActorResolver',
+        // Remembers which fields of an entity read the link ledger, for the lifetime of
+        // one request: a lookup cache, not a service.
+        'App\Support\RecordLinkFields',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
         // uniqueness; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\ReservedSlugAwareGenerateSlugAction',
@@ -299,13 +305,17 @@ arch('must not use custom-fields package models directly')
     ->not
     ->toUse([
         'Relaticle\CustomFields\Models\CustomField',
+        'Relaticle\CustomFields\Models\CustomFieldLink',
         'Relaticle\CustomFields\Models\CustomFieldOption',
+        'Relaticle\CustomFields\Models\CustomFieldRelationship',
         'Relaticle\CustomFields\Models\CustomFieldSection',
         'Relaticle\CustomFields\Models\CustomFieldValue',
     ])
     ->ignoring([
         'App\Models\CustomField',
+        'App\Models\CustomFieldLink',
         'App\Models\CustomFieldOption',
+        'App\Models\CustomFieldRelationship',
         'App\Models\CustomFieldSection',
         'App\Models\CustomFieldValue',
     ]);

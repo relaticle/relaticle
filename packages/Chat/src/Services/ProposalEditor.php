@@ -19,6 +19,7 @@ use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\TeamMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
@@ -194,7 +195,7 @@ final readonly class ProposalEditor
             if ($dataType === null
                 || ! $dataType->isChoiceField()
                 || $typeData->acceptsArbitraryValues
-                || $field->lookup_type !== null) {
+                || $field->relationshipDefinition() instanceof CustomFieldRelationship) {
                 $converted[$code] = $value;
 
                 continue;

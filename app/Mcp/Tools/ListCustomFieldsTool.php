@@ -23,7 +23,7 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\CustomFields\Services\ValidationService;
 
 #[Title('List Custom Fields')]
-#[Description('List workspace custom-field definitions, including inactive fields and configured option labels. Use get-crm-schema for the active write schema.')]
+#[Description('List workspace custom-field definitions, including inactive fields and configured option labels and categories. Use get-crm-schema for the active write schema.')]
 final class ListCustomFieldsTool extends Tool
 {
     use ChecksTokenAbility;
@@ -111,6 +111,7 @@ final class ListCustomFieldsTool extends Tool
             'options' => $field->options->map(fn (CustomFieldOption $option): array => [
                 'id' => $option->id,
                 'label' => $option->name,
+                'category' => $option->settings->category?->value,
             ])->values()->all(),
         ])->values()->all();
 

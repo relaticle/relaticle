@@ -6,6 +6,7 @@ namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 enum TaskField: string
 {
@@ -54,7 +55,8 @@ enum TaskField: string
     public function getFieldType(): string
     {
         return match ($this) {
-            self::STATUS, self::PRIORITY => CustomFieldType::SELECT->value,
+            self::STATUS => CustomFieldType::STATUS->value,
+            self::PRIORITY => CustomFieldType::SELECT->value,
             self::DESCRIPTION => CustomFieldType::RICH_EDITOR->value,
             self::DUE_DATE => CustomFieldType::DATE_TIME->value,
         };
@@ -142,6 +144,23 @@ enum TaskField: string
                 'Low' => '#94a3b8',         // Sage Whisper - Natural earth tone, subtle presence
                 'Medium' => '#d4a574',      // Burnished Gold - Mocha Mousse warmth & confidence
                 'High' => '#dc2626',        // Crimson Velvet - Sophisticated urgent command
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * Get category mapping for single-choice field options
+     *
+     * @return array<string, OptionCategory>|null Array of option => category mappings or null if not applicable
+     */
+    public function getOptionCategories(): ?array
+    {
+        return match ($this) {
+            self::STATUS => [
+                'To do' => OptionCategory::Unstarted,
+                'In progress' => OptionCategory::Started,
+                'Done' => OptionCategory::Completed,
             ],
             default => null,
         };

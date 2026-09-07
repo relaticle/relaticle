@@ -32,6 +32,8 @@ return [
         ->models([
             EntityModel::configure(
                 modelClass: People::class,
+                labelSingular: 'Person',
+                labelPlural: 'People',
                 primaryAttribute: 'name',
                 resourceClass: PeopleResource::class,
                 avatarConfiguration: EntityModel::avatar(attribute: 'avatar'),
@@ -93,6 +95,10 @@ return [
             CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS,
             CustomFieldsFeature::UI_TABLE_FILTERS,
             CustomFieldsFeature::SYSTEM_MULTI_TENANCY,
+
+            // Creates the two relationship tables and lets the upgrade command run. Record
+            // fields store their targets as links from 4.0 on, so this is not optional here.
+            CustomFieldsFeature::SYSTEM_RELATIONSHIPS,
         )->disable(
             // Hide the package's management page from the sidebar; reachable via the
             // tenant dropdown's "Custom Fields" entry. The page route is still registered.
@@ -101,6 +107,16 @@ return [
             CustomFieldsFeature::FIELD_VALIDATION_RULES,
             CustomFieldsFeature::UI_FIELD_WIDTH_CONTROL,
             CustomFieldsFeature::SYSTEM_SECTIONS,
+
+            // Off in 3.x because this block did not name them, and a flag it does not name
+            // now takes the package default instead. Naming them keeps the field editor and
+            // the record pages exactly as they are; each is a product call, not a bump.
+            CustomFieldsFeature::FIELD_DESCRIPTION,
+            CustomFieldsFeature::FIELD_DESCRIPTION_POSITION,
+            CustomFieldsFeature::SECTION_CONDITIONAL_VISIBILITY,
+            CustomFieldsFeature::UI_SECTION_WIDTH_CONTROL,
+            CustomFieldsFeature::MODEL_ATTRIBUTE_CONDITIONS,
+            CustomFieldsFeature::UI_TOGGLEABLE_COLUMNS_HIDDEN_DEFAULT,
         ),
 
     /*
@@ -131,7 +147,7 @@ return [
         'enabled' => true,
         'slug' => 'custom-fields',
         'navigation_sort' => 100,
-        'navigation_group' => true,
+        'navigation_group_enabled' => true,
         'cluster' => null,
     ],
 
@@ -155,11 +171,18 @@ return [
     */
     'database' => [
         'migrations_path' => database_path('custom-fields'),
+
+        // Every table this application owns is keyed by ULID, and the tables added in 4.0
+        // read this instead of being hand-edited after publishing.
+        'key_type' => 'ulid',
+
         'table_names' => [
             'custom_field_sections' => 'custom_field_sections',
             'custom_fields' => 'custom_fields',
             'custom_field_values' => 'custom_field_values',
             'custom_field_options' => 'custom_field_options',
+            'custom_field_relationships' => 'custom_field_relationships',
+            'custom_field_links' => 'custom_field_links',
         ],
         'column_names' => [
             'tenant_foreign_key' => 'tenant_id',

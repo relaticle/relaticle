@@ -6,6 +6,7 @@ namespace App\Filament\CustomFields;
 
 use Filament\Tables\Columns\Column as BaseColumn;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Filament\Integration\Components\Tables\Columns\DateTimeColumn as BaseDateTimeColumn;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -33,9 +34,9 @@ use Relaticle\CustomFields\Models\CustomField;
  */
 final class DateTimeColumn extends BaseDateTimeColumn
 {
-    public function make(CustomField $customField): BaseColumn
+    public function make(CustomField $customField, ?Model $record = null): BaseColumn
     {
-        $column = parent::make($customField);
+        $column = parent::make($customField, $record);
 
         if (! $column instanceof TextColumn) {
             return $column;

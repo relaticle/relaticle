@@ -499,3 +499,39 @@ it('still allows a name that merely shares a prefix with an existing field', fun
 
     expect($decoded)->not->toHaveKey('error');
 });
+
+it('creates a status field with its options', function (): void {
+    makeCreateFieldTool($this->convId)->handle(new Request([
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+        'options' => [['name' => 'Open'], ['name' => 'Shipped']],
+    ]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    $field = CustomField::query()
+        ->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'task')
+        ->where('name', 'Workflow')
+        ->firstOrFail();
+
+    TenantContextService::setTenantId($this->team->getKey());
+
+    expect($field->type)->toBe('status')
+        ->and(CustomFieldOption::query()->where('custom_field_id', $field->getKey())->pluck('name')->sort()->values()->all())
+        ->toBe(['Open', 'Shipped']);
+});
+
+it('rejects a status field with no options', function (): void {
+    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request([
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+    ])), true);
+
+    expect($decoded)->toHaveKey('error');
+});

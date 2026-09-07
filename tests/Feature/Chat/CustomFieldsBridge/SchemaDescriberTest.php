@@ -8,8 +8,17 @@ use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 
+mutates(CustomFieldsSchemaDescriber::class);
+
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
+});
+
+it('says a bracketed category is metadata, not part of the value', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    expect(resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, 'task'))
+        ->toContain('never part of its value');
 });
 
 it('describes the system-seeded task custom fields with type hints', function (): void {
@@ -24,9 +33,9 @@ it('describes the system-seeded task custom fields with type hints', function ()
         ->toContain('ISO 8601')
         ->toContain('status')
         ->toContain('single-choice')
-        ->toContain('"To do"')
-        ->toContain('"In progress"')
-        ->toContain('"Done"')
+        ->toContain('"To do" [unstarted]')
+        ->toContain('"In progress" [started]')
+        ->toContain('"Done" [completed]')
         ->toContain('priority')
         ->toContain('description');
 });
@@ -70,4 +79,26 @@ it('lists a deactivated field separately from the settable codes', function (): 
 
     expect($settablePart)->not->toContain('priority')
         ->and($inactivePart)->toContain('priority');
+});
+
+it('names the option category so a renamed status still reads as finished', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail()
+        ->options()
+        ->withoutGlobalScopes()
+        ->where('name', 'Done')
+        ->update(['name' => 'Shipped']);
+
+    $description = resolve(CustomFieldsSchemaDescriber::class)
+        ->describe($user->currentTeam, 'task');
+
+    expect($description)
+        ->toContain('"Shipped" [completed]')
+        ->not->toContain('"Done"');
 });

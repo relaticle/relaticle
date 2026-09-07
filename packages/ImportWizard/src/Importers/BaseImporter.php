@@ -6,12 +6,17 @@ namespace Relaticle\ImportWizard\Importers;
 
 use App\Enums\CreationSource;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Relaticle\CustomFields\Data\RecordLinkPayload;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
+use Relaticle\CustomFields\Services\Relationships\LinkWriter;
 use Relaticle\CustomFields\Services\ValidationService;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -28,6 +33,9 @@ use Relaticle\ImportWizard\Importers\Contracts\ImporterContract;
 abstract class BaseImporter implements ImporterContract
 {
     private ?ImportFieldCollection $allFieldsCache = null;
+
+    /** @var EloquentCollection<int, CustomField>|null */
+    private ?EloquentCollection $entityCustomFieldsCache = null;
 
     /** @var array<string, EntityLink>|null */
     private ?array $entityLinksCache = null;
@@ -76,7 +84,7 @@ abstract class BaseImporter implements ImporterContract
 
         $links = $this->defineEntityLinks();
 
-        foreach ($this->getRecordCustomFields() as $customField) {
+        foreach ($this->linkCustomFields() as $customField) {
             $link = EntityLink::fromCustomField($customField);
             $links[$link->key] = $link;
         }
@@ -96,15 +104,29 @@ abstract class BaseImporter implements ImporterContract
         return [];
     }
 
-    /** @return EloquentCollection<int, \Relaticle\CustomFields\Models\CustomField> */
-    protected function getRecordCustomFields(): EloquentCollection
+    /**
+     * The fields that link records rather than hold a value. Two field types do that, so
+     * the slot is what identifies them, never the type key.
+     *
+     * @return EloquentCollection<int, CustomField>
+     */
+    protected function linkCustomFields(): EloquentCollection
     {
-        return CustomField::query()
+        return $this->entityCustomFields()
+            ->filter(fn (CustomField $field): bool => $field->relationshipDefinition() instanceof CustomFieldRelationship);
+    }
+
+    /**
+     * @return EloquentCollection<int, CustomField>
+     */
+    protected function entityCustomFields(): EloquentCollection
+    {
+        return $this->entityCustomFieldsCache ??= CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $this->teamId)
             ->where('entity_type', $this->entityName())
-            ->forType('record')
             ->active()
+            ->with('options')
             ->orderBy('sort_order')
             ->get();
     }
@@ -160,15 +182,8 @@ abstract class BaseImporter implements ImporterContract
      */
     protected function customFields(): ImportFieldCollection
     {
-        $customFields = CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
-            ->where('entity_type', $this->entityName())
-            ->where('type', '!=', 'record')
-            ->active()
-            ->with('options')
-            ->orderBy('sort_order')
-            ->get();
+        $customFields = $this->entityCustomFields()
+            ->reject(fn (CustomField $field): bool => $field->relationshipDefinition() instanceof CustomFieldRelationship);
 
         $validationService = resolve(ValidationService::class);
 
@@ -257,7 +272,40 @@ abstract class BaseImporter implements ImporterContract
             return;
         }
 
+        ImportDataStorage::setMultiple($record, $this->writeLinks($record, ImportDataStorage::pull($record)));
+
         CustomFields::importer()->forModel($record)->saveValues($team);
+    }
+
+    /**
+     * Links are written here rather than through the value path, so the ledger records
+     * that an import made them. A file is the caller's statement of what the record links
+     * to, so a target held elsewhere moves instead of failing the row.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function writeLinks(Model $record, array $data): array
+    {
+        foreach ($this->linkCustomFields() as $field) {
+            if (! array_key_exists($field->code, $data)) {
+                continue;
+            }
+
+            $ids = RecordLinkPayload::fromValue($data[$field->code])->ids;
+
+            unset($data[$field->code]);
+
+            resolve(LinkWriter::class)->apply(
+                $record,
+                $field,
+                $ids,
+                CustomFieldLink::SOURCE_IMPORT,
+                array_map(strval(...), $ids),
+            );
+        }
+
+        return $data;
     }
 
     /**

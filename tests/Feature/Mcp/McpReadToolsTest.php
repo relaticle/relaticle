@@ -301,6 +301,65 @@ it('reports each stage separately so a caller can decide what counts as won', fu
             ->where('opportunities.by_stage.Closed Won.total_amount', 100)
             ->where('opportunities.by_stage.Unwon.total_amount', 500)
             ->etc());
+
+    $summary = resolve(GetCrmSummary::class)->execute($this->user);
+
+    expect($summary['opportunities']['total_won_value'])
+        ->toBe($summary['opportunities']['by_stage']['Closed Won']['total_amount']);
+});
+
+it('reports won and lost value on the stage category, not the stage name', function (): void {
+    $stage = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'stage')
+        ->firstOrFail();
+    $amount = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'amount')
+        ->firstOrFail();
+
+    $options = $stage->options()->withoutGlobalScopes()->get();
+    $won = $options->firstWhere('name', 'Closed Won');
+    $lost = $options->firstWhere('name', 'Closed Lost');
+    $open = $options->firstWhere('name', 'Prospecting');
+
+    $won->update(['name' => 'Signed']);
+    $lost->update(['name' => 'Walked away']);
+
+    foreach ([[$won, 100], [$lost, 30], [$open, 500]] as [$option, $value]) {
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+        $opportunity->saveCustomFieldValue($stage, $option->getKey());
+        $opportunity->saveCustomFieldValue($amount, $value);
+    }
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSummaryTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('opportunities.total_won_value', 100)
+            ->where('opportunities.total_lost_value', 30)
+            ->where('opportunities.total_pipeline_value', 630)
+            ->etc());
+});
+
+it('publishes the option category in the entity schema and the field listing', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => 'task'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('custom_fields.status.options.2.label', 'Done')
+            ->where('custom_fields.status.options.2.category', 'completed')
+            ->where('custom_fields.priority.options.0.category', null)
+            ->etc());
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListCustomFieldsTool::class, ['entity_type' => 'task'])
+        ->assertOk()
+        ->assertSee('"category":"completed"');
 });
 
 it('keeps custom-field definition reads scoped to the current team', function (): void {

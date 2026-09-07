@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Filters;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
+use Relaticle\CustomFields\QueryBuilders\RecordLinkQuery;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
 
@@ -203,6 +206,14 @@ final readonly class CustomFieldFilter implements Filter
         string $operator,
         mixed $operand,
     ): void {
+        $definition = $field->relationshipDefinition();
+
+        if ($definition instanceof CustomFieldRelationship) {
+            $this->applyLinkCondition($query, $field, $definition, $operator, $operand);
+
+            return;
+        }
+
         $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
             $q->where('custom_field_id', $field->getKey());
 
@@ -214,6 +225,45 @@ final readonly class CustomFieldFilter implements Filter
                 default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
             };
         });
+    }
+
+    /**
+     * A link field holds no value row: its condition rides the edge ledger. `eq` and `in`
+     * name the linked records by id, `contains` matches their own searchable attributes,
+     * so a caller can ask for the people linked to "Acme" without looking the id up.
+     *
+     * @param  Builder<Model>  $query
+     */
+    private function applyLinkCondition(
+        Builder $query,
+        CustomField $field,
+        CustomFieldRelationship $definition,
+        string $operator,
+        mixed $operand,
+    ): void {
+        $links = resolve(RecordLinkQuery::class);
+        $direction = $definition->readDirectionFor($field);
+
+        if ($operator === 'contains') {
+            $links->whereLinkedMatching($query, $definition, $direction, $this->targetSearchAttributes($definition, $field), (string) $operand);
+
+            return;
+        }
+
+        $links->whereLinkedTo($query, $definition, $direction, is_array($operand) ? $operand : [$operand]);
+    }
+
+    /**
+     * What "contains" reads on the far end: the record's own name, which is what the
+     * caller typed and what every surface shows.
+     *
+     * @return array<int, string>
+     */
+    private function targetSearchAttributes(CustomFieldRelationship $definition, CustomField $field): array
+    {
+        $entityType = $definition->targetEntityTypeFor($field);
+
+        return [CrmEntity::tryFrom($entityType)?->titleColumn() ?? 'name'];
     }
 
     /**
