@@ -11,3 +11,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | packages/Chat/** | .ai/rules/chat.md |
 | app/Jobs/Email/**, app/Support/Email/** | .ai/rules/email.md |
 | app/Models/**, app/Casts/** | .ai/rules/models.md |
+| resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/** | .ai/rules/panel-links.md |
