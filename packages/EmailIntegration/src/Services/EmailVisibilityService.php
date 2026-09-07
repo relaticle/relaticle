@@ -16,8 +16,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -25,6 +28,7 @@ use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 final class EmailVisibilityService
@@ -143,6 +147,44 @@ final class EmailVisibilityService
     }
 
     /**
+     * Communication-intelligence metrics scoped to mail and meetings the viewer may
+     * see on this record. Denormalized CRM counters include hidden teammate mail.
+     */
+    public function visibleCommunicationIntelligence(Company|Opportunity|People $record, User $viewer): VisibleCommunicationIntelligence
+    {
+        if ($this->hidesRecordMailbox($record)) {
+            return new VisibleCommunicationIntelligence;
+        }
+
+        $emailAggregates = $record->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->reorder()
+            ->toBase()
+            ->selectRaw('count(*) as email_count')
+            ->selectRaw('coalesce(sum(case when emails.direction = ? then 1 else 0 end), 0) as inbound_email_count', [EmailDirection::INBOUND->value])
+            ->selectRaw('coalesce(sum(case when emails.direction = ? then 1 else 0 end), 0) as outbound_email_count', [EmailDirection::OUTBOUND->value])
+            ->selectRaw('max(emails.sent_at) as last_email_at')
+            ->first();
+
+        $lastMeetingAt = $record->meetings()
+            ->withGlobalScope('visible', new VisibleMeetingScope($viewer))
+            ->reorder()
+            ->max('starts_at');
+
+        return new VisibleCommunicationIntelligence(
+            emailCount: (int) ($emailAggregates->email_count ?? 0),
+            inboundEmailCount: (int) ($emailAggregates->inbound_email_count ?? 0),
+            outboundEmailCount: (int) ($emailAggregates->outbound_email_count ?? 0),
+            lastEmailAt: filled($emailAggregates->last_email_at)
+                ? Date::parse((string) $emailAggregates->last_email_at)
+                : null,
+            lastMeetingAt: filled($lastMeetingAt)
+                ? Date::parse((string) $lastMeetingAt)
+                : null,
+        );
+    }
+
+    /**
      * Protected people and companies keep their mailbox empty on the record page,
      * even when mixed threads with unprotected contacts stay visible elsewhere.
      */
@@ -256,10 +298,15 @@ final class EmailVisibilityService
     }
 
     /**
-     * Blocked workspace entries and mailbox-only blocklists must not spawn CRM records.
+     * Blocked workspace entries, workspace member addresses, and mailbox-only
+     * blocklists must not spawn CRM records.
      */
     public function suppressesRecordCreation(string $address, string $teamId, ?string $connectedAccountId): bool
     {
+        if ($this->isTeamMemberEmail($address, $teamId)) {
+            return true;
+        }
+
         if ($this->matchesCustomEntry($address, $teamId, EmailVisibilityEnforcement::Blocked)) {
             return true;
         }

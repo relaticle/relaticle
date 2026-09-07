@@ -318,6 +318,62 @@ it('auto-creates a company in Selective mode for outbound addresses', function (
     expect(Company::where('team_id', $this->team->id)->where('name', 'Selective-corp')->exists())->toBeTrue();
 });
 
+it('does not auto-create a company when the person already exists', function (): void {
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if (! $emailField) {
+        $this->markTestSkipped('No emails custom field seeded for this team.');
+    }
+
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Known Contact',
+        'creator_id' => $this->user->id,
+    ]);
+    $person->saveCustomFieldValue($emailField, ['known@orphan-corp.com'], $this->team);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'known@orphan-corp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company for a www-prefixed public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.gmail.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
 it('auto-creates a company when auto_create_companies is true', function (): void {
     $this->team->update([
         'contact_creation_mode' => ContactCreationMode::All,
@@ -879,6 +935,57 @@ it('does not auto-create a person when Selective and the address has only inboun
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create people or companies for internal email', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+
+    $peopleBefore = People::where('team_id', $this->team->id)->count();
+    $companiesBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail(['is_internal' => true]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $this->user->email,
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $teammate->email,
+        'name' => 'Teammate',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->count())->toBe($peopleBefore)
+        ->and(Company::where('team_id', $this->team->id)->count())->toBe($companiesBefore);
+});
+
+it('does not auto-create a person when Selective outbound only reaches a teammate', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
+
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+
+    $countBefore = People::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $teammate->email,
+        'name' => 'Teammate',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
 it('auto-creates a person and company on the first outbound email in Selective mode', function (): void {
     $this->team->update([
         'contact_creation_mode' => ContactCreationMode::Selective,
@@ -933,6 +1040,41 @@ it('creates a person in Selective mode when a teammate already sent to the addre
     app(LinkEmailAction::class)->execute($inbound);
 
     expect(People::where('team_id', $this->team->id)->where('name', 'Shared Contact')->exists())->toBeTrue();
+});
+
+it('creates a person in Selective mode when outbound history is on a disconnected account', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
+
+    $disconnectedAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $address = 'history@partner.com';
+
+    $outbound = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $disconnectedAccount->getKey(),
+        'direction' => EmailDirection::OUTBOUND,
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $outbound->getKey(),
+        'email_address' => $address,
+    ]);
+
+    $disconnectedAccount->delete();
+
+    $inbound = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $inbound->getKey(),
+        'email_address' => $address,
+        'name' => 'History Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($inbound);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'History Contact')->exists())->toBeTrue();
 });
 
 it('increments person email_count when linked', function (): void {
