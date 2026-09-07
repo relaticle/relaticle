@@ -11,6 +11,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Notifications\Auth\VerifyEmail;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -60,6 +61,20 @@ test('users cannot authenticate with invalid password', function () {
         ->assertHasFormErrors(['email']);
 
     $this->assertGuest();
+});
+
+test('password login rejects an external destination for an account without a workspace', function (): void {
+    $user = User::factory()->create();
+    session()->put('url.intended', 'https://untrusted.example/collect');
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(Filament::getPanel('app')->getUrl());
+
+    $this->assertAuthenticatedAs($user);
 });
 
 test('login email field has autocomplete=username webauthn for conditional mediation', function (): void {

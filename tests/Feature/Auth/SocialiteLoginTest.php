@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SocialiteProvider;
+use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
@@ -76,6 +77,28 @@ test('callback from socialite provider logs in existing user when social account
     $this->assertAuthenticated();
     $this->assertAuthenticatedAs($user);
 
+    $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+});
+
+test('callback rejects an external destination for an account without a workspace', function () {
+    $user = User::factory()->create(['email' => 'no-workspace@example.com']);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => '123456789',
+    ]);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('123456789', 'No Workspace', 'no-workspace@example.com'),
+    );
+
+    session()->put('url.intended', 'https://untrusted.example/collect');
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    $this->assertAuthenticatedAs($user);
     $response->assertRedirect(url()->getAppUrl());
 });
 

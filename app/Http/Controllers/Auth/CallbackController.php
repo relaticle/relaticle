@@ -8,6 +8,7 @@ use App\Contracts\User\CreatesNewSocialUsers;
 use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\Auth\LoginDestination;
 use App\Support\EmailAddress;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
@@ -179,6 +180,8 @@ final readonly class CallbackController
     {
         Auth::login($user, remember: true);
 
-        return redirect()->intended(url()->getAppUrl());
+        $destination = resolve(LoginDestination::class)->resolve($user, session()->pull('url.intended'));
+
+        return redirect()->to($destination);
     }
 }

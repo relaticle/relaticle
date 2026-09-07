@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
-use Filament\Facades\Filament;
+use App\Models\User;
+use App\Support\Auth\LoginDestination;
 use Illuminate\Http\JsonResponse;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 
@@ -12,8 +13,11 @@ final readonly class PasskeyLoginResponse implements PasskeyLoginResponseContrac
 {
     public function toResponse(mixed $request): JsonResponse
     {
-        return new JsonResponse([
-            'redirect' => redirect()->intended(Filament::getPanel('app')->getUrl())->getTargetUrl(),
-        ]);
+        /** @var User $user */
+        $user = $request->user();
+
+        $destination = resolve(LoginDestination::class)->resolve($user, session()->pull('url.intended'));
+
+        return new JsonResponse(['redirect' => $destination]);
     }
 }
