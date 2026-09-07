@@ -55,10 +55,12 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         $nextPageToken = $result->nextPageToken;
         $nextSyncToken = $result->nextSyncToken;
 
+        $pageEvents = array_values($result->events);
+
         InitialSyncPageStoreBatch::dispatchMeetings(
             account: $account,
-            pageEvents: $result->events,
-            eventsToStore: $result->events,
+            pageEvents: $pageEvents,
+            eventsToStore: $pageEvents,
             onPageStored: static function (ConnectedAccount $account) use ($nextPageToken, $nextSyncToken): void {
                 self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
             },
