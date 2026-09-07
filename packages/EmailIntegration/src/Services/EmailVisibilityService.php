@@ -15,8 +15,8 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
@@ -176,10 +176,10 @@ final class EmailVisibilityService
             inboundEmailCount: (int) ($emailAggregates?->inbound_email_count ?? 0),
             outboundEmailCount: (int) ($emailAggregates?->outbound_email_count ?? 0),
             lastEmailAt: filled($emailAggregates?->last_email_at)
-                ? Carbon::parse((string) $emailAggregates->last_email_at)
+                ? Date::parse((string) $emailAggregates->last_email_at)
                 : null,
             lastMeetingAt: filled($lastMeetingAt)
-                ? Carbon::parse((string) $lastMeetingAt)
+                ? Date::parse((string) $lastMeetingAt)
                 : null,
         );
     }

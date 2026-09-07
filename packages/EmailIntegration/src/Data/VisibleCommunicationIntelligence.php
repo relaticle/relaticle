@@ -18,11 +18,11 @@ final readonly class VisibleCommunicationIntelligence
 
     public function lastInteractionAt(): ?Carbon
     {
-        if ($this->lastEmailAt === null) {
+        if (! $this->lastEmailAt instanceof Carbon) {
             return $this->lastMeetingAt;
         }
 
-        if ($this->lastMeetingAt === null) {
+        if (! $this->lastMeetingAt instanceof Carbon) {
             return $this->lastEmailAt;
         }
 
