@@ -126,19 +126,17 @@ final readonly class AuthenticationSession
         };
     }
 
-    /**
-     * A remembered session restores guard authentication without ever proving the
-     * account's enrolled MFA. Preserve the browser's remember cookie for other
-     * devices, drop only this device's authenticated state, and route it through
-     * the same pending-proof challenge every other primary method uses.
-     */
-    public static function suspendRemembered(User $user): void
+    // Read viaRemember() before logoutCurrentDevice(), which clears the recaller
+    // this reports on. Drops only this device, keeping other devices remembered.
+    public static function suspendRemembered(): bool
     {
         /** @var SessionGuard $guard */
         $guard = Auth::guard('web');
+        $viaRemember = $guard->viaRemember();
+
         $guard->logoutCurrentDevice();
 
-        self::begin($user, AuthMethod::REMEMBERED, null, remember: true);
+        return $viaRemember;
     }
 
     public static function completeFor(User $user): bool

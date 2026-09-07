@@ -55,11 +55,9 @@ final readonly class CompleteAuthentication
         return $this->loginDestination->resolve($user, is_string($intended) ? $intended : null);
     }
 
+    // These are dotted session paths (`fathom.track_signup` nests under `fathom`),
+    // so each is read and later restored through the session's dot-aware accessors.
     /**
-     * `Arr::only()` only matches top-level keys, but these are dotted session
-     * paths (e.g. `fathom.track_signup` nests under `fathom`), so each one is
-     * read and later re-written through the session's own dot-aware accessors.
-     *
      * @return array<string, mixed>
      */
     private function capturePreservedSessionValues(Session $session): array

@@ -12,19 +12,20 @@ use App\Contracts\User\CreatesNewSocialUsers;
 use App\Http\Controllers\Auth\MfaChallengeController;
 use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
-use App\Http\Responses\PasskeyLoginResponse;
+use App\Listeners\MarkTwoFactorEnrollmentCompleteListener;
 use App\Support\Auth\AuthenticationSession;
 use Filament\Facades\Filament;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\TwoFactorAuthenticatedSessionController;
-use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -32,13 +33,11 @@ final class FortifyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(CreatesNewSocialUsers::class, CreateNewSocialUser::class);
-        $this->app->singleton(PasskeyLoginResponseContract::class, PasskeyLoginResponse::class);
         $this->app->bind(AuthenticatedSessionController::class, PasswordSessionController::class);
         $this->app->bind(TwoFactorAuthenticatedSessionController::class, MfaChallengeController::class);
 
-        // The vendor controller authenticates the guard before resolving
-        // PasskeyLoginResponse, so that contract cannot enforce MFA. Swap the
-        // whole controller for one that defers guard login to BeginAuthentication.
+        // The vendor controller authenticates before resolving its response, so a
+        // response-only override cannot enforce MFA; swap the whole controller.
         $this->app->bind(PasskeyLoginController::class, PasskeySessionController::class);
     }
 
@@ -55,6 +54,10 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::verifyEmailView(fn (): RedirectResponse => to_route(
             Filament::getPanel('app')->getEmailVerificationPromptRouteName(),
         ));
+
+        // Confirming a TOTP code during enrollment is itself MFA proof for the
+        // session that just performed it, not only for logins completed afterward.
+        Event::listen(TwoFactorAuthenticationConfirmed::class, MarkTwoFactorEnrollmentCompleteListener::class);
 
         RateLimiter::for('login', function (Request $request): Limit {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());

@@ -11,7 +11,6 @@ use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\MfaChallengeController;
 use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
-use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -29,7 +28,6 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
 use Laravel\Passkeys\Support\WebAuthn;
@@ -40,7 +38,7 @@ use Webauthn\CredentialRecord;
 use Webauthn\TrustPath\EmptyTrustPath;
 
 mutates(Login::class, PasswordSessionController::class, MfaChallengeController::class);
-mutates(PasskeyLoginResponse::class, AuthenticatePasskey::class, PasskeySessionController::class);
+mutates(AuthenticatePasskey::class, PasskeySessionController::class);
 
 function base64UrlEncodeForPasskeyTest(string $bytes): string
 {
@@ -309,10 +307,6 @@ test('login email field has autocomplete=username webauthn for conditional media
         ->assertSeeHtml('autocomplete="username webauthn"');
 });
 
-test('PasskeyLoginResponse contract resolves to our admin-panel response', function (): void {
-    expect(app(PasskeyLoginResponseContract::class))->toBeInstanceOf(PasskeyLoginResponse::class);
-});
-
 test('the passkey login endpoint is rate limited', function (): void {
     $lastStatus = 200;
 
@@ -491,6 +485,29 @@ test('a scheduled-deletion user with enrolled MFA must complete the challenge be
 
     $this->get(Filament::getPanel('app')->getUrl())
         ->assertRedirect(route('filament.app.scheduled-deletion'));
+});
+
+test('a restored session with unproved MFA cannot reach the scheduled-deletion interstitial directly', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create([
+        'scheduled_deletion_at' => now()->subDay(),
+    ]);
+    $this->actingAs($user);
+
+    $this->get(route('filament.app.scheduled-deletion'))
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+});
+
+test('a restored session with unproved MFA cannot write through the timezone endpoint', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+
+    $this->post(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris'])
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+    expect($user->fresh()->timezone)->not->toBe('Europe/Paris');
 });
 
 test('continue with a password account reveals the password field', function (): void {

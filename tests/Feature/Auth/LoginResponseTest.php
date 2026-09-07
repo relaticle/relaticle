@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
 use App\Http\Responses\LoginResponse;
-use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -12,7 +11,6 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -220,33 +218,4 @@ describe('login destinations - domain-routed panel', function (): void {
 
         expect($target)->toBe(Dashboard::getUrl(['tenant' => $user->currentTeam]));
     });
-});
-
-function passkeyRedirectFor(User $user, ?string $intended): string
-{
-    if ($intended !== null) {
-        session(['url.intended' => $intended]);
-    }
-
-    $request = Request::create('/passkeys/login', 'POST');
-    $request->setUserResolver(fn (): User => $user);
-
-    $response = app(PasskeyLoginResponse::class)->toResponse($request);
-
-    expect($response)->toBeInstanceOf(JsonResponse::class);
-    assert($response instanceof JsonResponse);
-
-    return (string) $response->getData(true)['redirect'];
-}
-
-it('sends a passkey sign-in to the url it was interrupted on', function (): void {
-    $user = User::factory()->create();
-
-    expect(passkeyRedirectFor($user, '/app/scheduled-deletion'))->toEndWith('/app/scheduled-deletion');
-});
-
-it('falls back to the panel root when a passkey sign-in has no intended url', function (): void {
-    $user = User::factory()->create();
-
-    expect(passkeyRedirectFor($user, null))->toBe(Filament::getPanel('app')->getUrl());
 });

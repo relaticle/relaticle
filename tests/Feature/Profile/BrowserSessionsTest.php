@@ -8,8 +8,12 @@ use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Models\User;
 use App\Support\Auth\IdentityConfirmation;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
 
@@ -171,6 +175,23 @@ test('a confirmation inside the confirmation window still satisfies the gate', f
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
 });
 
+test('a genuine remember-me cookie with enrolled MFA is suspended and its recaller cookie cleared', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $rememberToken = Str::random(60);
+    $user->forceFill(['remember_token' => $rememberToken])->save();
+
+    $recallerName = 'remember_web_'.sha1(SessionGuard::class);
+    $recallerValue = "{$user->getAuthIdentifier()}|{$rememberToken}|{$user->password}";
+
+    $this->withCookie($recallerName, $recallerValue)
+        ->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+        ->assertRedirect(route('two-factor.login'))
+        ->assertCookieExpired($recallerName);
+
+    $this->assertGuest('web');
+    expect($user->fresh()->remember_token)->toBe($rememberToken);
+});
+
 test('a restored session with enrolled MFA is suspended before reaching a protected page', function (): void {
     $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $user->forceFill(['remember_token' => 'original-remember-token'])->save();
@@ -211,4 +232,38 @@ test('completing the challenge after a restored-session suspension resumes the o
     ])->assertRedirect("/app/{$team->slug}/companies");
 
     $this->assertAuthenticatedAs($user);
+});
+test('suspending a non-remembered incomplete session does not escalate into a persistent remember-me cookie', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+
+    $response = $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ]);
+
+    $response->assertRedirect();
+    $this->assertAuthenticatedAs($user);
+
+    $recallerName = 'remember_web_'.sha1(SessionGuard::class);
+    $response->assertCookieMissing($recallerName);
+});
+
+test('a restored session with enrolled MFA dispatches the same challenge event every other primary method uses', function (): void {
+    Event::fake([TwoFactorAuthenticationChallenged::class]);
+
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+        ->assertRedirect(route('two-factor.login'));
+
+    Event::assertDispatched(
+        TwoFactorAuthenticationChallenged::class,
+        fn (TwoFactorAuthenticationChallenged $event): bool => $event->user->is($user),
+    );
 });

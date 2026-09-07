@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Actions\Auth\BeginAuthentication;
+use App\Enums\AuthMethod;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use Closure;
@@ -46,6 +48,8 @@ final readonly class EnsureAuthenticationComplete
         'filament.app.auth.email-change-verification.block-verification',
     ];
 
+    public function __construct(private BeginAuthentication $beginAuthentication) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         $user = Auth::guard('web')->user();
@@ -66,8 +70,10 @@ final readonly class EnsureAuthenticationComplete
             session()->put('url.intended', $request->fullUrl());
         }
 
-        AuthenticationSession::suspendRemembered($user);
+        $remembered = AuthenticationSession::suspendRemembered();
 
-        return to_route('two-factor.login');
+        $challenge = $this->beginAuthentication->execute($user, AuthMethod::REMEMBERED, null, $remembered);
+
+        return redirect()->to($challenge);
     }
 }
