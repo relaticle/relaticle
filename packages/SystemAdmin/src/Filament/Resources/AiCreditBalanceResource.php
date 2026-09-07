@@ -6,6 +6,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -26,7 +27,6 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -147,7 +147,7 @@ final class AiCreditBalanceResource extends Resource
                     ->timezone(fn (): string => ViewerTime::timezone())
                     ->sortable()
                     ->badge()
-                    ->color(fn (?Carbon $state): string => $state?->isPast() ? 'danger' : 'gray'),
+                    ->color(fn (?CarbonInterface $state): string => $state?->isPast() ? 'danger' : 'gray'),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()

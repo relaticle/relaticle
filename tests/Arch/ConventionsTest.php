@@ -161,6 +161,68 @@ it('forces a conscious arch-coverage decision when a package is added', function
     );
 });
 
+it('keeps the mutable Carbon class out of the codebase', function (): void {
+    $root = dirname(__DIR__, 2);
+    $self = __FILE__;
+
+    $directories = [
+        $root.'/app',
+        $root.'/bootstrap',
+        $root.'/config',
+        $root.'/database',
+        $root.'/packages',
+        $root.'/routes',
+        $root.'/tests',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            if ($file->getPathname() === $self) {
+                continue;
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                $trimmed = mb_ltrim($line);
+
+                $isComment = str_starts_with($trimmed, '*')
+                    || str_starts_with($trimmed, '//')
+                    || str_starts_with($trimmed, '/*');
+
+                $declaresType = preg_match('/@(property|param|return|var)\b/', $trimmed) === 1;
+
+                if ($isComment && ! $declaresType) {
+                    continue;
+                }
+
+                if (preg_match('/\\bCarbon\\b(?!\\\\)/', $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = str_replace($root.'/', '', $file->getPathname()).':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Dates are immutable application-wide (.ai/guidelines/relaticle/core.md). The mutable Carbon '.
+        'class no longer matches what the date factory builds, so a type hint becomes a TypeError and an '.
+        'instanceof check silently turns false. Use CarbonImmutable, or CarbonInterface where a vendor '.
+        'may still hand you a mutable date. '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
 it('keeps published copy and source free of em-dashes', function (): void {
     $root = dirname(__DIR__, 2);
     $emDash = "\u{2014}";

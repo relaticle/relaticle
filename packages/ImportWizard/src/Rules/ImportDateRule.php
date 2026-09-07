@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Rules;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
@@ -36,7 +36,7 @@ final readonly class ImportDateRule implements ValidationRule
             return;
         }
 
-        if (! $this->format->parse($value) instanceof Carbon) {
+        if (! $this->format->parse($value) instanceof CarbonImmutable) {
             $fail(__('import-wizard-new::validation.invalid_date', [
                 'format' => $this->format->getLabel(),
             ]));

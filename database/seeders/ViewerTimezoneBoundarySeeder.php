@@ -14,8 +14,8 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
@@ -77,7 +77,7 @@ final class ViewerTimezoneBoundarySeeder extends Seeder
      * One workspace per instant, rebuilt from scratch each run so the rows stay
      * pinned to yesterday rather than drifting into the past.
      */
-    private function boundaryWorkspace(string $label, Carbon $instant): void
+    private function boundaryWorkspace(string $label, CarbonImmutable $instant): void
     {
         $email = 'boundary-'.mb_strtolower($label).'@example.test';
 

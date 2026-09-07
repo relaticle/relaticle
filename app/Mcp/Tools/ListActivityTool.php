@@ -11,12 +11,12 @@ use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -363,7 +363,7 @@ final class ListActivityTool extends Tool
         return is_string($label) && $label !== '' ? $label : null;
     }
 
-    private function occurredAt(User $user, Activity $activity): Carbon
+    private function occurredAt(User $user, Activity $activity): CarbonImmutable
     {
         return Date::parse($activity->created_at)->setTimezone($user->effectiveTimezone());
     }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
@@ -34,8 +34,8 @@ beforeEach(function (): void {
  */
 it('emits chat list datetimes with the user offset rather than bare utc', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     $payload = (new ListTasksTool)->handle(new Request([]));
@@ -50,8 +50,8 @@ it('emits chat list datetimes with the user offset rather than bare utc', functi
 
 it('emits chat show datetimes with the user offset too, so both tools agree', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     $payload = (new GetTaskTool)->handle(new Request(['id' => (string) $task->getKey()]));
@@ -102,8 +102,8 @@ it('converts custom-field datetimes in chat tool output', function (): void {
  */
 it('leaves the rest api on utc, because the conversion belongs to the chat layer', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     Sanctum::actingAs($this->user);

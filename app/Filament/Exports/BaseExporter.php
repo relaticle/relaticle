@@ -7,7 +7,7 @@ namespace App\Filament\Exports;
 use App\Models\CustomField;
 use App\Models\Team;
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
@@ -84,7 +84,7 @@ abstract class BaseExporter extends Exporter
     {
         return ExportColumn::make($name)
             ->label($label.' ('.self::requestTimezone().')')
-            ->formatStateUsing(fn (?Carbon $state, BaseExporter $exporter): ?string => $state?->setTimezone($exporter->timezone())->format('Y-m-d H:i:s'));
+            ->formatStateUsing(fn (?CarbonInterface $state, BaseExporter $exporter): ?string => $state?->setTimezone($exporter->timezone())->format('Y-m-d H:i:s'));
     }
 
     /**
@@ -122,13 +122,13 @@ abstract class BaseExporter extends Exporter
                 if ($field->typeData->dataType === FieldDataType::DATE_TIME) {
                     return $column
                         ->label($column->getLabel().' ('.self::requestTimezone().')')
-                        ->formatStateUsing(fn (mixed $state, BaseExporter $exporter): mixed => $state instanceof Carbon
+                        ->formatStateUsing(fn (mixed $state, BaseExporter $exporter): mixed => $state instanceof CarbonInterface
                             ? $state->copy()->setTimezone($exporter->timezone())->format('Y-m-d H:i:s')
                             : $state);
                 }
 
                 if ($field->typeData->dataType === FieldDataType::DATE) {
-                    return $column->formatStateUsing(fn (mixed $state): mixed => $state instanceof Carbon
+                    return $column->formatStateUsing(fn (mixed $state): mixed => $state instanceof CarbonInterface
                         ? $state->format('Y-m-d')
                         : $state);
                 }

@@ -9,6 +9,7 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Models\User;
 use App\Support\CompetitorFacts;
 use App\Support\DetectsPublicMarkdownRequest;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Relaticle\Ink\Models\Category;
@@ -1026,6 +1027,6 @@ describe('security.txt', function () {
         $response->assertSee('Canonical:', false);
 
         preg_match('/Expires: (.+)/', (string) $response->getContent(), $matches);
-        expect(Carbon\Carbon::parse($matches[1])->isFuture())->toBeTrue();
+        expect(Date::parse($matches[1])->isFuture())->toBeTrue();
     });
 });

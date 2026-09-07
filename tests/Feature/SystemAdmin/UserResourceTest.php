@@ -9,9 +9,9 @@ use App\Enums\SubscriberTagEnum;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
-use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Hash;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
@@ -272,7 +272,7 @@ it('deletes users in bulk through the Jetstream deleter so their workspaces are 
 });
 
 it('renders the engagement badge derived from the last login timestamp', function (): void {
-    $this->travelTo(Carbon::parse('2026-08-30 12:00:00'));
+    $this->travelTo(Date::parse('2026-08-30 12:00:00'));
 
     $active = User::factory()->create(['last_login_at' => now()->subDays(3)]);
     $dormant = User::factory()->create(['last_login_at' => now()->subDays(90)]);
@@ -316,7 +316,7 @@ it('shows both rejected and healthy users when the Mailcoach filter is unset', f
 });
 
 it('lists exactly the users whose engagement badge matches the selected filter', function (): void {
-    $this->travelTo(Carbon::parse('2026-08-30 12:00:00'));
+    $this->travelTo(Date::parse('2026-08-30 12:00:00'));
 
     $users = collect([3.0, 7.5, 20.0, 30.5, 45.0, 61.0, 90.0])
         ->map(fn (float $daysAgo): User => User::factory()->create([

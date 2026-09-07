@@ -6,7 +6,7 @@ namespace App\Observers;
 
 use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Models\CustomFieldValue;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
@@ -103,8 +103,8 @@ final readonly class CustomFieldValueObserver
             FieldDataType::SINGLE_CHOICE => $this->optionLabel($field, $value) ?? (string) $value,
             FieldDataType::MULTI_CHOICE => $this->multiOptionLabels($field, $value),
             FieldDataType::BOOLEAN => $value ? 'Yes' : 'No',
-            FieldDataType::DATE => $value instanceof Carbon ? $value->toDateString() : (string) $value,
-            FieldDataType::DATE_TIME => $value instanceof Carbon ? $value->toDateTimeString() : (string) $value,
+            FieldDataType::DATE => $value instanceof CarbonInterface ? $value->toDateString() : (string) $value,
+            FieldDataType::DATE_TIME => $value instanceof CarbonInterface ? $value->toDateTimeString() : (string) $value,
             default => (string) $value,
         };
 

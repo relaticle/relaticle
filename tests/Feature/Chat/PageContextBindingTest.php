@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -377,7 +377,7 @@ function seedConversationMessage(string $conversationId, string $userId): string
     return $id;
 }
 
-function seedMentionRow(string $messageId, string $type, string $recordId, string $label, string $source, Carbon $mentionedAt): void
+function seedMentionRow(string $messageId, string $type, string $recordId, string $label, string $source, CarbonImmutable $mentionedAt): void
 {
     DB::table('agent_conversation_message_mentions')->insert([
         'id' => (string) Str::ulid(),

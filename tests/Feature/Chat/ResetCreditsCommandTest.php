@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditPeriodResolver;
@@ -172,7 +172,7 @@ it('holds the anniversary-cycle invariant across a two-year sweep for a month-en
     ]);
 
     $resolver = resolve(CreditPeriodResolver::class);
-    $cursor = Carbon::instance($anchor);
+    $cursor = Date::instance($anchor);
     $sweepEnd = $cursor->copy()->addYears(2);
 
     while ($cursor->lessThan($sweepEnd)) {

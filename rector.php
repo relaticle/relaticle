@@ -25,6 +25,7 @@ use RectorLaravel\Rector\ClassMethod\MigrateToSimplifiedAttributeRector;
 use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
 use RectorLaravel\Rector\MethodCall\EloquentWhereTypeHintClosureParameterRector;
+use RectorLaravel\Rector\StaticCall\CarbonToDateFacadeRector;
 use RectorLaravel\Set\LaravelSetList;
 
 return RectorConfig::configure()
@@ -106,6 +107,10 @@ return RectorConfig::configure()
         LaravelSetList::LARAVEL_TYPE_DECLARATIONS,
     ])
     ->withRules([
+        // Dates are immutable application-wide via Date::use(CarbonImmutable::class).
+        // A hardcoded Carbon:: static call bypasses that factory and hands back a
+        // mutable date the type hints no longer accept.
+        CarbonToDateFacadeRector::class,
         EmptyToBlankAndFilledFuncRector::class,
         UseForwardsCallsTraitRector::class,
     ])

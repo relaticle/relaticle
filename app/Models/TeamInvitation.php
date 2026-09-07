@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsCanonicalEmail;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\TeamInvitation as JetstreamTeamInvitation;
 
 /**
- * @property ?Carbon $expires_at
+ * @property ?CarbonImmutable $expires_at
  * @property ?string $token
  * @property ?string $inviter_id
  */
@@ -47,7 +47,7 @@ final class TeamInvitation extends JetstreamTeamInvitation
             return true;
         }
 
-        /** @var Carbon $expiresAt */
+        /** @var CarbonImmutable $expiresAt */
         $expiresAt = $this->expires_at;
 
         return $expiresAt->isPast();
