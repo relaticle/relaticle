@@ -172,10 +172,10 @@ final class EmailVisibilityService
             ->max('starts_at');
 
         return new VisibleCommunicationIntelligence(
-            emailCount: (int) ($emailAggregates?->email_count ?? 0),
-            inboundEmailCount: (int) ($emailAggregates?->inbound_email_count ?? 0),
-            outboundEmailCount: (int) ($emailAggregates?->outbound_email_count ?? 0),
-            lastEmailAt: filled($emailAggregates?->last_email_at)
+            emailCount: (int) ($emailAggregates->email_count ?? 0),
+            inboundEmailCount: (int) ($emailAggregates->inbound_email_count ?? 0),
+            outboundEmailCount: (int) ($emailAggregates->outbound_email_count ?? 0),
+            lastEmailAt: filled($emailAggregates->last_email_at)
                 ? Date::parse((string) $emailAggregates->last_email_at)
                 : null,
             lastMeetingAt: filled($lastMeetingAt)
