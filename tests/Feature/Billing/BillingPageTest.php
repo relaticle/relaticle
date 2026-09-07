@@ -356,3 +356,115 @@ it('names the workspace in the upgrade confirmation step', function (): void {
         ->assertSee(__('billing.upgrade.confirm_title'))
         ->assertSee(__('billing.upgrade.confirm_button', ['workspace' => 'Acme Manufacturing']));
 });
+
+it('offers owners an Enterprise conversation without changing their plan', function (): void {
+    [, $team] = billingPageOwner();
+
+    livewire(Billing::class)
+        ->assertSee('From $20,000 / year')
+        ->assertSeeHtml('href="'.e(route('contact', ['plan' => 'enterprise'])).'"');
+
+    expect($team->refresh()->plan)->toBe(Plan::Free);
+});
+
+it('does not offer Enterprise purchases to workspace members', function (): void {
+    [, $team] = billingPageOwner();
+    $member = User::factory()->create();
+    $team->users()->attach($member, ['role' => 'editor']);
+    test()->actingAs($member);
+    Filament::setTenant($team->refresh());
+
+    livewire(Billing::class)
+        ->assertDontSee('From $20,000 / year');
+});
+
+it('keeps an Enterprise grant managed after an older subscription ended', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Enterprise])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_old_pro',
+        'stripe_status' => 'canceled',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->subDay(),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.enterprise.body'))
+        ->assertSee('Contact your Relaticle team')
+        ->assertDontSee(__('billing.upgrade.button'))
+        ->assertDontSee('From $20,000 / year');
+});
+
+it('does not send an Enterprise workspace through Pro checkout', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Enterprise])->save();
+
+    livewire(Billing::class)
+        ->call('upgrade', 'yearly')
+        ->assertNoRedirect()
+        ->assertNotNotified();
+
+    expect($team->refresh()->plan)->toBe(Plan::Enterprise);
+});
+
+it('keeps Enterprise access clear while an older Pro subscription is canceling', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Enterprise, 'trial_ends_at' => now()->addDays(5)])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_enterprise_old_grace',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->addDays(9),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.status.managed'))
+        ->assertSee('Your Enterprise access is unchanged.')
+        ->assertDontSee('After that, workspace access pauses.')
+        ->assertDontSee(__('billing.trial.active_title'));
+});
+
+it('shows the Enterprise allowance when an older Pro subscription is past due', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Enterprise])->save();
+    $team->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_enterprise_old_due',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee('/ 10,000')
+        ->assertSee('Your previous subscription has a payment issue.')
+        ->assertDontSee(__('billing.manage.past_due_body'));
+});
+
+it('identifies a manually managed Pro plan without calling it Enterprise', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+
+    livewire(Billing::class)
+        ->assertSee('Your plan is managed by Relaticle')
+        ->assertDontSee(__('billing.enterprise.title'));
+});
+
+it('shows spendable credits separately after the monthly allowance is exhausted', function (): void {
+    [, $team] = billingPageOwner();
+    $team->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('team_id', $team->getKey())->update([
+        'credits_remaining' => 150,
+        'credits_used' => 2050,
+        'purchased_credits' => 150,
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee('150 credits available')
+        ->assertSee('2,050 credits used this period')
+        ->assertSee('100%');
+});

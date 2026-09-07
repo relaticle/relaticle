@@ -20,8 +20,11 @@ return [
         'managed' => 'Managed',
     ],
     'usage' => [
-        'title' => 'AI credits this period',
+        'title' => 'AI allowance this period',
         'resets' => 'Resets :date',
+        'available' => ':credits credits available',
+        'total_used' => ':credits credits used this period',
+        'empty' => 'Your credit balance will appear when your allowance starts.',
     ],
     'packs' => [
         'buy' => 'Buy :credits credits',
@@ -64,7 +67,7 @@ return [
         'features' => [
             'Unlimited users and records',
             '2,000 AI credits / month',
-            'All AI models, including premium',
+            'Premium AI models included',
             'REST API and 37-tool MCP server',
             'Email support',
         ],
@@ -109,6 +112,41 @@ return [
     'enterprise' => [
         'title' => 'Enterprise plan',
         'body' => 'Your plan is managed by Relaticle. Contact us for changes.',
+        'tagline' => 'Implementation and support, scoped to your team.',
+        'starting_price' => 'From $:price / year',
+        'billing' => 'Billed yearly · never per seat',
+        'includes' => 'Everything in Cloud Pro, plus',
+        'features' => [
+            'Implementation scoped to your workflow',
+            'Custom integrations by agreement',
+            'AI usage agreed with your team',
+            'Ongoing maintenance and support',
+            'Direct access to the founding team',
+        ],
+        'terms' => 'Scope, usage, support, and delivery milestones agreed before signing.',
+        'contact' => 'Talk to us',
+        'manage' => 'Contact your Relaticle team',
+        'previous_subscription_canceling' => 'Your previous subscription ends on :date. Your Enterprise access is unchanged.',
+        'previous_subscription_past_due' => 'Your previous subscription has a payment issue. Your Enterprise access is unchanged. Contact us to resolve the previous subscription.',
+        'faq_title' => 'What does Enterprise include?',
+        'faq_body' => 'Enterprise starts at $:price a year. It includes Cloud Pro with a scoped implementation project, agreed integrations, and ongoing maintenance and support. We agree deliverables, AI usage, support terms, and milestones before signing. Additional work requires a separate quote.',
+        'timeline_title' => 'How does an Enterprise project start?',
+        'timeline_body' => 'Tell us about your workflow, integrations, and target date. We assess the requirements together, then agree scope and delivery milestones. Development starts after agreement. Features under discussion are not included until their scope is confirmed.',
+    ],
+    'managed' => [
+        'title' => 'Your plan is managed by Relaticle',
+        'tagline' => 'Contact us for plan and billing changes.',
+    ],
+    'comparison' => [
+        'integrations' => 'Integrations',
+        'support' => 'Support',
+    ],
+    'inquiry' => [
+        'title' => 'Let’s plan your Enterprise workspace',
+        'body' => 'Tell us what your team needs to accomplish. We will review your workflow and integrations, then agree the scope together.',
+        'message_label' => 'What would you like to build with Relaticle?',
+        'message' => "We are interested in Relaticle Enterprise.\n\nWorkflow and integrations we need:\n\nTeam size:\n\nTarget timeline:",
+        'submit' => 'Discuss Enterprise',
     ],
     'member' => [
         'ask_owner' => 'Billing is managed by :owner, the workspace owner.',

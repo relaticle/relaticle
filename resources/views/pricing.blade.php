@@ -1,52 +1,49 @@
 @php
+    $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
+    $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
 @endphp
 
 <x-guest-layout
     title="Pricing - $19/mo flat, unlimited users - Relaticle"
-    description="No per-seat pricing. One flat workspace plan at $19/mo billed yearly, with unlimited users and records. 14-day trial, no card. Self-host free forever."
+    :description="$billingActive
+        ? __('Cloud Pro is $19/mo billed yearly. Enterprise implementation from $:price/year. Unlimited users and records. Self-host free.', ['price' => $enterprisePrice])
+        : __('Self-host for free, or let us run Relaticle for you. Unlimited users and records. No per-seat pricing.')"
     ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
 >
-    <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
+    <section class="relative overflow-hidden bg-white pb-16 pt-32 dark:bg-gray-950 md:pb-20 md:pt-40">
+        <div class="absolute inset-x-0 top-0 h-[36rem] bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black_20%,transparent_100%)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)]"></div>
 
-        <div class="relative max-w-5xl mx-auto px-6 lg:px-8">
-
-            {{-- Badge --}}
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-heart-pulse-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Simple pricing</span>
+        <div class="relative mx-auto max-w-3xl px-6 text-center lg:px-8">
+            <div class="mb-6 flex justify-center">
+                <div class="inline-flex items-center gap-2 rounded-full border border-gray-200/80 bg-white/80 px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04]">
+                    <x-ri-price-tag-3-line class="h-3.5 w-3.5 text-primary dark:text-primary-400" />
+                    <span class="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Pricing') }}</span>
                 </div>
             </div>
 
-            {{-- Header --}}
-            <div class="text-center max-w-2xl mx-auto mb-16 md:mb-20">
-                <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                    No per-seat pricing. Ever.
-                </h1>
-                <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-                    Unlimited users. Unlimited data. Self-host for free forever, or let us run it for you.
-                </p>
-            </div>
+            <h1 class="text-balance font-display text-4xl font-bold leading-[1.1] tracking-[-0.03em] text-gray-950 dark:text-white sm:text-5xl">
+                @if($billingActive)
+                    {{ __('One price for your whole team.') }}
+                @else
+                    {{ __('No per-seat pricing. Ever.') }}
+                @endif
+            </h1>
+            <p class="mx-auto mt-5 max-w-2xl text-pretty text-base leading-relaxed text-gray-500 dark:text-gray-400 md:text-lg">
+                {{ $billingActive
+                    ? __('Unlimited users and records on every plan. Start with Cloud Pro, or work with us on a tailored implementation.')
+                    : __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
+            </p>
+        </div>
 
+        <div class="relative mx-auto mt-12 max-w-4xl px-6 lg:px-8">
             @php
-                $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
                 $freeCredits = number_format(\App\Enums\Plan::Free->credits());
                 $proCredits = number_format(\App\Enums\Plan::Pro->credits());
                 $enterpriseCredits = number_format(\App\Enums\Plan::Enterprise->credits());
                 $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
                 $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
                 $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
-
-
-                // offered(), not available(): this list can never name a model the app won't
-                // serve, because it drops the entries whose measured capabilities say they
-                // cannot call tools (both Gemini models today) and AiModelResolver::pick()
-                // can never select those. It deliberately does NOT drop models whose provider
-                // has no key on this install: what Cloud Pro includes is not a function of
-                // whether the web host currently holds an Anthropic key, and filtering on
-                // that renders these sentences with a hole where the model names belong.
                 $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
                     ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
                         'label' => $model->displayLabel(),
@@ -55,12 +52,6 @@
                     ]);
                 $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
                 $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
-
-                // Grouped, not three hardcoded tiers. The catalog is editable at runtime, so
-                // asking for the 1.0 / 1.5 / 3.0 buckets by name printed "3x for )" the moment
-                // an operator retired the only 3x model, and silently omitted any model priced
-                // at a fourth multiplier. Self-hosted models ride the 1x bucket because
-                // ModelRegistry gives them that multiplier.
                 $multiplierClauses = $toolCapableCloudModels
                     ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
                     ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
@@ -73,10 +64,6 @@
                     ->sortKeys(SORT_NUMERIC)
                     ->map(fn (string $models, string $multiplier): string => __(':multiplierx for :models', ['multiplier' => $multiplier, 'models' => $models]))
                     ->join('; ');
-
-                // The worked example names the cheapest and dearest models the catalog
-                // actually offers, so retiring either cannot leave the sentence describing a
-                // model nobody can pick.
                 $sortedByCost = $toolCapableCloudModels->sortBy('credit_multiplier')->values();
                 $cheapestModel = $sortedByCost->first()['label'] ?? __('a 1x model');
                 $dearestEntry = $sortedByCost->last() ?? ['label' => __('a higher-multiplier model'), 'credit_multiplier' => 1.0];
@@ -91,19 +78,7 @@
                         'dearestCost' => $dearestReplyCost,
                     ]
                 );
-
-                // "Cloud Pro" is the billing-on marketing name only. Under billing-off there is
-                // no self-service path onto a paid plan at all (CreateTeam only auto-starts a
-                // trial when Feature::active(Billing), and the billing page 403s otherwise), so
-                // these two facts use the generic "a paid plan" label when billing is off.
                 $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
-
-                // No Enterprise plan card or checkout path exists anywhere in the codebase, so
-                // whether it's an actual purchasable offering isn't something the code can
-                // confirm. It is mentioned nowhere in this page's visible copy for that reason.
-                // Two independent sentences rather than one with two holes in it: a catalog
-                // with no free-tier model rendered "Every plan can use  and any self-hosted
-                // model you connect yourself", which is the failure this shape removes.
                 $modelsUnlockAnswer = trim(implode(' ', array_filter([
                     $freeCloudModels === ''
                         ? __('Every plan can use any self-hosted model you connect yourself.')
@@ -138,9 +113,6 @@
                             'credits' => $proCredits,
                             'cheapestModel' => $cheapestModel,
                             'dearestModel' => $dearestEntry['label'],
-                            // Settlement formula, packages/Chat/src/Services/CreditService.php
-                            // ::calculateCredits(): max(1, ceil(multiplier + toolCalls * toolBonus)).
-                            // Before tool calls that is just the multiplier.
                             'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                             'days' => $trialDays,
                         ]
@@ -165,10 +137,50 @@
             @else
                 @include('partials.pricing-legacy')
             @endif
+        </div>
+    </section>
 
-            {{-- Self-hosted vs hosted comparison --}}
-            <div class="mt-16 max-w-4xl mx-auto">
-                <div class="mx-auto mb-10 max-w-2xl text-center">
+    <section class="bg-gray-50 py-20 dark:bg-gray-950 md:py-28">
+        <div class="mx-auto max-w-4xl px-6 lg:px-8">
+            @if($billingActive)
+                <div class="mx-auto mb-12 max-w-2xl text-center">
+                    <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">{{ __('Choose how you get started') }}</h2>
+                    <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">{{ __('The same CRM at the core. A different level of help around it.') }}</p>
+                </div>
+                <div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.02]" role="region" aria-label="{{ __('Compare Cloud Pro and Enterprise') }}">
+                    <table class="w-full text-left text-sm">
+                        <caption class="sr-only">{{ __('Compare Cloud Pro and Enterprise') }}</caption>
+                        <thead class="hidden border-b border-gray-100 dark:border-white/[0.06] sm:table-header-group">
+                            <tr>
+                                <th scope="col" class="w-[30%] px-5 py-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('What’s included') }}</th>
+                                <th scope="col" class="w-[35%] bg-primary/[0.04] px-5 py-4 font-semibold text-primary-700 dark:bg-primary/[0.08] dark:text-primary-300">{{ __('billing.plans.cloud_pro') }}</th>
+                                <th scope="col" class="w-[35%] px-5 py-4 font-semibold text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/[0.06]">
+                            @foreach([
+                                [__('Users and records'), __('Unlimited'), __('Unlimited')],
+                                [__('AI assistant'), __('2,000 credits each month'), __('Usage agreed with your team')],
+                                [__('Getting started'), __('Self-service setup'), __('Scoped implementation project')],
+                                [__('billing.comparison.integrations'), __('REST API and MCP server'), __('Custom integrations by agreement')],
+                                [__('Hosting and updates'), __('Managed by Relaticle'), __('Agreed deployment and maintenance')],
+                                [__('billing.comparison.support'), __('Email support'), __('Agreed support with the founding team')],
+                            ] as [$feature, $pro, $enterprise])
+                                <tr class="block px-5 py-4 sm:table-row sm:p-0">
+                                    <th scope="row" class="block pb-2 text-left font-semibold text-gray-900 dark:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:font-medium">{{ $feature }}</th>
+                                    <td data-label="{{ __('billing.plans.cloud_pro') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-primary-700 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-primary-300 sm:table-cell sm:bg-primary/[0.04] sm:px-5 sm:py-4 sm:align-top sm:before:content-none dark:sm:bg-primary/[0.08]">{{ $pro }}</td>
+                                    <td data-label="{{ __('billing.plans.enterprise') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-gray-900 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:before:content-none">{{ $enterprise }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <p class="mt-4 text-center text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                    {{ __('AI credits depend on the model and tool calls.') }}
+                    <a href="#pricing-faq" class="font-medium text-gray-700 underline underline-offset-4 hover:text-primary dark:text-gray-300 dark:hover:text-primary-300">{{ __('How credits work') }}</a>
+                </p>
+            @else
+                <div class="mx-auto mb-12 max-w-2xl text-center">
                     <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
                         {{ __('Self-hosted or hosted: how to choose') }}
                     </h2>
@@ -176,14 +188,6 @@
                         {{ __('Both options run the identical open-source Relaticle codebase, with unlimited users and unlimited records on every plan. The real differences are who operates the server and how AI usage is metered.') }}
                     </p>
                 </div>
-
-                {{--
-                    List layout kept for responsive styling; tables DO convert to
-                    markdown since the TableAwareLeagueDriver landed. <ul>/<li>/<p>
-                    (category names are CSS-bold, not <strong>, so no semantic-bold
-                    tag is used) were verified to survive conversion. Each row
-                    below reads as "Category" / "Self-Hosted: X" / "Hosted: Y" in markdown.
-                --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
                     <li class="px-4 py-3 sm:px-6 sm:py-4">
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Price') }}</p>
@@ -206,93 +210,90 @@
                         <p class="text-sm text-gray-600 dark:text-gray-400"><span class="font-medium text-gray-500 dark:text-gray-400">{{ __('Hosted') }}:</span> {{ __('Email support') }}</p>
                     </li>
                 </ul>
+            @endif
+        </div>
+    </section>
+
+    <section id="pricing-faq" class="scroll-mt-24 bg-white py-20 dark:bg-gray-950 md:py-28">
+        <div class="mx-auto max-w-3xl px-6 lg:px-8">
+            <div class="mb-10 text-center">
+                <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
+                    {{ __('Pricing questions, answered') }}
+                </h2>
             </div>
 
-            {{-- FAQ --}}
-            <div class="mt-16 max-w-3xl mx-auto">
-                <div class="mx-auto mb-6 max-w-2xl text-center">
-                    <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
-                        {{ __('Pricing questions, answered') }}
-                    </h2>
-                </div>
+            @php
+                $trialFaq = [
+                    __('What happens after my trial ends?'),
+                    __(
+                        'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the exact same open-source codebase is always available as a fallback.',
+                        ['days' => $trialDays]
+                    ),
+                ];
 
-                @php
-                    $pricingFaqs = [
-                        [
-                            __('Is Relaticle really free to self-host?'),
-                            __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file. Your data stays on your own server the entire time.'),
-                        ],
-                        [
-                            __('Do you charge per seat?'),
-                            __('No. Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
-                        ],
-                        [__("What's included in the hosted plan?"), $hostedPlanAnswer],
-                        [__('What happens when I hit a plan limit?'), $planLimitAnswer],
-                        [__('What counts as an AI credit?'), $creditFaqAnswer],
-                        [__('Which AI models does my plan unlock?'), $modelsUnlockAnswer],
-                        [__('Is there a message rate limit?'), $rateLimitAnswer],
-                        [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
-                        [
-                            __('Can I switch between self-hosted and cloud?'),
-                            __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
-                        ],
-                    ];
+                $pricingFaqs = [
+                    [
+                        __('Is Relaticle really free to self-host?'),
+                        __('Yes. Self-hosting is fully open source under the AGPL-3.0 license, with unlimited users and unlimited records and no credit card required. Deploy it yourself with the published Docker Compose file. Your data stays on your own server the entire time.'),
+                    ],
+                    [
+                        __('Do you charge per seat?'),
+                        __('No. Relaticle has never charged per seat. Every plan, self-hosted or hosted, is priced per workspace, so you can add as many teammates as you need without the bill changing.'),
+                    ],
+                    [__("What's included in the hosted plan?"), $hostedPlanAnswer],
+                    ...($billingActive ? [$trialFaq] : []),
+                    [__('What happens when I hit a plan limit?'), $planLimitAnswer],
+                    [__('What counts as an AI credit?'), $creditFaqAnswer],
+                    [__('Which AI models does my plan unlock?'), $modelsUnlockAnswer],
+                    [__('Is there a message rate limit?'), $rateLimitAnswer],
+                    [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
+                    [
+                        __('Can I switch between self-hosted and cloud?'),
+                        __('Yes. Both options run the identical open-source codebase against the same PostgreSQL schema, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
+                    ],
+                ];
 
-                    if ($billingActive) {
-                        $pricingFaqs[] = [
-                            __('What happens after my trial ends?'),
-                            __(
-                                'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the exact same open-source codebase is always available as a fallback.',
-                                ['days' => $trialDays]
-                            ),
-                        ];
-                    }
-                @endphp
+                if ($billingActive) {
+                    $pricingFaqs[] = [__('billing.enterprise.faq_title'), __('billing.enterprise.faq_body', ['price' => $enterprisePrice])];
+                    $pricingFaqs[] = [__('billing.enterprise.timeline_title'), __('billing.enterprise.timeline_body')];
+                }
+            @endphp
 
-                <x-marketing.faq-accordion :faqs="$pricingFaqs" id-prefix="pricing-faq" />
-            </div>
+            <x-marketing.faq-accordion :faqs="$pricingFaqs" id-prefix="pricing-faq" />
+        </div>
+    </section>
 
-            {{-- Trust signals --}}
-            <div class="mt-16 max-w-4xl mx-auto">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    @foreach([
-                        ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', (string) $mcpToolCount, 'MCP Tools'],
-                        ['ri-stack-line', '22', 'Field Types'],
-                        ['ri-lock-line', '5-Layer', 'Authorization'],
-                    ] as [$icon, $value, $label])
-                        <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-5 py-4 text-center">
-                            <x-dynamic-component :component="$icon" class="w-5 h-5 text-primary dark:text-primary-400 mx-auto mb-2"/>
-                            <div class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">{{ $value }}</div>
-                            <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 uppercase tracking-wider font-medium">{{ $label }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                {{-- Two of the tiles above are the whole subject of a page each. --}}
-                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
-                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('What the AI assistant and MCP server do') }}</a>
-                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
-                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Run it free on your own server') }}</a>
-                </p>
-            </div>
-
-            {{-- Help CTA --}}
-            <div class="mt-8 max-w-4xl mx-auto">
-                <div class="relative rounded-2xl border border-gray-200/80 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.015] p-8 flex flex-col sm:flex-row items-center gap-6 overflow-hidden">
-                    <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-primary/[0.04] dark:bg-primary/[0.08] rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
-                    <div class="relative flex-1 text-left">
-                        <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">Need help choosing?</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            Not sure which option fits? Have questions about deployment or migration? We're happy to help.
-                        </p>
-                    </div>
-                    <x-marketing.button variant="secondary" href="{{ route('contact') }}" class="relative shrink-0">
-                        Get in touch
+    <section id="pricing-cta" class="bg-gray-50 py-20 dark:bg-gray-950 md:py-28">
+        <div class="mx-auto max-w-xl px-6 text-center lg:px-8">
+            <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
+                {{ $billingActive ? __('Start with a 14-day trial') : __('Start for free today') }}
+            </h2>
+            <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                {{ $billingActive
+                    ? __('No card required. Unlimited users from day one, and the same open-source codebase to self-host whenever you want.')
+                    : __('Unlimited users and records. Hosted by us, or on your own server.') }}
+            </p>
+            <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <x-marketing.button :href="route('login')">
+                    {{ __('Start for free') }}
+                </x-marketing.button>
+                @if($billingActive)
+                    <x-marketing.button variant="secondary" :href="route('contact')">
+                        {{ __('Talk to us') }}
                     </x-marketing.button>
-                </div>
+                @else
+                    <x-marketing.button variant="secondary" :href="route('selfHosted')">
+                        {{ __('Explore self-hosting') }}
+                    </x-marketing.button>
+                @endif
             </div>
-
+            <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">
+                <a href="{{ route('ai') }}" class="font-medium text-gray-700 underline underline-offset-4 hover:text-primary dark:text-gray-300 dark:hover:text-primary-300">{{ __('Explore the AI assistant and :count MCP tools', ['count' => $mcpToolCount]) }}</a>
+                @if(! $billingActive)
+                    <span class="mx-2" aria-hidden="true">·</span>
+                    <a href="{{ route('contact') }}" class="font-medium text-gray-700 underline underline-offset-4 hover:text-primary dark:text-gray-300 dark:hover:text-primary-300">{{ __('Questions? Talk to us.') }}</a>
+                @endif
+            </p>
         </div>
     </section>
 
@@ -324,6 +325,14 @@
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Per workspace, billed yearly at $228/year ($19/mo); $24/mo billed monthly.'),
+                        \Spatie\SchemaOrg\Schema::offer()
+                            ->name('Enterprise')
+                            ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
+                                ->minPrice(config('relaticle.enterprise.starting_price_yearly'))
+                                ->priceCurrency('USD')
+                                ->unitText('year'))
+                            ->url(route('contact', ['plan' => 'enterprise']))
+                            ->description(__('billing.enterprise.faq_body', ['price' => $enterprisePrice])),
                     ]
                     : [
                         \Spatie\SchemaOrg\Schema::offer()
