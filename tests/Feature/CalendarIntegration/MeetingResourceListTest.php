@@ -2,21 +2,31 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
+use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
+use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Filament\Resources\MeetingResource;
 use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\MeetingAttendee;
 
-mutates(MeetingResource::class);
+mutates(MeetingResource::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
     $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
 
     $this->account = ConnectedAccount::withoutEvents(
         fn () => ConnectedAccount::factory()->create([
@@ -58,6 +68,230 @@ it('filters upcoming meetings', function (): void {
         ->filterTable('upcoming')
         ->assertCanSeeTableRecords([$future])
         ->assertCanNotSeeTableRecords([$past]);
+});
+
+it('shows title, time range, duration, and rsvp in the view modal', function (): void {
+    $starts = Carbon::parse('2026-09-30 05:30:00');
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'New Meeting',
+        'starts_at' => $starts,
+        'ends_at' => $starts->copy()->addHour(),
+        'all_day' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+        'html_link' => 'https://meet.example.test/abc',
+        'location' => 'HQ',
+        'description' => '<p>Agenda</p>',
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('New Meeting')
+        ->assertMountedActionModalSee('Sep 30')
+        ->assertMountedActionModalSee('5:30 AM')
+        ->assertMountedActionModalSee('6:30 AM')
+        ->assertMountedActionModalSee('(1h)')
+        ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel())
+        ->assertMountedActionModalSee('https://meet.example.test/abc')
+        ->assertMountedActionModalSee('HQ')
+        ->assertMountedActionModalSee('Agenda')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.description.heading'));
+});
+
+it('shows all-day meetings without a clock range', function (): void {
+    $starts = Carbon::parse('2026-09-30 00:00:00');
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Offsite',
+        'starts_at' => $starts,
+        'ends_at' => $starts->copy()->addDay(),
+        'all_day' => true,
+        'response_status' => AttendeeResponseStatus::TENTATIVE,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Offsite')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.time.all_day'))
+        ->assertMountedActionModalDontSee('→');
+});
+
+it('hides the rsvp pill when response status is null', function (): void {
+    $starts = Carbon::parse('2026-09-30 05:30:00');
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'No RSVP Meeting',
+        'starts_at' => $starts,
+        'ends_at' => $starts->copy()->addHour(),
+        'all_day' => false,
+        'response_status' => null,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('No RSVP Meeting')
+        ->assertMountedActionModalDontSee('Accepted');
+});
+
+it('hides link, location, and description when they are empty', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'html_link' => null,
+        'location' => null,
+        'description' => null,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalDontSee('https://meet.example.test/abc')
+        ->assertMountedActionModalDontSee('Rooftop Terrace 7B')
+        ->assertMountedActionModalDontSee('Kickoff notes')
+        ->assertMountedActionModalDontSee(__('filament/resources/meeting.sections.description.heading'));
+});
+
+it('lists attendees with host and rsvp in the view modal', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Asmit Magan',
+        'email_address' => 'asmit@example.test',
+        'is_organizer' => true,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Asmit Nepali',
+        'email_address' => 'guest@example.test',
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
+        ->assertMountedActionModalSee('Asmit Magan')
+        ->assertMountedActionModalSee('asmit@example.test')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'))
+        ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel())
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalSee('guest@example.test')
+        ->assertMountedActionModalSee(AttendeeResponseStatus::NEEDS_ACTION->getLabel());
+});
+
+it('shows an empty participants line when there are no attendees', function (): void {
+    $starts = Carbon::parse('2026-09-15 11:11:00');
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'starts_at' => $starts,
+        'ends_at' => $starts->copy()->addMinutes(75),
+        'all_day' => false,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
+        ->assertMountedActionModalSee('0')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.empty'));
+});
+
+it('shows the current user attendee row when is_self is true', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Current User',
+        'email_address' => 'self@example.test',
+        'is_self' => true,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Current User')
+        ->assertMountedActionModalSee('self@example.test')
+        ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
+});
+
+it('shows link, location, and description when they are filled', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'html_link' => 'https://meet.example.test/abc',
+        'location' => 'Rooftop Terrace 7B',
+        'description' => '<p>Kickoff notes</p>',
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('https://meet.example.test/abc')
+        ->assertMountedActionModalSee('Rooftop Terrace 7B')
+        ->assertMountedActionModalSee('Kickoff notes')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.description.heading'));
+});
+
+it('lists linked people, companies, and opportunities in the view modal', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $person = People::factory()->for($this->team)->create(['name' => 'Linked Person']);
+    $company = Company::factory()->for($this->team)->create(['name' => 'Linked Co']);
+    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Linked Deal']);
+
+    $meeting->people()->attach($person, ['link_source' => 'manual']);
+    $meeting->companies()->attach($company, ['link_source' => 'manual']);
+    $meeting->opportunities()->attach($opportunity, ['link_source' => 'manual']);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.linked_records.heading'))
+        ->assertMountedActionModalSee('Linked Person')
+        ->assertMountedActionModalSee('Linked Co')
+        ->assertMountedActionModalSee('Linked Deal');
+});
+
+it('shows link records when nothing is linked', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    livewire(ListMeetings::class)
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.actions.link_records.label'));
+});
+
+it('links a record from the meeting view modal', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $person = People::factory()->for($this->team)->create();
+
+    livewire(ListMeetings::class)
+        ->callAction([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('linkRecordsEmpty'),
+        ], [
+            'target_type' => 'People',
+            'target_id' => $person->getKey(),
+        ])
+        ->assertNotified();
+
+    expect($meeting->fresh()?->people()->count())->toBe(1);
 });
 
 it('filters past meetings', function (): void {
