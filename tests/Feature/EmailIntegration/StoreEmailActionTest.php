@@ -268,6 +268,56 @@ it('stores inline attachment metadata', function (): void {
         ->assertExists((string) $attachment->storage_path);
 });
 
+it('stores a nameless inline cid image with a generated filename', function (): void {
+    $data = makeFetchedEmailData([
+        'attachments' => [
+            [
+                'filename' => null,
+                'mime_type' => 'image/png',
+                'size' => 2769,
+                'content_id' => '64dde1dcdd71c_619bcc205105b@9fe1defa658f4522965e4f05974e142d-527074092.mail',
+                'attachment_id' => 'ANGjdJ_C0D5OGQiXtzOJg0HWAuQuorPLxx4bmjkY1a6C7rYa4ts9PBKBZ7ZSite2',
+                'inline_data' => null,
+                'is_inline' => true,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('inline.png')
+        ->and($attachment->mime_type)->toBe('image/png')
+        ->and($attachment->content_id)->toBe('64dde1dcdd71c_619bcc205105b@9fe1defa658f4522965e4f05974e142d-527074092.mail')
+        ->and($attachment->is_inline)->toBeTrue()
+        ->and($attachment->provider_attachment_id)->toBe('ANGjdJ_C0D5OGQiXtzOJg0HWAuQuorPLxx4bmjkY1a6C7rYa4ts9PBKBZ7ZSite2');
+});
+
+it('stores a nameless file attachment with a generated filename', function (): void {
+    $data = makeFetchedEmailData([
+        'hasAttachments' => true,
+        'attachments' => [
+            [
+                'filename' => null,
+                'mime_type' => 'application/pdf',
+                'size' => 204800,
+                'content_id' => null,
+                'attachment_id' => 'att-unnamed',
+                'inline_data' => null,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('attachment.pdf')
+        ->and($attachment->is_inline)->toBeFalse()
+        ->and($attachment->provider_attachment_id)->toBe('att-unnamed');
+});
+
 it('cleans up stored inline files when storing the email rolls back', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
