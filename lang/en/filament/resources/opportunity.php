@@ -76,6 +76,7 @@ return [
                 ],
             ],
             'communication_intelligence' => [
+                'heading' => 'Communication Intelligence',
                 'fields' => [
                     'last_interaction' => [
                         'label' => 'Last Interaction',

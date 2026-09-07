@@ -12,6 +12,7 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -211,7 +212,7 @@ it('does not badge private teammate mail or emails linked to another record', fu
     expect(emailsHeaderBadge($page, $owner))->toBe('1');
 })->with(recordEmailsHeaderPages());
 
-it('scopes communication intelligence on the person view to visible mail only', function (): void {
+it('renders scoped communication intelligence once on the person view', function (): void {
     $person = People::factory()->recycle([$this->user, $this->team])->create([
         'email_count' => 99,
         'inbound_email_count' => 50,
@@ -228,9 +229,27 @@ it('scopes communication intelligence on the person view to visible mail only', 
         'is_internal' => false,
     ]);
 
-    $metrics = resolve(EmailVisibilityService::class)->visibleCommunicationIntelligence($person, $this->user);
+    DB::flushQueryLog();
+    DB::enableQueryLog();
 
-    expect($metrics->emailCount)->toBe(1)
-        ->and($metrics->inboundEmailCount)->toBe(1)
-        ->and($metrics->outboundEmailCount)->toBe(0);
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertOk()
+        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.heading'))
+        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.email_count.label'))
+        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.inbound_email_count.label'))
+        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.outbound_email_count.label'))
+        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.last_email.label'))
+        ->assertSchemaStateSet([
+            'visible_email_count' => 1,
+            'visible_inbound_email_count' => 1,
+            'visible_outbound_email_count' => 0,
+        ]);
+
+    $emailCountAggregates = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'as email_count'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect($emailCountAggregates)->toBe(1);
 });

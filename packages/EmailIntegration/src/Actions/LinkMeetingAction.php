@@ -191,11 +191,11 @@ final readonly class LinkMeetingAction
     private function buildSkippedDomains(string $teamId): Collection
     {
         $configDomains = collect((array) config('email-integration.public_domains', []))
-            ->map(fn (mixed $d): string => strtolower((string) $d));
+            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
 
         $teamDomains = PublicEmailDomain::query()->where('team_id', $teamId)
             ->pluck('domain')
-            ->map(fn (mixed $d): string => strtolower((string) $d));
+            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
 
         return $configDomains->merge($teamDomains)->unique()->values();
     }
