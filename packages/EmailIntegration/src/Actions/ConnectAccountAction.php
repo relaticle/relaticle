@@ -19,7 +19,9 @@ final readonly class ConnectAccountAction
         $account = DB::transaction(function () use ($data): ConnectedAccount {
             // Match against trashed rows too: the unique index spans soft-deleted
             // records, so a previously disconnected account must be reused and
-            // restored rather than inserted again.
+            // restored rather than inserted again. Uniqueness is per workspace
+            // (user, team, provider, email), so the same mailbox can exist on
+            // another team without colliding.
             $values = [
                 'display_name' => $data->displayName,
                 'provider_account_id' => $data->providerAccountId,
