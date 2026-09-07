@@ -106,7 +106,10 @@ it('serializes the store-batch continuation without the running queue worker', f
     $syncJob->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($batch->thenCallbacks())->toBeEmpty()
+            ->and($batch->finallyCallbacks())->not->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
             serialize($callback);
         }
 
@@ -150,7 +153,9 @@ it('chains the next calendar page after the store batch completes', function ():
     (new InitialCalendarSyncJob($account))->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($batch->thenCallbacks())->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
             $callback();
         }
 
@@ -282,7 +287,9 @@ it('stores the sync token when the batch completion callback runs', function ():
     (new InitialCalendarSyncJob($account))->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($batch->thenCallbacks())->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
             $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
             $closure();
         }

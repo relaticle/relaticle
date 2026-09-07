@@ -122,7 +122,10 @@ it('serializes the store-batch continuation without the running queue worker', f
     $syncJob->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($batch->thenCallbacks())->toBeEmpty()
+            ->and($batch->finallyCallbacks())->not->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
             serialize($callback);
         }
 
@@ -149,7 +152,9 @@ it('chains the next page after the store batch completes', function (): void {
     (new InitialEmailSyncJob($account))->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($batch->thenCallbacks())->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
             $callback();
         }
 
@@ -189,6 +194,43 @@ it('chains the next page when the current page has no new ids', function (): voi
     );
     expect($account->fresh()?->sync_cursor)->toBeNull();
     Notification::assertNothingSent();
+});
+
+it('sets the cursor after the last page store batch finishes', function (): void {
+    Bus::fake();
+    Notification::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']),
+        nextPageToken: null,
+        cursor: 'history-1',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    (new InitialEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        expect($batch->thenCallbacks())->toBeEmpty();
+
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $callback();
+        }
+
+        return true;
+    });
+
+    expect($account->fresh()?->sync_cursor)->toBe('history-1')
+        ->and($account->fresh()?->last_synced_at)->not->toBeNull();
+
+    Notification::assertSentTo(
+        $account->user,
+        MailboxHistoryImportCompletedNotification::class,
+    );
 });
 
 it('sets the cursor and notifies the owner when the last page is stored', function (): void {

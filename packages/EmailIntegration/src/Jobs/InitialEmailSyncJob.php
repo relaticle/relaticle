@@ -86,7 +86,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(static function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
+            ->finally(static function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
 
                 if (! $account instanceof ConnectedAccount) {

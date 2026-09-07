@@ -111,9 +111,11 @@ it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue',
 function assertBatchCallbacksCarryNoJobInstance(): void
 {
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        expect($batch->thenCallbacks())->not->toBeEmpty();
+        $callbacks = [...$batch->thenCallbacks(), ...$batch->finallyCallbacks()];
 
-        foreach ($batch->thenCallbacks() as $callback) {
+        expect($callbacks)->not->toBeEmpty();
+
+        foreach ($callbacks as $callback) {
             $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
 
             expect((new ReflectionFunction($closure))->getClosureThis())->toBeNull();
