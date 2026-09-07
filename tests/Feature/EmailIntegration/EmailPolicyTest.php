@@ -57,3 +57,29 @@ it('still allows a teammate to view a shared-tier email in the same workspace', 
         ->and($teammate->can('viewBody', $this->email))->toBeTrue()
         ->and($teammate->can('share', $this->email))->toBeFalse();
 });
+
+it('gives a teammate full access when they already synced the same message', function (): void {
+    $this->email->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+    $teammate = User::factory()->create();
+    $teammate->teams()->attach($this->team);
+    $teammate->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+    ]));
+
+    Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'rfc_message_id' => $this->email->rfc_message_id,
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'is_internal' => false,
+    ]);
+
+    expect($teammate->can('viewBody', $this->email))->toBeTrue()
+        ->and($teammate->can('requestAccess', $this->email))->toBeFalse()
+        ->and($teammate->can('share', $this->email))->toBeFalse();
+});

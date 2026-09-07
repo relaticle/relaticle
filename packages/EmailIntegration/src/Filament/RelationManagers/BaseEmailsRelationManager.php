@@ -32,6 +32,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 /**
  * @property-read Email|null $selectedEmail
@@ -92,7 +93,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     $query->whereRaw('0 = 1');
                 }
 
-                return $query;
+                return resolve(PreferredEmailCopyService::class)
+                    ->restrictToPreferredCopies($query, $this->authUser());
             })
             ->recordTitleAttribute('subject')
             ->recordAction('view')

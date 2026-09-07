@@ -34,6 +34,8 @@ final class EmailVisibilityService
      */
     private array $workspaceEntryCache = [];
 
+    public function __construct(private readonly PreferredEmailCopyService $preferredCopies) {}
+
     /**
      * @var array<string, array<int, lowercase-string>>
      */
@@ -116,10 +118,13 @@ final class EmailVisibilityService
             return 0;
         }
 
-        return $record
+        $query = $record
             ->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
-            ->count();
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+
+        $this->preferredCopies->restrictToPreferredCopies($query->getQuery(), $viewer);
+
+        return $query->count();
     }
 
     public function visibleEmailCountBadge(Company|Opportunity|People $record, User $viewer): ?string
