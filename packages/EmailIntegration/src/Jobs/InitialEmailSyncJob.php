@@ -11,8 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
@@ -57,7 +55,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             $account->update(['initial_sync_estimated' => $page->estimatedTotal]);
         }
 
-        $allIds = $page->messageIds->all();
+        $allIds = array_values($page->messageIds->all());
 
         $storedIds = Email::query()
             ->where('connected_account_id', $account->getKey())
@@ -73,29 +71,20 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $accountId = (string) $account->getKey();
         $nextPageToken = $page->nextPageToken;
         $pageCursor = $page->cursor;
 
-        $jobs = collect($newIds)
-            ->chunk(Config::integer('email-integration.sync.batch_size', 50))
-            ->flatMap(fn (Collection $chunk): array => $chunk->map(fn (string $id): StoreEmailJob => new StoreEmailJob($account, $id))->all())
-            ->all();
-
-        Bus::batch($jobs)
-            ->name("Initial sync: {$account->email_address}")
-            ->onQueue('emails-sync')
-            ->allowFailures()
-            ->finally(static function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
-                $account = ConnectedAccount::query()->whereKey($accountId)->first();
-
-                if (! $account instanceof ConnectedAccount) {
-                    return;
-                }
-
+        InitialSyncPageStoreBatch::dispatchEmails(
+            account: $account,
+            pageMessageIds: $allIds,
+            messageIdsToStore: $newIds,
+            historyCursor: $historyCursor,
+            nextPageToken: $nextPageToken,
+            pageCursor: $pageCursor,
+            onPageStored: static function (ConnectedAccount $account) use ($historyCursor, $nextPageToken, $pageCursor): void {
                 self::continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
-            })
-            ->dispatch();
+            },
+        );
     }
 
     public function failed(Throwable $exception): void

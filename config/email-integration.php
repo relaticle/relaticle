@@ -69,6 +69,7 @@ return [
             ? null
             : (int) $days,
         'batch_size' => (int) env('EMAIL_SYNC_BATCH_SIZE', 50),
+        'initial_store_attempts' => (int) env('EMAIL_SYNC_INITIAL_STORE_ATTEMPTS', 3),
     ],
 
     /*
