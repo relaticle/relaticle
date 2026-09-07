@@ -55,7 +55,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             $account->update(['initial_sync_estimated' => $page->estimatedTotal]);
         }
 
-        $allIds = $page->messageIds->all();
+        $allIds = array_values($page->messageIds->all());
 
         $storedIds = Email::query()
             ->where('connected_account_id', $account->getKey())
