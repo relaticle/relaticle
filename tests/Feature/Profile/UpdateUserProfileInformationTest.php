@@ -844,6 +844,26 @@ describe('locale', function () {
             ->locale->toBe('fr');
     });
 
+    test('locale is stored alongside an email change', function () {
+        Notification::fake();
+
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-email@example.com',
+            'email_verified_at' => now(),
+            'locale' => null,
+        ]);
+
+        $this->action->update($user, [
+            'name' => $user->name,
+            'email' => 'locale-email-changed@example.com',
+            'locale' => 'da',
+        ]);
+
+        expect($user->fresh())
+            ->locale->toBe('da')
+            ->email_verified_at->toBeNull();
+    });
+
     test('chatLocale falls back to English for a language without translations', function () {
         expect(User::factory()->make(['locale' => 'da'])->chatLocale())->toBe('da')
             ->and(User::factory()->make(['locale' => 'ne'])->chatLocale())->toBe('en')
