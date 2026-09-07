@@ -58,6 +58,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property Carbon|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
  * @property string|null $subscriber_profile_hash
+ * @property string|null $rejected_subscriber_profile_hash
  * @property string|null $remember_token
  * @property Carbon|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
@@ -84,6 +85,7 @@ use Laravel\Sanctum\HasApiTokens;
     'two_factor_secret',
     'mailcoach_subscriber_uuid',
     'subscriber_profile_hash',
+    'rejected_subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
 final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
