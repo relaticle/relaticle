@@ -6,12 +6,17 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailShare;
 
 final readonly class PrivacyService
 {
-    public function __construct(private EmailVisibilityService $visibility) {}
+    public function __construct(
+        private EmailVisibilityService $visibility,
+        private PreferredEmailCopyService $preferredCopies,
+    ) {}
 
     /**
      * Resolve the effective privacy tier this $viewer can see on $email.
@@ -31,16 +36,19 @@ final readonly class PrivacyService
             return null;
         }
 
-        // 3. Per-email share overrides the email's own tier (uses the loaded relation when
-        // eager-loaded, so filtering a list of emails doesn't issue a query per row).
-        $email->loadMissing('shares');
-        $share = $email->shares->firstWhere('shared_with', $viewer->getKey());
+        if ($this->preferredCopies->viewerHasSyncedCopy($email, $viewer)) {
+            return EmailPrivacyTier::FULL;
+        }
 
-        if ($share) {
+        // Per-email share overrides the email's own tier (uses the loaded relation when
+        // eager-loaded, so filtering a list of emails doesn't issue a query per row).
+        $share = $this->shareForViewer($email, $viewer);
+
+        if ($share instanceof EmailShare) {
             return EmailPrivacyTier::from($share->tier);
         }
 
-        // 4. Email's own tier
+        // Email's own tier
         $tier = $email->privacy_tier;
 
         if ($tier === EmailPrivacyTier::PRIVATE) {
@@ -70,5 +78,29 @@ final readonly class PrivacyService
         }
 
         return $team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+    }
+
+    private function shareForViewer(Email $email, User $viewer): ?EmailShare
+    {
+        $email->loadMissing('shares');
+        $direct = $email->shares->firstWhere('shared_with', $viewer->getKey());
+
+        if ($direct instanceof EmailShare) {
+            return $direct;
+        }
+
+        if (blank($email->rfc_message_id)) {
+            return null;
+        }
+
+        return EmailShare::query()
+            ->where('team_id', $email->team_id)
+            ->where('shared_with', $viewer->getKey())
+            ->whereHas('email', function (Builder $query) use ($email): void {
+                $query
+                    ->where('team_id', $email->team_id)
+                    ->where('rfc_message_id', $email->rfc_message_id);
+            })
+            ->first();
     }
 }
