@@ -17,6 +17,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
@@ -112,25 +113,34 @@ final readonly class LinkEmailAction
                 $email->connected_account_id,
             );
 
-            // 1. Try to match Company by email domain first, so the person can be born already linked.
+            // 1. Resolve the person before deciding whether to create a company.
+            // Email values are stored as JSON arrays in json_value (e.g. ["user@example.com"])
+            $person = People::query()->where('team_id', $teamId)
+                ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
+                    ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('type', 'email'))
+                    ->whereJsonContains('json_value', $participant->email_address)
+                )
+                ->first();
+
+            $wouldCreatePerson = ! $person
+                && ! $email->is_internal
+                && ! $isAutomatedSender
+                && ! $suppressCreate
+                && $connectedAccount
+                && $team
+                && $this->shouldCreatePerson($team, $participant->email_address, $email);
+
+            // 2. Match or create Company by email host so a new person can be born already linked.
             $company = null;
-            $domain = $this->extractDomain($participant->email_address);
+            $rawDomain = $this->extractDomain($participant->email_address);
+            $host = $rawDomain !== null ? $this->domainMatcher->host($rawDomain) : null;
 
-            if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = $this->domainMatcher->firstMatching($domain, $teamId);
+            if ($host && $skippedDomains->doesntContain($host)) {
+                $company = $this->domainMatcher->firstMatching($host, $teamId);
 
-                // 2. Auto-create Company when no existing record found. Blocked
-                // addresses must not spawn a company, and creation still follows
-                // the same All / Selective / None rule as people.
-                if (
-                    ! $company
-                    && ! $isAutomatedSender
-                    && ! $suppressCreate
-                    && $connectedAccount
-                    && $team
-                    && $this->shouldCreateCompany($team, $participant->email_address, $email)
-                ) {
-                    $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
+                // 3. Auto-create Company only when a new person would also be created.
+                if (! $company && $wouldCreatePerson && $this->shouldCreateCompany($team, $participant->email_address, $email)) {
+                    $company = $this->autoCreateCompany->execute($host, $teamId, $team);
                 }
 
                 if ($company instanceof Company) {
@@ -143,17 +153,8 @@ final readonly class LinkEmailAction
                 }
             }
 
-            // 3. Try to match existing People record by email address.
-            // Email values are stored as JSON arrays in json_value (e.g. ["user@example.com"])
-            $person = People::query()->where('team_id', $teamId)
-                ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
-                    ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('type', 'email'))
-                    ->whereJsonContains('json_value', $participant->email_address)
-                )
-                ->first();
-
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && ! $suppressCreate && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address, $email)) {
+            if ($wouldCreatePerson) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -201,8 +202,6 @@ final readonly class LinkEmailAction
     {
         return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
-            // The outbound message being linked is itself history: do not depend on a
-            // second query that ActiveAccountScope can hide during mailbox re-import.
             ContactCreationMode::Selective => $email->direction === EmailDirection::OUTBOUND
                 || $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
@@ -223,12 +222,13 @@ final readonly class LinkEmailAction
 
     /**
      * True when any connected mailbox on this team has an outbound email involving
-     * the address. The email currently being linked already exists in the table,
-     * so the first send is enough, and a reply is not required.
+     * the address. Includes mail stored under disconnected accounts so a reply
+     * on an active mailbox still creates the person after account churn.
      */
     private function hasTeamOutboundHistory(Team $team, string $emailAddress): bool
     {
         return Email::query()
+            ->withoutGlobalScope(ActiveAccountScope::class)
             ->where('team_id', $team->getKey())
             ->where('direction', EmailDirection::OUTBOUND)
             ->whereHas(
