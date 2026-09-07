@@ -11,9 +11,10 @@ use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
-mutates(PrivacyService::class);
+mutates(PrivacyService::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withTeam()->create();
@@ -309,6 +310,100 @@ it('effectiveTier hides a blocked email from its owner', function (): void {
     $tier = $this->service->effectiveTier($email, $this->owner);
 
     expect($tier)->toBeNull();
+});
+
+it('effectiveTier returns FULL for a teammate who already synced the same message', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($viewer, ['role' => 'editor']);
+
+    $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+    ]));
+
+    $email = makePrivacyEmail([
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<same-message@example.com>',
+    ]);
+
+    Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+        'connected_account_id' => $viewerAccount->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<same-message@example.com>',
+        'is_internal' => false,
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('effectiveTier does not treat a different message as a mailbox copy', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($viewer, ['role' => 'editor']);
+
+    $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+    ]));
+
+    $email = makePrivacyEmail([
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<original@example.com>',
+    ]);
+
+    Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+        'connected_account_id' => $viewerAccount->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<other@example.com>',
+        'is_internal' => false,
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+});
+
+it('effectiveTier uses a share on another copy of the same message', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($viewer, ['role' => 'editor']);
+
+    $otherOwner = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($otherOwner, ['role' => 'editor']);
+
+    $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherOwner->id,
+    ]));
+
+    $email = makePrivacyEmail([
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<shared-copy@example.com>',
+    ]);
+
+    $otherCopy = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $otherOwner->id,
+        'connected_account_id' => $otherAccount->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => '<shared-copy@example.com>',
+        'is_internal' => false,
+    ]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $otherCopy->getKey(),
+        'team_id' => $this->team->id,
+        'shared_by' => $otherOwner->id,
+        'shared_with' => $viewer->id,
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
 it('effectiveTier hides a mailbox-blocklisted email from its owner', function (): void {

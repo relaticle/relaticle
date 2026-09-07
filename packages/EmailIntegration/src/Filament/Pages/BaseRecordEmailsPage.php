@@ -29,6 +29,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 abstract class BaseRecordEmailsPage extends Page
 {
@@ -129,6 +130,8 @@ abstract class BaseRecordEmailsPage extends Page
             });
         }
 
+        resolve(PreferredEmailCopyService::class)->restrictToPreferredCopies($query->getQuery(), $user);
+
         return $query->latest('sent_at')->paginate(20);
     }
 
@@ -209,11 +212,16 @@ abstract class BaseRecordEmailsPage extends Page
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 
-        return $record
+        $user = $this->authUser();
+        $query = $record
             ->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
-            ->unreadFor($this->authUser()->getKey())
-            ->count();
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->unreadFor($user->getKey());
+
+        resolve(PreferredEmailCopyService::class)
+            ->restrictToPreferredCopies($query->getQuery(), $user);
+
+        return $query->count();
     }
 
     public function selectEmail(string $id): void
