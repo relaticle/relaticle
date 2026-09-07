@@ -31,7 +31,7 @@ $organizations = Organization::factory()
 
 Create only the records required to arrange the behavior or support an assertion.
 
-## The Datasets
+## Datasets
 
 Use a dataset when the setup, test body, and assertions remain the same across input values.
 
@@ -45,11 +45,11 @@ it('forbids roles other than admin', function (Role $role) {
 
 Use parameterized tests for:
 
-- the cases of an enum
-- the roles and the plans
-- the boundary values
-- the input values that are not valid in the same way
-- the pairs of an input value and an output value
+- enum cases
+- roles and plans
+- boundary values
+- input values that are invalid in the same way
+- input and output value pairs
 
 Write separate tests if the cases need a different setup, a different behavior, or different assertions. One test function with a branch in the body is two tests in one function.
 
