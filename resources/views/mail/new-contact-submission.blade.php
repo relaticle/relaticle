@@ -8,7 +8,7 @@
 {{ $data['message'] }}
 </x-mail::panel>
 
-<x-mail::button :url="'mailto:'.$data['email']">
+<x-mail::button :url="$replyUrl">
 {{ __('mail.contact_submission.cta', ['name' => $data['name']]) }}
 </x-mail::button>
 </x-mail::message>

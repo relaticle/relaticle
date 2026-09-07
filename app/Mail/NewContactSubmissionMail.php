@@ -35,6 +35,7 @@ final class NewContactSubmissionMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'mail.new-contact-submission',
             with: [
+                'replyUrl' => 'mailto:'.$this->data['email'].'?subject='.rawurlencode('Re: '.$this->envelope()->subject),
                 'preheader' => $company === null || $company === ''
                     ? __('mail.contact_submission.preheader_without_company', ['email' => $this->data['email']])
                     : __('mail.contact_submission.preheader', ['company' => $company, 'email' => $this->data['email']]),
