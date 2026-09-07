@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Team;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use Illuminate\Support\Facades\Bus;
@@ -199,6 +200,52 @@ it('dispatches history import when a disconnected account is reconnected', funct
 
     Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
     Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('stores a separate connected account when the same mailbox is connected in a second workspace', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $firstTeam = $user->currentTeam;
+    $secondTeam = Team::factory()->create(['user_id' => $user->getKey()]);
+    $user->teams()->attach($secondTeam, ['role' => 'admin']);
+
+    $connect = function () use ($user): void {
+        $social = new SocialiteUser;
+        $social->id = 'gmail-shared-mailbox';
+        $social->email = 'shared@example.com';
+        $social->name = 'Demo';
+        $social->token = 'access-token';
+        $social->refreshToken = 'refresh-token';
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('gmail', $social);
+
+        $this->actingAs($user)
+            ->get(route('email-accounts.callback', ['provider' => 'gmail']))
+            ->assertRedirect();
+    };
+
+    $connect();
+
+    $user->forceFill(['current_team_id' => $secondTeam->getKey()])->save();
+    $user->unsetRelation('currentTeam');
+    $connect();
+
+    $accounts = ConnectedAccount::query()
+        ->where('user_id', $user->getKey())
+        ->where('email_address', 'shared@example.com')
+        ->get();
+
+    expect($accounts)->toHaveCount(2)
+        ->and($accounts->pluck('team_id')->all())->toEqualCanonicalizing([
+            $firstTeam->getKey(),
+            $secondTeam->getKey(),
+        ]);
 });
 
 it('makes the first connected account the default and leaves later connections non-default', function (): void {
