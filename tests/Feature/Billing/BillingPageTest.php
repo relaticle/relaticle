@@ -358,11 +358,12 @@ it('names the workspace in the upgrade confirmation step', function (): void {
 });
 
 it('offers owners an Enterprise conversation without changing their plan', function (): void {
+    config()->set('app.url', 'https://marketing.test');
     [, $team] = billingPageOwner();
 
     livewire(Billing::class)
         ->assertSee('From $20,000 / year')
-        ->assertSeeHtml('href="'.e(route('contact', ['plan' => 'enterprise'])).'"');
+        ->assertSeeHtml('href="https://marketing.test/contact?plan=enterprise"');
 
     expect($team->refresh()->plan)->toBe(Plan::Free);
 });
@@ -379,6 +380,7 @@ it('does not offer Enterprise purchases to workspace members', function (): void
 });
 
 it('keeps an Enterprise grant managed after an older subscription ended', function (): void {
+    config()->set('app.url', 'https://marketing.test');
     [, $team] = billingPageOwner();
     $team->forceFill(['plan' => Plan::Enterprise])->save();
     $team->subscriptions()->create([
@@ -393,6 +395,7 @@ it('keeps an Enterprise grant managed after an older subscription ended', functi
     livewire(Billing::class)
         ->assertSee(__('billing.enterprise.body'))
         ->assertSee('Contact your Relaticle team')
+        ->assertSeeHtml('href="https://marketing.test/contact"')
         ->assertDontSee(__('billing.upgrade.button'))
         ->assertDontSee('From $20,000 / year');
 });
