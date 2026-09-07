@@ -156,8 +156,13 @@ final class EmailVisibilityService
             return new VisibleCommunicationIntelligence;
         }
 
-        $emailAggregates = $record->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+        $emailsQuery = $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+
+        $this->preferredCopies->restrictToPreferredCopies($emailsQuery->getQuery(), $viewer);
+
+        $emailAggregates = $emailsQuery
             ->reorder()
             ->toBase()
             ->selectRaw('count(*) as email_count')

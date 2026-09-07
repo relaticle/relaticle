@@ -21,7 +21,7 @@ final class CommunicationIntelligenceInfolist
         string $translationKey,
         bool $includeDirectionCounts = true,
     ): Section {
-        return Section::make('Communication Intelligence')
+        return Section::make(__("{$translationKey}.heading"))
             ->icon(Heroicon::ChartBar)
             ->schema([
                 TextEntry::make('visible_last_interaction_at')
@@ -67,11 +67,33 @@ final class CommunicationIntelligenceInfolist
             ->collapsed(fn (People|Company|Opportunity $record): bool => self::metrics($record)->emailCount === 0);
     }
 
+    /**
+     * Filament evaluates each TextEntry and the collapsed callback separately, and
+     * schema components do not share loaded infolist state. Cache on the current
+     * request, keyed by record and viewer, so one render runs the aggregates once
+     * without leaking across records, users, Livewire requests, or tests.
+     */
     private static function metrics(People|Company|Opportunity $record): VisibleCommunicationIntelligence
     {
         /** @var User $viewer */
         $viewer = Auth::user();
 
-        return resolve(EmailVisibilityService::class)->visibleCommunicationIntelligence($record, $viewer);
+        $key = sprintf(
+            'email-integration.visible-communication-intelligence.%s.%s.%s',
+            $record::class,
+            $record->getKey(),
+            $viewer->getKey(),
+        );
+
+        $cached = request()->attributes->get($key);
+
+        if ($cached instanceof VisibleCommunicationIntelligence) {
+            return $cached;
+        }
+
+        $metrics = resolve(EmailVisibilityService::class)->visibleCommunicationIntelligence($record, $viewer);
+        request()->attributes->set($key, $metrics);
+
+        return $metrics;
     }
 }

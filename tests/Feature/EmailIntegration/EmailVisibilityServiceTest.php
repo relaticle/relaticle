@@ -171,3 +171,50 @@ it('scopes communication intelligence metrics to mail the viewer can see', funct
         ->and($metrics->inboundEmailCount)->toBe(1)
         ->and($metrics->outboundEmailCount)->toBe(0);
 });
+
+it('counts one preferred copy when the same rfc message is synced twice', function (): void {
+    $person = People::factory()->for($this->team)->create();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $coworker = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+    ]));
+
+    $messageId = '<preferred-metrics@example.com>';
+    $preferredSentAt = now()->subHour();
+
+    $preferred = Email::factory()->inbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $account->getKey(),
+        'rfc_message_id' => $messageId,
+        'sent_at' => $preferredSentAt,
+        'is_internal' => false,
+    ]);
+    $duplicate = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+        'rfc_message_id' => $messageId,
+        'sent_at' => now(),
+        'is_internal' => false,
+    ]);
+
+    $person->emails()->attach([$preferred->getKey(), $duplicate->getKey()]);
+
+    $metrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
+
+    expect($metrics->emailCount)->toBe(1)
+        ->and($metrics->emailCount)->toBe($this->service->visibleEmailCount($person, $this->user))
+        ->and($metrics->inboundEmailCount)->toBe(1)
+        ->and($metrics->outboundEmailCount)->toBe(0)
+        ->and($metrics->lastEmailAt?->toDateTimeString())->toBe($preferredSentAt->toDateTimeString());
+});
