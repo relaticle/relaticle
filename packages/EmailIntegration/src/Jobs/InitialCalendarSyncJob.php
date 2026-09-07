@@ -67,7 +67,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Initial calendar sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(static function () use ($accountId, $nextPageToken, $nextSyncToken): void {
+            ->finally(static function () use ($accountId, $nextPageToken, $nextSyncToken): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
 
                 if (! $account instanceof ConnectedAccount) {
