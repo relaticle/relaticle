@@ -11,6 +11,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -59,10 +61,42 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        foreach ($result->events as $event) {
-            dispatch(new StoreMeetingJob($account, $event));
+        // Advancing the cursor before the fetched events are stored loses any event
+        // whose StoreMeetingJob exhausts its retries: the next sync starts past it and
+        // it is never retried. So advance the cursor only once the batch has fully stored.
+        // With no events the delta is a read-only window, so advance inline.
+        if ($result->events === []) {
+            self::advanceCursor($account, $result->nextSyncToken);
+
+            return;
         }
 
+        $accountId = (string) $account->getKey();
+        $nextSyncToken = $result->nextSyncToken;
+
+        $jobs = array_map(
+            fn (CalendarEventData $event): StoreMeetingJob => new StoreMeetingJob($account, $event),
+            $result->events,
+        );
+
+        Bus::batch($jobs)
+            ->name("Incremental calendar sync: {$account->email_address}")
+            ->onQueue('emails-sync')
+            ->allowFailures()
+            ->then(static function () use ($accountId, $nextSyncToken): void {
+                $account = ConnectedAccount::query()->whereKey($accountId)->first();
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                self::advanceCursor($account, $nextSyncToken);
+            })
+            ->dispatch();
+    }
+
+    private static function advanceCursor(ConnectedAccount $account, ?string $nextSyncToken): void
+    {
         $update = [
             'last_calendar_synced_at' => now(),
             'status' => EmailAccountStatus::ACTIVE,
@@ -70,8 +104,8 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         ];
 
         // Never overwrite a good cursor with null (see InitialCalendarSyncJob).
-        if ($result->nextSyncToken !== null) {
-            $update['calendar_sync_cursor'] = $result->nextSyncToken;
+        if ($nextSyncToken !== null) {
+            $update['calendar_sync_cursor'] = $nextSyncToken;
         }
 
         $account->update($update);
