@@ -9,6 +9,9 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Bootstrap\LoadConfiguration;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -151,6 +154,72 @@ it('honors a preserved invitation destination reached before signing in', functi
     $target = loginResponseFor($user, route('team-invitations.token.accept', ['token' => $rawToken]));
 
     expect($target)->toBe(route('team-invitations.token.accept', ['token' => $rawToken]));
+});
+
+it('honors a preserved email-change verification destination reached before signing in', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $intended = Filament::getVerifyEmailChangeUrl($user, 'new-address@example.com');
+
+    $target = loginResponseFor($user, $intended);
+
+    expect($target)->toBe($intended);
+});
+
+it('honors a preserved email-change block destination reached before signing in', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $verifyUrl = Filament::getVerifyEmailChangeUrl($user, 'new-address@example.com');
+    parse_str((string) parse_url($verifyUrl, PHP_URL_QUERY), $query);
+    $intended = Filament::getBlockEmailChangeVerificationUrl($user, 'new-address@example.com', (string) $query['signature']);
+
+    $target = loginResponseFor($user, $intended);
+
+    expect($target)->toBe($intended);
+});
+
+describe('login destinations - domain-routed panel', function (): void {
+    beforeEach(function (): void {
+        putenv('APP_PANEL_DOMAIN=app.example.com');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+    });
+
+    afterEach(function (): void {
+        putenv('APP_PANEL_DOMAIN');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('honors a relative destination into a workspace the user belongs to', function (): void {
+        $user = User::factory()->withTeam()->create();
+        $team = $user->currentTeam;
+
+        $target = loginResponseFor($user, "/{$team->slug}/companies");
+
+        expect($target)->toEndWith("/{$team->slug}/companies");
+    });
+
+    it('falls back to the dashboard for a foreign workspace on the panel domain', function (): void {
+        $user = User::factory()->withTeam()->create();
+        $otherTeam = Team::factory()->create();
+
+        $target = loginResponseFor($user, url()->getAppUrl($otherTeam->slug.'/companies'));
+
+        expect($target)->toBe(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+    });
+
+    it('falls back to the dashboard for a workspace the user was removed from on the panel domain', function (): void {
+        $user = User::factory()->withTeam()->create();
+        $revokedTeam = Team::factory()->create();
+        $revokedTeam->users()->attach($user, ['role' => 'editor']);
+        $revokedTeam->removeUser($user);
+
+        $target = loginResponseFor($user, url()->getAppUrl($revokedTeam->slug.'/companies'));
+
+        expect($target)->toBe(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+    });
 });
 
 function passkeyRedirectFor(User $user, ?string $intended): string

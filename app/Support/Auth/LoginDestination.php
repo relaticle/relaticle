@@ -8,17 +8,20 @@ use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Routing\Router;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
-/**
- * Validates and selects the URL a sign-in method redirects to, replacing the
- * per-response ad hoc checks that let an unauthenticated `url.intended` value
- * reach `redirect()->intended()` unchecked (e.g. the passkey and social
- * responses trusted it outright, and the password response only validated it
- * once a workspace already existed).
- */
 final readonly class LoginDestination
 {
     private const array ALLOWED_SCHEMES = ['http', 'https'];
+
+    /**
+     * @var list<string>
+     */
+    // Bare panel root always redirects to the caller's own tenant already.
+    private const array META_ROUTE_NAMES = ['filament.app.tenant'];
 
     public function resolve(User $user, ?string $intended): string
     {
@@ -44,41 +47,50 @@ final readonly class LoginDestination
             return false;
         }
 
-        $path = parse_url($intended, PHP_URL_PATH);
+        $route = $this->matchRoute($intended);
 
-        if (! is_string($path)) {
+        if (! $route instanceof RoutingRoute || in_array($route->getName(), self::META_ROUTE_NAMES, true)) {
             return false;
         }
 
-        $segments = array_values(array_filter(explode('/', $path), fn (string $s): bool => $s !== ''));
-
-        $isPanelUrl = ($segments[0] ?? null) === config('app.app_panel_path', 'app');
-
-        // Drop the panel path prefix for path-based panels (/app/{slug}/...).
-        // Domain-based panels ({domain}/{slug}/...) have no such prefix.
-        if ($isPanelUrl) {
-            array_shift($segments);
-        }
-
-        $slug = $segments[0] ?? null;
-
-        if ($slug === null) {
-            return false;
-        }
-
-        // Non-tenant destinations, the OAuth consent screen, invitation links, and
-        // shared join links being the ones that matter, carry no workspace to check.
-        // Reserved slugs cover the panel-prefixed equivalents (email verification,
-        // scheduled-deletion interstitial, passkey/profile screens, ...): a team can
-        // never actually hold one of those slugs, so treating them as inaccessible
-        // would strand every one of those flows after sign-in.
-        if (! $isPanelUrl || in_array($slug, Team::RESERVED_SLUGS, true)) {
+        if (! $route->hasParameter('tenant')) {
             return true;
         }
 
-        $team = Team::query()->where('slug', $slug)->first();
+        $tenantSlug = $route->parameter('tenant');
+
+        if (! is_string($tenantSlug)) {
+            return false;
+        }
+
+        $team = Team::query()->where('slug', $tenantSlug)->first();
 
         return $team instanceof Team && $user->belongsToTeam($team);
+    }
+
+    // A relative URL is matched against the panel domain when one is configured,
+    // since that is the only origin a relative destination can mean there.
+    private function matchRoute(string $intended): ?RoutingRoute
+    {
+        $path = parse_url($intended, PHP_URL_PATH) ?: '/';
+        $query = parse_url($intended, PHP_URL_QUERY);
+        $host = parse_url($intended, PHP_URL_HOST);
+
+        $request = Request::create(is_string($query) ? "{$path}?{$query}" : $path, 'GET');
+
+        $panelDomain = config('app.app_panel_domain');
+
+        if (is_string($host)) {
+            $request->headers->set('HOST', $host);
+        } elseif (is_string($panelDomain) && $panelDomain !== '') {
+            $request->headers->set('HOST', $panelDomain);
+        }
+
+        try {
+            return resolve(Router::class)->getRoutes()->match($request);
+        } catch (NotFoundHttpException) {
+            return null;
+        }
     }
 
     private function isSameSite(string $intended): bool
