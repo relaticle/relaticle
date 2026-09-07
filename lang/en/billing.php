@@ -114,11 +114,12 @@ return [
         'body' => 'Your plan is managed by Relaticle. Contact us for changes.',
         'tagline' => 'Implementation and support, scoped to your team.',
         'starting_price' => 'From $:price / year',
-        'billing' => 'Billed annually. Never per seat.',
+        'billing' => 'Billed yearly · never per seat',
         'includes' => 'Everything in Cloud Pro, plus',
         'features' => [
             'Implementation scoped to your workflow',
             'Custom integrations by agreement',
+            'AI usage agreed with your team',
             'Ongoing maintenance and support',
             'Direct access to the founding team',
         ],
