@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Dashboard;
+use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -16,6 +19,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
@@ -23,7 +27,7 @@ use Laravel\Passkeys\Passkeys;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 
-mutates(Login::class);
+mutates(Login::class, PasswordSessionController::class, MfaChallengeController::class);
 mutates(PasskeyLoginResponse::class);
 
 beforeEach(function (): void {
@@ -48,6 +52,133 @@ test('users can authenticate using the login screen', function () {
         ->assertRedirect(url()->getAppUrl((string) $team->slug));
 
     $this->assertAuthenticated();
+});
+
+test('password login waits for enrolled MFA before authenticating', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+    expect(session('auth.pending.user_id'))->toBe($user->id);
+});
+
+test('the Fortify password route completes login without MFA', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+        'remember' => 'on',
+    ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('a recovery code completes pending password MFA', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withTeam()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentTeam]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+    $this->get($dashboard)->assertRedirect();
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertRedirect($dashboard);
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('an invalid TOTP cannot complete pending password MFA', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    $this->postJson(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertOk()->assertJson(['two_factor' => true]);
+
+    $this->postJson(route('two-factor.login.store'), [
+        'code' => 'invalid',
+    ])->assertUnprocessable()->assertJsonValidationErrors('code');
+
+    $this->assertGuest('web');
+});
+
+test('an expired pending context cannot complete password MFA', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $pending = session('auth.pending');
+    $pending['expires_at'] = now()->subSecond()->getTimestamp();
+    session()->put('auth.pending', $pending);
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertSessionHasErrors('recovery_code');
+
+    $this->assertGuest('web');
+});
+
+test('a used recovery code cannot complete another password MFA challenge', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ]);
+    $this->post(route('logout'));
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertSessionHasErrors('recovery_code');
+
+    $this->assertGuest('web');
+});
+
+test('a password reset invalidates pending password MFA', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $token = Password::broker('users')->createToken($user);
+
+    livewire(ResetPassword::class, [
+        'email' => $user->email,
+        'token' => $token,
+    ])->fillForm([
+        'password' => 'new-secure-password',
+        'passwordConfirmation' => 'new-secure-password',
+    ])->call('resetPassword')->assertRedirect();
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertSessionHasErrors('recovery_code');
+
+    $this->assertGuest('web');
 });
 
 test('users cannot authenticate with invalid password', function () {

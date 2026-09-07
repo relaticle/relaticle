@@ -32,6 +32,17 @@ return [
         'wrong_email' => 'Wrong email address?',
         'sign_out' => 'Sign out',
     ],
+    'mfa' => [
+        'heading' => 'Confirm your identity',
+        'description' => 'Enter the six-digit code from your authenticator app.',
+        'code' => 'Authentication code',
+        'recovery_code' => 'Recovery code',
+        'continue' => 'Continue',
+        'use_recovery_code' => 'Use a recovery code',
+        'use_code' => 'Use an authentication code',
+        'invalid' => 'The authentication code or recovery code is invalid.',
+        'expired' => 'Your sign-in attempt expired. Please start again.',
+    ],
     'footer' => [
         'terms_notice' => 'By proceeding you acknowledge that you have read, understood and agree to our :terms.',
         'terms_of_service' => 'Terms of Service',

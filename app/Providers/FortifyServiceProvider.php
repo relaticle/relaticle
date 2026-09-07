@@ -9,7 +9,10 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Http\Responses\PasskeyLoginResponse;
+use App\Support\Auth\AuthenticationSession;
 use Filament\Facades\Filament;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +21,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
+use Laravel\Fortify\Http\Controllers\TwoFactorAuthenticatedSessionController;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -26,6 +31,8 @@ final class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(CreatesNewSocialUsers::class, CreateNewSocialUser::class);
         $this->app->singleton(PasskeyLoginResponseContract::class, PasskeyLoginResponse::class);
+        $this->app->bind(AuthenticatedSessionController::class, PasswordSessionController::class);
+        $this->app->bind(TwoFactorAuthenticatedSessionController::class, MfaChallengeController::class);
     }
 
     public function boot(): void
@@ -42,13 +49,18 @@ final class FortifyServiceProvider extends ServiceProvider
             Filament::getPanel('app')->getEmailVerificationPromptRouteName(),
         ));
 
-        RateLimiter::for('login', function (Request $request) {
+        RateLimiter::for('login', function (Request $request): Limit {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
         });
 
-        RateLimiter::for('two-factor', fn (Request $request) => Limit::perMinute(5)->by($request->session()->get('login.id')));
+        RateLimiter::for('two-factor', function (Request $request): Limit {
+            $pending = AuthenticationSession::pending();
+            $key = $pending === [] ? $request->session()->getId() : $pending['user_id'];
+
+            return Limit::perMinute(5)->by($key);
+        });
 
         /**
          * Every passkey ceremony costs two requests (options, then assertion), so this
@@ -56,7 +68,7 @@ final class FortifyServiceProvider extends ServiceProvider
          * assertion verification. Keyed per user where the route is authenticated, so
          * shared egress IPs only aggregate on the guest login endpoint.
          */
-        RateLimiter::for('passkeys', fn (Request $request) => Limit::perMinute(30)
+        RateLimiter::for('passkeys', fn (Request $request): Limit => Limit::perMinute(30)
             ->by($request->user()?->getAuthIdentifier() ?? (string) $request->ip()));
     }
 }
