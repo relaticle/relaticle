@@ -11,8 +11,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Bus;
-use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -54,29 +52,19 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $accountId = (string) $account->getKey();
         $nextPageToken = $result->nextPageToken;
         $nextSyncToken = $result->nextSyncToken;
 
-        $jobs = array_map(
-            fn (CalendarEventData $event): StoreMeetingJob => new StoreMeetingJob($account, $event),
-            $result->events,
-        );
+        $pageEvents = array_values($result->events);
 
-        Bus::batch($jobs)
-            ->name("Initial calendar sync: {$account->email_address}")
-            ->onQueue('emails-sync')
-            ->allowFailures()
-            ->finally(static function () use ($accountId, $nextPageToken, $nextSyncToken): void {
-                $account = ConnectedAccount::query()->whereKey($accountId)->first();
-
-                if (! $account instanceof ConnectedAccount) {
-                    return;
-                }
-
+        InitialSyncPageStoreBatch::dispatchMeetings(
+            account: $account,
+            pageEvents: $pageEvents,
+            eventsToStore: $pageEvents,
+            onPageStored: static function (ConnectedAccount $account) use ($nextPageToken, $nextSyncToken): void {
                 self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
-            })
-            ->dispatch();
+            },
+        );
     }
 
     public function failed(Throwable $exception): void
