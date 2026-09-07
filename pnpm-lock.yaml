@@ -12,8 +12,8 @@ importers:
         specifier: ^3.17.1
         version: 3.17.1
       '@laravel/passkeys':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.4.0
+        version: 0.4.0
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.2(jiti@2.7.0))
@@ -139,13 +139,13 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@laravel/passkeys@0.2.0':
-    resolution: {integrity: sha512-K+owv26weKrYaoTJutqU40UsJZpwYkqB9jdlz5Bv/C54nxj2+Py9jbVwxASWg21fLsPhn3ngPKZE5RnfakCQKg==}
+  '@laravel/passkeys@0.4.0':
+    resolution: {integrity: sha512-59UHJHZPrIT8f5hFQJUR1EXhazWZTg3DcJefxSfA3aRj6xu40I/lYDveUY4oL2/h/crq9jjptSKykZDDold7aA==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       svelte: ^5.0.0
-      vue: ^3.0.0
+      vue: ^3.3.0
     peerDependenciesMeta:
       react:
         optional: true
@@ -1088,7 +1088,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@laravel/passkeys@0.2.0':
+  '@laravel/passkeys@0.4.0':
     dependencies:
       '@simplewebauthn/browser': 13.3.0
 

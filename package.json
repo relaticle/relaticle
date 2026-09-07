@@ -24,7 +24,7 @@
     },
     "dependencies": {
         "@alpinejs/collapse": "^3.17.1",
-        "@laravel/passkeys": "^0.2.0",
+        "@laravel/passkeys": "^0.4.0",
         "@tailwindcss/vite": "^4.3.3",
         "@tiptap/core": "^3.31.0",
         "@tiptap/extension-document": "^3.31.0",
