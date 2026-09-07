@@ -7,12 +7,12 @@ namespace Relaticle\Chat\Tools\Activity;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
@@ -572,7 +572,7 @@ final readonly class ListActivityTool implements Tool
         };
     }
 
-    private function occurredAt(User $user, Activity $activity): Carbon
+    private function occurredAt(User $user, Activity $activity): CarbonImmutable
     {
         return Date::parse($activity->created_at)->setTimezone($user->effectiveTimezone());
     }

@@ -13,6 +13,7 @@ use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
 use App\Support\ReservedSlugAwareGenerateSlugAction;
+use Carbon\CarbonImmutable;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -23,7 +24,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 use Laravel\Cashier\Subscription;
@@ -44,17 +44,17 @@ use Spatie\Sluggable\SlugOptions;
  * @property string $slug
  * @property Plan $plan
  * @property ?string $invite_link_token
- * @property ?Carbon $invite_link_token_expires_at
+ * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
- * @property Carbon|null $scheduled_deletion_at
+ * @property CarbonImmutable|null $scheduled_deletion_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
  * @property ?string $pm_last_four
- * @property Carbon|null $trial_ends_at
- * @property Carbon|null $pro_trial_used_at
- * @property Carbon|null $hosted_free_grandfathered_at
+ * @property CarbonImmutable|null $trial_ends_at
+ * @property CarbonImmutable|null $pro_trial_used_at
+ * @property CarbonImmutable|null $hosted_free_grandfathered_at
  * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way

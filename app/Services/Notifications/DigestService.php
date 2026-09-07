@@ -10,9 +10,9 @@ use App\Data\DigestTeamSection;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
@@ -37,7 +37,7 @@ final readonly class DigestService
         return new DigestPayload($sections);
     }
 
-    private function sectionForTeam(User $user, Team $team, Carbon $startOfToday, Carbon $windowEnd): DigestTeamSection
+    private function sectionForTeam(User $user, Team $team, CarbonImmutable $startOfToday, CarbonImmutable $windowEnd): DigestTeamSection
     {
         $meta = $this->resolveFieldMetadata($team);
 

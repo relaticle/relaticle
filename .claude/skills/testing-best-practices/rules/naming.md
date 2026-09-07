@@ -7,7 +7,7 @@
 - Follow the project's convention for fixture files. If none exists, put fixtures in `tests/Fixtures/` and load them by path.
 - Move large literal values out of the test body and into fixture files.
 
-## The Test Function
+## Test Function
 
 Use the test function used by other files in the same directory. If no neighboring test files exist:
 
@@ -16,7 +16,7 @@ Use the test function used by other files in the same directory. If no neighbori
 
 Use one Pest declaration style in each file. Use either `it()` or `test()` consistently.
 
-## The Names of the Tests
+## Naming Tests
 
 The name of a test is a specification. State the user-visible result and the condition that causes it.
 

@@ -6,7 +6,7 @@ namespace Relaticle\Chat\Services;
 
 use App\Actions\Billing\StartProTrial;
 use App\Models\Team;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
 use RuntimeException;
 
 final readonly class CreditPeriodResolver
@@ -23,7 +23,7 @@ final readonly class CreditPeriodResolver
      * Credit-period bounds for a team, per the billing spec's policy table:
      * subscription anniversary cycle > trial span > calendar month.
      *
-     * @return array{start: Carbon, end: Carbon}
+     * @return array{start: CarbonImmutable, end: CarbonImmutable}
      */
     public function boundsFor(Team $team): array
     {
@@ -36,7 +36,7 @@ final readonly class CreditPeriodResolver
         $subscription = $team->subscription();
 
         if ($subscription?->valid() === true) {
-            /** @var Carbon $anchor */
+            /** @var CarbonImmutable $anchor */
             $anchor = $subscription->created_at;
 
             return $this->anniversaryCycle($anchor);
@@ -65,9 +65,9 @@ final readonly class CreditPeriodResolver
      * points until start <= now < end holds exactly, rather than trusting
      * the guess or only correcting an over-estimate.
      *
-     * @return array{start: Carbon, end: Carbon}
+     * @return array{start: CarbonImmutable, end: CarbonImmutable}
      */
-    private function anniversaryCycle(Carbon $anchor): array
+    private function anniversaryCycle(CarbonImmutable $anchor): array
     {
         $now = now();
         $elapsed = max(0, (int) $anchor->diffInMonths($now));

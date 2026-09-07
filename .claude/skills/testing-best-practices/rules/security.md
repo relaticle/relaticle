@@ -4,7 +4,7 @@ Test each security boundary where user input affects authorization, rendered out
 
 Write a test for each of these cases:
 
-- **Cross-tenant access.** Request a record of a different tenant, team, or organization. Read `rules/endpoint-tests.md` for why the response should be `404` rather than `403`.
+- **Cross-tenant access.** Request a record of a different tenant, team, or organization. Read `rules/endpoint-tests.md` for why the response should possibly be `404` rather than `403`.
 - **Each unprivileged role.** Use a dataset over the roles that the endpoint must refuse.
 - **Escaping user-provided content.** Test escaping in HTML and mail. Include names and every free-text field a template renders. Assert that dangerous characters are escaped and the raw value is absent. Do not assert an exact entity for a quote, because Markdown and mail CSS inliners may decode it.
 - **Injection into dynamic query components.** Examples include sort columns, filter fields, and sort directions.
