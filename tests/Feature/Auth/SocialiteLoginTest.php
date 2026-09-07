@@ -80,7 +80,7 @@ test('callback from socialite provider logs in existing user when social account
     $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
 });
 
-test('callback rejects an external destination for an account without a workspace', function () {
+test('callback rejects an external destination for an account without a workspace', function (): void {
     $user = User::factory()->create(['email' => 'no-workspace@example.com']);
 
     UserSocialAccount::factory()->create([
