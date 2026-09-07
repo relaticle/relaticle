@@ -1,52 +1,40 @@
 @php
+    $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
+    $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
 @endphp
 
 <x-guest-layout
     title="Pricing - $19/mo flat, unlimited users - Relaticle"
-    description="No per-seat pricing. One flat workspace plan at $19/mo billed yearly, with unlimited users and records. 14-day trial, no card. Self-host free forever."
+    :description="$billingActive
+        ? __('Cloud Pro is $19/mo billed yearly. Enterprise implementation from $:price/year. Unlimited users and records. Self-host free.', ['price' => $enterprisePrice])
+        : __('Self-host for free, or let us run Relaticle for you. Unlimited users and records. No per-seat pricing.')"
     ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
 >
-    <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
-        <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
-
-        <div class="relative max-w-5xl mx-auto px-6 lg:px-8">
-
-            {{-- Badge --}}
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-                    <x-ri-heart-pulse-line class="h-3.5 w-3.5 text-primary dark:text-primary-400"/>
-                    <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Simple pricing</span>
-                </div>
-            </div>
-
-            {{-- Header --}}
-            <div class="text-center max-w-2xl mx-auto mb-16 md:mb-20">
-                <h1 class="font-display text-4xl sm:text-5xl font-bold text-gray-950 dark:text-white tracking-[-0.03em] leading-[1.1]">
-                    No per-seat pricing. Ever.
+    <section class="bg-white pb-20 pt-28 dark:bg-gray-950 sm:pt-32 lg:pb-24">
+        <div class="mx-auto max-w-6xl px-5 sm:px-8">
+            <div class="mx-auto mb-10 max-w-3xl text-center">
+                <h1 class="text-balance font-display text-4xl font-bold leading-tight tracking-tight text-gray-950 dark:text-white sm:text-5xl">
+                    @if($billingActive)
+                        {{ __('One price for your whole team.') }}
+                    @else
+                        {{ __('No per-seat pricing. Ever.') }}
+                    @endif
                 </h1>
-                <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-                    Unlimited users. Unlimited data. Self-host for free forever, or let us run it for you.
+                <p class="mx-auto mt-4 max-w-xl text-balance text-base leading-relaxed text-gray-600 dark:text-gray-400">
+                    {{ $billingActive
+                        ? __('Unlimited users and records. Start with Cloud Pro, or work with us on a tailored implementation.')
+                        : __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
                 </p>
             </div>
 
             @php
-                $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
                 $freeCredits = number_format(\App\Enums\Plan::Free->credits());
                 $proCredits = number_format(\App\Enums\Plan::Pro->credits());
                 $enterpriseCredits = number_format(\App\Enums\Plan::Enterprise->credits());
                 $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
                 $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
                 $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
-
-
-                // offered(), not available(): this list can never name a model the app won't
-                // serve, because it drops the entries whose measured capabilities say they
-                // cannot call tools (both Gemini models today) and AiModelResolver::pick()
-                // can never select those. It deliberately does NOT drop models whose provider
-                // has no key on this install: what Cloud Pro includes is not a function of
-                // whether the web host currently holds an Anthropic key, and filtering on
-                // that renders these sentences with a hole where the model names belong.
                 $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
                     ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
                         'label' => $model->displayLabel(),
@@ -55,12 +43,6 @@
                     ]);
                 $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
                 $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
-
-                // Grouped, not three hardcoded tiers. The catalog is editable at runtime, so
-                // asking for the 1.0 / 1.5 / 3.0 buckets by name printed "3x for )" the moment
-                // an operator retired the only 3x model, and silently omitted any model priced
-                // at a fourth multiplier. Self-hosted models ride the 1x bucket because
-                // ModelRegistry gives them that multiplier.
                 $multiplierClauses = $toolCapableCloudModels
                     ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
                     ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
@@ -73,10 +55,6 @@
                     ->sortKeys(SORT_NUMERIC)
                     ->map(fn (string $models, string $multiplier): string => __(':multiplierx for :models', ['multiplier' => $multiplier, 'models' => $models]))
                     ->join('; ');
-
-                // The worked example names the cheapest and dearest models the catalog
-                // actually offers, so retiring either cannot leave the sentence describing a
-                // model nobody can pick.
                 $sortedByCost = $toolCapableCloudModels->sortBy('credit_multiplier')->values();
                 $cheapestModel = $sortedByCost->first()['label'] ?? __('a 1x model');
                 $dearestEntry = $sortedByCost->last() ?? ['label' => __('a higher-multiplier model'), 'credit_multiplier' => 1.0];
@@ -91,19 +69,7 @@
                         'dearestCost' => $dearestReplyCost,
                     ]
                 );
-
-                // "Cloud Pro" is the billing-on marketing name only. Under billing-off there is
-                // no self-service path onto a paid plan at all (CreateTeam only auto-starts a
-                // trial when Feature::active(Billing), and the billing page 403s otherwise), so
-                // these two facts use the generic "a paid plan" label when billing is off.
                 $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
-
-                // No Enterprise plan card or checkout path exists anywhere in the codebase, so
-                // whether it's an actual purchasable offering isn't something the code can
-                // confirm. It is mentioned nowhere in this page's visible copy for that reason.
-                // Two independent sentences rather than one with two holes in it: a catalog
-                // with no free-tier model rendered "Every plan can use  and any self-hosted
-                // model you connect yourself", which is the failure this shape removes.
                 $modelsUnlockAnswer = trim(implode(' ', array_filter([
                     $freeCloudModels === ''
                         ? __('Every plan can use any self-hosted model you connect yourself.')
@@ -138,9 +104,6 @@
                             'credits' => $proCredits,
                             'cheapestModel' => $cheapestModel,
                             'dearestModel' => $dearestEntry['label'],
-                            // Settlement formula, packages/Chat/src/Services/CreditService.php
-                            // ::calculateCredits(): max(1, ceil(multiplier + toolCalls * toolBonus)).
-                            // Before tool calls that is just the multiplier.
                             'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                             'days' => $trialDays,
                         ]
@@ -165,25 +128,57 @@
             @else
                 @include('partials.pricing-legacy')
             @endif
-
-            {{-- Self-hosted vs hosted comparison --}}
+            @if($billingActive)
+                <div class="mx-auto mt-20 max-w-4xl border-t border-[var(--surface-card-border)] pt-12">
+                    <div class="mb-6">
+                        <div>
+                            <h2 class="font-display text-2xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-3xl">{{ __('Choose how you get started') }}</h2>
+                        </div>
+                        <p class="mt-3 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('The same CRM at the core. A different level of help around it.') }}</p>
+                    </div>
+                    <div class="overflow-hidden rounded-xl border border-[var(--surface-card-border)]" role="region" aria-label="{{ __('Compare Cloud Pro and Enterprise') }}">
+                        <table class="w-full table-fixed text-left text-xs sm:text-sm">
+                            <caption class="sr-only">{{ __('Compare Cloud Pro and Enterprise') }}</caption>
+                            <thead class="border-b border-[var(--surface-card-border)] bg-[var(--surface-card-bg)]">
+                                <tr>
+                                    <th scope="col" class="px-3 py-4 sm:px-5 font-medium text-gray-500 dark:text-gray-400">{{ __('What’s included') }}</th>
+                                    <th scope="col" class="px-3 py-4 sm:px-5 font-semibold text-primary-700 dark:text-primary-300">{{ __('billing.plans.cloud_pro') }}</th>
+                                    <th scope="col" class="px-3 py-4 sm:px-5 font-semibold text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--surface-card-border)]">
+                                @foreach([
+                                    [__('Users and records'), __('Unlimited'), __('Unlimited')],
+                                    [__('AI assistant'), __('2,000 credits each month'), __('Usage agreed with your team')],
+                                    [__('Getting started'), __('Self-service setup'), __('Scoped implementation project')],
+                                    [__('billing.comparison.integrations'), __('REST API and MCP server'), __('Custom integrations by agreement')],
+                                    [__('Hosting and updates'), __('Managed by Relaticle'), __('Agreed deployment and maintenance')],
+                                    [__('billing.comparison.support'), __('Email support'), __('Agreed support with the founding team')],
+                                ] as [$feature, $pro, $enterprise])
+                                    <tr>
+                                        <th scope="row" class="px-3 py-4 sm:px-5 font-medium text-gray-900 dark:text-gray-200">{{ $feature }}</th>
+                                        <td class="px-3 py-4 sm:px-5 text-gray-500 dark:text-gray-400">{{ $pro }}</td>
+                                        <td class="px-3 py-4 sm:px-5 text-gray-500 dark:text-gray-400">{{ $enterprise }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ __('AI credits depend on the model and tool calls.') }}
+                        <a href="#pricing-faq" class="underline underline-offset-4 hover:text-primary dark:hover:text-primary-300">{{ __('How credits work') }}</a>
+                    </p>
+                </div>
+            @else
             <div class="mt-16 max-w-4xl mx-auto">
                 <div class="mx-auto mb-10 max-w-2xl text-center">
-                    <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
+                    <h2 class="font-display text-2xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-3xl">
                         {{ __('Self-hosted or hosted: how to choose') }}
                     </h2>
                     <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Both options run the identical open-source Relaticle codebase, with unlimited users and unlimited records on every plan. The real differences are who operates the server and how AI usage is metered.') }}
                     </p>
                 </div>
-
-                {{--
-                    List layout kept for responsive styling; tables DO convert to
-                    markdown since the TableAwareLeagueDriver landed. <ul>/<li>/<p>
-                    (category names are CSS-bold, not <strong>, so no semantic-bold
-                    tag is used) were verified to survive conversion. Each row
-                    below reads as "Category" / "Self-Hosted: X" / "Hosted: Y" in markdown.
-                --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
                     <li class="px-4 py-3 sm:px-6 sm:py-4">
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Price') }}</p>
@@ -207,11 +202,10 @@
                     </li>
                 </ul>
             </div>
-
-            {{-- FAQ --}}
-            <div class="mt-16 max-w-3xl mx-auto">
-                <div class="mx-auto mb-6 max-w-2xl text-center">
-                    <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">
+            @endif
+            <div id="pricing-faq" class="mt-16 max-w-4xl mx-auto scroll-mt-24 border-t border-[var(--surface-card-border)] pt-12">
+                <div class="mb-6">
+                    <h2 class="font-display text-2xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-3xl">
                         {{ __('Pricing questions, answered') }}
                     </h2>
                 </div>
@@ -239,6 +233,8 @@
                     ];
 
                     if ($billingActive) {
+                        $pricingFaqs[] = [__('billing.enterprise.faq_title'), __('billing.enterprise.faq_body', ['price' => $enterprisePrice])];
+                        $pricingFaqs[] = [__('billing.enterprise.timeline_title'), __('billing.enterprise.timeline_body')];
                         $pricingFaqs[] = [
                             __('What happens after my trial ends?'),
                             __(
@@ -251,47 +247,15 @@
 
                 <x-marketing.faq-accordion :faqs="$pricingFaqs" id-prefix="pricing-faq" />
             </div>
-
-            {{-- Trust signals --}}
-            <div class="mt-16 max-w-4xl mx-auto">
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    @foreach([
-                        ['ri-shield-check-line', '2,000+', 'Automated Tests'],
-                        ['ri-robot-2-line', (string) $mcpToolCount, 'MCP Tools'],
-                        ['ri-stack-line', '22', 'Field Types'],
-                        ['ri-lock-line', '5-Layer', 'Authorization'],
-                    ] as [$icon, $value, $label])
-                        <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] px-5 py-4 text-center">
-                            <x-dynamic-component :component="$icon" class="w-5 h-5 text-primary dark:text-primary-400 mx-auto mb-2"/>
-                            <div class="text-lg font-semibold text-gray-900 dark:text-white tracking-tight">{{ $value }}</div>
-                            <div class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 uppercase tracking-wider font-medium">{{ $label }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                {{-- Two of the tiles above are the whole subject of a page each. --}}
-                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
-                    <a href="{{ route('ai') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('What the AI assistant and MCP server do') }}</a>
-                    <span class="px-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">&middot;</span>
-                    <a href="{{ route('selfHosted') }}" class="underline decoration-gray-300 dark:decoration-gray-600 underline-offset-2 hover:text-primary dark:hover:text-primary-400">{{ __('Run it free on your own server') }}</a>
-                </p>
-            </div>
-
-            {{-- Help CTA --}}
-            <div class="mt-8 max-w-4xl mx-auto">
-                <div class="relative rounded-2xl border border-gray-200/80 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.015] p-8 flex flex-col sm:flex-row items-center gap-6 overflow-hidden">
-                    <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-primary/[0.04] dark:bg-primary/[0.08] rounded-full blur-3xl pointer-events-none" aria-hidden="true"></div>
-                    <div class="relative flex-1 text-left">
-                        <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">Need help choosing?</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            Not sure which option fits? Have questions about deployment or migration? We're happy to help.
-                        </p>
-                    </div>
-                    <x-marketing.button variant="secondary" href="{{ route('contact') }}" class="relative shrink-0">
-                        Get in touch
-                    </x-marketing.button>
-                </div>
-            </div>
+            <p class="mx-auto mt-10 max-w-4xl border-t border-[var(--surface-card-border)] pt-6 text-sm text-gray-600 dark:text-gray-400">
+                <a href="{{ route('ai') }}" class="underline underline-offset-4 hover:text-primary dark:hover:text-primary-300">{{ __('Explore the AI assistant and :count MCP tools', ['count' => $mcpToolCount]) }}</a>
+                <span class="mx-2" aria-hidden="true">·</span>
+                @if(! $billingActive)
+                    <a href="{{ route('selfHosted') }}" class="underline underline-offset-4 hover:text-primary dark:hover:text-primary-300">{{ __('Explore self-hosting') }}</a>
+                    <span class="mx-2" aria-hidden="true">·</span>
+                @endif
+                <a href="{{ route('contact') }}" class="underline underline-offset-4 hover:text-primary dark:hover:text-primary-300">{{ __('Questions? Talk to us.') }}</a>
+            </p>
 
         </div>
     </section>
@@ -324,6 +288,14 @@
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Per workspace, billed yearly at $228/year ($19/mo); $24/mo billed monthly.'),
+                        \Spatie\SchemaOrg\Schema::offer()
+                            ->name('Enterprise')
+                            ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
+                                ->minPrice(config('relaticle.enterprise.starting_price_yearly'))
+                                ->priceCurrency('USD')
+                                ->unitText('year'))
+                            ->url(route('contact', ['plan' => 'enterprise']))
+                            ->description(__('billing.enterprise.faq_body', ['price' => $enterprisePrice])),
                     ]
                     : [
                         \Spatie\SchemaOrg\Schema::offer()

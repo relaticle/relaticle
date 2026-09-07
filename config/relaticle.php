@@ -8,6 +8,10 @@ return [
         'email' => env('CONTACT_EMAIL', 'hello@relaticle.com'),
     ],
 
+    'enterprise' => [
+        'starting_price_yearly' => 20_000,
+    ],
+
     'company' => [
         'name' => env('RELATICLE_COMPANY_NAME', 'Relaticle'),
         'address' => env('RELATICLE_COMPANY_ADDRESS', ''),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Enums\Plan;
 use App\Filament\Pages\Billing;
 use App\Models\Team;
 use App\Models\User;
@@ -29,7 +30,9 @@ final readonly class NotifyWorkspaceOfPaymentFailure
 
         Notification::make()
             ->title(__('billing.payment_failed.notification_title', ['workspace' => $team->name]))
-            ->body(__('billing.payment_failed.notification_body'))
+            ->body($team->plan === Plan::Enterprise
+                ? __('billing.enterprise.previous_subscription_past_due')
+                : __('billing.payment_failed.notification_body'))
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->iconColor('danger')
             ->actions([

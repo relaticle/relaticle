@@ -63,6 +63,10 @@ final readonly class SyncTeamPlanFromSubscription
 
     private function targetPlan(Team $team, Subscription $subscription, Plan $subscriptionPlan): ?Plan
     {
+        if ($team->plan === Plan::Enterprise && $subscriptionPlan !== Plan::Enterprise) {
+            return null;
+        }
+
         if ($subscription->valid()) {
             return $subscriptionPlan;
         }

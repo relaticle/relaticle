@@ -2,31 +2,36 @@
     @php
         $purchased = (int) ($balance?->purchased_credits ?? 0);
         $used = (int) ($balance?->credits_used ?? 0);
+        $monthlyUsed = min($used, $allowance);
+        $remaining = (int) ($balance?->credits_remaining ?? 0);
+        $isEnterprise = $team->plan === \App\Enums\Plan::Enterprise;
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
         $isSubscribed = $subscription?->valid() ?? false;
         $canManageSubscription = $subscription && ($subscription->valid() || $pastDue);
-        $onTrial = $team->onGenericTrial();
+        $onTrial = ! $isEnterprise && $team->onGenericTrial();
         $onLegacyFree = $isGrandfathered
             && $team->plan === \App\Enums\Plan::Free
             && ! $onTrial
             && ! $isSubscribed;
         $isPaused = ! $hasHostedAccess;
-        $isManagedPlan = ! $subscription
+        $isManagedPlan = $isEnterprise || (! $subscription
             && ! $onTrial
             && ! $isPaused
             && ! $onLegacyFree
-            && $team->plan !== \App\Enums\Plan::Free;
+            && $team->plan !== \App\Enums\Plan::Free);
+        $showEnterpriseOffer = $isOwner && ! $isEnterprise && ! $pastDue && ! $onGrace && ! $activating;
         $trialDaysLeft = $onTrial ? max(0, (int) ceil(now()->floatDiffInDays($team->trial_ends_at))) : 0;
 
         $planLabel = match (true) {
             $isPaused => __('billing.plans.cloud_pro'),
             $onLegacyFree => __('billing.plans.legacy_free'),
             $team->plan === \App\Enums\Plan::Enterprise => __('billing.plans.enterprise'),
-            default => __('billing.plans.pro'),
+            default => __('billing.plans.cloud_pro'),
         };
 
         [$statusLabel, $statusClasses] = match (true) {
+            $isEnterprise => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
             $pastDue => [__('billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
             $onGrace => [__('billing.status.canceling'), 'bg-warning-50 text-warning-700 dark:bg-warning-400/10 dark:text-warning-400'],
             $onTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
@@ -42,7 +47,7 @@
             default => 'bg-primary',
         };
 
-        $card = 'rounded-2xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] shadow-[0_2px_16px_-6px_rgba(0,0,0,0.05)] dark:shadow-none';
+        $card = 'rounded-2xl border border-[var(--surface-card-border)] bg-white shadow-sm dark:bg-[var(--surface-card-bg)] dark:shadow-none';
     @endphp
 
     <div
@@ -76,7 +81,7 @@
             </div>
         @endif
 
-        <section class="{{ $card }} overflow-hidden">
+        <section class="{{ $card }} overflow-hidden" aria-label="{{ __('billing.title') }}">
             <div class="grid gap-px bg-gray-200/60 sm:grid-cols-5 dark:bg-white/[0.06]">
                 <div class="bg-white p-6 sm:col-span-3 dark:bg-transparent">
                     <div class="flex items-center gap-3">
@@ -88,13 +93,15 @@
                                 <h2 class="font-display text-2xl font-semibold leading-none text-gray-900 dark:text-white">
                                     {{ $planLabel }}
                                 </h2>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $statusClasses }}">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-micro font-semibold {{ $statusClasses }}">
                                     {{ $statusLabel }}
                                 </span>
                             </div>
 
                             <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                @if($onTrial)
+                                @if($isManagedPlan)
+                                    {{ __('billing.managed.tagline') }}
+                                @elseif($onTrial)
                                     {{ __('billing.trial.active_title') }} ({{ trans_choice('billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
@@ -132,24 +139,33 @@
                     <div class="bg-white p-6 sm:col-span-2 dark:bg-transparent">
                         <div class="flex items-center justify-between">
                             <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('billing.usage.title') }}</span>
-                            <span class="text-xs text-gray-400 dark:text-gray-500">{{ $usedPercent }}%</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $usedPercent }}%</span>
                         </div>
 
                         <div class="mt-2.5 flex items-baseline gap-1.5">
-                            <span class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ number_format($used) }}</span>
-                            <span class="text-sm text-gray-400 dark:text-gray-500">/ {{ number_format($allowance) }}</span>
+                            <span class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ number_format($monthlyUsed) }}</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ number_format($allowance) }}</span>
                         </div>
 
-                        <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
+                        <div role="progressbar" aria-label="{{ __('billing.usage.title') }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
                             <div class="h-full rounded-full {{ $meterColor }} transition-all duration-500" style="width: {{ $usedPercent }}%"></div>
                         </div>
 
+                        @if($balance)
+                            <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('billing.usage.available', ['credits' => number_format($remaining)]) }}</p>
+                            @if($used > $allowance)
+                                <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('billing.usage.total_used', ['credits' => number_format($used)]) }}</p>
+                            @endif
+                        @else
+                            <p class="mt-3 text-xs text-gray-600 dark:text-gray-400">{{ __('billing.usage.empty') }}</p>
+                        @endif
+
                         @if($balance?->period_ends_at)
-                            <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
                         @endif
 
                         @if($purchased > 0)
-                            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
                         @endif
 
                         @if($isOwner && $availablePacks !== [])
@@ -172,7 +188,7 @@
                     <x-ri-error-warning-fill class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('billing.manage.past_due_title') }}</h3>
-                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ __('billing.manage.past_due_body') }}</p>
+                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ $isEnterprise ? __('billing.enterprise.previous_subscription_past_due') : __('billing.manage.past_due_body') }}</p>
                         @if($isOwner)
                             <div class="mt-3">
                                 <x-filament::button color="danger" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
@@ -190,9 +206,11 @@
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('billing.manage.cancel_scheduled_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">
-                            {{ $isGrandfathered
+                            {{ $isEnterprise
+                                ? __('billing.enterprise.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                : ($isGrandfathered
                                 ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
-                                : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])) }}
                         </p>
                     </div>
                 </div>
@@ -206,13 +224,16 @@
             </div>
         @elseif($isManagedPlan)
             <div class="{{ $card }} p-6">
-                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.enterprise.title') }}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.body') }}</p>
+                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ $isEnterprise ? __('billing.enterprise.title') : __('billing.managed.title') }}</h3>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.body') }}</p>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <x-filament::button tag="a" color="gray" :href="route('contact')">{{ __('billing.enterprise.manage') }}</x-filament::button>
+                    @if($canManageSubscription && ! $pastDue)
+                        <x-filament::button color="gray" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
+                    @endif
+                </div>
             </div>
         @elseif($pastDue)
-            {{-- The past-due panel above already states the problem and carries
-                 the portal button. Claiming "You're on Pro" underneath it, in a
-                 success card, contradicts the panel it sits below. --}}
         @elseif($canManageSubscription)
             <div class="{{ $card }} p-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -253,7 +274,7 @@
 
             <div
                 x-data="{ yearly: true, confirming: false }"
-                class="relative flex w-full flex-col rounded-2xl border border-primary/25 bg-white p-7 shadow-[0_6px_36px_-14px_rgba(124,58,237,0.18)] sm:p-8 dark:border-primary/20 dark:bg-primary/[0.03] dark:shadow-none"
+                class="relative flex w-full flex-col rounded-2xl border border-primary-200 bg-white p-6 shadow-sm sm:p-8 dark:border-primary-400/25 dark:bg-[var(--surface-card-bg)] dark:shadow-none"
             >
                 <div class="flex flex-1 flex-col">
                     <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.cloud_pro') }}</h3>
@@ -263,18 +284,12 @@
                         <div>
                             <div class="flex items-baseline gap-1.5">
                                 <span class="font-display text-4xl font-bold tracking-tight text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
-                                <span class="text-sm text-gray-400 dark:text-gray-500">/mo</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">/mo</span>
                             </div>
-                            <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{{ __('billing.pro_plan.per_workspace') }}</p>
+                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.per_workspace') }}</p>
                         </div>
 
-                        <div class="inline-flex w-fit items-center gap-1 rounded-full border border-gray-200/80 p-1 text-xs dark:border-white/[0.08]">
-                            <button type="button" @click="yearly = true" :aria-pressed="yearly" :class="yearly ? 'bg-primary text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'" class="rounded-full px-3 py-1 font-medium transition">
-                                {{ __('billing.pro_plan.yearly') }}
-                                <span class="ml-1 text-[10px]" :class="yearly ? 'text-white/80' : 'text-primary-600 dark:text-primary-300'">{{ __('billing.pro_plan.yearly_save') }}</span>
-                            </button>
-                            <button type="button" @click="yearly = false" :aria-pressed="!yearly" :class="!yearly ? 'bg-primary text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'" class="rounded-full px-3 py-1 font-medium transition">{{ __('billing.pro_plan.monthly') }}</button>
-                        </div>
+                        <x-billing.interval-toggle />
                     </div>
 
                     <div class="mt-6 h-px w-full bg-gray-100 dark:bg-white/[0.06]"></div>
@@ -306,8 +321,8 @@
                                         : ($isPaused ? __('billing.upgrade.unlock') : __('billing.upgrade.button')) }}
                                 </x-filament::button>
                             @endif
-                            <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
-                                x-text="yearly ? '{{ __('billing.pro_plan.billed_yearly') }}' : '{{ __('billing.pro_plan.billed_monthly') }}'">
+                            <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"
+                                x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
                                 {{ __('billing.pro_plan.billed_yearly') }}
                             </p>
                         </div>
@@ -316,12 +331,12 @@
                             <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.confirm_title') }}</p>
                             <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $team->name]) }}</p>
                             <p class="mt-2 text-sm font-medium text-gray-900 dark:text-white"
-                                x-text="yearly ? '{{ __('billing.pro_plan.billed_yearly') }}' : '{{ __('billing.pro_plan.billed_monthly') }}'">
+                                x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
                                 {{ __('billing.pro_plan.billed_yearly') }}
                             </p>
                             <div class="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
                                 <x-filament::button type="button" class="justify-center"
-                                    x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
+                                    wire:loading.attr="disabled" wire:target="upgrade" x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
                                     {{ __('billing.upgrade.confirm_button', ['workspace' => $team->name]) }}
                                 </x-filament::button>
                                 <x-filament::button type="button" color="gray" class="justify-center"
@@ -333,6 +348,18 @@
                     </div>
                 </div>
             </div>
+        @endif
+        @if($showEnterpriseOffer)
+            <section class="{{ $card }} p-6" aria-label="{{ __('billing.plans.enterprise') }}">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.enterprise') }}</h3>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
+                    </div>
+                    <x-filament::button tag="a" color="gray" :href="route('contact', ['plan' => 'enterprise'])">{{ __('billing.enterprise.contact') }}</x-filament::button>
+                </div>
+                <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.tagline') }} {{ __('billing.enterprise.terms') }}</p>
+            </section>
         @endif
     </div>
 </x-filament-panels::page>
