@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\SetApiTeamContext;
@@ -80,7 +81,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // api/mcp root banners are exactly the crawlable secondary-host URLs.
         $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
 
-        $middleware->web(append: RedirectToPrimaryHost::class);
+        $middleware->web(append: [
+            RedirectToPrimaryHost::class,
+            EnsureAuthenticationComplete::class,
+        ]);
 
         // Only enforced on multi-host deployments (any *_DOMAIN configured);
         // the framework already skips TrustHosts in local and test runs.

@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\Auth\AuthenticationSession;
 use Illuminate\Support\Facades\Exceptions;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -78,6 +80,41 @@ test('callback from socialite provider logs in existing user when social account
     $this->assertAuthenticatedAs($user);
 
     $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+});
+
+test('linked Google login cannot bypass enrolled MFA', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'existing-google-id',
+    ]);
+
+    Socialite::fake(SocialiteProvider::GOOGLE->value, makeSocialiteUser('existing-google-id', 'Maya', $user->email));
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+});
+
+test('unlinking a social account while its MFA challenge is pending cannot complete authentication', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    AuthenticationSession::begin($user, AuthMethod::GOOGLE, (string) $account->getKey(), true);
+
+    $account->delete();
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
 });
 
 test('callback rejects an external destination for an account without a workspace', function (): void {

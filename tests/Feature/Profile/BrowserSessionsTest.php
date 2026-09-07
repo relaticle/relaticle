@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Filament\Actions\ConfirmIdentityAction;
+use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Models\User;
 use App\Support\Auth\IdentityConfirmation;
@@ -12,6 +14,7 @@ use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
 
 mutates(LogoutOtherBrowserSessions::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
+mutates(EnsureAuthenticationComplete::class);
 
 test('social user can log out other sessions without confirmation', function (): void {
     $this->actingAs(User::factory()->withTeam()->socialOnly()->create());
@@ -166,4 +169,46 @@ test('a confirmation inside the confirmation window still satisfies the gate', f
     Livewire::test(LogoutOtherBrowserSessions::class)
         ->call('logoutOtherBrowserSessions')
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
+});
+
+test('a restored session with enrolled MFA is suspended before reaching a protected page', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user->forceFill(['remember_token' => 'original-remember-token'])->save();
+
+    $this->actingAs($user);
+
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+    expect(session('auth.pending.method'))->toBe('remembered');
+    expect($user->fresh()->remember_token)->toBe('original-remember-token');
+});
+
+test('a restored session stays challenged across repeated requests until MFA completes', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentTeam]);
+
+    $this->get($dashboard)->assertRedirect(route('two-factor.login'));
+    $this->assertGuest('web');
+
+    $this->get($dashboard)->assertRedirect();
+    $this->assertGuest('web');
+});
+
+test('completing the challenge after a restored-session suspension resumes the original destination', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $team = $user->currentTeam;
+    $this->actingAs($user);
+
+    $this->get("/app/{$team->slug}/companies")->assertRedirect(route('two-factor.login'));
+    $this->assertGuest('web');
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertRedirect("/app/{$team->slug}/companies");
+
+    $this->assertAuthenticatedAs($user);
 });

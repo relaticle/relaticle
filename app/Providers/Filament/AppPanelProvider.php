@@ -24,6 +24,7 @@ use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
+use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Listeners\SwitchTeam;
 use App\Livewire\App\AppDatabaseNotifications;
@@ -289,7 +290,11 @@ final class AppPanelProvider extends PanelProvider
             ->authPasswordBroker('users')
             ->authMiddleware([
                 Authenticate::class,
+                EnsureAuthenticationComplete::class,
                 CheckScheduledDeletion::class,
+            ])
+            ->persistentMiddleware([
+                EnsureAuthenticationComplete::class,
             ])
             ->tenantMiddleware(
                 [

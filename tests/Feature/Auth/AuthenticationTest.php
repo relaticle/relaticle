@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\AuthenticatePasskey;
+use App\Enums\AuthMethod;
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
@@ -14,6 +17,11 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Notifications\Auth\VerifyEmail;
+use App\Support\Auth\AuthenticationSession;
+use CBOR\ByteStringObject;
+use CBOR\MapObject;
+use CBOR\NegativeIntegerObject;
+use CBOR\UnsignedIntegerObject;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
@@ -24,11 +32,99 @@ use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
+use Laravel\Passkeys\Support\WebAuthn;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Symfony\Component\Uid\Uuid;
+use Webauthn\CredentialRecord;
+use Webauthn\TrustPath\EmptyTrustPath;
 
 mutates(Login::class, PasswordSessionController::class, MfaChallengeController::class);
-mutates(PasskeyLoginResponse::class);
+mutates(PasskeyLoginResponse::class, AuthenticatePasskey::class, PasskeySessionController::class);
+
+function base64UrlEncodeForPasskeyTest(string $bytes): string
+{
+    return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+}
+
+/**
+ * Builds a real, cryptographically valid ES256 WebAuthn assertion (its own key
+ * pair, COSE public key, and ECDSA signature) so passkey login is proven through
+ * the installed verifier rather than a mocked one.
+ *
+ * @return array{credentialId: string, storedCredential: array<string, mixed>, payload: array<string, mixed>}
+ */
+function buildRealPasskeyAssertion(string $rpId, string $origin, string $challenge, ?string $credentialId = null): array
+{
+    $credentialId ??= random_bytes(16);
+
+    $key = openssl_pkey_new([
+        'curve_name' => 'prime256v1',
+        'private_key_type' => OPENSSL_KEYTYPE_EC,
+    ]);
+    $details = openssl_pkey_get_details($key);
+    $x = str_pad((string) $details['ec']['x'], 32, "\0", STR_PAD_LEFT);
+    $y = str_pad((string) $details['ec']['y'], 32, "\0", STR_PAD_LEFT);
+
+    $coseKey = MapObject::create()
+        ->add(UnsignedIntegerObject::create(1), UnsignedIntegerObject::create(2))
+        ->add(UnsignedIntegerObject::create(3), NegativeIntegerObject::create(-7))
+        ->add(NegativeIntegerObject::create(-1), UnsignedIntegerObject::create(1))
+        ->add(NegativeIntegerObject::create(-2), ByteStringObject::create($x))
+        ->add(NegativeIntegerObject::create(-3), ByteStringObject::create($y));
+
+    $userHandle = random_bytes(16);
+
+    $credentialRecord = CredentialRecord::create(
+        $credentialId,
+        'public-key',
+        [],
+        'none',
+        EmptyTrustPath::create(),
+        Uuid::v4(),
+        (string) $coseKey,
+        $userHandle,
+        0,
+    );
+
+    $authenticatorData = hash('sha256', $rpId, true)."\x05\x00\x00\x00\x00";
+
+    $clientDataJson = json_encode([
+        'type' => 'webauthn.get',
+        'challenge' => base64UrlEncodeForPasskeyTest($challenge),
+        'origin' => $origin,
+    ], JSON_THROW_ON_ERROR);
+
+    openssl_sign($authenticatorData.hash('sha256', $clientDataJson, true), $signature, $key, OPENSSL_ALGO_SHA256);
+
+    return [
+        'credentialId' => $credentialId,
+        'storedCredential' => json_decode(WebAuthn::toJson($credentialRecord), true, flags: JSON_THROW_ON_ERROR),
+        'payload' => [
+            'credential' => [
+                'id' => base64UrlEncodeForPasskeyTest($credentialId),
+                'rawId' => base64UrlEncodeForPasskeyTest($credentialId),
+                'type' => 'public-key',
+                'response' => [
+                    'clientDataJSON' => base64UrlEncodeForPasskeyTest($clientDataJson),
+                    'authenticatorData' => base64UrlEncodeForPasskeyTest($authenticatorData),
+                    'signature' => base64UrlEncodeForPasskeyTest($signature),
+                ],
+            ],
+            'remember' => true,
+        ],
+    ];
+}
+
+function storePasskeyAssertionFor(User $user, array $assertion): Passkey
+{
+    return Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Test',
+        'credential_id' => base64UrlEncodeForPasskeyTest($assertion['credentialId']),
+        'credential' => $assertion['storedCredential'],
+    ]);
+}
 
 beforeEach(function (): void {
     RateLimiter::clear('login-discover-ip:127.0.0.1');
@@ -271,6 +367,130 @@ test('passkey login is allowed for users scheduled for deletion so they reach th
     ]);
 
     expect(Passkeys::allowsLogin(Request::create('/passkeys/login', 'POST'), $passkey))->toBeTrue();
+});
+
+test('a well-formed passkey assertion completes login through the installed verifier', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    storePasskeyAssertionFor($user, $assertion);
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])
+        ->assertOk()
+        ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentTeam])]);
+
+    $this->assertAuthenticatedAs($user);
+});
+
+test('a passkey assertion for enrolled MFA waits for the challenge', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    storePasskeyAssertionFor($user, $assertion);
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])
+        ->assertOk()
+        ->assertJson(['redirect' => route('two-factor.login')]);
+
+    $this->assertGuest('web');
+});
+
+test('a passkey assertion with the wrong origin fails at the real verifier', function (): void {
+    $user = User::factory()->create();
+
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], 'https://evil.example', (string) $challenge);
+    storePasskeyAssertionFor($user, $assertion);
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])->assertUnprocessable();
+
+    $this->assertGuest('web');
+});
+
+test('a passkey assertion with a credential id nobody registered fails at the real verifier', function (): void {
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])->assertUnprocessable();
+
+    $this->assertGuest('web');
+});
+
+test('a passkey revoked after options were issued fails at the real verifier', function (): void {
+    $user = User::factory()->create();
+
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    $passkey = storePasskeyAssertionFor($user, $assertion);
+    $passkey->delete();
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])->assertUnprocessable();
+
+    $this->assertGuest('web');
+});
+
+test('the passkey login endpoint rejects a submission with no prior options request', function (): void {
+    $assertion = buildRealPasskeyAssertion('relaticle.test', config('fortify.passkeys.allowed_origins')[0], 'placeholder-challenge');
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['credential']);
+
+    $this->assertGuest('web');
+});
+
+test('a passkey revoked while its MFA challenge is pending cannot complete authentication', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $passkey = Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Test',
+        'credential_id' => 'revoke-mid-mfa-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    AuthenticationSession::begin($user, AuthMethod::PASSKEY, (string) $passkey->getKey(), true);
+
+    $passkey->delete();
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+});
+
+test('a scheduled-deletion user with enrolled MFA must complete the challenge before reaching the cancellation interstitial', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create([
+        'scheduled_deletion_at' => now()->subDay(),
+    ]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $this->assertGuest('web');
+
+    $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ])->assertRedirect();
+
+    $this->assertAuthenticatedAs($user);
+
+    $this->get(Filament::getPanel('app')->getUrl())
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 });
 
 test('continue with a password account reveals the password field', function (): void {

@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Auth\BeginAuthentication;
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
-use App\Support\Auth\LoginDestination;
 use App\Support\EmailAddress;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
@@ -23,6 +23,8 @@ use Throwable;
 
 final readonly class CallbackController
 {
+    public function __construct(private BeginAuthentication $beginAuthentication) {}
+
     public function __invoke(
         Request $request,
         SocialiteProvider $provider,
@@ -34,13 +36,18 @@ final readonly class CallbackController
 
         try {
             $socialUser = $this->retrieveSocialUser($provider->value);
-            $user = $this->resolveUser($provider->value, $socialUser, $creator);
+            $account = $this->resolveUser($provider->value, $socialUser, $creator);
+            $user = $account->user;
+
+            if (! $user instanceof User) {
+                return $this->handleError('Authentication state mismatch. Please try again.');
+            }
 
             if ($user->wasRecentlyCreated) {
                 $this->flagSignupForAnalytics();
             }
 
-            return $this->loginAndRedirect($user);
+            return $this->beginAndRedirect($user, $provider, $account);
         } catch (InvalidStateException) {
             return $this->handleError('Authentication state mismatch. Please try again.');
         } catch (ValidationException $e) {
@@ -65,8 +72,8 @@ final readonly class CallbackController
         string $provider,
         SocialiteUser $socialUser,
         CreatesNewSocialUsers $creator
-    ): User {
-        return DB::transaction(function () use ($provider, $socialUser, $creator): User {
+    ): UserSocialAccount {
+        return DB::transaction(function () use ($provider, $socialUser, $creator): UserSocialAccount {
             $existingAccount = UserSocialAccount::query()
                 ->with('user')
                 ->where('provider_name', $provider)
@@ -74,7 +81,7 @@ final readonly class CallbackController
                 ->first();
 
             if ($existingAccount?->user) {
-                return $existingAccount->user;
+                return $existingAccount;
             }
 
             $email = $socialUser->getEmail();
@@ -86,9 +93,7 @@ final readonly class CallbackController
                 $user = $this->createUser($socialUser, $creator, $provider);
             }
 
-            $this->linkSocialAccount($user, $provider, $socialUser->getId());
-
-            return $user;
+            return $this->linkSocialAccount($user, $provider, $socialUser->getId());
         });
     }
 
@@ -122,14 +127,17 @@ final readonly class CallbackController
         session()->put('fathom.track_signup', true);
     }
 
-    private function linkSocialAccount(User $user, string $provider, string|int $providerId): void
+    private function linkSocialAccount(User $user, string $provider, string|int $providerId): UserSocialAccount
     {
-        $user->socialAccounts()->updateOrCreate(
+        $account = $user->socialAccounts()->updateOrCreate(
             [
                 'provider_name' => $provider,
                 'provider_id' => (string) $providerId,
             ]
         );
+        $account->setRelation('user', $user);
+
+        return $account;
     }
 
     private function extractName(SocialiteUser $socialUser): string
@@ -176,12 +184,15 @@ final readonly class CallbackController
             ->with('error', $message);
     }
 
-    private function loginAndRedirect(User $user): RedirectResponse
+    private function beginAndRedirect(User $user, SocialiteProvider $provider, UserSocialAccount $account): RedirectResponse
     {
-        Auth::login($user, remember: true);
+        $next = $this->beginAuthentication->execute(
+            $user,
+            AuthMethod::from($provider->value),
+            (string) $account->getKey(),
+            remember: true,
+        );
 
-        $destination = resolve(LoginDestination::class)->resolve($user, session()->pull('url.intended'));
-
-        return redirect()->to($destination);
+        return redirect()->to($next);
     }
 }

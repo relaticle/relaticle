@@ -10,6 +10,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Support\Auth\AuthenticationSession;
@@ -24,6 +25,7 @@ use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\TwoFactorAuthenticatedSessionController;
 use Laravel\Passkeys\Contracts\PasskeyLoginResponse as PasskeyLoginResponseContract;
+use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
@@ -33,6 +35,11 @@ final class FortifyServiceProvider extends ServiceProvider
         $this->app->singleton(PasskeyLoginResponseContract::class, PasskeyLoginResponse::class);
         $this->app->bind(AuthenticatedSessionController::class, PasswordSessionController::class);
         $this->app->bind(TwoFactorAuthenticatedSessionController::class, MfaChallengeController::class);
+
+        // The vendor controller authenticates the guard before resolving
+        // PasskeyLoginResponse, so that contract cannot enforce MFA. Swap the
+        // whole controller for one that defers guard login to BeginAuthentication.
+        $this->app->bind(PasskeyLoginController::class, PasskeySessionController::class);
     }
 
     public function boot(): void

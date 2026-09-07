@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\LoginDestination;
 use Illuminate\Contracts\Session\Session;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
@@ -43,7 +42,7 @@ final readonly class CompleteAuthentication
 
         $session = resolve(Session::class);
         $intended = $session->get('url.intended');
-        $preserved = Arr::only($session->all(), self::PRESERVED_SESSION_KEYS);
+        $preserved = $this->capturePreservedSessionValues($session);
 
         $session->invalidate();
         $session->put($preserved);
@@ -51,7 +50,29 @@ final readonly class CompleteAuthentication
         Auth::guard('web')->login($user, $pending['remember']);
         $session->regenerateToken();
 
+        AuthenticationSession::markComplete($user);
+
         return $this->loginDestination->resolve($user, is_string($intended) ? $intended : null);
+    }
+
+    /**
+     * `Arr::only()` only matches top-level keys, but these are dotted session
+     * paths (e.g. `fathom.track_signup` nests under `fathom`), so each one is
+     * read and later re-written through the session's own dot-aware accessors.
+     *
+     * @return array<string, mixed>
+     */
+    private function capturePreservedSessionValues(Session $session): array
+    {
+        $preserved = [];
+
+        foreach (self::PRESERVED_SESSION_KEYS as $key) {
+            if ($session->has($key)) {
+                $preserved[$key] = $session->get($key);
+            }
+        }
+
+        return $preserved;
     }
 
     private function expired(): ValidationException
