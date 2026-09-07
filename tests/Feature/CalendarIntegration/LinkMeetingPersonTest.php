@@ -133,6 +133,137 @@ it('skips person creation when contact_creation_mode=None', function (): void {
     expect(Company::query()->where('team_id', $team->id)->count())->toBe(0);
 });
 
+it('does not auto-create a company when the person already exists', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $person = People::factory()->for($team)->create();
+    savePersonEmail($person, 'known@orphan-corp.com');
+
+    $countBefore = Company::query()->where('team_id', $team->id)->count();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'known@orphan-corp.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(Company::query()->where('team_id', $team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a person or company for an automated attendee', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'noreply@partner.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(People::query()->where('team_id', $team->id)->count())->toBe(0)
+        ->and(Company::query()->where('team_id', $team->id)->count())->toBe(0);
+});
+
+it('does not auto-create a company for a www-prefixed public domain', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $countBefore = Company::query()->where('team_id', $team->id)->count();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'user@www.gmail.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(Company::query()->where('team_id', $team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a person or company when the connected account is soft-deleted', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $account->delete();
+
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'guest@newcorp.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(People::query()->where('team_id', $team->id)->count())->toBe(0)
+        ->and(Company::query()->where('team_id', $team->id)->count())->toBe(0);
+});
+
 it('auto-creates a person on the first meeting in Selective mode', function (): void {
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);

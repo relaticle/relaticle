@@ -9,6 +9,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
@@ -114,4 +115,59 @@ it('prefers blocked over protected when resolving record mailbox copy', function
         ->toBe(EmailVisibilityEnforcement::Blocked)
         ->and($this->service->recordMailboxHiddenCopy($person)['description'])
         ->toBe(__('filament/pages/record-emails.blocked.description'));
+});
+
+it('suppresses record creation for workspace member emails', function (): void {
+    expect($this->service->suppressesRecordCreation(
+        'owner@thefireflytech.com',
+        $this->team->getKey(),
+        null,
+    ))->toBeTrue();
+
+    expect($this->service->suppressesRecordCreation(
+        'external@partner.com',
+        $this->team->getKey(),
+        null,
+    ))->toBeFalse();
+});
+
+it('scopes communication intelligence metrics to mail the viewer can see', function (): void {
+    $person = People::factory()->for($this->team)->create([
+        'email_count' => 99,
+        'inbound_email_count' => 50,
+        'outbound_email_count' => 49,
+    ]);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $visible = Email::factory()->inbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    $person->emails()->attach($visible->getKey());
+
+    $coworker = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+    ]));
+
+    $private = Email::factory()->private()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+    ]);
+    $person->emails()->attach($private->getKey());
+
+    $metrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
+
+    expect($metrics->emailCount)->toBe(1)
+        ->and($metrics->inboundEmailCount)->toBe(1)
+        ->and($metrics->outboundEmailCount)->toBe(0);
 });

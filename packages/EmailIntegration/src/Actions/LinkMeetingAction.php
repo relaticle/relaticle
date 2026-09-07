@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkMeetingAction
@@ -27,6 +28,7 @@ final readonly class LinkMeetingAction
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
+        private AutomatedSenderMatcher $automatedSender,
         private EmailVisibilityService $visibility,
     ) {}
 
@@ -40,19 +42,36 @@ final readonly class LinkMeetingAction
         $skippedDomains = $this->buildSkippedDomains($teamId);
 
         foreach ($attendees as $attendee) {
-            $company = null;
-            $domain = $this->extractDomain($attendee->email_address);
+            $isAutomatedSender = $this->automatedSender->matches($attendee->email_address);
             $suppressCreate = $this->visibility->suppressesRecordCreation(
                 $attendee->email_address,
                 $teamId,
                 $meeting->connected_account_id,
             );
 
-            if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = $this->domainMatcher->firstMatching($domain, $teamId);
+            $person = People::query()->where('team_id', $teamId)
+                ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
+                    ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('type', 'email'))
+                    ->whereJsonContains('json_value', $attendee->email_address)
+                )
+                ->first();
 
-                if (! $company && ! $suppressCreate && $team && $team->auto_create_companies && $this->shouldCreatePerson($team)) {
-                    $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
+            $wouldCreatePerson = ! $person
+                && ! $isAutomatedSender
+                && ! $suppressCreate
+                && $account
+                && $team
+                && $this->shouldCreatePerson($team);
+
+            $company = null;
+            $rawDomain = $this->extractDomain($attendee->email_address);
+            $host = $rawDomain !== null ? $this->domainMatcher->host($rawDomain) : null;
+
+            if ($host && $skippedDomains->doesntContain($host)) {
+                $company = $this->domainMatcher->firstMatching($host, $teamId);
+
+                if (! $company && $wouldCreatePerson && $team->auto_create_companies) {
+                    $company = $this->autoCreateCompany->execute($host, $teamId, $team);
                 }
 
                 if ($company instanceof Company) {
@@ -63,14 +82,7 @@ final readonly class LinkMeetingAction
                 }
             }
 
-            $person = People::query()->where('team_id', $teamId)
-                ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
-                    ->whereHas('customField', fn (Builder $fieldQuery) => $fieldQuery->where('type', 'email'))
-                    ->whereJsonContains('json_value', $attendee->email_address)
-                )
-                ->first();
-
-            if (! $person && ! $suppressCreate && $account && $team && $this->shouldCreatePerson($team)) {
+            if ($wouldCreatePerson) {
                 $person = $this->autoCreatePerson->execute(
                     $attendee->name ?? '',
                     $attendee->email_address,

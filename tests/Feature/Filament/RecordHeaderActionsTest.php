@@ -13,13 +13,15 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(ViewCompany::class, ViewPeople::class, ViewOpportunity::class, ViewRecordEmailsAction::class, EmailVisibilityService::class);
+mutates(ViewCompany::class, ViewPeople::class, ViewOpportunity::class, ViewRecordEmailsAction::class, EmailVisibilityService::class, CommunicationIntelligenceInfolist::class, VisibleCommunicationIntelligence::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -208,3 +210,27 @@ it('does not badge private teammate mail or emails linked to another record', fu
 
     expect(emailsHeaderBadge($page, $owner))->toBe('1');
 })->with(recordEmailsHeaderPages());
+
+it('scopes communication intelligence on the person view to visible mail only', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->team])->create([
+        'email_count' => 99,
+        'inbound_email_count' => 50,
+        'outbound_email_count' => 49,
+    ]);
+
+    attachRecordEmail($this->user, $this->team, $person);
+
+    $coworker = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    attachRecordEmail($coworker, $this->team, $person, [
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'is_internal' => false,
+    ]);
+
+    $metrics = resolve(EmailVisibilityService::class)->visibleCommunicationIntelligence($person, $this->user);
+
+    expect($metrics->emailCount)->toBe(1)
+        ->and($metrics->inboundEmailCount)->toBe(1)
+        ->and($metrics->outboundEmailCount)->toBe(0);
+});
