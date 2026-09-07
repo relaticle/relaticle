@@ -84,6 +84,8 @@ it('keeps a completed import visible until dismiss on this instance', function (
 
     $component->call('refreshStatus')
         ->assertSee(__('filament/pages/email-accounts.sync_status.title_complete'))
+        ->assertSee('data-mailbox-import-complete-icon', false)
+        ->assertSee('text-success-600', false)
         ->assertSee(trans_choice('filament/pages/email-accounts.sync_status.emails_processed', 643, ['count' => 643]));
 });
 
