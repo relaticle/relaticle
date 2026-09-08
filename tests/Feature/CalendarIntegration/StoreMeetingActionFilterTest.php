@@ -49,11 +49,12 @@ it('skips cancelled events', function (): void {
     expect(Meeting::query()->count())->toBe(0);
 });
 
-it('skips events declined by self', function (): void {
+it('stores events declined by self so RSVP can still be changed', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     (app(StoreMeetingAction::class))->execute(payload(['selfResponseStatus' => AttendeeResponseStatus::DECLINED]), $account);
 
-    expect(Meeting::query()->count())->toBe(0);
+    expect(Meeting::query()->count())->toBe(1)
+        ->and(Meeting::query()->first()?->response_status)->toBe(AttendeeResponseStatus::DECLINED);
 });
 
 it('stores events older than 90 days', function (): void {

@@ -7,6 +7,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
@@ -190,4 +191,30 @@ it('throws CalendarSyncTokenExpired on Graph 410', function (): void {
     expect(fn (): CalendarSyncResult => new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=EXPIRED'))
         ->toThrow(CalendarSyncTokenExpired::class);
+});
+
+it('posts accept to Graph so the organizer is notified', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/accept' => Http::response(null, 202),
+    ]);
+
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::ACCEPTED);
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+        && str_ends_with($request->url(), '/me/events/evt-1/accept')
+        && $request['sendResponse'] === true);
+});
+
+it('posts tentativelyAccept for maybe', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/tentativelyAccept' => Http::response(null, 202),
+    ]);
+
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
 });
