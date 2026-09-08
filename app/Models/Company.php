@@ -12,6 +12,7 @@ use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
 use App\Observers\CompanyObserver;
 use App\Services\AvatarService;
+use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -35,7 +36,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property string $name
- * @property Carbon|null $deleted_at
+ * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
  * @property Carbon|null $last_email_at
  * @property Carbon|null $last_interaction_at

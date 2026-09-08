@@ -1,19 +1,18 @@
-<x-mail::message>
-# Your Pro trial ends in 3 days
+<x-mail::message :reason="__('mail.footer.reason.owner', ['team' => $team->name])">
+<x-slot:preheader>{{ __('mail.trial_ending.preheader') }}</x-slot:preheader>
+# {{ __('mail.trial_ending.heading', ['team' => $team->name]) }}
 
-The 14-day Pro trial for **{{ $team->name }}** ends on {{ $team->trial_ends_at?->toFormattedDateString() }}.
-Keep all AI models, 2,000 monthly credits, and higher rate limits by subscribing. There is still no per-seat pricing, just one flat price for the whole workspace.
+{{ __('mail.trial_ending.ends_on', ['date' => $endsOn]) }}
+
+{{ __('mail.trial_ending.keeps') }} {{ __('mail.trial_ending.flat_price') }}
 
 <x-mail::button :url="$billingUrl">
-Keep Pro
+{{ __('mail.trial_ending.cta') }}
 </x-mail::button>
 
-@if($team->hosted_free_grandfathered_at)
-If you do nothing, this workspace returns to its grandfathered Cloud Free plan. Your data is untouched.
+@if($grandfathered)
+{{ __('mail.trial_ending.grandfathered', ['team' => $team->name]) }}
 @else
-If you do nothing, Cloud access pauses when the trial ends. Your data stays safely stored, and you can subscribe at any time to pick up where you left off.
+{{ __('mail.trial_ending.paused') }}
 @endif
-
-Thanks,<br>
-{{ config('app.name') }}
 </x-mail::message>

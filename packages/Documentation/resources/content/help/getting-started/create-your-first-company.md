@@ -1,6 +1,6 @@
 ---
 title: Create your first company
-description: Add a company record and fill in the fields your team actually uses.
+description: Follow the steps to create a company record in Relaticle, fill in its fields and add people, tasks or notes.
 order: 1
 updated: "2026-08-12"
 related: [help/getting-started/add-your-first-person, help/getting-started/import-your-existing-data]

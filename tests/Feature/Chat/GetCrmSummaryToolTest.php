@@ -5,8 +5,9 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
@@ -24,14 +25,14 @@ beforeEach(function (): void {
  * 2026-08-10. A company created between those two boundaries belongs to "this week"
  * for one of them and "last week" for the other.
  */
-function crmSummaryInstant(): Carbon
+function crmSummaryInstant(): CarbonImmutable
 {
-    return Carbon::parse('2026-08-16 23:30:00', 'UTC');
+    return Date::parse('2026-08-16 23:30:00', 'UTC');
 }
 
-function companyCreatedAt(): Carbon
+function companyCreatedAt(): CarbonImmutable
 {
-    return Carbon::parse('2026-08-14 12:00:00', 'UTC');
+    return Date::parse('2026-08-14 12:00:00', 'UTC');
 }
 
 function crmSummaryWeekCount(User $user): int

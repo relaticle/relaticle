@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
 use App\Models\User;
-use Filament\Auth\Notifications\ResetPassword as ResetPasswordNotification;
+use App\Notifications\Auth\ResetPassword as ResetPasswordNotification;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;

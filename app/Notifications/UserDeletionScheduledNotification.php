@@ -26,12 +26,13 @@ final class UserDeletionScheduledNotification extends Notification implements Sh
 
     public function toMail(object $notifiable): MailMessage
     {
+        $date = $this->user->scheduled_deletion_at?->copy()->setTimezone($this->user->effectiveTimezone())->format('M j, Y') ?? '';
+
         return (new MailMessage)
-            ->subject('Your account is scheduled for deletion')
-            ->greeting("Hello {$this->user->name},")
-            ->line("Your account is scheduled for permanent deletion on {$this->user->scheduled_deletion_at->format('F j, Y')}.")
-            ->line('All your data will be permanently removed after this date.')
-            ->line('If you changed your mind, simply log in anytime before that date to cancel the deletion.')
-            ->salutation('Thank you for using Relaticle.');
+            ->subject(__('mail.account_deletion_scheduled.subject'))
+            ->markdown('mail.notifications.account-deletion-scheduled', [
+                'date' => $date,
+                'keepUrl' => route('filament.app.scheduled-deletion'),
+            ]);
     }
 }

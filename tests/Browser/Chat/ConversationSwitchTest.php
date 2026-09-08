@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Filament\Pages\ChatConversation;
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
@@ -150,7 +150,7 @@ it('places the conversation title in the topbar and the toggle beside the worksp
  * exactly that assertion fail, not any timing assertion), so this is
  * failure-of-absence, not a race that luck can win.
  */
-function switchTestInsertMessage(string $conversationId, User $user, string $role, string $content, ?Carbon $at = null): void
+function switchTestInsertMessage(string $conversationId, User $user, string $role, string $content, ?CarbonImmutable $at = null): void
 {
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),

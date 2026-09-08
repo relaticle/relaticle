@@ -1,10 +1,11 @@
 @php
     $baseTitle = __('Help Centre');
+    $pageTitle = __('Help centre: Records, imports and setup');
     $pageDescription = __('Guides for setting up your workspace, importing records, and using Relaticle day to day.');
 @endphp
 
 <x-documentation::shell
-    :title="$baseTitle . ' - ' . config('app.name')"
+    :title="$pageTitle . ' - ' . config('app.name')"
     :description="$pageDescription"
     :nav="$nav">
     <div class="mx-auto max-w-5xl">

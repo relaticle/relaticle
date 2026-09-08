@@ -7,10 +7,10 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Models\Task;
 use App\Models\Team;
+use Carbon\CarbonInterface;
 use Exception;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Relaticle\OnboardSeed\Support\BaseModelSeeder;
 use Relaticle\OnboardSeed\Support\FixtureRegistry;
@@ -112,7 +112,7 @@ final class TaskSeeder extends BaseModelSeeder
      */
     private function formatDate(mixed $dateValue): string
     {
-        if ($dateValue instanceof Carbon) {
+        if ($dateValue instanceof CarbonInterface) {
             return $dateValue->format('Y-m-d H:i:s');
         }
 

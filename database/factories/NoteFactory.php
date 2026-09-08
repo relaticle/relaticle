@@ -23,7 +23,7 @@ final class NoteFactory extends Factory
     public function definition(): array
     {
         return [
-            'title' => $this->faker->sentence(),
+            'title' => fake()->sentence(),
             'team_id' => Team::factory(),
         ];
     }

@@ -20,7 +20,7 @@ final class OpportunityFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->sentence(),
+            'name' => fake()->sentence(),
             'team_id' => Team::factory(),
         ];
     }

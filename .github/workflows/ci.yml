@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Cache Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.composer/cache
@@ -46,7 +46,7 @@ jobs:
       # per-commit key would churn through the repo's 10GB cache budget. Both tools
       # revalidate changed files against a restored cache, so staleness is safe.
       - name: Cache Static Analysis Results
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache
           key: ${{ runner.os }}-static-analysis-${{ hashFiles('composer.lock', 'phpstan.neon', 'rector.php') }}
@@ -116,10 +116,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Cache Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.composer/cache
@@ -185,10 +185,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Cache Dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.composer/cache
@@ -206,10 +206,10 @@ jobs:
           coverage: none
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '22.x'
           cache: pnpm
@@ -220,7 +220,7 @@ jobs:
       # Playwright re-downloads Chromium (~150MB) on every run without this.
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}

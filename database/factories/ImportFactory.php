@@ -31,7 +31,7 @@ final class ImportFactory extends Factory
                 'user_id' => $attributes['user_id'],
             ])->getKey(),
             'entity_type' => ImportEntityType::People,
-            'file_name' => $this->faker->unique()->lexify('import-????????.csv'),
+            'file_name' => fake()->unique()->lexify('import-????????.csv'),
             'status' => ImportStatus::Uploading,
             'total_rows' => 0,
             'headers' => [],

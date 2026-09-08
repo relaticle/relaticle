@@ -41,7 +41,7 @@ it('emits article and breadcrumb json-ld on a help article', function (): void {
     expect($html)->toContain('"@type":"Article"')
         ->and($html)->toContain('"@type":"BreadcrumbList"')
         ->and($html)->toContain('"headline":"Create your first company"')
-        ->and($html)->toContain('"description":"Add a company record and fill in the fields your team actually uses."')
+        ->and($html)->toContain('"description":"Follow the steps to create a company record in Relaticle, fill in its fields and add people, tasks or notes."')
         ->and($html)->toContain('"mainEntityOfPage":"'.$url.'"')
         ->and($html)->toContain('"publisher":{"@type":"Organization","name":"'.config('app.name').'"')
         ->and($html)->toContain('"position":1')
@@ -111,9 +111,7 @@ it('titles every content page base-title-dash-brand, exactly once', function ():
 
         preg_match('/<title>(.*?)<\/title>/', $html, $match);
 
-        $expected = $page->area === DocUrl::HELP
-            ? "{$page->title} - {$brand} Help Centre"
-            : "{$page->title} - {$brand}";
+        $expected = "{$page->title} - {$brand}";
 
         if (($match[1] ?? null) !== $expected || substr_count($match[1] ?? '', " - {$brand}") !== 1) {
             $offenders[] = "{$page->path} -> ".($match[1] ?? '(no title)');

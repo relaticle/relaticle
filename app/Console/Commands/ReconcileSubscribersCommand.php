@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * The convergence backstop: re-derives every verified user's subscriber
  * profile and syncs the ones that drifted, whatever the cause (a missed
- * event, a failed job, recency decay, a deleted team).
+ * event, a failed job, recency decay, a deleted team). The one exception is
+ * a profile Mailcoach already rejected, which waits until it changes.
  */
 #[Description('Sync Mailcoach subscriber profiles for verified users whose derived profile changed')]
 #[Signature('subscribers:reconcile
@@ -34,11 +35,12 @@ final class ReconcileSubscribersCommand extends Command
         $dryRun = (bool) $this->option('dry-run');
         $limit = $this->option('limit') === null ? null : (int) $this->option('limit');
         $changed = 0;
+        $rejected = 0;
 
         User::query()
             ->whereNotNull('email_verified_at')
             ->with(['ownedTeams', 'teams'])
-            ->chunkById(200, function (Collection $users) use ($deriver, $dryRun, $limit, &$changed): bool {
+            ->chunkById(200, function (Collection $users) use ($deriver, $dryRun, $limit, &$changed, &$rejected): bool {
                 /** @var User $user */
                 foreach ($users as $user) {
                     if ($limit !== null && $changed >= $limit) {
@@ -47,7 +49,11 @@ final class ReconcileSubscribersCommand extends Command
 
                     $profile = $deriver->derive($user);
 
-                    if ($profile->matchesStored($user)) {
+                    if (! $profile->needsSync($user)) {
+                        if ($profile->wasRejected($user)) {
+                            $rejected++;
+                        }
+
                         continue;
                     }
 
@@ -66,6 +72,10 @@ final class ReconcileSubscribersCommand extends Command
             });
 
         $this->info($dryRun ? "Would sync {$changed} users." : "Dispatched {$changed} sync jobs.");
+
+        if ($rejected > 0) {
+            $this->info("Skipped {$rejected} profiles Mailcoach already rejected.");
+        }
 
         return self::SUCCESS;
     }

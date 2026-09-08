@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Models;
 
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Factories\ImportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -15,7 +16,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -32,7 +32,7 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
  * @property ImportStatus $status
  * @property list<string> $headers
  * @property list<array<string, mixed>> $column_mappings
- * @property Carbon|null $completed_at
+ * @property CarbonImmutable|null $completed_at
  * @property int $total_rows
  * @property int $created_rows
  * @property int $updated_rows

@@ -13,15 +13,13 @@ trait DetectsTeamInvitation
 {
     protected function getTeamInvitationFromSession(): ?TeamInvitation
     {
-        $segment = $this->getIntendedUrlSegmentAfter('team-invitations');
+        $token = $this->getIntendedUrlSegmentAfter('invitations');
 
-        if ($segment === null) {
+        if ($token === null) {
             return null;
         }
 
-        return TeamInvitation::query()
-            ->whereKey($segment)
-            ->first();
+        return TeamInvitation::findByRawToken($token);
     }
 
     protected function getTeamFromInviteLinkInSession(): ?Team

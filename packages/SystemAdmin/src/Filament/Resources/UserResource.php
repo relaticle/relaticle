@@ -34,6 +34,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
@@ -180,6 +181,15 @@ final class UserResource extends Resource
                     ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('last_login_at', $direction))
                     ->toggleable()
                     ->placeholder('—'),
+                IconColumn::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->state(fn (User $record): bool => $record->rejected_subscriber_profile_hash !== null)
+                    ->boolean()
+                    ->trueIcon('heroicon-o-exclamation-triangle')
+                    ->trueColor('warning')
+                    ->falseIcon('heroicon-o-minus-small')
+                    ->falseColor('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -190,6 +200,12 @@ final class UserResource extends Resource
             ->filters([
                 TernaryFilter::make('email_verified_at')
                     ->label('Email Verified')
+                    ->nullable(),
+                TernaryFilter::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->placeholder('All users')
+                    ->trueLabel('Rejected by Mailcoach')
+                    ->falseLabel('Not rejected')
                     ->nullable(),
                 SelectFilter::make('engagement')
                     ->label('Engagement')
@@ -236,6 +252,7 @@ final class UserResource extends Resource
         return [
             OwnedTeamsRelationManager::class,
             TeamsRelationManager::class,
+            SocialAccountsRelationManager::class,
         ];
     }
 

@@ -1,5 +1,3 @@
-# Terms of Service
-
 **Effective date:** August 26, 2026
 
 These Terms of Service ("Terms") govern your use of Relaticle, an open-source CRM platform provided by Relaticle ("we", "us", "our"). By accessing or using our services, you agree to these Terms.

@@ -12,6 +12,7 @@ use App\Support\Email\SubscriberProfile;
 use App\Support\Email\SubscriberProfileDeriver;
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Support\Facades\Queue;
+use Spatie\MailcoachSdk\Exceptions\InvalidData;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
 use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
@@ -340,4 +341,95 @@ test('releases with the retry-after delay when rate limited', function (): void 
     $job->handle(new SubscriberProfileDeriver);
 
     expect($user->refresh()->subscriber_profile_hash)->toBeNull();
+});
+
+function mailcoachRejectsTheEmail(): InvalidData
+{
+    return new InvalidData([
+        'message' => 'The email field must be a valid email address.',
+        'errors' => ['email' => ['The email field must be a valid email address.']],
+    ]);
+}
+
+function syncExpectingPermanentFailure(User $user, InvalidData $exception): void
+{
+    $queueJob = Mockery::mock(QueueJob::class);
+    $queueJob->shouldReceive('fail')->once()->with($exception);
+    $queueJob->shouldReceive('release')->never();
+
+    $job = new SyncSubscriberJob((string) $user->id);
+    $job->setJob($queueJob);
+    $job->handle(new SubscriberProfileDeriver);
+}
+
+test('fails without retrying and records the rejected profile when Mailcoach rejects an update', function (): void {
+    $user = User::factory()->withTeam()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'mc-uuid-dead-domain',
+        'subscriber_profile_hash' => 'hash-mailcoach-still-holds',
+    ]);
+    $exception = mailcoachRejectsTheEmail();
+
+    Mailcoach::shouldReceive('subscriber')
+        ->once()
+        ->with('mc-uuid-dead-domain')
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-dead-domain', 'email' => $user->email, 'tags' => []]));
+    Mailcoach::shouldReceive('updateSubscriber')->once()->andThrow($exception);
+
+    syncExpectingPermanentFailure($user, $exception);
+
+    $profile = (new SubscriberProfileDeriver)->derive($user->refresh());
+
+    expect($user)
+        ->mailcoach_subscriber_uuid->toBe('mc-uuid-dead-domain')
+        ->subscriber_profile_hash->toBe('hash-mailcoach-still-holds')
+        ->rejected_subscriber_profile_hash->toBe($profile->hash());
+});
+
+test('fails without retrying and records the rejected profile when Mailcoach rejects a create', function (): void {
+    $user = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $exception = mailcoachRejectsTheEmail();
+
+    Mailcoach::shouldReceive('findByEmail')->once()->andReturnNull();
+    Mailcoach::shouldReceive('createSubscriber')->once()->andThrow($exception);
+
+    syncExpectingPermanentFailure($user, $exception);
+
+    $profile = (new SubscriberProfileDeriver)->derive($user->refresh());
+
+    expect($user)
+        ->mailcoach_subscriber_uuid->toBeNull()
+        ->subscriber_profile_hash->toBeNull()
+        ->rejected_subscriber_profile_hash->toBe($profile->hash());
+});
+
+test('does not re-offer a rejected profile until it changes', function (): void {
+    $user = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $user->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($user)->hash()])->save();
+
+    Mailcoach::shouldReceive('findByEmail')->never();
+    Mailcoach::shouldReceive('createSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh()->mailcoach_subscriber_uuid)->toBeNull();
+});
+
+test('a rejected profile is offered again once it changes, and success clears the rejection', function (): void {
+    $user = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $user->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($user)->hash()])->save();
+
+    $user->forceFill(['email' => 'renamed@example.com'])->save();
+
+    Mailcoach::shouldReceive('findByEmail')->once()->with('test-list-id', 'renamed@example.com')->andReturnNull();
+    Mailcoach::shouldReceive('createSubscriber')
+        ->once()
+        ->andReturn(new Subscriber(['uuid' => 'new-uuid', 'email' => 'renamed@example.com', 'tags' => []]));
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh())
+        ->mailcoach_subscriber_uuid->toBe('new-uuid')
+        ->subscriber_profile_hash->not->toBeNull()
+        ->rejected_subscriber_profile_hash->toBeNull();
 });
