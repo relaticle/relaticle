@@ -2,19 +2,30 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\LinkSocialAccount;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\CallbackController;
+use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
+use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Support\Facades\Exceptions;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
-mutates(CallbackController::class, RedirectController::class);
+mutates(
+    CallbackController::class,
+    RedirectController::class,
+    LinkSocialAccount::class,
+    LinkSocialAccountRedirectController::class,
+    LinkSocialAccountCallbackController::class,
+);
 
 function makeSocialiteUser(string $id, string $name, string $email): SocialiteUser
 {
@@ -139,26 +150,18 @@ test('callback rejects an external destination for an account without a workspac
     $response->assertRedirect(url()->getAppUrl());
 });
 
-test('callback from socialite provider links social account to existing user when email matches', function () {
-    $user = User::factory()->withTeam()->create([
-        'email' => 'existing@example.com',
-        'name' => 'Existing User',
-    ]);
+test('matching provider email cannot sign in to an unlinked account', function (): void {
+    $user = User::factory()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('new-provider-id', 'Maya', $user->email));
 
-    Socialite::fake(
-        SocialiteProvider::GOOGLE->value,
-        makeSocialiteUser('123456789', 'Existing User', 'existing@example.com'),
-    );
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect();
 
-    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
-
-    $response->assertRedirect();
-
-    $this->assertAuthenticated();
-    $this->assertAuthenticatedAs($user);
+    $this->assertGuest('web');
+    expect($user->socialAccounts()->exists())->toBeFalse();
 });
 
-test('callback links to the existing account when the provider returns a mixed-case email', function () {
+test('a mixed-case provider email match still cannot sign in to an unlinked account', function () {
     $user = User::factory()->withTeam()->create(['email' => 'case-link-'.uniqid().'@example.com']);
 
     Socialite::fake(
@@ -170,9 +173,45 @@ test('callback links to the existing account when the provider returns a mixed-c
 
     $response->assertRedirect();
 
-    $this->assertAuthenticatedAs($user);
+    $this->assertGuest('web');
     expect(User::where('email', 'ilike', $user->email)->count())->toBe(1)
-        ->and($user->socialAccounts()->where('provider_name', 'google')->exists())->toBeTrue();
+        ->and($user->socialAccounts()->where('provider_name', 'google')->exists())->toBeFalse();
+});
+
+test('a matching-email link suggestion survives a subsequent password login', function (): void {
+    $user = User::factory()->withTeam()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('new-provider-id', 'Maya', $user->email));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    expect(AuthenticationSession::linkSuggestion())->not->toBe([]);
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect();
+
+    $this->assertAuthenticatedAs($user);
+    expect(AuthenticationSession::linkSuggestion())->not->toBe([]);
+});
+
+test('an existing linked account still signs in when the provider now reports a different email', function (): void {
+    $user = User::factory()->withTeam()->create(['email' => 'old-address@example.com']);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'stable-google-id',
+    ]);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('stable-google-id', 'Existing User', 'new-address@example.com'),
+    );
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']))
+        ->assertRedirect();
+
+    $this->assertAuthenticatedAs($user);
 });
 
 test('callback from socialite provider handles error gracefully', function () {
@@ -287,4 +326,195 @@ test('github callback route is gone', function () {
 
 test('callback rejects unknown providers', function () {
     $this->get('/auth/callback/bitbucket?code=x')->assertNotFound();
+});
+
+test('link redirect requires a fresh identity confirmation', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect(route('password.confirm'));
+
+    expect(AuthenticationSession::pendingOperation())->toBe([]);
+});
+
+test('link redirect to google for a confirmed user requests account selection', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirectContains('prompt=select_account')
+        ->assertRedirectContains('redirect_uri='.urlencode(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value])));
+});
+
+test('link redirect to microsoft for a confirmed user forces re-authentication', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::MICROSOFT->value]))
+        ->assertRedirectContains('prompt=login')
+        ->assertRedirectContains('redirect_uri='.urlencode(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::MICROSOFT->value])));
+});
+
+test('link callback creates a new social account for a confirmed user', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('new-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('user_social_accounts', [
+        'user_id' => $user->getKey(),
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'new-google-id',
+    ]);
+});
+
+test('hitting the link callback directly without first visiting the link redirect cannot link a provider', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('direct-hit-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'direct-hit-google-id']);
+});
+
+test('link callback handles a cancelled authorization', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertDatabaseMissing('user_social_accounts', ['user_id' => $user->id]);
+});
+
+test('link callback treats an invalid oauth state as a failed link attempt', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        fn () => throw new InvalidStateException,
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertDatabaseMissing('user_social_accounts', ['user_id' => $user->id]);
+});
+
+test('link callback rejects an expired operation grant', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    $this->travel(16)->minutes();
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('late-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'late-google-id']);
+});
+
+test('link callback refuses a grant overwritten by another operation before the round trip returned', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    AuthenticationSession::startOperation($user, 'set_password', null);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('clobbered-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'clobbered-google-id']);
+});
+
+test('linking a provider identity already linked to another account does not reassign it', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $owner->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'contested-google-id',
+    ]);
+
+    $challenger = User::factory()->withTeam()->create();
+    $this->actingAs($challenger);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('contested-google-id', 'Challenger', $challenger->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    expect(UserSocialAccount::where('provider_id', 'contested-google-id')->count())->toBe(1);
+    $this->assertDatabaseHas('user_social_accounts', [
+        'user_id' => $owner->id,
+        'provider_id' => 'contested-google-id',
+    ]);
+});
+
+test('linking a provider the user already has one linked for reports already linked without duplicating the row', function (): void {
+    $user = User::factory()->withTeam()->create();
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'already-mine',
+    ]);
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('a-different-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    expect($user->socialAccounts()->where('provider_name', SocialiteProvider::GOOGLE->value)->count())->toBe(1);
 });

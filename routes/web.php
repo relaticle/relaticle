@@ -11,6 +11,8 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\IdentityConfirmationCallbackController;
 use App\Http\Controllers\Auth\IdentityConfirmationMfaController;
 use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
+use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
+use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
@@ -71,6 +73,17 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/auth/confirm/callback/{provider}', IdentityConfirmationCallbackController::class)
             ->name('auth.socialite.confirm.callback')
             ->middleware('throttle:10,1,socialite-confirm-callback');
+
+        // Linking intent: establishes a brand-new provider association, unlike
+        // the confirm routes above which re-prove an existing one. Gated by
+        // password.confirm so entry itself proves current account access; the
+        // OAuth round trip that follows proves the provider identity.
+        Route::get('/auth/link/redirect/{provider}', LinkSocialAccountRedirectController::class)
+            ->name('auth.socialite.link.redirect')
+            ->middleware(['password.confirm', 'throttle:10,1,socialite-link-redirect']);
+        Route::get('/auth/link/callback/{provider}', LinkSocialAccountCallbackController::class)
+            ->name('auth.socialite.link.callback')
+            ->middleware('throttle:10,1,socialite-link-callback');
     }
 
     Route::get('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'show'])

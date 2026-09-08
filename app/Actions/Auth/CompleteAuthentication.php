@@ -17,6 +17,7 @@ final readonly class CompleteAuthentication
         'fathom.track_signup',
         'fathom.track_workspace_created',
         'mcp.oauth.team_id',
+        'auth.link_suggestion',
     ];
 
     public function __construct(private LoginDestination $loginDestination) {}

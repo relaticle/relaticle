@@ -50,6 +50,11 @@ return [
         'access_denied' => 'Access was denied. Please authorize the application to continue.',
         'failed' => 'Failed to authenticate with :provider.',
     ],
+    'link' => [
+        'account_exists' => 'An account with this email already exists. Sign in, then link your :provider account from your profile.',
+        'already_linked' => 'That :provider account is already linked to a different profile.',
+        'last_method' => 'Link another way to sign in before removing this one.',
+    ],
     'mfa' => [
         'heading' => 'Confirm your identity',
         'description' => 'Enter the six-digit code from your authenticator app.',

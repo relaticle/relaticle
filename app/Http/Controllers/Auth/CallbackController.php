@@ -11,6 +11,7 @@ use App\Enums\SocialiteProvider;
 use App\Http\Controllers\Auth\Concerns\ResolvesSocialiteUsers;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\EmailAddress;
 use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
@@ -39,6 +40,11 @@ final readonly class CallbackController
         try {
             $socialUser = $this->retrieveSocialUser($provider->value);
             $account = $this->resolveUser($provider->value, $socialUser, $creator);
+
+            if (! $account instanceof UserSocialAccount) {
+                return $this->handleError(__('auth.link.account_exists', ['provider' => ucfirst($provider->value)]));
+            }
+
             $user = $account->user;
 
             if (! $user instanceof User) {
@@ -61,12 +67,19 @@ final readonly class CallbackController
         }
     }
 
+    /**
+     * A matching email is never proof of ownership on its own, so a guest
+     * callback with no existing (provider, provider_id) association must
+     * never create or update one. It returns null and leaves a short-lived
+     * link suggestion for the caller to surface instead, requiring the person
+     * to authenticate normally before an explicit link flow can run.
+     */
     private function resolveUser(
         string $provider,
         SocialiteUser $socialUser,
         CreatesNewSocialUsers $creator
-    ): UserSocialAccount {
-        return DB::transaction(function () use ($provider, $socialUser, $creator): UserSocialAccount {
+    ): ?UserSocialAccount {
+        return DB::transaction(function () use ($provider, $socialUser, $creator): ?UserSocialAccount {
             $existingAccount = UserSocialAccount::query()
                 ->with('user')
                 ->where('provider_name', $provider)
@@ -78,13 +91,18 @@ final readonly class CallbackController
             }
 
             $email = $socialUser->getEmail();
-            $user = $email
-                ? User::query()->where('email', EmailAddress::canonicalize($email))->first()
+            $canonicalEmail = $email !== null ? EmailAddress::canonicalize($email) : null;
+            $matchedUser = $canonicalEmail !== null
+                ? User::query()->where('email', $canonicalEmail)->first()
                 : null;
 
-            if (! $user) {
-                $user = $this->createUser($socialUser, $creator, $provider);
+            if ($matchedUser instanceof User) {
+                AuthenticationSession::suggestLink($provider, (string) $socialUser->getId(), $canonicalEmail);
+
+                return null;
             }
+
+            $user = $this->createUser($socialUser, $creator, $provider);
 
             return $this->linkSocialAccount($user, $provider, $socialUser->getId());
         });

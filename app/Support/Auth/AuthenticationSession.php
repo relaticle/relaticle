@@ -27,9 +27,13 @@ final readonly class AuthenticationSession
 
     private const string PROVIDER_CONFIRM_KEY = 'auth.confirm.provider_grant';
 
+    private const string LINK_SUGGESTION_KEY = 'auth.link_suggestion';
+
     private const int LIFETIME_MINUTES = 10;
 
     private const int OPERATION_LIFETIME_MINUTES = 15;
+
+    private const int LINK_SUGGESTION_LIFETIME_MINUTES = 10;
 
     /**
      * The only sensitive operations that may consume a scoped, one-use identity
@@ -258,6 +262,85 @@ final readonly class AuthenticationSession
         $id = session()->pull(self::PROVIDER_CONFIRM_KEY);
 
         return is_string($id) ? $id : null;
+    }
+
+    /**
+     * Rebind an operation grant minted before the provider identity it targets
+     * was known (link_provider starts with a null target, since the provider
+     * assigns that id only once the OAuth round trip completes) to the identity
+     * that round trip just proved, marking it proven in the same step. Only the
+     * exact grant id stashed before that redirect may be rebound, and only once:
+     * an already-targeted grant is refused rather than retargeted a second time.
+     */
+    public static function bindOperationTarget(User $user, string $operation, string $grantId, string $targetId): void
+    {
+        $pending = self::pendingOperation();
+
+        if (
+            $pending === []
+            || $pending['id'] !== $grantId
+            || $pending['user_id'] !== (string) $user->getAuthIdentifier()
+            || $pending['operation'] !== $operation
+            || $pending['target_id'] !== null
+            || $pending['expires_at'] <= now()->getTimestamp()
+        ) {
+            throw ValidationException::withMessages([
+                'identity' => [__('auth.confirm.required')],
+            ]);
+        }
+
+        session()->put(self::OPERATION_KEY, [
+            'id' => $pending['id'],
+            'user_id' => $pending['user_id'],
+            'operation' => $pending['operation'],
+            'target_id' => $targetId,
+            'fingerprint' => self::operationFingerprint($user, $operation, $targetId),
+            'expires_at' => $pending['expires_at'],
+            'proven' => true,
+        ]);
+    }
+
+    /**
+     * Record a candidate provider identity for a later, explicit link. This is
+     * a UI hint only: a matching email during a guest OAuth callback is never
+     * proof of ownership, so it grants no capability by itself. Establishing
+     * the link still requires the full link_provider flow (both proofs).
+     */
+    public static function suggestLink(string $providerName, string $providerId, string $email): void
+    {
+        session()->put(self::LINK_SUGGESTION_KEY, [
+            'provider' => $providerName,
+            'provider_id' => $providerId,
+            'email' => $email,
+            'expires_at' => now()->addMinutes(self::LINK_SUGGESTION_LIFETIME_MINUTES)->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * @return array{}|array{provider: string, provider_id: string, email: string, expires_at: int}
+     */
+    public static function linkSuggestion(): array
+    {
+        $suggestion = session()->get(self::LINK_SUGGESTION_KEY);
+
+        if (
+            ! is_array($suggestion)
+            || ! isset($suggestion['provider'], $suggestion['provider_id'], $suggestion['email'], $suggestion['expires_at'])
+            || ! is_string($suggestion['provider'])
+            || ! is_string($suggestion['provider_id'])
+            || ! is_string($suggestion['email'])
+            || ! is_int($suggestion['expires_at'])
+            || $suggestion['expires_at'] <= now()->getTimestamp()
+        ) {
+            return [];
+        }
+
+        return [
+            'provider' => $suggestion['provider'],
+            'provider_id' => $suggestion['provider_id'],
+            'email' => $suggestion['email'],
+            'expires_at' => $suggestion['expires_at'],
+        ];
     }
 
     /**
