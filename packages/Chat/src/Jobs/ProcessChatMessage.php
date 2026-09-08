@@ -519,6 +519,16 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        ChatLocale::within($this->user->chatLocale(), fn () => $this->runFailed($exception));
+    }
+
+    /**
+     * The queue rebuilds this instance from the dispatch payload before calling
+     * failed(), after handle()'s ChatLocale scope already restored English, so
+     * failed() re-opens its own scope for every __() call this reaches.
+     */
+    private function runFailed(?Throwable $exception): void
+    {
         // Unconditional, because this instance can never answer the question the
         // charge depends on: the queue rebuilds the command from the original
         // dispatch payload before calling failed(), so $streamedAnything is false

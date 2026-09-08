@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -62,7 +63,7 @@ function fakeChatTranslationFromJsonFile(string $locale, string $key, string $va
     mkdir($directory);
     file_put_contents($directory.'/'.$locale.'.json', json_encode([$key => $value], JSON_THROW_ON_ERROR));
 
-    app('translator')->addJsonPath($directory);
+    resolve(Translator::class)->addJsonPath($directory);
 }
 
 it('names the user\'s language in the prompt of a typed turn', function (): void {
@@ -117,7 +118,7 @@ it('runs the turn in the user\'s locale and restores the worker afterwards', fun
 });
 
 it('restores the worker locale when the turn throws', function (): void {
-    expect(fn () => ChatLocale::within('da', function (): void {
+    expect(fn (): mixed => ChatLocale::within('da', function (): void {
         throw new RuntimeException('boom');
     }))->toThrow(RuntimeException::class);
 
