@@ -58,6 +58,7 @@ return [
     'mfa' => [
         'heading' => 'Confirm your identity',
         'description' => 'Enter the six-digit code from your authenticator app.',
+        'recovery_description' => 'Enter one of the recovery codes you saved when you set up two-factor authentication.',
         'code' => 'Authentication code',
         'recovery_code' => 'Recovery code',
         'continue' => 'Continue',

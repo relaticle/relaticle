@@ -7,7 +7,10 @@
         </header>
 
         <main class="flex flex-1 items-center justify-center p-4 sm:p-6">
-            <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div
+                class="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                x-data="{ recovery: {{ old('recovery_code') ? 'true' : 'false' }} }"
+            >
                 <div class="text-center">
                     <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10">
                         <x-filament::icon icon="ri-shield-keyhole-line" class="size-6 text-primary-600 dark:text-primary-400" />
@@ -17,16 +20,16 @@
                         {{ __('auth.mfa.heading') }}
                     </h1>
 
-                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('auth.mfa.description') }}
-                    </p>
+                    <p
+                        class="mt-3 text-sm text-gray-500 dark:text-gray-400"
+                        x-text="recovery ? @js(__('auth.mfa.recovery_description')) : @js(__('auth.mfa.description'))"
+                    >{{ old('recovery_code') ? __('auth.mfa.recovery_description') : __('auth.mfa.description') }}</p>
                 </div>
 
                 <form
                     method="POST"
                     action="{{ route('identity.confirm.mfa.store') }}"
                     class="mt-8 space-y-5"
-                    x-data="{ recovery: {{ old('recovery_code') ? 'true' : 'false' }} }"
                 >
                     @csrf
 
