@@ -116,3 +116,65 @@ test('disabling MFA through the direct Fortify route requires its own proven man
 })->skip(function () {
     return ! Features::canManageTwoFactorAuthentication();
 }, 'Two factor authentication is not enabled.');
+
+test('a generic identity confirmation cannot disclose the two-factor secret', function () {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+
+    $this->getJson(route('two-factor.secret-key'))->assertStatus(423);
+
+    $code = resolve(Google2FA::class)->getCurrentOtp($secret);
+    $this->postJson(route('password.confirm.store'), ['password' => 'password', 'code' => $code])
+        ->assertNoContent();
+
+    $this->getJson(route('two-factor.secret-key'))
+        ->assertUnprocessable()
+        ->assertJson(['message' => __('auth.confirm.required')]);
+})->skip(function () {
+    return ! Features::canManageTwoFactorAuthentication();
+}, 'Two factor authentication is not enabled.');
+
+test('a generic identity confirmation cannot rotate the recovery codes', function () {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $before = $user->recoveryCodes();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+
+    $code = resolve(Google2FA::class)->getCurrentOtp($secret);
+    $this->postJson(route('password.confirm.store'), ['password' => 'password', 'code' => $code])
+        ->assertNoContent();
+
+    $this->postJson(route('two-factor.regenerate-recovery-codes'))
+        ->assertUnprocessable()
+        ->assertJson(['message' => __('auth.confirm.required')]);
+
+    $this->getJson(route('two-factor.recovery-codes'))
+        ->assertUnprocessable();
+
+    expect($user->fresh()->recoveryCodes())->toBe($before);
+})->skip(function () {
+    return ! Features::canManageTwoFactorAuthentication();
+}, 'Two factor authentication is not enabled.');
+
+test('a proven manage_mfa grant still reaches the two-factor secret', function () {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+
+    $code = resolve(Google2FA::class)->getCurrentOtp($secret);
+    $this->postJson(route('password.confirm.store'), ['password' => 'password', 'code' => $code])
+        ->assertNoContent();
+
+    AuthenticationSession::startOperation($user, 'manage_mfa', null);
+    AuthenticationSession::proveOperation($user, 'manage_mfa', null);
+
+    $this->getJson(route('two-factor.secret-key'))
+        ->assertOk()
+        ->assertJson(['secretKey' => $secret]);
+})->skip(function () {
+    return ! Features::canManageTwoFactorAuthentication();
+}, 'Two factor authentication is not enabled.');

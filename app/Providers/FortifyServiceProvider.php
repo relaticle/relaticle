@@ -110,6 +110,14 @@ final class FortifyServiceProvider extends ServiceProvider
                 'passkey.destroy' => 'delete_passkey',
                 'two-factor.enable' => 'manage_mfa',
                 'two-factor.disable' => 'manage_mfa',
+                // Reading the secret or the recovery codes hands over a durable
+                // second factor, and regenerating them locks the owner out, so
+                // each needs the same grant as enabling or disabling.
+                'two-factor.confirm' => 'manage_mfa',
+                'two-factor.qr-code' => 'manage_mfa',
+                'two-factor.secret-key' => 'manage_mfa',
+                'two-factor.recovery-codes' => 'manage_mfa',
+                'two-factor.regenerate-recovery-codes' => 'manage_mfa',
             ];
 
             // Route::name() is fluent, applied after the route is first added to
