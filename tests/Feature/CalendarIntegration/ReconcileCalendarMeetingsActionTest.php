@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
+use Relaticle\EmailIntegration\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\ReconcileCalendarMeetingsFailed;
 
 mutates(ReconcileCalendarMeetingsAction::class);
 

@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
-use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Services\MicrosoftCalendarService;
 

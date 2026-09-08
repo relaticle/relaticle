@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Testing\Fakes\BatchFake;
+use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
@@ -16,7 +19,6 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 
 mutates(IncrementalEmailSyncJob::class);
 
@@ -117,8 +119,18 @@ it('advances the cursor after the store batch completes', function (): void {
     (new IncrementalEmailSyncJob($account))->handle($factory);
 
     Bus::assertBatched(function (PendingBatch $batch): bool {
-        foreach ($batch->thenCallbacks() as $callback) {
-            $callback();
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
+            $closure(new BatchFake(
+                id: 'batch-1',
+                name: 'Incremental sync',
+                totalJobs: $batch->jobs->count(),
+                pendingJobs: 0,
+                failedJobs: 0,
+                failedJobIds: [],
+                options: [],
+                createdAt: now()->toImmutable(),
+            ));
         }
 
         return true;

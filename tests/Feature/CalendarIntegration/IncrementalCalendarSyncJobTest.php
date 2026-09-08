@@ -10,13 +10,13 @@ use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 mutates(IncrementalCalendarSyncJob::class);

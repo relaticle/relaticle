@@ -8,12 +8,12 @@ use App\Policies\MeetingPolicy;
 use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 

@@ -14,12 +14,13 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Exceptions\CalendarPushChannelFailed;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarPushChannelFailed;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Support\CalendarPushWebhookUrl;
 use Throwable;
@@ -137,7 +138,7 @@ final class EnsureCalendarPushChannelJob implements ShouldBeUnique, ShouldQueue
 
         $channel = $service->ensurePushChannel($webhookUrl, $verificationToken);
 
-        if ($channel === null) {
+        if (! $channel instanceof CalendarPushChannelData) {
             throw CalendarPushChannelFailed::unableToCreate();
         }
 

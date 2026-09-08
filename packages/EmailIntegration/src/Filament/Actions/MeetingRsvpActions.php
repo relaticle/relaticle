@@ -13,8 +13,8 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\Meeting;
-use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 final class MeetingRsvpActions

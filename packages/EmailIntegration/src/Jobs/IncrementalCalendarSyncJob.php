@@ -16,11 +16,11 @@ use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
-use Relaticle\EmailIntegration\Services\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Throwable;
 
