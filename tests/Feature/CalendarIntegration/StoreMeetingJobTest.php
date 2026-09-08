@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -22,8 +22,8 @@ it('stores a calendar event via StoreMeetingJob', function (): void {
         iCalUid: null,
         title: 'Kickoff',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -55,8 +55,8 @@ it('stores the mailbox owner as host when the provider omits them from attendees
         iCalUid: null,
         title: 'Call Asmit',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -91,8 +91,8 @@ it('does not duplicate a host who is already in attendees without the organizer 
         iCalUid: null,
         title: 'Listed host',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,

@@ -21,7 +21,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -34,9 +33,9 @@ use Spatie\EloquentSortable\SortableTrait;
 /**
  * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
- * @property Carbon|null $last_email_at
- * @property Carbon|null $last_interaction_at
- * @property Carbon|null $last_meeting_at
+ * @property CarbonImmutable|null $last_email_at
+ * @property CarbonImmutable|null $last_interaction_at
+ * @property CarbonImmutable|null $last_meeting_at
  * @property int $email_count
  * @property int $inbound_email_count
  * @property int $outbound_email_count

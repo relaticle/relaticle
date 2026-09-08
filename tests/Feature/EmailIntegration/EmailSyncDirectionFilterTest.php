@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -28,7 +28,7 @@ function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction):
         inReplyTo: null,
         subject: 'Hello',
         snippet: 'Hello',
-        sentAt: Carbon::now(),
+        sentAt: Date::now(),
         direction: $direction,
         folder: $direction === EmailDirection::OUTBOUND ? EmailFolder::Sent : EmailFolder::Inbox,
         hasAttachments: false,

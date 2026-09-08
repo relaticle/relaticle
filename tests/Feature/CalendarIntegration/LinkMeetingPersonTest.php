@@ -7,7 +7,7 @@ use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -392,7 +392,7 @@ it('increments meeting_count metrics on matched records', function (): void {
 
     $person = People::query()->where('team_id', $team->id)->first();
     expect($person?->meeting_count)->toBe(1);
-    expect(Carbon::parse($person?->last_meeting_at)->timestamp)->toBe($meeting->starts_at->timestamp);
+    expect(Date::parse($person?->last_meeting_at)->timestamp)->toBe($meeting->starts_at->timestamp);
 });
 
 it('does not double-count metrics when a meeting is re-linked on re-sync', function (): void {
@@ -446,8 +446,8 @@ it('never regresses last_meeting_at when an older meeting is linked after a newe
     $recent = Meeting::factory()->create([
         'team_id' => $account->team_id,
         'connected_account_id' => $account->getKey(),
-        'starts_at' => Carbon::now()->addDays(3),
-        'ends_at' => Carbon::now()->addDays(3)->addHour(),
+        'starts_at' => Date::now()->addDays(3),
+        'ends_at' => Date::now()->addDays(3)->addHour(),
     ]);
     MeetingAttendee::factory()->create([
         'meeting_id' => $recent->getKey(),
@@ -460,8 +460,8 @@ it('never regresses last_meeting_at when an older meeting is linked after a newe
     $older = Meeting::factory()->create([
         'team_id' => $account->team_id,
         'connected_account_id' => $account->getKey(),
-        'starts_at' => Carbon::now()->subDays(30),
-        'ends_at' => Carbon::now()->subDays(30)->addHour(),
+        'starts_at' => Date::now()->subDays(30),
+        'ends_at' => Date::now()->subDays(30)->addHour(),
     ]);
     MeetingAttendee::factory()->create([
         'meeting_id' => $older->getKey(),
@@ -473,7 +473,7 @@ it('never regresses last_meeting_at when an older meeting is linked after a newe
 
     $person = People::query()->where('team_id', $team->id)->first();
     expect($person?->meeting_count)->toBe(2);
-    expect(Carbon::parse($person?->last_meeting_at)->timestamp)->toBe($recent->starts_at->timestamp);
+    expect(Date::parse($person?->last_meeting_at)->timestamp)->toBe($recent->starts_at->timestamp);
 });
 
 it('does not auto-create a person for a workspace-blocked attendee', function (): void {

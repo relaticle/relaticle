@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\People;
 use App\Models\Team;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -75,8 +75,8 @@ it('increments meeting metrics on a new manual link', function (): void {
     $person->refresh();
 
     expect($person->meeting_count)->toBe(1)
-        ->and(Carbon::parse($person->last_meeting_at)->timestamp)->toBe($meeting->starts_at->timestamp)
-        ->and(Carbon::parse($person->last_interaction_at)->timestamp)->toBe($meeting->starts_at->timestamp);
+        ->and(Date::parse($person->last_meeting_at)->timestamp)->toBe($meeting->starts_at->timestamp)
+        ->and(Date::parse($person->last_interaction_at)->timestamp)->toBe($meeting->starts_at->timestamp);
 });
 
 it('does not double-count metrics when the same manual link is applied twice', function (): void {

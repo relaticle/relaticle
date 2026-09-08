@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Testing\Fakes\BatchFake;
 use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
@@ -54,8 +54,8 @@ it('batches a StoreMeetingJob per event and does not advance the cursor until th
         iCalUid: null,
         title: 'Test',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -96,8 +96,8 @@ it('serializes the store-batch continuation without the running queue worker', f
         iCalUid: null,
         title: 'Test',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -154,8 +154,8 @@ it('chains the next calendar page after the store batch completes', function ():
         iCalUid: null,
         title: 'Test',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -287,8 +287,8 @@ it('stores the sync token when the batch completion callback runs', function ():
         iCalUid: null,
         title: 'Callback',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -335,8 +335,8 @@ it('does not advance the initial calendar import while page events are still mis
             iCalUid: null,
             title: 'A',
             description: null,
-            startsAt: Carbon::now()->addDay(),
-            endsAt: Carbon::now()->addDay()->addHour(),
+            startsAt: Date::now()->addDay(),
+            endsAt: Date::now()->addDay()->addHour(),
             isAllDay: false,
             location: null,
             htmlLink: null,
@@ -352,8 +352,8 @@ it('does not advance the initial calendar import while page events are still mis
             iCalUid: null,
             title: 'B',
             description: null,
-            startsAt: Carbon::now()->addDays(2),
-            endsAt: Carbon::now()->addDays(2)->addHour(),
+            startsAt: Date::now()->addDays(2),
+            endsAt: Date::now()->addDays(2)->addHour(),
             isAllDay: false,
             location: null,
             htmlLink: null,
