@@ -759,8 +759,13 @@ final class EmailVisibilityService
      */
     private function connectionFor(Company|Opportunity|People $record, User $viewer, Carbon $now): array
     {
-        $emailScores = $record->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+        $emailScoresQuery = $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+
+        $this->preferredCopies->restrictToPreferredCopies($emailScoresQuery->getQuery(), $viewer);
+
+        $emailScores = $emailScoresQuery
             ->reorder()
             ->toBase()
             ->select('emails.user_id')

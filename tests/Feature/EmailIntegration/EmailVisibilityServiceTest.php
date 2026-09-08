@@ -289,3 +289,58 @@ it('counts one preferred copy for every viewer of the same rfc message', functio
     expect($ownerMetrics->emailCount)->toBe(1)
         ->and($coworkerMetrics->emailCount)->toBe(1);
 });
+
+it('scores connection strength on one preferred copy of a duplicated rfc message', function (): void {
+    $this->travelTo('2026-09-08 12:00:00');
+
+    $person = People::factory()->for($this->team)->create();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $coworker = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+    ]));
+
+    $messageId = '<connection-copy@example.com>';
+    $recentSentAt = now()->subDay();
+
+    $preferred = Email::factory()->inbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $account->getKey(),
+        'rfc_message_id' => $messageId,
+        'sent_at' => $recentSentAt,
+        'is_internal' => false,
+    ]);
+    $duplicate = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+        'rfc_message_id' => $messageId,
+        'sent_at' => $recentSentAt,
+        'is_internal' => false,
+    ]);
+    $staleCoworkerOnly = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+        'rfc_message_id' => '<coworker-only@example.com>',
+        'sent_at' => now()->subDays(200),
+        'is_internal' => false,
+    ]);
+
+    $person->emails()->attach([$preferred->getKey(), $duplicate->getKey(), $staleCoworkerOnly->getKey()]);
+
+    $metrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
+
+    expect($metrics->emailCount)->toBe(2)
+        ->and($metrics->connectionStrength)->toBe(ConnectionStrength::Weak)
+        ->and($metrics->strongestConnectionName)->toBe($this->user->name);
+});
