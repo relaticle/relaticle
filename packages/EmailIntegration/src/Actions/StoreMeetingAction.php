@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -20,7 +21,7 @@ final readonly class StoreMeetingAction
     public function execute(NormalizedMeetingPayload $payload, ConnectedAccount $account): ?Meeting
     {
         if ($this->shouldSkip($payload)) {
-            $this->softDeleteExisting($account, $payload->providerEventId);
+            $this->softDeleteCancelledMeetings($account, $payload);
 
             return null;
         }
@@ -32,6 +33,8 @@ final readonly class StoreMeetingAction
                 ->where('connected_account_id', $account->getKey())
                 ->where('provider_event_id', $payload->providerEventId)
                 ->first();
+
+            $responseStatus = $this->resolveSelfResponseStatus($payload, $account, $meeting);
 
             $attributes = [
                 'team_id' => $account->team_id,
@@ -49,7 +52,7 @@ final readonly class StoreMeetingAction
                 'organizer_name' => $payload->organizerName,
                 'status' => $payload->status,
                 'visibility' => $payload->visibility,
-                'response_status' => $payload->selfResponseStatus,
+                'response_status' => $responseStatus,
                 'html_link' => $payload->htmlLink,
                 'deleted_at' => null,
             ];
@@ -68,7 +71,9 @@ final readonly class StoreMeetingAction
                 $meeting->attendees()->create([
                     'email_address' => $attendee->emailAddress,
                     'name' => $attendee->name,
-                    'response_status' => $attendee->responseStatus,
+                    'response_status' => $attendee->isSelf
+                        ? ($attendee->responseStatus ?? $responseStatus)
+                        : $attendee->responseStatus,
                     'is_organizer' => $attendee->isOrganizer,
                     'is_self' => $attendee->isSelf,
                 ]);
@@ -101,24 +106,54 @@ final readonly class StoreMeetingAction
         return $meeting;
     }
 
+    private function resolveSelfResponseStatus(
+        NormalizedMeetingPayload $payload,
+        ConnectedAccount $account,
+        ?Meeting $meeting,
+    ): ?AttendeeResponseStatus {
+        if ($payload->selfResponseStatus instanceof AttendeeResponseStatus) {
+            return $payload->selfResponseStatus;
+        }
+
+        if ($meeting instanceof Meeting && $meeting->response_status instanceof AttendeeResponseStatus) {
+            return $meeting->response_status;
+        }
+
+        $organizerEmail = $payload->organizerEmail;
+
+        if ($organizerEmail !== null && strtolower($organizerEmail) === strtolower($account->email_address)) {
+            return AttendeeResponseStatus::ACCEPTED;
+        }
+
+        return null;
+    }
+
     private function shouldSkip(NormalizedMeetingPayload $payload): bool
     {
         if ($payload->visibility->isPrivate()) {
             return true;
         }
-        if ($payload->status === CalendarEventStatus::CANCELLED) {
-            return true;
-        }
 
-        return $payload->selfResponseStatus === AttendeeResponseStatus::DECLINED;
+        return $payload->status === CalendarEventStatus::CANCELLED;
     }
 
-    private function softDeleteExisting(ConnectedAccount $account, string $providerEventId): void
+    private function softDeleteCancelledMeetings(ConnectedAccount $account, NormalizedMeetingPayload $payload): void
     {
         Meeting::query()
             ->where('connected_account_id', $account->getKey())
-            ->where('provider_event_id', $providerEventId)
+            ->where(function (Builder $query) use ($payload): void {
+                $query->where('provider_event_id', $payload->providerEventId);
+
+                if ($this->isSeriesMasterPayload($payload)) {
+                    $query->orWhere('provider_recurring_event_id', $payload->providerEventId);
+                }
+            })
             ->delete();
+    }
+
+    private function isSeriesMasterPayload(NormalizedMeetingPayload $payload): bool
+    {
+        return $payload->providerRecurringEventId === null || $payload->providerRecurringEventId === '';
     }
 
     private function bumpInitialCalendarImportProgress(ConnectedAccount $connectedAccount): void

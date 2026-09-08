@@ -16,9 +16,9 @@ use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 
 final readonly class GmailService implements MailServiceInterface
 {

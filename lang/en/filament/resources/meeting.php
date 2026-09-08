@@ -29,6 +29,20 @@ return [
         'link_records' => [
             'label' => 'Link records',
         ],
+        'rsvp' => [
+            'label' => 'RSVP',
+            'accepted' => [
+                'label' => 'Accept',
+            ],
+            'tentative' => [
+                'label' => 'Maybe',
+            ],
+            'declined' => [
+                'label' => 'Decline',
+                'heading' => 'Decline this meeting?',
+                'description' => 'Your calendar is updated to declined. The meeting stays on the calendar for other guests.',
+            ],
+        ],
     ],
     'linked_record_types' => [
         'people' => 'Person',
@@ -74,6 +88,28 @@ return [
     'filters' => [
         'response_status' => [
             'label' => 'My RSVP',
+        ],
+    ],
+
+    'notifications' => [
+        'rsvp' => [
+            'accepted' => [
+                'title' => 'Invitation accepted. Your calendar is updated.',
+            ],
+            'tentative' => [
+                'title' => 'Marked as maybe. Your calendar is updated.',
+            ],
+            'declined' => [
+                'title' => 'Invitation declined. Your calendar is updated.',
+            ],
+            'failed' => [
+                'title' => 'Could not update your RSVP.',
+                'body' => 'Reconnect the mailbox and try again.',
+            ],
+            'not_synced' => [
+                'title' => 'Could not update your RSVP.',
+                'body' => 'This meeting has not appeared on your calendar yet. Try again in a moment.',
+            ],
         ],
     ],
 

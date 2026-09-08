@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use Illuminate\Bus\Batch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,12 +14,13 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -45,11 +47,14 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        MailboxSyncTracker::markEmailStarted($account);
+
         $service = $mailFactory->make($account);
 
         try {
             $delta = $service->fetchDelta($account->sync_cursor);
         } catch (MailHistoryExpired) {
+            MailboxSyncTracker::markEmailFinished($account);
             $account->update(['sync_cursor' => null]);
             dispatch(new InitialEmailSyncJob($account));
 
@@ -123,18 +128,35 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             ->name("Incremental sync: {$account->email_address}")
             ->onQueue('emails-sync')
             ->allowFailures()
-            ->then(static function () use ($accountId, $newCursor): void {
+            ->finally(static function (Batch $batch) use ($accountId, $newCursor): void {
                 $account = ConnectedAccount::query()->whereKey($accountId)->first();
-                $account?->update([
+
+                if (! $account instanceof ConnectedAccount) {
+                    return;
+                }
+
+                if ($batch->failedJobs > 0) {
+                    $account->update([
+                        'sync_cursor' => $newCursor,
+                        'last_synced_at' => now(),
+                        'status' => EmailAccountStatus::ERROR,
+                        'last_error' => "{$batch->failedJobs} email(s) could not be stored during sync.",
+                    ]);
+
+                    MailboxSyncTracker::markEmailFinished($account);
+
+                    return;
+                }
+
+                $account->update([
                     'sync_cursor' => $newCursor,
                     'last_synced_at' => now(),
                     'status' => EmailAccountStatus::ACTIVE,
                     'last_error' => null,
                 ]);
+
+                MailboxSyncTracker::markEmailFinished($account);
             })
-            // ponytail: a single failed StoreEmailJob in the batch holds back the cursor
-            // for the WHOLE batch, so its already-stored siblings get re-fetched (deduped,
-            // cheap) next sync. Per-message cursors would avoid that re-fetch; not worth it.
             ->dispatch();
     }
 
@@ -146,10 +168,14 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             'status' => EmailAccountStatus::ACTIVE,
             'last_error' => null,
         ]);
+
+        MailboxSyncTracker::markEmailFinished($account);
     }
 
     public function failed(Throwable $exception): void
     {
+        MailboxSyncTracker::markEmailFinished($this->connectedAccount);
+
         $this->connectedAccount->update([
             'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
             'last_error' => $exception->getMessage(),

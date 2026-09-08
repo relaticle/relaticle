@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 final class InitialSyncPageStoreBatch
 {
@@ -82,7 +83,7 @@ final class InitialSyncPageStoreBatch
                         return;
                     }
 
-                    self::markImportStoreFailed($account, count($missingIds), 'message(s)');
+                    self::markImportStoreFailed($account, count($missingIds), 'message(s)', 'email');
 
                     return;
                 }
@@ -146,7 +147,7 @@ final class InitialSyncPageStoreBatch
                         return;
                     }
 
-                    self::markImportStoreFailed($account, count($missingEvents), 'event(s)');
+                    self::markImportStoreFailed($account, count($missingEvents), 'event(s)', 'calendar');
 
                     return;
                 }
@@ -207,12 +208,24 @@ final class InitialSyncPageStoreBatch
         return max(1, Config::integer('email-integration.sync.initial_store_attempts', 3));
     }
 
-    private static function markImportStoreFailed(ConnectedAccount $account, int $missingCount, string $resourceLabel): void
-    {
+    private static function markImportStoreFailed(
+        ConnectedAccount $account,
+        int $missingCount,
+        string $resourceLabel,
+        string $syncKind,
+    ): void {
         $account->update([
             'status' => EmailAccountStatus::ERROR,
             'last_error' => "Initial import paused: {$missingCount} {$resourceLabel} could not be stored after "
                 .self::maxStoreAttempts().' attempts.',
         ]);
+
+        if ($syncKind === 'calendar') {
+            MailboxSyncTracker::markCalendarFinished($account);
+        }
+
+        if ($syncKind === 'email') {
+            MailboxSyncTracker::markEmailFinished($account);
+        }
     }
 }

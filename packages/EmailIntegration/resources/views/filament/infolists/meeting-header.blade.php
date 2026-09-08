@@ -10,7 +10,7 @@
 
     <h2 class="flex-1 text-xl font-semibold">{{ $state['title'] }}</h2>
 
-    @if ($state['response_status'] !== null)
+    @if ($state['response_status'] !== null && ! $state['can_respond'])
         @include('email-integration::filament.infolists.partials.rsvp-pill', ['status' => $state['response_status']])
     @endif
 </div>

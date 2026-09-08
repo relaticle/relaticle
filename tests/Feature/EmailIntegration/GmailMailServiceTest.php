@@ -13,8 +13,8 @@ use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartBody;
 use Google\Service\Gmail\MessagePartHeader;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Services\GmailService;
 
 mutates(GmailService::class);

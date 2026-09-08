@@ -96,7 +96,7 @@ final class Meeting extends Model
     /** @return HasMany<MeetingAttendee, $this> */
     public function attendees(): HasMany
     {
-        return $this->hasMany(MeetingAttendee::class);
+        return $this->hasMany(MeetingAttendee::class)->with('contact');
     }
 
     /** @return MorphToMany<People, $this> */
