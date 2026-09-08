@@ -419,6 +419,9 @@ final class Login extends \Filament\Auth\Pages\Login
             ->password()
             ->revealable(filament()->arePasswordsRevealable())
             ->autocomplete(fn (): string => $this->authMethod === 'signup' ? 'new-password' : 'current-password')
+            // The document spends its one autofocus on the email field, so the
+            // password field that replaces it has to take focus explicitly.
+            ->extraInputAttributes(['x-init' => '$el.focus()'])
             ->required()
             ->rule(Password::default(), condition: fn (): bool => $this->authMethod === 'signup')
             ->showAllValidationMessages()

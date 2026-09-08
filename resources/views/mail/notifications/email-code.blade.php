@@ -5,7 +5,7 @@
 {{ __("mail.email_code.purposes.{$purpose->value}.body") }}
 
 <x-mail::panel>
-<div style="text-align:center; font-size:32px; font-weight:700; letter-spacing:8px;">{{ $code }}</div>
+<div style="text-align:center; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:32px; font-weight:700; letter-spacing:8px; margin-right:-8px;">{{ $code }}</div>
 </x-mail::panel>
 
 {{ __('mail.email_code.expires', ['count' => $expiresInMinutes]) }}

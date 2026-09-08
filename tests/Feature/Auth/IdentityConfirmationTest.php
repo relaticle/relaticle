@@ -12,7 +12,11 @@ use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Laravel\Fortify\Fortify;
+use Laravel\Passkeys\Passkey;
 use PragmaRX\Google2FA\Google2FA;
+use Symfony\Component\Uid\Uuid;
+use Webauthn\CredentialRecord;
+use Webauthn\TrustPath\EmptyTrustPath;
 
 mutates(
     IdentityConfirmationController::class,
@@ -29,6 +33,33 @@ test('the confirm-identity page renders for a user with a password', function ()
     $this->get(route('password.confirm'))
         ->assertOk()
         ->assertSee(__('auth.confirm.heading'));
+});
+
+test('the confirm-identity page offers the passkey alternative alongside the password form', function () {
+    $user = User::factory()->withTeam()->create();
+    Passkey::create([
+        'user_id' => $user->getKey(),
+        'name' => 'Chrome on macOS',
+        'credential_id' => 'confirm-identity-credential',
+        'credential' => new CredentialRecord(
+            'confirm-identity-credential',
+            'public-key',
+            [],
+            'none',
+            new EmptyTrustPath,
+            Uuid::fromString('00000000-0000-0000-0000-000000000000'),
+            'public-key-bytes',
+            'relaticle.test',
+            0,
+        ),
+    ]);
+    $this->actingAs($user);
+
+    $this->get(route('password.confirm'))
+        ->assertOk()
+        ->assertSee(__('profile.form.password.label'))
+        ->assertSee(__('auth.confirm.use_passkey'))
+        ->assertSee(__('auth.confirm.passkey_retry'));
 });
 
 test('the confirm-identity page offers a linked provider for a passwordless user', function () {

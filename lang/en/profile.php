@@ -87,6 +87,10 @@ return [
             'recovery_regenerate' => 'Generate new codes',
             'recovery_regenerated' => 'New recovery codes generated. The old ones no longer work.',
             'recovery_heading' => 'Your recovery codes',
+            'copy' => 'Copy',
+            'copied' => 'Copied',
+            'copy_key' => 'Copy setup key',
+            'copy_codes' => 'Copy all codes',
         ],
 
         'passkeys' => [
