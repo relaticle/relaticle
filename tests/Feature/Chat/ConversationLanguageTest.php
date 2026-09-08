@@ -3,16 +3,20 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
+use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Support\ChatLocale;
 
-mutates(CrmAssistant::class, ProcessChatMessage::class);
+mutates(CrmAssistant::class, ProcessChatMessage::class, ChatLocale::class, ChatInterface::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create(['locale' => 'da']);
@@ -51,6 +55,16 @@ function languageTurn(User $user, string $conversationId, string $message, bool 
     );
 }
 
+function fakeChatTranslationFromJsonFile(string $locale, string $key, string $value): void
+{
+    $directory = sys_get_temp_dir().'/chat-locale-test-'.Str::random(8);
+
+    mkdir($directory);
+    file_put_contents($directory.'/'.$locale.'.json', json_encode([$key => $value], JSON_THROW_ON_ERROR));
+
+    app('translator')->addJsonPath($directory);
+}
+
 it('names the user\'s language in the prompt of a typed turn', function (): void {
     CrmAssistant::fake(['ok']);
 
@@ -84,4 +98,47 @@ it('defaults the tie-breaker to English for a user without a locale', function (
         (string) $prompt->agent->instructions(),
         'If there is no typed message yet, use English.',
     ));
+});
+
+it('runs the turn in the user\'s locale and restores the worker afterwards', function (): void {
+    $localesDuringTurn = null;
+    CrmAssistant::fake(function () use (&$localesDuringTurn): string {
+        $localesDuringTurn = app()->getLocale().'/'.Date::getLocale();
+
+        return 'ok';
+    });
+
+    languageTurn($this->user, $this->conversationId, 'Vis mine virksomheder')
+        ->handle(resolve(CreditService::class));
+
+    expect($localesDuringTurn)->toBe('da/da')
+        ->and(app()->getLocale())->toBe('en')
+        ->and(Date::getLocale())->toBe('en');
+});
+
+it('restores the worker locale when the turn throws', function (): void {
+    expect(fn () => ChatLocale::within('da', function (): void {
+        throw new RuntimeException('boom');
+    }))->toThrow(RuntimeException::class);
+
+    expect(app()->getLocale())->toBe('en')
+        ->and(Date::getLocale())->toBe('en');
+});
+
+it('renders the chat surface in the user\'s locale and hands the request back in English', function (): void {
+    fakeChatTranslationFromJsonFile('da', 'Ask anything...', 'Skriv her...');
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $this->conversationId])
+        ->assertSee('Skriv her...')
+        ->assertDontSee('Ask anything...');
+
+    expect(app()->getLocale())->toBe('en');
+});
+
+it('renders English chrome for a user whose language has no translations', function (): void {
+    $this->user->forceFill(['locale' => 'ne'])->save();
+    fakeChatTranslationFromJsonFile('da', 'Ask anything...', 'Skriv her...');
+
+    Livewire::test(ChatInterface::class, ['conversationId' => $this->conversationId])
+        ->assertSee('Ask anything...');
 });

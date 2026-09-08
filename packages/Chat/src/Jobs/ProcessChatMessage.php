@@ -44,6 +44,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
+use Relaticle\Chat\Support\ChatLocale;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
@@ -125,6 +126,11 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     public function handle(CreditService $creditService): void
+    {
+        ChatLocale::within($this->user->chatLocale(), fn () => $this->runTurn($creditService));
+    }
+
+    private function runTurn(CreditService $creditService): void
     {
         $startedAt = microtime(true);
 
