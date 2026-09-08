@@ -34,6 +34,8 @@ final readonly class LinkSocialAccountRedirectController
         /** @var AbstractProvider $driver */
         $driver = Socialite::driver($provider->value);
 
+        // Prompt choice duplicated from IdentityConfirmationRedirectController;
+        // see its docblock for why select_account/login differ per provider.
         $driver = $driver
             ->redirectUrl(route('auth.socialite.link.callback', ['provider' => $provider->value]))
             ->with(['prompt' => $provider === SocialiteProvider::GOOGLE ? 'select_account' : 'login']);

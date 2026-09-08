@@ -42,7 +42,7 @@ final readonly class CallbackController
             $account = $this->resolveUser($provider->value, $socialUser, $creator);
 
             if (! $account instanceof UserSocialAccount) {
-                return $this->handleError(__('auth.link.account_exists', ['provider' => ucfirst($provider->value)]));
+                return $this->handleError(__('auth.link.account_exists'));
             }
 
             $user = $account->user;

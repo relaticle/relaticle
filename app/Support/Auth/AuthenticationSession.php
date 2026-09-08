@@ -203,9 +203,9 @@ final readonly class AuthenticationSession
 
     /**
      * Reject a missing, expired, foreign, retargeted, tampered, or unproven grant.
-     * A grant minted before a credential change (password set, passkey added or
-     * removed, MFA enrolled or dropped) fails the fingerprint check and counts as
-     * stale. This is the actual authorization check for a mutation: call it at
+     * A grant minted before a password or MFA change fails the fingerprint check
+     * and counts as stale. Passkey state is not part of the fingerprint.
+     * This is the actual authorization check for a mutation: call it at
      * the point of the write, not only at the point identity was proven.
      */
     public static function requireOperation(User $user, string $operation, ?string $targetId): void
@@ -271,6 +271,8 @@ final readonly class AuthenticationSession
      * that round trip just proved, marking it proven in the same step. Only the
      * exact grant id stashed before that redirect may be rebound, and only once:
      * an already-targeted grant is refused rather than retargeted a second time.
+     * Also re-derives the fingerprint over the mint-time credentials (target
+     * null) so a grant does not outlive a password or MFA change.
      */
     public static function bindOperationTarget(User $user, string $operation, string $grantId, string $targetId): void
     {
@@ -283,6 +285,7 @@ final readonly class AuthenticationSession
             || $pending['operation'] !== $operation
             || $pending['target_id'] !== null
             || $pending['expires_at'] <= now()->getTimestamp()
+            || ! hash_equals($pending['fingerprint'], self::operationFingerprint($user, $operation, null))
         ) {
             throw ValidationException::withMessages([
                 'identity' => [__('auth.confirm.required')],

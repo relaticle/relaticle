@@ -74,10 +74,8 @@ Route::middleware('auth')->group(function (): void {
             ->name('auth.socialite.confirm.callback')
             ->middleware('throttle:10,1,socialite-confirm-callback');
 
-        // Linking intent: establishes a brand-new provider association, unlike
-        // the confirm routes above which re-prove an existing one. Gated by
-        // password.confirm so entry itself proves current account access; the
-        // OAuth round trip that follows proves the provider identity.
+        // Linking intent, unlike confirm above: establishes a brand-new
+        // association. Gated by password.confirm, then a fresh OAuth round trip.
         Route::get('/auth/link/redirect/{provider}', LinkSocialAccountRedirectController::class)
             ->name('auth.socialite.link.redirect')
             ->middleware(['password.confirm', 'throttle:10,1,socialite-link-redirect']);

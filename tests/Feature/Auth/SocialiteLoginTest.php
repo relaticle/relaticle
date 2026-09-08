@@ -14,7 +14,10 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -161,7 +164,7 @@ test('matching provider email cannot sign in to an unlinked account', function (
     expect($user->socialAccounts()->exists())->toBeFalse();
 });
 
-test('a mixed-case provider email match still cannot sign in to an unlinked account', function () {
+test('a mixed-case provider email match still cannot sign in to an unlinked account', function (): void {
     $user = User::factory()->withTeam()->create(['email' => 'case-link-'.uniqid().'@example.com']);
 
     Socialite::fake(
@@ -467,6 +470,26 @@ test('link callback refuses a grant overwritten by another operation before the 
     $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'clobbered-google-id']);
 });
 
+test('link callback rejects a grant minted before the password was rotated', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    $user->forceFill(['password' => Hash::make('a-brand-new-password')])->save();
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('post-rotation-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'post-rotation-google-id']);
+});
+
 test('linking a provider identity already linked to another account does not reassign it', function (): void {
     $owner = User::factory()->withTeam()->create();
     UserSocialAccount::factory()->create([
@@ -494,6 +517,38 @@ test('linking a provider identity already linked to another account does not rea
         'user_id' => $owner->id,
         'provider_id' => 'contested-google-id',
     ]);
+});
+
+test('a link rejected by the unique index after its pre-check passes reports it as already linked', function (): void {
+    $racer = User::factory()->withTeam()->create();
+
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    IdentityConfirmation::markConfirmed();
+
+    $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
+
+    UserSocialAccount::creating(function (UserSocialAccount $account) use ($racer): void {
+        DB::table('user_social_accounts')->insert([
+            'id' => (string) Str::ulid(),
+            'user_id' => $racer->id,
+            'provider_name' => $account->provider_name,
+            'provider_id' => $account->provider_id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    });
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('raced-google-id', 'Existing User', $user->email),
+    );
+
+    $this->get(route('auth.socialite.link.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect(route('password.confirm'));
+
+    expect(UserSocialAccount::where('provider_id', 'raced-google-id')->count())->toBe(0);
+    $this->assertDatabaseMissing('user_social_accounts', ['user_id' => $user->id]);
 });
 
 test('linking a provider the user already has one linked for reports already linked without duplicating the row', function (): void {

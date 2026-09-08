@@ -51,7 +51,7 @@ return [
         'failed' => 'Failed to authenticate with :provider.',
     ],
     'link' => [
-        'account_exists' => 'An account with this email already exists. Sign in, then link your :provider account from your profile.',
+        'account_exists' => 'An account with this email already exists. Sign in with the method you already use to continue.',
         'already_linked' => 'That :provider account is already linked to a different profile.',
         'last_method' => 'Link another way to sign in before removing this one.',
     ],
