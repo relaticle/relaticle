@@ -91,9 +91,7 @@ final class ViewPeople extends ViewRecord
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
             ])->columnSpanFull(),
 
-            CommunicationIntelligenceInfolist::section(
-                'filament/resources/person.pages.view.communication_intelligence',
-            ),
+            CommunicationIntelligenceInfolist::section(),
         ]);
     }
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
@@ -138,15 +141,15 @@ final readonly class SendEmailAction
 
             $this->storeAttachments($email, $attachmentPaths, $data['attachment_file_names'] ?? []);
 
-            if ($linkToType !== null && $linkToId !== null) {
-                DB::table('emailables')->insert([
-                    'email_id' => $email->getKey(),
-                    'emailable_type' => $linkToType,
-                    'emailable_id' => $linkToId,
-                    'link_source' => 'manual',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+            if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
+                $linked = $linkToType::query()->whereKey($linkToId)->first();
+
+                if ($linked instanceof Company || $linked instanceof Opportunity || $linked instanceof People) {
+                    // Attach through the record relation so emailable_type is the
+                    // morph alias (`people`), not the class name. Relation::enforceMorphMap
+                    // means `$person->emails()` would miss a fully-qualified class name.
+                    $linked->emails()->attach($email->getKey(), ['link_source' => 'manual']);
+                }
             }
 
             return $email;

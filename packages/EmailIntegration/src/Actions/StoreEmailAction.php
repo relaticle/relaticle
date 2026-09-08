@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
+use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
 final readonly class StoreEmailAction
@@ -75,7 +76,7 @@ final readonly class StoreEmailAction
                 foreach ($data->attachments as $attachment) {
                     EmailAttachment::query()->create([
                         'email_id' => $email->getKey(),
-                        'filename' => $attachment['filename'],
+                        'filename' => $this->persistableAttachmentFilename($attachment),
                         'mime_type' => $attachment['mime_type'],
                         'size' => $attachment['size'],
                         'content_id' => $attachment['content_id'],
@@ -130,6 +131,34 @@ final readonly class StoreEmailAction
 
             throw $exception;
         }
+    }
+
+    /**
+     * Providers often omit a filename on CID inline images. The column is not
+     * nullable, so invent a stable name from the part's mime type.
+     *
+     * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     */
+    private function persistableAttachmentFilename(array $attachment): string
+    {
+        if (filled($attachment['filename'])) {
+            return (string) $attachment['filename'];
+        }
+
+        $stem = ($attachment['is_inline'] ?? false) ? 'inline' : 'attachment';
+
+        return "{$stem}.{$this->extensionFromMimeType($attachment['mime_type'])}";
+    }
+
+    private function extensionFromMimeType(?string $mimeType): string
+    {
+        if (blank($mimeType)) {
+            return 'bin';
+        }
+
+        $extensions = MimeTypes::getDefault()->getExtensions($mimeType);
+
+        return $extensions[0] ?? 'bin';
     }
 
     /**
