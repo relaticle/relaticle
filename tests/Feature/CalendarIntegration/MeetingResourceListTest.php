@@ -8,7 +8,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
@@ -54,14 +54,14 @@ it('filters upcoming meetings', function (): void {
     $future = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
-        'starts_at' => Carbon::now()->addDays(2),
-        'ends_at' => Carbon::now()->addDays(2)->addHour(),
+        'starts_at' => Date::now()->addDays(2),
+        'ends_at' => Date::now()->addDays(2)->addHour(),
     ]);
     $past = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
-        'starts_at' => Carbon::now()->subDays(2),
-        'ends_at' => Carbon::now()->subDays(2)->addHour(),
+        'starts_at' => Date::now()->subDays(2),
+        'ends_at' => Date::now()->subDays(2)->addHour(),
     ]);
 
     livewire(ListMeetings::class)
@@ -71,7 +71,7 @@ it('filters upcoming meetings', function (): void {
 });
 
 it('shows title, time range, duration, and rsvp in the view modal', function (): void {
-    $starts = Carbon::parse('2026-09-30 05:30:00');
+    $starts = Date::parse('2026-09-30 05:30:00');
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -100,7 +100,7 @@ it('shows title, time range, duration, and rsvp in the view modal', function ():
 });
 
 it('shows all-day meetings without a clock range', function (): void {
-    $starts = Carbon::parse('2026-09-30 00:00:00');
+    $starts = Date::parse('2026-09-30 00:00:00');
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -119,7 +119,7 @@ it('shows all-day meetings without a clock range', function (): void {
 });
 
 it('hides the rsvp pill when response status is null', function (): void {
-    $starts = Carbon::parse('2026-09-30 05:30:00');
+    $starts = Date::parse('2026-09-30 05:30:00');
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -187,7 +187,7 @@ it('lists attendees with host and rsvp in the view modal', function (): void {
 });
 
 it('shows an empty participants line when there are no attendees', function (): void {
-    $starts = Carbon::parse('2026-09-15 11:11:00');
+    $starts = Date::parse('2026-09-15 11:11:00');
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -298,14 +298,14 @@ it('filters past meetings', function (): void {
     $future = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
-        'starts_at' => Carbon::now()->addDays(2),
-        'ends_at' => Carbon::now()->addDays(2)->addHour(),
+        'starts_at' => Date::now()->addDays(2),
+        'ends_at' => Date::now()->addDays(2)->addHour(),
     ]);
     $past = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
-        'starts_at' => Carbon::now()->subDays(2),
-        'ends_at' => Carbon::now()->subDays(2)->addHour(),
+        'starts_at' => Date::now()->subDays(2),
+        'ends_at' => Date::now()->subDays(2)->addHour(),
     ]);
 
     livewire(ListMeetings::class)

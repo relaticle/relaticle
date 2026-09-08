@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\ActivityLog\Activity;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
 use Relaticle\EmailIntegration\Data\NormalizedAttendee;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
@@ -25,8 +25,8 @@ it('creates a meeting with attendees', function (): void {
         title: 'Design review',
         description: 'Q2 planning',
         location: 'Zoom',
-        startsAt: Carbon::now()->addDays(2),
-        endsAt: Carbon::now()->addDays(2)->addHour(),
+        startsAt: Date::now()->addDays(2),
+        endsAt: Date::now()->addDays(2)->addHour(),
         allDay: false,
         organizerEmail: 'host@example.com',
         organizerName: 'Host',
@@ -59,8 +59,8 @@ it('logs a meeting.created activity entry with the accurate attendee_count', fun
         title: 'Q2 Kickoff',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDays(2),
-        endsAt: Carbon::now()->addDays(2)->addHour(),
+        startsAt: Date::now()->addDays(2),
+        endsAt: Date::now()->addDays(2)->addHour(),
         allDay: false,
         organizerEmail: 'host@example.com',
         organizerName: 'Host',
@@ -95,7 +95,7 @@ it('does not log meeting.created when updating an existing meeting', function ()
         providerEventId: 'evt-upd-log',
         providerRecurringEventId: null, icalUid: null,
         title: 'First', description: null, location: null,
-        startsAt: Carbon::now()->addDay(), endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(), endsAt: Date::now()->addDay()->addHour(),
         allDay: false, organizerEmail: null, organizerName: null,
         status: CalendarEventStatus::CONFIRMED, visibility: CalendarVisibility::DEFAULT,
         selfResponseStatus: AttendeeResponseStatus::ACCEPTED, htmlLink: null, attendees: [],
@@ -112,7 +112,7 @@ it('updates an existing meeting idempotently', function (): void {
         providerEventId: 'evt-2',
         providerRecurringEventId: null, icalUid: null,
         title: 'First title', description: null, location: null,
-        startsAt: Carbon::now()->addDay(), endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(), endsAt: Date::now()->addDay()->addHour(),
         allDay: false, organizerEmail: null, organizerName: null,
         status: CalendarEventStatus::CONFIRMED, visibility: CalendarVisibility::DEFAULT,
         selfResponseStatus: AttendeeResponseStatus::ACCEPTED, htmlLink: null, attendees: [],
@@ -144,8 +144,8 @@ it('bumps calendar import progress while the calendar cursor is still empty', fu
         title: 'Kickoff',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: null,
         organizerName: null,
@@ -171,8 +171,8 @@ it('does not bump calendar import progress after the calendar cursor is written'
         title: 'Kickoff',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: null,
         organizerName: null,
@@ -195,8 +195,8 @@ it('does not bump calendar import progress when updating an existing meeting', f
         title: 'First',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: null,
         organizerName: null,

@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Date;
 use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
@@ -41,8 +41,8 @@ function queueRoutingCalendarEvent(): CalendarEventData
         iCalUid: null,
         title: 'Callback test',
         description: null,
-        startsAt: Carbon::now(),
-        endsAt: Carbon::now()->addHour(),
+        startsAt: Date::now(),
+        endsAt: Date::now()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -63,8 +63,8 @@ it('routes inbound email and calendar sync jobs to emails-sync queue', function 
         iCalUid: null,
         title: 'Queue test',
         description: null,
-        startsAt: Carbon::now(),
-        endsAt: Carbon::now()->addHour(),
+        startsAt: Date::now(),
+        endsAt: Date::now()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,

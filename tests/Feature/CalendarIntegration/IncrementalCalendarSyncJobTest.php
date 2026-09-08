@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Testing\Fakes\BatchFake;
 use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
@@ -57,8 +57,8 @@ it('batches a StoreMeetingJob per delta event and does not advance the cursor un
         iCalUid: null,
         title: 'Delta event',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -100,8 +100,8 @@ it('advances the cursor after the store batch completes', function (): void {
         iCalUid: null,
         title: 'Delta event',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,
@@ -232,8 +232,8 @@ it('records a batch failure, holds the cursor, and clears the calendar sync badg
         iCalUid: null,
         title: 'Delta event',
         description: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         isAllDay: false,
         location: null,
         htmlLink: null,

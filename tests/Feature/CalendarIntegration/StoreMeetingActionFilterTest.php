@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -22,8 +22,8 @@ function payload(array $overrides = []): NormalizedMeetingPayload
         title: 'Quarterly Sync',
         description: null,
         location: null,
-        startsAt: $overrides['startsAt'] ?? Carbon::now()->addDay(),
-        endsAt: $overrides['endsAt'] ?? Carbon::now()->addDay()->addHour(),
+        startsAt: $overrides['startsAt'] ?? Date::now()->addDay(),
+        endsAt: $overrides['endsAt'] ?? Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: 'host@example.com',
         organizerName: 'Host',
@@ -160,8 +160,8 @@ it('defaults a host meeting with no self response to accepted', function (): voi
         title: 'Call',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: 'host@example.com',
         organizerName: 'Host',
@@ -187,8 +187,8 @@ it('keeps a host RSVP when the next sync has no self response', function (): voi
         title: 'Call',
         description: null,
         location: null,
-        startsAt: Carbon::now()->addDay(),
-        endsAt: Carbon::now()->addDay()->addHour(),
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
         allDay: false,
         organizerEmail: 'host@example.com',
         organizerName: 'Host',
@@ -227,8 +227,8 @@ it('keeps a host RSVP when the next sync has no self response', function (): voi
 it('stores events older than 90 days', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     (app(StoreMeetingAction::class))->execute(payload([
-        'startsAt' => Carbon::now()->subDays(100),
-        'endsAt' => Carbon::now()->subDays(100)->addHour(),
+        'startsAt' => Date::now()->subDays(100),
+        'endsAt' => Date::now()->subDays(100)->addHour(),
     ]), $account);
 
     expect(Meeting::query()->count())->toBe(1);
