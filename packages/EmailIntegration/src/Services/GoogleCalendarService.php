@@ -129,7 +129,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
                 'maxResults' => 250,
             ];
 
-            if ($pageToken !== null && $pageToken !== '') {
+            if ($pageToken !== null) {
                 $params['pageToken'] = $pageToken;
             }
 
@@ -144,7 +144,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             }
 
             $pageToken = $response->getNextPageToken();
-        } while ($pageToken !== null && $pageToken !== '');
+        } while ($pageToken !== null);
 
         return $ids;
     }
@@ -182,6 +182,29 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         } catch (Throwable $e) {
             throw Exceptions\MeetingResponseFailed::fromProvider($e);
         }
+    }
+
+    public function findEventIdByICalUid(string $iCalUid): ?string
+    {
+        try {
+            $page = $this->client->events->listEvents('primary', [
+                'iCalUID' => $iCalUid,
+                'maxResults' => 1,
+                'showDeleted' => false,
+            ]);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $items = $page->getItems();
+
+        if (! is_array($items) || $items === []) {
+            return null;
+        }
+
+        $id = $items[0]->getId();
+
+        return is_string($id) && $id !== '' ? $id : null;
     }
 
     public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?Data\CalendarPushChannelData

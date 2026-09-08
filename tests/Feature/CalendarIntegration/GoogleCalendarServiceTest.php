@@ -223,6 +223,56 @@ it('adds the host when Google omits the attendees list', function (): void {
         ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
 });
 
+it('resolves this mailbox event id from a shared iCalendar UID', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'email_address' => 'me@example.com',
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $match = new Event;
+    $match->setId('evt-teammate-mailbox');
+
+    $page = new EventsResource;
+    $page->setItems([$match]);
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->with('primary', [
+            'iCalUID' => 'ical-shared',
+            'maxResults' => 1,
+            'showDeleted' => false,
+        ])
+        ->andReturn($page);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $eventId = (new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('ical-shared');
+
+    expect($eventId)->toBe('evt-teammate-mailbox');
+});
+
+it('returns null when Google has no event for the iCalendar UID', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $page = new EventsResource;
+    $page->setItems([]);
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')->once()->andReturn($page);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    expect((new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('missing'))
+        ->toBeNull();
+});
+
 it('requests deleted events during incremental sync and maps cancellations to tombstones', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'refresh_token' => 'refresh',

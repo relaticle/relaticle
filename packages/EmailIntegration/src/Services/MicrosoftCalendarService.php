@@ -66,6 +66,26 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         }
     }
 
+    public function findEventIdByICalUid(string $iCalUid): ?string
+    {
+        $escaped = str_replace("'", "''", $iCalUid);
+
+        try {
+            $id = $this->clientFactory->make($this->account)
+                ->get('/me/events', [
+                    '$filter' => "iCalUId eq '{$escaped}'",
+                    '$select' => 'id',
+                    '$top' => 1,
+                ])
+                ->throw()
+                ->json('value.0.id');
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
     public function listActiveProviderEventIds(): array
     {
         $ids = [];

@@ -12,6 +12,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 final readonly class RespondToMeetingAction
@@ -30,11 +31,19 @@ final readonly class RespondToMeetingAction
         $account = $this->respondentResolver->resolveAccount($user, $meeting);
         abort_unless($account instanceof ConnectedAccount, 403);
 
+        $calendar = $this->calendarFactory->make($account);
         $providerEventId = $this->respondentResolver->resolveProviderEventId($account, $meeting);
+        $iCalUid = $meeting->ical_uid;
 
-        $this->calendarFactory
-            ->make($account)
-            ->respondToEvent($providerEventId, $status);
+        if ($providerEventId === null && is_string($iCalUid) && $iCalUid !== '') {
+            $providerEventId = $calendar->findEventIdByICalUid($iCalUid);
+        }
+
+        if ($providerEventId === null || $providerEventId === '') {
+            throw MeetingResponseFailed::missingMailboxCopy();
+        }
+
+        $calendar->respondToEvent($providerEventId, $status);
 
         if ($this->respondentResolver->ownsMeetingMailbox($account, $meeting)) {
             $this->updateMailboxOwnerResponse($meeting, $account, $status);

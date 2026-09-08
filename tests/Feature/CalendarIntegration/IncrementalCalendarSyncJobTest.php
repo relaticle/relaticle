@@ -218,7 +218,7 @@ it('clears the calendar sync badge when delegating to initial sync without start
     expect(MailboxSyncTracker::isCalendarSyncing($account))->toBeFalse();
 });
 
-it('records a batch failure, advances the cursor, and clears the calendar sync badge', function (): void {
+it('records a batch failure, holds the cursor, and clears the calendar sync badge', function (): void {
     Bus::fake();
 
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -271,7 +271,7 @@ it('records a batch failure, advances the cursor, and clears the calendar sync b
         return true;
     });
 
-    expect($account->fresh()?->calendar_sync_cursor)->toBe('new-token')
+    expect($account->fresh()?->calendar_sync_cursor)->toBe('valid-token')
         ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
         ->and($account->fresh()?->last_error)->toContain('1 calendar event(s)')
         ->and(MailboxSyncTracker::isCalendarSyncing($account))->toBeFalse();

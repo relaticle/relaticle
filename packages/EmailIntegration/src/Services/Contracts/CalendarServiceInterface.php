@@ -26,6 +26,11 @@ interface CalendarServiceInterface
      */
     public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void;
 
+    /**
+     * This mailbox's provider event id for a shared iCalendar UID, if the event exists.
+     */
+    public function findEventIdByICalUid(string $iCalUid): ?string;
+
     public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?CalendarPushChannelData;
 
     public function stopPushChannel(string $channelId, ?string $resourceId): void;

@@ -100,7 +100,7 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
                 }
 
                 if ($batch->failedJobs > 0) {
-                    self::recordBatchFailure($account, $nextSyncToken, $batch->failedJobs);
+                    self::recordBatchFailure($account, $batch->failedJobs);
 
                     return;
                 }
@@ -140,22 +140,13 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         dispatch(new EnsureCalendarPushChannelJob($account));
     }
 
-    private static function recordBatchFailure(
-        ConnectedAccount $account,
-        ?string $nextSyncToken,
-        int $failedJobs,
-    ): void {
-        $update = [
+    private static function recordBatchFailure(ConnectedAccount $account, int $failedJobs): void
+    {
+        $account->update([
             'last_calendar_synced_at' => now(),
             'status' => EmailAccountStatus::ERROR,
             'last_error' => "{$failedJobs} calendar event(s) could not be stored during sync.",
-        ];
-
-        if ($nextSyncToken !== null) {
-            $update['calendar_sync_cursor'] = $nextSyncToken;
-        }
-
-        $account->update($update);
+        ]);
 
         MailboxSyncTracker::markCalendarFinished($account);
     }

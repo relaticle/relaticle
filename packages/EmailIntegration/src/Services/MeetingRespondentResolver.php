@@ -40,17 +40,11 @@ final readonly class MeetingRespondentResolver
             return null;
         }
 
-        $matchingAccount = $accounts->first(
+        return $accounts->first(
             fn (ConnectedAccount $account): bool => $account->isActive()
                 && $account->hasCalendar()
                 && in_array(strtolower($account->email_address), $listedAttendeeEmails, true),
         );
-
-        if ($matchingAccount instanceof ConnectedAccount) {
-            return $matchingAccount;
-        }
-
-        return null;
     }
 
     /**
@@ -167,24 +161,26 @@ final readonly class MeetingRespondentResolver
         return AttendeeResponseStatus::NEEDS_ACTION;
     }
 
-    public function resolveProviderEventId(ConnectedAccount $account, Meeting $meeting): string
+    public function resolveProviderEventId(ConnectedAccount $account, Meeting $meeting): ?string
     {
         if ($this->ownsMeetingMailbox($account, $meeting)) {
             return $meeting->provider_event_id;
         }
 
-        if (filled($meeting->ical_uid)) {
-            $ownCopyEventId = Meeting::query()
-                ->where('connected_account_id', $account->getKey())
-                ->where('ical_uid', $meeting->ical_uid)
-                ->value('provider_event_id');
-
-            if (is_string($ownCopyEventId) && $ownCopyEventId !== '') {
-                return $ownCopyEventId;
-            }
+        if (blank($meeting->ical_uid)) {
+            return null;
         }
 
-        return $meeting->provider_event_id;
+        $ownCopyEventId = Meeting::query()
+            ->where('connected_account_id', $account->getKey())
+            ->where('ical_uid', $meeting->ical_uid)
+            ->value('provider_event_id');
+
+        if (is_string($ownCopyEventId) && $ownCopyEventId !== '') {
+            return $ownCopyEventId;
+        }
+
+        return null;
     }
 
     public function ownsMeetingMailbox(ConnectedAccount $account, Meeting $meeting): bool

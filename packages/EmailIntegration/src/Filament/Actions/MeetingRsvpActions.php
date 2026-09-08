@@ -100,12 +100,14 @@ final class MeetingRsvpActions
                 try {
                     resolve(RespondToMeetingAction::class)->execute($user, $record, $status);
                 } catch (MeetingResponseFailed $e) {
-                    report($e);
+                    report_unless($e->missingMailboxCopy, $e);
+
+                    $notificationKey = $e->missingMailboxCopy ? 'not_synced' : 'failed';
 
                     Notification::make()
                         ->danger()
-                        ->title(__('filament/resources/meeting.notifications.rsvp.failed.title'))
-                        ->body(__('filament/resources/meeting.notifications.rsvp.failed.body'))
+                        ->title(__('filament/resources/meeting.notifications.rsvp.'.$notificationKey.'.title'))
+                        ->body(__('filament/resources/meeting.notifications.rsvp.'.$notificationKey.'.body'))
                         ->send();
 
                     return;
