@@ -139,6 +139,45 @@ it('advances the cursor after the store batch completes', function (): void {
     expect($account->refresh()->sync_cursor)->toBe('new-cursor');
 });
 
+it('does not advance the cursor when the store batch fails', function (): void {
+    Bus::fake();
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
+        messageIds: collect(['M1']),
+        readMessageIds: collect([]),
+        newCursor: 'new-cursor',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    $this->app->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
+            $closure(new BatchFake(
+                id: 'batch-1',
+                name: 'Incremental sync',
+                totalJobs: $batch->jobs->count(),
+                pendingJobs: 0,
+                failedJobs: 1,
+                failedJobIds: ['job-1'],
+                options: [],
+                createdAt: now()->toImmutable(),
+            ));
+        }
+
+        return true;
+    });
+
+    expect($account->refresh()->sync_cursor)->toBe('old-cursor');
+});
+
 it('advances the cursor inline when the delta has no new messages', function (): void {
     Bus::fake();
 

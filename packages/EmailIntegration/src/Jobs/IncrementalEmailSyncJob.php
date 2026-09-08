@@ -137,7 +137,6 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
                 if ($batch->failedJobs > 0) {
                     $account->update([
-                        'sync_cursor' => $newCursor,
                         'last_synced_at' => now(),
                         'status' => EmailAccountStatus::ERROR,
                         'last_error' => "{$batch->failedJobs} email(s) could not be stored during sync.",
