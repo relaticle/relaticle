@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 /**
  * Hides calendar events that workspace or mailbox visibility rules exclude.
@@ -33,10 +34,13 @@ final readonly class VisibleMeetingScope implements Scope
     {
         $viewerId = $this->viewer->getKey();
         $teamId = $this->viewer->current_team_id;
+        $identityEmails = $teamId !== null
+            ? resolve(MeetingRespondentResolver::class)->identityEmailsForUser($this->viewer, $teamId)
+            : [];
 
         $builder
             ->where($model->qualifyColumn('team_id'), $teamId)
-            ->where(function (Builder $visibilityQuery) use ($viewerId, $teamId): void {
+            ->where(function (Builder $visibilityQuery) use ($viewerId, $teamId, $identityEmails): void {
                 $this->excludeMeetingsMatchingMailboxBlocklist($visibilityQuery);
                 $this->excludeMeetingsWithBlockedOrganizerMatchingMailboxBlocklist($visibilityQuery);
 
@@ -45,15 +49,26 @@ final readonly class VisibleMeetingScope implements Scope
                     $this->excludeMeetingsWithBlockedOrganizer($visibilityQuery, $teamId);
                 }
 
-                $visibilityQuery->where(function (Builder $ownerOrShared) use ($viewerId, $teamId): void {
+                $visibilityQuery->where(function (Builder $ownerOrShared) use ($viewerId, $teamId, $identityEmails): void {
                     $ownerOrShared
                         ->whereHas(
                             'connectedAccount',
                             fn (Builder $accountQuery): Builder => $accountQuery->where('user_id', $viewerId),
-                        )
-                        ->orWhere(function (Builder $teammateQuery) use ($teamId): void {
-                            $this->excludeTeammateHiddenMeetings($teammateQuery, $teamId);
-                        });
+                        );
+
+                    if ($identityEmails !== []) {
+                        $ownerOrShared->orWhereHas(
+                            'attendees',
+                            fn (Builder $attendeeQuery): Builder => $attendeeQuery->whereIn(
+                                DB::raw('lower(meeting_attendees.email_address)'),
+                                $identityEmails,
+                            ),
+                        );
+                    }
+
+                    $ownerOrShared->orWhere(function (Builder $teammateQuery) use ($teamId): void {
+                        $this->excludeTeammateHiddenMeetings($teammateQuery, $teamId);
+                    });
                 });
             });
     }

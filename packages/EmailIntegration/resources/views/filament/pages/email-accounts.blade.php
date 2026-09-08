@@ -39,7 +39,7 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-3">
-                        @if ($account->isImportingHistory())
+                        @if ($account->showsSyncProgress())
                             <x-email-integration::importing-badge :account="$account" :icon="$this->syncingIcon()" />
                         @else
                             <x-filament::badge

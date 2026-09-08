@@ -53,8 +53,8 @@ return [
     ],
     'notifications' => [
         'calendar_sync_queued' => [
-            'title' => 'Calendar sync queued.',
-            'body' => 'New events should appear within a minute.',
+            'title' => 'Calendar sync started.',
+            'body' => 'Your meetings will update on this page as the sync finishes.',
         ],
         'disconnected' => [
             'title' => 'Account disconnected.',
@@ -80,6 +80,9 @@ return [
     'in_sync' => 'In Sync',
     'send_missing_tooltip' => 'Send access was not granted. Grant it to send mail from Relaticle.',
     'importing' => 'Syncing',
+    'importing_calendar' => 'Syncing calendar',
+    'importing_email' => 'Syncing email',
+    'importing_email_and_calendar' => 'Syncing email and calendar',
     'importing_percent' => ':percent%',
     'sync_status' => [
         'title_syncing' => 'Syncing',

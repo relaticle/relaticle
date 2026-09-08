@@ -177,6 +177,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->withoutOverlapping()
                 ->onOneServer();
 
+            $schedule->command('calendar:renew-push-channels')
+                ->daily()
+                ->name('calendar:renew-push-channels')
+                ->withoutOverlapping()
+                ->onOneServer();
+
             $schedule->command('email:dispatch-outbox')
                 ->everyMinute()
                 ->name('email:dispatch-outbox')

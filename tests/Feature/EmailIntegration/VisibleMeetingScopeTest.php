@@ -56,6 +56,26 @@ function visibleMeetingsTo(User $viewer): Collection
         ->get();
 }
 
+it('shows a coworker meeting to a workspace member listed on the guest list even when all attendees are protected', function (): void {
+    $coworkerEmail = strtolower((string) $this->coworker->email);
+
+    $internal = ($this->makeCoworkerMeeting)([$coworkerEmail, 'mail2asmitnepali99@gmail.com']);
+
+    expect(visibleMeetingsTo($this->coworker)->modelKeys())->toContain($internal->id);
+});
+
+it('shows a coworker meeting when only the connected mailbox identity is on the guest list', function (): void {
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->coworker->id,
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+    ]));
+
+    $internal = ($this->makeCoworkerMeeting)(['mail2asmitnepali99@gmail.com']);
+
+    expect(visibleMeetingsTo($this->coworker)->modelKeys())->toContain($internal->id);
+});
+
 it('hides a coworker meeting when all attendees are protected', function (): void {
     TeamEmailBlocklist::factory()->protected()->email('vip@contact.com')->create([
         'team_id' => $this->team->id,

@@ -7,8 +7,10 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Services\MicrosoftCalendarService;
 
@@ -89,6 +91,7 @@ it('maps Graph attendee response codes to the canonical vocabulary', function ()
                     'attendees' => [
                         ['emailAddress' => ['address' => 'tent@example.com'], 'status' => ['response' => 'tentativelyAccepted']],
                         ['emailAddress' => ['address' => 'none@example.com'], 'status' => ['response' => 'notResponded']],
+                        ['emailAddress' => ['address' => 'org@example.com'], 'status' => ['response' => 'organizer']],
                     ],
                 ],
             ],
@@ -100,8 +103,10 @@ it('maps Graph attendee response codes to the canonical vocabulary', function ()
         ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
 
     // tentativelyAccepted -> tentative, notResponded -> needsAction (Google's vocab).
+    // organizer is not an RSVP. Leave it empty so a host status chosen in Relaticle is kept.
     expect($result->events[0]->attendees[0]['response_status'])->toBe('tentative')
-        ->and($result->events[0]->attendees[1]['response_status'])->toBe('needsAction');
+        ->and($result->events[0]->attendees[1]['response_status'])->toBe('needsAction')
+        ->and($result->events[0]->attendees[2]['response_status'])->toBeNull();
 });
 
 it('maps Graph "personal" sensitivity to private so the event is treated as private', function (): void {
@@ -190,4 +195,142 @@ it('throws CalendarSyncTokenExpired on Graph 410', function (): void {
     expect(fn (): CalendarSyncResult => new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=EXPIRED'))
         ->toThrow(CalendarSyncTokenExpired::class);
+});
+
+it('posts accept to Graph so the organizer is notified', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/accept' => Http::response(null, 202),
+    ]);
+
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::ACCEPTED);
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+        && str_ends_with($request->url(), '/me/events/evt-1/accept')
+        && $request['sendResponse'] === true);
+});
+
+it('posts tentativelyAccept for maybe', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/tentativelyAccept' => Http::response(null, 202),
+    ]);
+
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
+});
+
+it('does not fail when Graph rejects the host responding to their own meeting', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/tentativelyAccept' => Http::response([
+            'error' => [
+                'code' => 'ErrorInvalidRequest',
+                'message' => 'Your request can\'t be completed. You can\'t respond to this meeting because you\'re the organizer.',
+            ],
+        ], 400),
+    ]);
+
+    (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
+});
+
+it('still fails when Graph returns a server error that mentions organizer', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/decline' => Http::response([
+            'error' => [
+                'code' => 'UnknownError',
+                'message' => 'The organizer service is unavailable.',
+            ],
+        ], 500),
+    ]);
+
+    expect(fn () => (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::DECLINED))
+        ->toThrow(MeetingResponseFailed::class);
+});
+
+it('resolves this mailbox event id from a shared iCalendar UID', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events*' => Http::response([
+            'value' => [
+                ['id' => 'evt-teammate-mailbox'],
+            ],
+        ]),
+    ]);
+
+    $eventId = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->findEventIdByICalUid("uid-with'-quote");
+
+    expect($eventId)->toBe('evt-teammate-mailbox');
+
+    Http::assertSent(function (Request $request): bool {
+        $url = urldecode($request->url());
+
+        return $request->method() === 'GET'
+            && str_contains($url, '/me/events')
+            && str_contains($url, "iCalUId eq 'uid-with''-quote'")
+            && str_contains($url, '$select=id')
+            && str_contains($url, '$top=1');
+    });
+});
+
+it('returns null when Graph has no event for the iCalendar UID', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events*' => Http::response([
+            'value' => [],
+        ]),
+    ]);
+
+    expect((new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->findEventIdByICalUid('missing'))
+        ->toBeNull();
+});
+
+it('paginates listActiveProviderEventIds across nextLink pages and time windows', function (): void {
+    $this->travelTo('2020-01-01 00:00:00');
+
+    Http::fake(function (Request $request) {
+        $url = urldecode($request->url());
+
+        if (str_contains($url, 'startDateTime=1990-01-01') && ! str_contains($url, '$skiptoken=')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-1', 'isCancelled' => false],
+                ],
+                '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=PAGE2',
+            ]);
+        }
+
+        if (str_contains($url, '$skiptoken=PAGE2')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-1-page-2', 'isCancelled' => false],
+                ],
+            ]);
+        }
+
+        if (str_contains($url, 'startDateTime=1995-01-01')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-2', 'isCancelled' => false],
+                ],
+            ]);
+        }
+
+        return Http::response(['value' => []]);
+    });
+
+    $ids = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->listActiveProviderEventIds();
+
+    expect($ids)->toContain('evt-window-1', 'evt-window-1-page-2', 'evt-window-2');
 });

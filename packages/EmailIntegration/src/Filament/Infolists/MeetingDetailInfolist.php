@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -21,6 +22,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
+use Relaticle\EmailIntegration\Filament\Actions\MeetingRsvpActions;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
@@ -36,6 +38,7 @@ final class MeetingDetailInfolist
             ->schema(fn (Schema $schema): Schema => self::configure($schema))
             ->registerModalActions([
                 self::linkRecordsAction('linkRecordsEmpty'),
+                ...MeetingRsvpActions::make(),
             ]);
     }
 
@@ -45,11 +48,22 @@ final class MeetingDetailInfolist
             $record = $schema->getRecord();
 
             if ($record instanceof Meeting) {
-                $record->loadMissing(['attendees.contact', 'people', 'companies', 'opportunities']);
+                $record->loadMissing(['attendees.contact', 'people', 'companies', 'opportunities', 'connectedAccount']);
+            }
+
+            $rsvpGroup = MeetingRsvpActions::group();
+
+            if ($record instanceof Meeting) {
+                $rsvpGroup->record($record);
             }
 
             return [
-                MeetingHeaderEntry::make('header')->hiddenLabel(),
+                Flex::make([
+                    MeetingHeaderEntry::make('header')
+                        ->hiddenLabel()
+                        ->grow(),
+                    $rsvpGroup,
+                ])->verticallyAlignCenter(),
                 TextEntry::make('time_row')
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedClock)
