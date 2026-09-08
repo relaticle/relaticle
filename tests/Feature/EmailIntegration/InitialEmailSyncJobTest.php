@@ -6,8 +6,12 @@ use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Testing\Fakes\BatchFake;
+use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -18,17 +22,17 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
 mutates(InitialEmailSyncJob::class);
 
-function invokeInitialEmailSyncBatchFinallyCallbacks(): void
+function invokeInitialEmailSyncBatchFinallyCallbacks(int $failedJobs = 0): void
 {
-    Bus::assertBatched(function (PendingBatch $batch): bool {
+    Bus::assertBatched(function (PendingBatch $batch) use ($failedJobs): bool {
         foreach ($batch->finallyCallbacks() as $callback) {
             $callback(new BatchFake(
                 id: 'batch-1',
                 name: 'Initial sync',
                 totalJobs: $batch->jobs->count(),
                 pendingJobs: 0,
-                failedJobs: 0,
-                failedJobIds: [],
+                failedJobs: $failedJobs,
+                failedJobIds: array_fill(0, $failedJobs, 'failed-job'),
                 options: [],
                 createdAt: now()->toImmutable(),
             ));
@@ -281,6 +285,54 @@ it('sets the cursor after the last page store batch finishes', function (): void
     );
 });
 
+it('advances after a disabled direction skips every message in a page', function (): void {
+    Bus::fake();
+    Notification::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_inbox' => false,
+    ]));
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']),
+        nextPageToken: 'page-2',
+        cursor: 'history-1',
+    ));
+    $service->shouldReceive('fetchMessage')->once()->with('M1')->andReturn(new FetchedEmailData(
+        providerMessageId: 'M1',
+        threadId: 'thread-1',
+        rfcMessageId: '<m1@example.com>',
+        inReplyTo: null,
+        subject: 'Skipped inbox email',
+        snippet: 'Skipped inbox email',
+        bodyText: 'Skipped inbox email',
+        bodyHtml: '<p>Skipped inbox email</p>',
+        direction: EmailDirection::INBOUND,
+        folder: EmailFolder::Inbox,
+        sentAt: now(),
+        isRead: true,
+        hasAttachments: false,
+        participants: [],
+        attachments: [],
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    (new InitialEmailSyncJob($account))->handle($factory);
+
+    (new StoreEmailJob($account, 'M1'))->handle($factory, resolve(StoreEmailAction::class));
+
+    invokeInitialEmailSyncBatchFinallyCallbacks();
+
+    Bus::assertDispatched(
+        InitialEmailSyncJob::class,
+        fn (InitialEmailSyncJob $job): bool => $job->pageToken === 'page-2',
+    );
+    expect(Email::query()->where('provider_message_id', 'M1')->exists())->toBeFalse();
+});
+
 it('does not advance the initial import while page messages are still missing', function (): void {
     Bus::fake();
     Notification::fake();
@@ -300,7 +352,7 @@ it('does not advance the initial import while page messages are still missing', 
 
     (new InitialEmailSyncJob($account))->handle($factory);
 
-    invokeInitialEmailSyncBatchFinallyCallbacks();
+    invokeInitialEmailSyncBatchFinallyCallbacks(1);
 
     Bus::assertDispatchedTimes(InitialEmailSyncJob::class, 0);
     expect($account->fresh()?->sync_cursor)->toBeNull()
@@ -335,7 +387,7 @@ it('re-dispatches store jobs for missing messages before advancing the page', fu
         'provider_message_id' => 'M1',
     ]);
 
-    invokeInitialEmailSyncBatchFinallyCallbacks();
+    invokeInitialEmailSyncBatchFinallyCallbacks(1);
 
     Bus::assertBatchCount(2);
     Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 1
