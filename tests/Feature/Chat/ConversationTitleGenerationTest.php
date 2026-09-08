@@ -21,7 +21,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Tests\Helpers\ChatDocument;
 
-mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
+mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class, ConversationTitler::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -362,6 +362,7 @@ it('never pays for a title it could no longer apply', function (): void {
 it('titles from the assistant reply when the opening message named nothing', function (): void {
     Queue::fake();
     CrmAssistant::fake(['Globex has three open opportunities worth $45,000.']);
+    $this->user->forceFill(['locale' => 'da'])->save();
 
     $conversationId = seedTitlingConversation('hey');
 
@@ -377,7 +378,8 @@ it('titles from the assistant reply when the opening message named nothing', fun
         GenerateConversationTitle::class,
         fn (GenerateConversationTitle $job): bool => $job->conversationId === $conversationId
             && $job->provisionalTitle === 'hey'
-            && $job->reply === 'Globex has three open opportunities worth $45,000.',
+            && $job->reply === 'Globex has three open opportunities worth $45,000.'
+            && $job->languageName === 'Danish',
     );
 });
 

@@ -22,7 +22,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 
-mutates(SuggestNextSteps::class, NextSteps::class);
+mutates(SuggestNextSteps::class, NextSteps::class, NextStepSuggester::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -311,6 +311,7 @@ it('never calls the model when suggestions are switched off', function (): void 
 it('dispatches the suggester at the end of a turn with what the turn produced', function (): void {
     Queue::fake();
     CrmAssistant::fake(['Acme Corp has two open deals worth $30,000.']);
+    $this->user->forceFill(['locale' => 'da'])->save();
 
     (new ProcessChatMessage(
         user: $this->user,
@@ -324,7 +325,8 @@ it('dispatches the suggester at the end of a turn with what the turn produced', 
         SuggestNextSteps::class,
         fn (SuggestNextSteps $job): bool => $job->conversationId === $this->conversationId
             && $job->message === 'how is acme doing'
-            && $job->reply === 'Acme Corp has two open deals worth $30,000.',
+            && $job->reply === 'Acme Corp has two open deals worth $30,000.'
+            && $job->languageName === 'Danish',
     );
 });
 
