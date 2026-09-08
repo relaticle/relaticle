@@ -6,7 +6,6 @@ use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Livewire\App\Profile\UpdateProfileInformation as UpdateProfileInformationComponent;
 use App\Models\User;
 use App\Notifications\Auth\NoticeOfEmailChangeRequest;
-use App\Notifications\Auth\VerifyEmail;
 use App\Notifications\Auth\VerifyEmailChange;
 use App\Support\SameOriginUrl;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -17,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(UpdateUserProfileInformation::class, UpdateProfileInformationComponent::class);
 
@@ -191,26 +191,41 @@ describe('photo upload', function () {
             ->and(Storage::disk('public')->exists($user->profile_photo_path))->toBeTrue();
     })->with(['jpg', 'jpeg', 'png']);
 
-    test('handles photo with email change', function () {
+    test('refuses a photo update that also swaps the email', function () {
         Notification::fake();
         $photo = UploadedFile::fake()->image('avatar.png', 400, 400);
 
-        // Store the file first (simulating what Filament does)
+        $photoPath = $photo->storePublicly('profile-photos', ['disk' => 'public']);
+
+        expect(fn () => $this->action->update($this->user, [
+            'name' => 'Photo User',
+            'email' => 'photouser@example.com',
+            'profile_photo_path' => $photoPath,
+        ]))->toThrow(HttpException::class);
+
+        expect($this->user->fresh())
+            ->email->toBe('john@example.com')
+            ->email_verified_at->not->toBeNull();
+
+        Notification::assertNothingSent();
+    });
+
+    test('handles a photo update that keeps the email', function () {
+        Notification::fake();
+        $photo = UploadedFile::fake()->image('avatar.png', 400, 400);
+
         $photoPath = $photo->storePublicly('profile-photos', ['disk' => 'public']);
 
         $this->action->update($this->user, [
             'name' => 'Photo User',
-            'email' => 'photouser@example.com',
+            'email' => $this->user->email,
             'profile_photo_path' => $photoPath,
         ]);
 
         expect($this->user->fresh())
             ->name->toBe('Photo User')
-            ->email->toBe('photouser@example.com')
-            ->email_verified_at->toBeNull()
+            ->email->toBe('john@example.com')
             ->profile_photo_path->toBe($photoPath);
-
-        Notification::assertSentTo($this->user, VerifyEmail::class);
     });
 
     test('null profile_photo_path does not delete existing photo', function () {
@@ -543,5 +558,43 @@ describe('timezone', function () {
         expect($user->fresh())
             ->name->toBe('Renamed Without Timezone Key')
             ->timezone->toBe('Asia/Tokyo');
+    });
+});
+
+describe('the raw profile-information route', function () {
+    test('a direct request cannot change the account email without an identity proof', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'owner@example.com',
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('user-profile-information.update'), [
+                'name' => $user->name,
+                'email' => 'attacker@example.com',
+            ])
+            ->assertStatus(423);
+
+        expect($user->fresh())
+            ->email->toBe('owner@example.com')
+            ->email_verified_at->not->toBeNull();
+    });
+
+    test('a direct request may still update non-credential fields', function () {
+        $user = User::factory()->withTeam()->create([
+            'name' => 'Original Name',
+            'email' => 'owner@example.com',
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('user-profile-information.update'), [
+                'name' => 'Renamed Over Http',
+                'email' => 'owner@example.com',
+            ])
+            ->assertSuccessful();
+
+        expect($user->fresh())
+            ->name->toBe('Renamed Over Http')
+            ->email->toBe('owner@example.com');
     });
 });
