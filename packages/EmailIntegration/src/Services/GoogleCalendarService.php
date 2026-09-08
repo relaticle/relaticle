@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use Google\Service\Calendar;
+use Google\Service\Calendar\Channel;
 use Google\Service\Calendar\Event as GoogleEvent;
 use Google\Service\Calendar\EventAttendee;
 use Google\Service\Exception;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
@@ -86,6 +88,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             $params = [
                 'syncToken' => $syncToken,
                 'singleEvents' => true,
+                'showDeleted' => true,
                 'maxResults' => 250,
             ];
 
@@ -112,6 +115,38 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         } while ($pageToken !== null);
 
         return new Data\CalendarSyncResult(events: $events, nextSyncToken: $nextSyncToken);
+    }
+
+    public function listActiveProviderEventIds(): array
+    {
+        $ids = [];
+        $pageToken = null;
+
+        do {
+            $params = [
+                'singleEvents' => true,
+                'showDeleted' => false,
+                'maxResults' => 250,
+            ];
+
+            if ($pageToken !== null && $pageToken !== '') {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = $this->client->events->listEvents('primary', $params);
+
+            foreach ($response->getItems() as $event) {
+                if ($event->getStatus() === 'cancelled') {
+                    continue;
+                }
+
+                $ids[] = (string) $event->getId();
+            }
+
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null && $pageToken !== '');
+
+        return $ids;
     }
 
     public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void
@@ -146,6 +181,50 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             ]);
         } catch (Throwable $e) {
             throw Exceptions\MeetingResponseFailed::fromProvider($e);
+        }
+    }
+
+    public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?Data\CalendarPushChannelData
+    {
+        $channel = new Channel;
+        $channel->setId(Str::uuid()->toString());
+        $channel->setType('web_hook');
+        $channel->setAddress($webhookUrl);
+        $channel->setToken($verificationToken);
+
+        try {
+            $response = $this->client->events->watch('primary', $channel);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $expiration = $response->getExpiration();
+        $expiresAt = $expiration !== null
+            ? Date::createFromTimestampMs((int) $expiration)
+            : now()->addDays(6);
+
+        return new Data\CalendarPushChannelData(
+            channelId: (string) $response->getId(),
+            resourceId: $response->getResourceId(),
+            verificationToken: $verificationToken,
+            expiresAt: $expiresAt,
+        );
+    }
+
+    public function stopPushChannel(string $channelId, ?string $resourceId): void
+    {
+        if ($resourceId === null || $resourceId === '') {
+            return;
+        }
+
+        try {
+            $channel = new Channel;
+            $channel->setId($channelId);
+            $channel->setResourceId($resourceId);
+
+            $this->client->channels->stop($channel);
+        } catch (Throwable) {
+            // The channel may already be expired or stopped.
         }
     }
 
@@ -200,6 +279,10 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
 
     private function normalizeGoogleEvent(GoogleEvent $event): CalendarEventData
     {
+        if ($event->getStatus() === 'cancelled') {
+            return $this->tombstone($event);
+        }
+
         $start = $event->getStart();
         $end = $event->getEnd();
 
@@ -248,6 +331,29 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             organizerEmail: $organizer?->getEmail(),
             organizerName: $organizer?->getDisplayName(),
             attendees: $attendees,
+        );
+    }
+
+    private function tombstone(GoogleEvent $event): CalendarEventData
+    {
+        $now = Date::now();
+
+        return new CalendarEventData(
+            providerEventId: (string) $event->getId(),
+            providerRecurringEventId: $event->getRecurringEventId(),
+            iCalUid: $event->getICalUID(),
+            title: null,
+            description: null,
+            startsAt: $now,
+            endsAt: $now,
+            isAllDay: false,
+            location: null,
+            htmlLink: null,
+            status: 'cancelled',
+            visibility: null,
+            organizerEmail: null,
+            organizerName: null,
+            attendees: [],
         );
     }
 }

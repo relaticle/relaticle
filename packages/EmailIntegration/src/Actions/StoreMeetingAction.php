@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -20,7 +21,7 @@ final readonly class StoreMeetingAction
     public function execute(NormalizedMeetingPayload $payload, ConnectedAccount $account): ?Meeting
     {
         if ($this->shouldSkip($payload)) {
-            $this->softDeleteExisting($account, $payload->providerEventId);
+            $this->softDeleteCancelledMeetings($account, $payload);
 
             return null;
         }
@@ -136,12 +137,23 @@ final readonly class StoreMeetingAction
         return $payload->status === CalendarEventStatus::CANCELLED;
     }
 
-    private function softDeleteExisting(ConnectedAccount $account, string $providerEventId): void
+    private function softDeleteCancelledMeetings(ConnectedAccount $account, NormalizedMeetingPayload $payload): void
     {
         Meeting::query()
             ->where('connected_account_id', $account->getKey())
-            ->where('provider_event_id', $providerEventId)
+            ->where(function (Builder $query) use ($payload): void {
+                $query->where('provider_event_id', $payload->providerEventId);
+
+                if ($this->isSeriesMasterPayload($payload)) {
+                    $query->orWhere('provider_recurring_event_id', $payload->providerEventId);
+                }
+            })
             ->delete();
+    }
+
+    private function isSeriesMasterPayload(NormalizedMeetingPayload $payload): bool
+    {
+        return $payload->providerRecurringEventId === null || $payload->providerRecurringEventId === '';
     }
 
     private function bumpInitialCalendarImportProgress(ConnectedAccount $connectedAccount): void

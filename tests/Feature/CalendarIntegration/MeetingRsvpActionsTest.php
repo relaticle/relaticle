@@ -16,8 +16,9 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
-mutates(MeetingRsvpActions::class, MeetingDetailInfolist::class, MeetingHeaderEntry::class, MeetingPolicy::class);
+mutates(MeetingRsvpActions::class, MeetingDetailInfolist::class, MeetingHeaderEntry::class, MeetingPolicy::class, MeetingRespondentResolver::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -56,12 +57,12 @@ function meetingRsvpInvitation(ConnectedAccount $account, array $overrides = [])
     return $meeting;
 }
 
-it('renders the RSVP dropdown as RSVP when the mailbox has not answered', function (): void {
+it('renders the RSVP dropdown as Pending when the mailbox has not answered', function (): void {
     $meeting = meetingRsvpInvitation($this->account);
 
     livewire(ListMeetings::class)
         ->mountAction(TestAction::make('view')->table($meeting))
-        ->assertSee(__('filament/resources/meeting.actions.rsvp.label'));
+        ->assertSee(AttendeeResponseStatus::NEEDS_ACTION->getLabel());
 });
 
 it('labels the RSVP dropdown with the current response after the mailbox answers', function (): void {
@@ -134,7 +135,7 @@ it('shows RSVP actions when the signed-in user is the host', function (): void {
         ]);
 });
 
-it('hides RSVP actions for a teammate viewing someone else\'s meeting', function (): void {
+it('hides RSVP actions for a teammate who is not listed on the guest list', function (): void {
     $meeting = meetingRsvpInvitation($this->account);
 
     MeetingAttendee::factory()->create([
@@ -153,6 +154,118 @@ it('hides RSVP actions for a teammate viewing someone else\'s meeting', function
     livewire(ListMeetings::class)
         ->assertCanSeeTableRecords([$meeting])
         ->assertActionHidden([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('acceptMeeting'),
+        ]);
+});
+
+it('hides RSVP actions when only the workspace email is invited but no matching calendar account is connected', function (): void {
+    $meeting = meetingRsvpInvitation($this->account);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'buyer@acme-buyer.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $this->team->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($this->team);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $this->actingAs($teammate);
+    Filament::setTenant($this->team);
+
+    livewire(ListMeetings::class)
+        ->assertCanSeeTableRecords([$meeting])
+        ->assertActionHidden([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('acceptMeeting'),
+        ]);
+});
+
+it('shows RSVP actions when the workspace email is invited and the matching calendar account is connected', function (): void {
+    $meeting = meetingRsvpInvitation($this->account);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $this->team->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($this->team);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $this->actingAs($teammate);
+    Filament::setTenant($this->team);
+
+    livewire(ListMeetings::class)
+        ->assertCanSeeTableRecords([$meeting])
+        ->assertActionVisible([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('acceptMeeting'),
+        ]);
+});
+
+it('shows RSVP actions when only the connected mailbox email is on the guest list', function (): void {
+    $meeting = meetingRsvpInvitation($this->account);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'buyer@acme-buyer.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $this->team->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($this->team);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    $this->actingAs($teammate);
+    Filament::setTenant($this->team);
+
+    livewire(ListMeetings::class)
+        ->assertCanSeeTableRecords([$meeting])
+        ->assertActionVisible([
             TestAction::make('view')->table($meeting),
             TestAction::make('acceptMeeting'),
         ]);

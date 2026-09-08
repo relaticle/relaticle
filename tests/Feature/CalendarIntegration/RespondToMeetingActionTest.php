@@ -14,9 +14,10 @@ use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(RespondToMeetingAction::class, MeetingPolicy::class);
+mutates(RespondToMeetingAction::class, MeetingPolicy::class, MeetingRespondentResolver::class);
 
 /**
  * @param  array<string, mixed>  $overrides
@@ -180,7 +181,7 @@ it('lets the mailbox owner change RSVP when they are the host even without an at
         ->and($updated->attendees->first()?->response_status)->toBe(AttendeeResponseStatus::TENTATIVE);
 });
 
-it('forbids a teammate from changing someone else\'s RSVP', function (): void {
+it('forbids a teammate from changing someone else\'s RSVP when they are not on the guest list', function (): void {
     $owner = User::factory()->withTeam()->create();
     $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
     $meeting = respondToMeetingInvitation($account);
@@ -199,6 +200,201 @@ it('forbids a teammate from changing someone else\'s RSVP', function (): void {
 
     expect(fn () => app(RespondToMeetingAction::class)->execute($teammate, $meeting, AttendeeResponseStatus::ACCEPTED))
         ->toThrow(HttpException::class);
+});
+
+it('lets a teammate respond when only their connected mailbox email is on the guest list', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'buyer@acme-buyer.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-rsvp-1', AttendeeResponseStatus::TENTATIVE);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($teammateAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    $updated = app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::TENTATIVE,
+    );
+
+    expect($updated->attendees->firstWhere('email_address', 'mail2asmitnepali99@gmail.com')?->response_status)
+        ->toBe(AttendeeResponseStatus::TENTATIVE);
+});
+
+it('forbids a teammate from responding when only the workspace email is invited without a matching calendar account', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldNotReceive('respondToEvent');
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    expect(fn () => app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::TENTATIVE,
+    ))->toThrow(HttpException::class);
+});
+
+it('lets a teammate respond when their workspace email is on the guest list and the matching calendar account is connected', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'buyer@acme-buyer.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-rsvp-1', AttendeeResponseStatus::TENTATIVE);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($teammateAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    $updated = app(RespondToMeetingAction::class)->execute($teammate, $meeting->fresh(['attendees', 'connectedAccount']), AttendeeResponseStatus::TENTATIVE);
+
+    expect($updated->response_status)->toBe(AttendeeResponseStatus::NEEDS_ACTION)
+        ->and($updated->attendees->firstWhere('email_address', 'mail2asmitnepali@gmail.com')?->response_status)
+        ->toBe(AttendeeResponseStatus::TENTATIVE);
+});
+
+it('uses the connected calendar account that matches the listed mailbox identity', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    $teammate = User::factory()->create(['email' => 'personal@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'personal@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    $workAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'work@company.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'work@company.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-rsvp-1', AttendeeResponseStatus::ACCEPTED);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($workAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::ACCEPTED,
+    );
 });
 
 it('forbids RSVP on a meeting from another team', function (): void {
