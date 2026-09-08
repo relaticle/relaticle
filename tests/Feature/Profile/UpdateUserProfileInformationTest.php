@@ -763,6 +763,25 @@ describe('locale', function () {
             ->assertFormSet(['locale' => 'da']);
     });
 
+    test('a user with no stored locale is shown and saves English', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-default@example.com',
+            'locale' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['locale' => 'en'])
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'locale-default@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->locale)->toBe('en');
+    });
+
     test('offers every supported locale named in its own language', function () {
         $user = User::factory()->withTeam()->create();
         $this->actingAs($user);
@@ -805,25 +824,6 @@ describe('locale', function () {
             'email' => 'locale-bad@example.com',
             'locale' => 'xx',
         ]))->toThrow(ValidationException::class);
-
-        expect($user->fresh()->locale)->toBeNull();
-    });
-
-    test('clearing the select writes null', function () {
-        $user = User::factory()->withTeam()->create([
-            'email' => 'locale-clear@example.com',
-            'locale' => 'da',
-        ]);
-        $this->actingAs($user);
-
-        Livewire::test(UpdateProfileInformationComponent::class)
-            ->fillForm([
-                'name' => $user->name,
-                'email' => 'locale-clear@example.com',
-                'locale' => null,
-            ])
-            ->call('updateProfile')
-            ->assertHasNoFormErrors();
 
         expect($user->fresh()->locale)->toBeNull();
     });
