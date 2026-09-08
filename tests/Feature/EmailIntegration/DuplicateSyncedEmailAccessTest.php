@@ -9,6 +9,7 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
@@ -184,4 +185,15 @@ it('hides the duplicate table row from the emails relation manager', function ()
         ->assertCanSeeTableRecords([$this->ownerCopy])
         ->assertCanNotSeeTableRecords([$this->teammateCopy])
         ->assertTableActionHidden('requestAccess', $this->ownerCopy);
+});
+
+it('moves the record mailbox to All after a compose send', function (): void {
+    $this->actingAs($this->owner);
+    Filament::setTenant($this->team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->set('folder', EmailFolder::Inbox)
+        ->dispatch('composer:sent', emailId: $this->ownerCopy->getKey())
+        ->assertSet('folder', EmailFolder::All)
+        ->assertSet('selectedEmailId', $this->ownerCopy->getKey());
 });

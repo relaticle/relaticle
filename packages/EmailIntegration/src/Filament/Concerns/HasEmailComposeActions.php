@@ -65,7 +65,12 @@ trait HasEmailComposeActions
             ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
             ->visible(fn (): bool => $this->hasActiveConnectedAccount())
             ->action(function (): void {
-                $this->dispatch('composer:open');
+                $record = $this->getCrmRecord();
+
+                $this->dispatch('composer:open', payload: [
+                    'linkRecordType' => $record::class,
+                    'linkRecordId' => (string) $record->getKey(),
+                ]);
             });
     }
 
