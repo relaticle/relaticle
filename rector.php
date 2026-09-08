@@ -12,7 +12,6 @@ use Rector\Privatization\Rector\ClassMethod\PrivatizeFinalClassMethodRector;
 use RectorLaravel\Rector\Class_\AddHasFactoryToModelsRector;
 use RectorLaravel\Rector\Class_\AppendsPropertyToAppendsAttributeRector;
 use RectorLaravel\Rector\Class_\BackoffPropertyToBackoffAttributeRector;
-use RectorLaravel\Rector\Class_\EmptyGuardedPropertyToUnguardedAttributeRector;
 use RectorLaravel\Rector\Class_\FillablePropertyToFillableAttributeRector;
 use RectorLaravel\Rector\Class_\HiddenPropertyToHiddenAttributeRector;
 use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
@@ -20,7 +19,6 @@ use RectorLaravel\Rector\Class_\TimeoutPropertyToTimeoutAttributeRector;
 use RectorLaravel\Rector\Class_\TriesPropertyToTriesAttributeRector;
 use RectorLaravel\Rector\Class_\UniqueForPropertyToUniqueForAttributeRector;
 use RectorLaravel\Rector\Class_\UseForwardsCallsTraitRector;
-use RectorLaravel\Rector\ClassMethod\AddGenericBuilderToScopesRector;
 use RectorLaravel\Rector\ClassMethod\MigrateToSimplifiedAttributeRector;
 use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
@@ -52,7 +50,6 @@ return RectorConfig::configure()
         // refactor best handled in dedicated PRs, not bundled into dependency updates.
         AppendsPropertyToAppendsAttributeRector::class,
         BackoffPropertyToBackoffAttributeRector::class,
-        EmptyGuardedPropertyToUnguardedAttributeRector::class,
         FillablePropertyToFillableAttributeRector::class,
         HiddenPropertyToHiddenAttributeRector::class,
         TablePropertyToTableAttributeRector::class,
@@ -63,7 +60,6 @@ return RectorConfig::configure()
         MigrateToSimplifiedAttributeRector::class,
         // Rewrites imported `Builder<Model>` scope docblocks to fully qualified
         // `Builder<self>`, which regresses the docblock import rule for no type gain.
-        AddGenericBuilderToScopesRector::class,
         RemoveUnusedPrivateMethodRector::class => [
             // Skip Filament importer lifecycle hooks - they're called dynamically via callHook()
             __DIR__.'/app/Filament/Imports/*',

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Data;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Enums\CalendarVisibility;
@@ -21,8 +21,8 @@ final readonly class NormalizedMeetingPayload
         public string $title,
         public ?string $description,
         public ?string $location,
-        public Carbon $startsAt,
-        public Carbon $endsAt,
+        public CarbonInterface $startsAt,
+        public CarbonInterface $endsAt,
         public bool $allDay,
         public ?string $organizerEmail,
         public ?string $organizerName,

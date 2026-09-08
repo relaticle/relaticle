@@ -8,8 +8,8 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use DateTimeInterface;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -208,7 +208,7 @@ final readonly class SendEmailAction
     /**
      * @param  array<string, mixed>  $data
      */
-    private function resolveScheduledFor(array $data, EmailPriority $priority): ?Carbon
+    private function resolveScheduledFor(array $data, EmailPriority $priority): ?CarbonInterface
     {
         if (isset($data['scheduled_for']) && $data['scheduled_for'] instanceof DateTimeInterface) {
             return Date::instance($data['scheduled_for']);

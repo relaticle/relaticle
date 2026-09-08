@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Models;
 use App\Models\Concerns\HasTeam;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
@@ -37,20 +37,20 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string $access_token
  * @property string|null $refresh_token
  * @property array{email?: bool, send?: bool, calendar?: bool}|null $capabilities
- * @property Carbon|null $token_expires_at
+ * @property CarbonInterface|null $token_expires_at
  * @property int|null $hourly_send_limit
  * @property int|null $daily_send_limit
  * @property string|null $sync_cursor
- * @property Carbon|null $last_synced_at
+ * @property CarbonInterface|null $last_synced_at
  * @property int $initial_sync_imported
  * @property int|null $initial_sync_estimated
  * @property int $initial_calendar_sync_imported
  * @property string|null $calendar_sync_cursor
- * @property Carbon|null $last_calendar_synced_at
+ * @property CarbonInterface|null $last_calendar_synced_at
  * @property string|null $calendar_push_channel_id
  * @property string|null $calendar_push_resource_id
  * @property string|null $calendar_push_verification_token
- * @property Carbon|null $calendar_push_expires_at
+ * @property CarbonInterface|null $calendar_push_expires_at
  */
 final class ConnectedAccount extends Model
 {
