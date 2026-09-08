@@ -743,7 +743,7 @@ final class EmailVisibilityService
 
     private function timestampOrNull(mixed $value): ?Carbon
     {
-        if (! filled($value)) {
+        if (blank($value)) {
             return null;
         }
 

@@ -8,14 +8,15 @@ use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
-use Relaticle\EmailIntegration\Support\ProviderRateLimit;
+use Relaticle\EmailIntegration\Services\ProviderRateLimit;
 
-mutates(StoreEmailJob::class, ProviderRateLimit::class);
+mutates(StoreEmailJob::class, ProviderRateLimit::class, ReleasesOnProviderRateLimit::class);
 
 function gmailUserRateLimited(string $retryAfterIso): GoogleServiceException
 {
