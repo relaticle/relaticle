@@ -8,11 +8,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 final readonly class RespondToMeetingAction

@@ -15,6 +15,8 @@ use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\GoogleClientFactory;
@@ -76,7 +78,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
     }
 
     /**
-     * @throws Exceptions\CalendarSyncTokenExpired when Google invalidates the syncToken (HTTP 410)
+     * @throws CalendarSyncTokenExpired when Google invalidates the syncToken (HTTP 410)
      */
     public function fetchDelta(string $syncToken): Data\CalendarSyncResult
     {
@@ -101,7 +103,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
                 $response = $this->client->events->listEvents('primary', $params);
             } catch (Exception $e) {
                 if ($e->getCode() === 410) {
-                    throw Exceptions\CalendarSyncTokenExpired::forAccount($this->account->getKey());
+                    throw CalendarSyncTokenExpired::forAccount($this->account->getKey());
                 }
                 throw $e;
             }
@@ -180,7 +182,7 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
                 'sendUpdates' => $sendUpdates,
             ]);
         } catch (Throwable $e) {
-            throw Exceptions\MeetingResponseFailed::fromProvider($e);
+            throw MeetingResponseFailed::fromProvider($e);
         }
     }
 

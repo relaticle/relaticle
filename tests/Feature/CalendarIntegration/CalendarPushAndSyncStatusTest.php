@@ -10,13 +10,13 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Controllers\CalendarPushWebhookController;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Exceptions\CalendarPushChannelFailed;
 use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Livewire\MailboxImportStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarPushChannelFailed;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 mutates(

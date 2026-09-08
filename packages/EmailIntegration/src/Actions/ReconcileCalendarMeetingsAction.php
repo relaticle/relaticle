@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Relaticle\EmailIntegration\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\ReconcileCalendarMeetingsFailed;
 use Throwable;
 
 final readonly class ReconcileCalendarMeetingsAction

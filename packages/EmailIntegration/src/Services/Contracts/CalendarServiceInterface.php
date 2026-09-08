@@ -7,8 +7,8 @@ namespace Relaticle\EmailIntegration\Services\Contracts;
 use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
-use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 
 interface CalendarServiceInterface
 {

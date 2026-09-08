@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\EmailIntegration\Services\Exceptions;
+namespace Relaticle\EmailIntegration\Exceptions;
 
 use RuntimeException;
 use Throwable;

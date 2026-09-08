@@ -7,7 +7,7 @@ namespace Relaticle\EmailIntegration\Services;
 use Illuminate\Support\Facades\Cache;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
-final class MailboxSyncTracker
+final readonly class MailboxSyncTracker
 {
     private const int TTL_MINUTES = 30;
 
