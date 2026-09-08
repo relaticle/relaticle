@@ -11,6 +11,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
+use Relaticle\EmailIntegration\Enums\CalendarVisibility;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -53,21 +56,27 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         $service = $serviceFactory->make($account);
         $result = $service->initialSync($this->pageToken);
 
-        if ($result->events === []) {
+        $eventsToStore = array_values($result->events);
+
+        if ($eventsToStore === []) {
             self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken);
 
             return;
         }
 
+        $pageEvents = array_values(array_filter(
+            $eventsToStore,
+            static fn (CalendarEventData $event): bool => ! CalendarVisibility::tryFrom($event->visibility ?? '')?->isPrivate()
+                && $event->status !== CalendarEventStatus::CANCELLED->value,
+        ));
+
         $nextPageToken = $result->nextPageToken;
         $nextSyncToken = $result->nextSyncToken;
-
-        $pageEvents = array_values($result->events);
 
         InitialSyncPageStoreBatch::dispatchMeetings(
             account: $account,
             pageEvents: $pageEvents,
-            eventsToStore: $pageEvents,
+            eventsToStore: $eventsToStore,
             onPageStored: static function (ConnectedAccount $account) use ($nextPageToken, $nextSyncToken): void {
                 self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
             },
