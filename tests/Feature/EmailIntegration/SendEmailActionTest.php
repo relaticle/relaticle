@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -22,7 +23,7 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, EmailSendingService::class, ConnectedAccount::class);
+mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -235,6 +236,53 @@ it('links the queued email to a CRM record via emailables', function (): void {
     ]);
 
     expect($person->emails()->whereKey($email->getKey())->exists())->toBeTrue();
+});
+
+it('updates record metrics after a manually linked queued send is delivered', function (): void {
+    $this->account->update([
+        'email_address' => 'sender@acmecorp.com',
+        'display_name' => 'Test Sender',
+    ]);
+
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Jane Doe',
+        'creator_id' => $this->user->id,
+        'email_count' => 0,
+        'outbound_email_count' => 0,
+    ]);
+
+    $sendData = [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'jane@clientcorp.com', 'name' => 'Jane']],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ];
+
+    $email = app(SendEmailAction::class)->execute($sendData, People::class, $person->id);
+
+    expect($person->fresh()->email_count)->toBe(0);
+
+    $sentAt = now()->subHour();
+    $email->update([
+        'status' => EmailStatus::SENT,
+        'sent_at' => $sentAt,
+    ]);
+
+    app(LinkEmailAction::class)->execute($email->fresh());
+
+    $person->refresh();
+
+    expect($person->email_count)->toBe(1)
+        ->and($person->outbound_email_count)->toBe(1)
+        ->and($person->last_email_at?->timestamp)->toBe($sentAt->timestamp)
+        ->and($person->last_interaction_at?->timestamp)->toBe($sentAt->timestamp);
 });
 
 it('rejects sending through a connected account owned by another user', function (): void {

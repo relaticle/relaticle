@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
@@ -30,6 +31,7 @@ final readonly class LinkEmailAction
         private CompanyDomainMatcher $domainMatcher,
         private AutomatedSenderMatcher $automatedSender,
         private EmailVisibilityService $visibility,
+        private RecordCommunicationMetrics $metrics,
     ) {}
 
     /**
@@ -77,7 +79,9 @@ final readonly class LinkEmailAction
                 return;
             }
 
-            $this->link($email);
+            $applyMetricsForPrelinkedRecords = $locked->linked_at === null;
+
+            $this->link($email, $applyMetricsForPrelinkedRecords);
 
             if ($locked->linked_at === null) {
                 $locked->updateQuietly(['linked_at' => now()]);
@@ -85,7 +89,7 @@ final readonly class LinkEmailAction
         });
     }
 
-    private function link(Email $email): void
+    private function link(Email $email, bool $applyMetricsForPrelinkedRecords): void
     {
         $participants = $email->participants()->with('contact', 'company')->get();
         $teamId = $email->team_id;
@@ -148,7 +152,7 @@ final readonly class LinkEmailAction
 
                     if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
                         $countedCompanies[$company->getKey()] = true;
-                        $this->incrementEmailMetrics($company, $email);
+                        $this->metrics->incrementEmailMetrics($company, $email);
                     }
                 }
             }
@@ -169,7 +173,7 @@ final readonly class LinkEmailAction
 
                 if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
-                    $this->incrementEmailMetrics($person, $email);
+                    $this->metrics->incrementEmailMetrics($person, $email);
                 }
 
                 if ($person->company_id) {
@@ -183,10 +187,19 @@ final readonly class LinkEmailAction
                 foreach ($opportunities as $opportunity) {
                     if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
-                        $this->incrementEmailMetrics($opportunity, $email);
+                        $this->metrics->incrementEmailMetrics($opportunity, $email);
                     }
                 }
             }
+        }
+
+        if ($applyMetricsForPrelinkedRecords) {
+            $this->metrics->incrementEmailMetricsForPrelinkedRecords(
+                $email,
+                $countedCompanies,
+                $countedPeople,
+                $countedOpportunities,
+            );
         }
     }
 
@@ -280,52 +293,5 @@ final readonly class LinkEmailAction
         $relation->attach($relatedId, ['link_source' => 'auto']);
 
         return true;
-    }
-
-    /**
-     * Increment the shared email-interaction counters on a linked CRM record
-     * (People, Company, or Opportunity, all of which expose the same metric columns).
-     *
-     * Counters use atomic SQL increments so concurrent StoreEmailJob workers
-     * don't lose updates. The timestamps use GREATEST so an older email linked
-     * after a newer one (out-of-order parallel backfill) never moves
-     * last_email_at backwards.
-     */
-    private function incrementEmailMetrics(Model $record, Email $email): void
-    {
-        if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
-            return;
-        }
-
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
-
-        // Raw, parameterised UPDATE: counters increment atomically (no lost updates
-        // under concurrent StoreEmailJob workers) and the timestamps use GREATEST so
-        // an older email linked after a newer one (out-of-order parallel backfill)
-        // never moves last_email_at backwards. Bindings keep the date out of the SQL
-        // string; the table/key come from model metadata, never user input.
-        $sets = [
-            'email_count = email_count + 1',
-            'inbound_email_count = inbound_email_count + ?',
-            'outbound_email_count = outbound_email_count + ?',
-            'updated_at = ?',
-        ];
-
-        /** @var list<mixed> $bindings */
-        $bindings = [$isInbound ? 1 : 0, $isInbound ? 0 : 1, now()];
-
-        if ($email->sent_at !== null) {
-            $sets[] = 'last_email_at = GREATEST(last_email_at, ?)';
-            $sets[] = 'last_interaction_at = GREATEST(last_interaction_at, ?)';
-            $bindings[] = $email->sent_at;
-            $bindings[] = $email->sent_at;
-        }
-
-        $bindings[] = $record->getKey();
-
-        DB::update(
-            'update '.$record->getTable().' set '.implode(', ', $sets).' where '.$record->getKeyName().' = ?',
-            $bindings,
-        );
     }
 }
