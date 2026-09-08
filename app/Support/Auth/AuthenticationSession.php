@@ -542,14 +542,6 @@ final readonly class AuthenticationSession
 
     private static function decodedAppKey(): string
     {
-        $key = (string) config('app.key');
-
-        if (! str_starts_with($key, 'base64:')) {
-            return $key;
-        }
-
-        $decoded = base64_decode(substr($key, 7), true);
-
-        return is_string($decoded) ? $decoded : $key;
+        return AppKey::decode();
     }
 }

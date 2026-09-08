@@ -66,6 +66,12 @@ return [
         'invalid' => 'The authentication code or recovery code is invalid.',
         'expired' => 'Your sign-in attempt expired. Please start again.',
     ],
+    'email_code' => [
+        'unavailable' => 'We could not send a code right now. Please try again shortly.',
+        'verify_unavailable' => 'We could not verify that code right now. Please try again shortly.',
+        'cooldown' => 'Please wait :seconds second before requesting another code.|Please wait :seconds seconds before requesting another code.',
+        'throttled' => 'Too many codes requested. Try again in :minutes minute.|Too many codes requested. Try again in :minutes minutes.',
+    ],
     'footer' => [
         'terms_notice' => 'By proceeding you acknowledge that you have read, understood and agree to our :terms.',
         'terms_of_service' => 'Terms of Service',

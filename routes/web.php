@@ -8,12 +8,15 @@ use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\AlternativesController;
 use App\Http\Controllers\Auth\CallbackController;
+use App\Http\Controllers\Auth\EmailChallengeController;
 use App\Http\Controllers\Auth\IdentityConfirmationCallbackController;
 use App\Http\Controllers\Auth\IdentityConfirmationMfaController;
 use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
 use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Controllers\Auth\ResendEmailChallengeController;
+use App\Http\Controllers\Auth\VerifyEmailChallengeController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\Dev\MailPreviewController;
@@ -91,6 +94,17 @@ Route::middleware('auth')->group(function (): void {
         ->middleware('throttle:5,1,identity-confirm-mfa')
         ->name('identity.confirm.mfa.store');
 });
+
+// Not nested under 'guest' or 'auth': the action enforces authentication per
+// purpose. No generic `throttle:` middleware: it keys by user id, not IP.
+Route::post('/auth/email-challenges', [EmailChallengeController::class, 'store'])
+    ->name('auth.email-challenges.store');
+
+Route::post('/auth/email-challenges/resend', ResendEmailChallengeController::class)
+    ->name('auth.email-challenges.resend');
+
+Route::post('/auth/email-challenges/verify', VerifyEmailChallengeController::class)
+    ->name('auth.email-challenges.verify');
 
 Route::get('/.well-known/security.txt', function (): Response {
     $lines = [
