@@ -256,6 +256,45 @@ it('still fails when Graph returns a server error that mentions organizer', func
         ->toThrow(MeetingResponseFailed::class);
 });
 
+it('resolves this mailbox event id from a shared iCalendar UID', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events*' => Http::response([
+            'value' => [
+                ['id' => 'evt-teammate-mailbox'],
+            ],
+        ]),
+    ]);
+
+    $eventId = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->findEventIdByICalUid("uid-with'-quote");
+
+    expect($eventId)->toBe('evt-teammate-mailbox');
+
+    Http::assertSent(function (Request $request): bool {
+        $url = urldecode($request->url());
+
+        return $request->method() === 'GET'
+            && str_contains($url, '/me/events')
+            && str_contains($url, "iCalUId eq 'uid-with''-quote'")
+            && str_contains($url, '$select=id')
+            && str_contains($url, '$top=1');
+    });
+});
+
+it('returns null when Graph has no event for the iCalendar UID', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events*' => Http::response([
+            'value' => [],
+        ]),
+    ]);
+
+    expect((new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->findEventIdByICalUid('missing'))
+        ->toBeNull();
+});
+
 it('paginates listActiveProviderEventIds across nextLink pages and time windows', function (): void {
     $this->travelTo('2020-01-01 00:00:00');
 

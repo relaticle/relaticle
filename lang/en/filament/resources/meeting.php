@@ -106,6 +106,10 @@ return [
                 'title' => 'Could not update your RSVP.',
                 'body' => 'Reconnect the mailbox and try again.',
             ],
+            'not_synced' => [
+                'title' => 'Could not update your RSVP.',
+                'body' => 'This meeting has not appeared on your calendar yet. Try again in a moment.',
+            ],
         ],
     ],
 

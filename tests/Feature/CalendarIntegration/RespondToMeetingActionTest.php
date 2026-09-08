@@ -54,6 +54,19 @@ function respondToMeetingCalendarAccount(User $user, Team $team): ConnectedAccou
     ]));
 }
 
+function teammateMailboxCopy(ConnectedAccount $account, Meeting $source, string $providerEventId = 'evt-teammate-copy'): Meeting
+{
+    return Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'provider_event_id' => $providerEventId,
+        'ical_uid' => $source->ical_uid,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+        'status' => CalendarEventStatus::CONFIRMED,
+        'organizer_email' => $source->organizer_email,
+    ]);
+}
+
 it('writes the RSVP to the provider and updates the local meeting', function (): void {
     $user = User::factory()->withTeam()->create();
     $account = respondToMeetingCalendarAccount($user, $user->currentTeam);
@@ -233,10 +246,12 @@ it('lets a teammate respond when only their connected mailbox email is on the gu
         'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
     ]);
 
+    teammateMailboxCopy($teammateAccount, $meeting);
+
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('respondToEvent')
         ->once()
-        ->with('evt-rsvp-1', AttendeeResponseStatus::TENTATIVE);
+        ->with('evt-teammate-copy', AttendeeResponseStatus::TENTATIVE);
 
     $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
     $factory->shouldReceive('make')
@@ -326,10 +341,12 @@ it('lets a teammate respond when their workspace email is on the guest list and 
         'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
     ]);
 
+    teammateMailboxCopy($teammateAccount, $meeting);
+
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('respondToEvent')
         ->once()
-        ->with('evt-rsvp-1', AttendeeResponseStatus::TENTATIVE);
+        ->with('evt-teammate-copy', AttendeeResponseStatus::TENTATIVE);
 
     $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
     $factory->shouldReceive('make')
@@ -377,10 +394,12 @@ it('uses the connected calendar account that matches the listed mailbox identity
         'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
     ]);
 
+    teammateMailboxCopy($workAccount, $meeting);
+
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('respondToEvent')
         ->once()
-        ->with('evt-rsvp-1', AttendeeResponseStatus::ACCEPTED);
+        ->with('evt-teammate-copy', AttendeeResponseStatus::ACCEPTED);
 
     $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
     $factory->shouldReceive('make')
@@ -395,6 +414,141 @@ it('uses the connected calendar account that matches the listed mailbox identity
         $meeting->fresh(['attendees', 'connectedAccount']),
         AttendeeResponseStatus::ACCEPTED,
     );
+});
+
+it('writes the teammate RSVP to their own mailbox event, not the source mailbox id', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    teammateMailboxCopy($teammateAccount, $meeting);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldNotReceive('findEventIdByICalUid');
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-teammate-copy', AttendeeResponseStatus::TENTATIVE);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($teammateAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::TENTATIVE,
+    );
+});
+
+it('looks up the teammate mailbox event by iCal UID when their local copy has not synced', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('findEventIdByICalUid')
+        ->once()
+        ->with($meeting->ical_uid)
+        ->andReturn('evt-teammate-mailbox');
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-teammate-mailbox', AttendeeResponseStatus::TENTATIVE);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($teammateAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::TENTATIVE,
+    );
+});
+
+it('does not RSVP with another mailbox event ID when the teammate copy cannot be resolved', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $meeting = respondToMeetingInvitation($account);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('findEventIdByICalUid')->once()->andReturnNull();
+    $service->shouldNotReceive('respondToEvent');
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    expect(fn () => app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $meeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::TENTATIVE,
+    ))->toThrow(MeetingResponseFailed::class);
 });
 
 it('forbids RSVP on a meeting from another team', function (): void {
