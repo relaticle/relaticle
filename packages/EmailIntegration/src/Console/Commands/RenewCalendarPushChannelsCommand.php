@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Console\Commands;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -26,7 +27,7 @@ final class RenewCalendarPushChannelsCommand extends Command
             ->where('status', EmailAccountStatus::ACTIVE)
             ->whereJsonContains('capabilities->calendar', true)
             ->whereNotNull('calendar_sync_cursor')
-            ->where(function ($query): void {
+            ->where(function (Builder $query): void {
                 $query
                     ->whereNull('calendar_push_expires_at')
                     ->orWhere('calendar_push_expires_at', '<=', now()->addDay());
