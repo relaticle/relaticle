@@ -195,7 +195,7 @@ final readonly class ChatController
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
         $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
 
-        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
+        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext, $user);
 
         TurnPresence::begin(
             $conversation,
@@ -239,7 +239,7 @@ final readonly class ChatController
      *
      * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
-    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext): void
+    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext, User $user): void
     {
         $provisional = ConversationTitleGate::beforeTurn($conversationId, $message);
 
@@ -252,6 +252,7 @@ final readonly class ChatController
             provisionalTitle: $provisional,
             message: $message,
             provider: $provider,
+            languageName: $user->chatLanguageName(),
             pageContext: $pageContext,
         ));
     }

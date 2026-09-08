@@ -898,6 +898,7 @@ final class ProcessChatMessage implements ShouldQueue
             provisionalTitle: $attempt['provisional'],
             message: $attempt['latest'],
             provider: $this->resolved['provider'],
+            languageName: $this->user->chatLanguageName(),
             pageContext: $this->pageContext,
             reply: $reply,
         ));
@@ -940,6 +941,7 @@ final class ProcessChatMessage implements ShouldQueue
             message: $this->isContinuation ? '' : $this->message,
             reply: $reply,
             provider: $this->resolved['provider'],
+            languageName: $this->user->chatLanguageName(),
             toolNames: array_values(array_unique(
                 $streamedResponse->toolCalls
                     ->map(static fn (ToolCallData $toolCall): string => $toolCall->name)
