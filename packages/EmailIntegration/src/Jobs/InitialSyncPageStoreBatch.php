@@ -65,6 +65,12 @@ final class InitialSyncPageStoreBatch
                     return;
                 }
 
+                if ($batch->failedJobs === 0) {
+                    $onPageStored($account);
+
+                    return;
+                }
+
                 $missingIds = self::missingMessageIds($account, $pageMessageIds);
 
                 if ($missingIds !== []) {

@@ -177,11 +177,45 @@ it('POSTs to /me/sendMail and returns provider ids', function (): void {
         'body_html' => '<p>Hi</p>',
         'body_text' => 'Hi',
         'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'rfc_message_id' => '<local-id@example.com>',
     ]);
 
     expect($result['provider_message_id'])->not->toBeEmpty();
 
-    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+    Http::assertSent(function (Request $r): bool {
+        $message = $r->data()['message'];
+
+        return str_contains((string) $r->url(), '/me/sendMail')
+            && ! array_key_exists('internetMessageId', $message)
+            && $message['singleValueExtendedProperties'] === [[
+                'id' => 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId',
+                'value' => '<local-id@example.com>',
+            ]];
+    });
+});
+
+it('finds a sent message by its reconciliation property', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response([
+            'value' => [[
+                'id' => 'AAA1',
+                'conversationId' => 'thread-1',
+                'internetMessageId' => '<provider-id@example.com>',
+            ]],
+        ]),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)
+        ->make(makeAzureAccount())
+        ->findSentMessage('<local-id@example.com>');
+
+    expect($result)->toBe([
+        'provider_message_id' => 'AAA1',
+        'thread_id' => 'thread-1',
+        'rfc_message_id' => '<provider-id@example.com>',
+    ]);
+
+    Http::assertSent(fn (Request $r): bool => str_contains(urldecode((string) $r->url()), "singleValueExtendedProperties/Any(ep: ep/id eq 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId' and ep/value eq '<local-id@example.com>')"));
 });
 
 it('includes file attachments in the /me/sendMail payload', function (): void {
