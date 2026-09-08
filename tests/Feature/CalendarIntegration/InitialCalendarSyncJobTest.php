@@ -212,6 +212,51 @@ it('stores the sync token immediately when the last page has no events', functio
         ->and($account->fresh()?->initial_calendar_sync_imported)->toBe(0);
 });
 
+it('batches skipped events for cleanup without waiting for them to persist', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    $events = [
+        new CalendarEventData(
+            providerEventId: 'private-event', providerRecurringEventId: null, iCalUid: null,
+            title: 'Private', description: null, startsAt: Date::now()->addDay(), endsAt: Date::now()->addDay()->addHour(),
+            isAllDay: false, location: null, htmlLink: null, status: 'confirmed', visibility: 'private',
+            organizerEmail: null, organizerName: null, attendees: [],
+        ),
+        new CalendarEventData(
+            providerEventId: 'cancelled-event', providerRecurringEventId: null, iCalUid: null,
+            title: 'Cancelled', description: null, startsAt: Date::now()->addDays(2), endsAt: Date::now()->addDays(2)->addHour(),
+            isAllDay: false, location: null, htmlLink: null, status: 'cancelled', visibility: 'default',
+            organizerEmail: null, organizerName: null, attendees: [],
+        ),
+        new CalendarEventData(
+            providerEventId: 'confidential-event', providerRecurringEventId: null, iCalUid: null,
+            title: 'Confidential', description: null, startsAt: Date::now()->addDays(3), endsAt: Date::now()->addDays(3)->addHour(),
+            isAllDay: false, location: null, htmlLink: null, status: 'confirmed', visibility: 'confidential',
+            organizerEmail: null, organizerName: null, attendees: [],
+        ),
+    ];
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('initialSync')->once()
+        ->andReturn(new CalendarSyncResult(events: $events, nextSyncToken: 'token-xyz'));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    (new InitialCalendarSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->jobs->count() === 3
+        && $batch->jobs->every(fn (object $job): bool => $job instanceof StoreMeetingJob));
+
+    invokeInitialCalendarSyncBatchFinallyCallbacks();
+
+    expect($account->fresh()?->calendar_sync_cursor)->toBe('token-xyz');
+});
+
 it('writes the stored meeting count when the initial calendar backfill finishes', function (): void {
     Bus::fake();
 
