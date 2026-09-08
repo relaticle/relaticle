@@ -176,12 +176,18 @@ it('honors a preserved email-change block destination reached before signing in'
 
 describe('login destinations - domain-routed panel', function (): void {
     beforeEach(function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
         putenv('APP_PANEL_DOMAIN=app.example.com');
         CachedState::$cachedRoutes = null;
         CachedState::$cachedConfig = null;
         RouteServiceProvider::loadCachedRoutesUsing(null);
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
+
+        config(["database.connections.{$connection}.database" => $database]);
+        $this->beginDatabaseTransaction();
     });
 
     afterEach(function (): void {
