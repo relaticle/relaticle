@@ -295,6 +295,14 @@ final class Email extends Model
     }
 
     /**
+     * Connected mailboxes that hold a visible copy of this message. Email is
+     * the mailbox address, never the Relaticle login.
+     *
+     * @var list<array{name: string, mailbox_email: string}>
+     */
+    public array $accessMailboxes = [];
+
+    /**
      * @return EloquentCollection<int, EmailAttachment>
      */
     public function inlineAttachments(): EloquentCollection

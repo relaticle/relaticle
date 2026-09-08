@@ -89,10 +89,7 @@ final class ViewOpportunity extends ViewRecord
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
             ])->columnSpanFull(),
 
-            CommunicationIntelligenceInfolist::section(
-                'filament/resources/opportunity.pages.view.communication_intelligence',
-                includeDirectionCounts: false,
-            ),
+            CommunicationIntelligenceInfolist::section(),
         ]);
     }
 }

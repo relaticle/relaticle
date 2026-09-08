@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final readonly class PreferredEmailCopyService
 {
@@ -58,5 +64,86 @@ final readonly class PreferredEmailCopyService
             ->where('user_id', $viewer->getKey())
             ->where('rfc_message_id', $email->rfc_message_id)
             ->exists();
+    }
+
+    /**
+     * Attach the connected mailboxes that hold a visible copy of each listed
+     * message. The address is the mailbox, not the Relaticle login.
+     *
+     * @param  iterable<int, Email>  $emails
+     */
+    public function hydrateMailboxAccess(iterable $emails, User $viewer, Company|Opportunity|People $record): void
+    {
+        $items = collect($emails);
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $messageIds = $items
+            ->pluck('rfc_message_id')
+            ->filter(fn (mixed $id): bool => is_string($id) && $id !== '')
+            ->unique()
+            ->values();
+
+        $copies = $messageIds->isEmpty()
+            ? collect()
+            : $record->emails()
+                ->with(['connectedAccount.user'])
+                ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+                ->whereIn('rfc_message_id', $messageIds)
+                ->get();
+
+        $grouped = $copies->groupBy('rfc_message_id');
+
+        foreach ($items as $email) {
+            $siblings = filled($email->rfc_message_id)
+                ? $grouped->get($email->rfc_message_id, collect())
+                : collect();
+
+            if ($siblings->isEmpty()) {
+                $siblings = collect([$email]);
+            }
+
+            $email->accessMailboxes = $this->uniqueMailboxRows($siblings);
+        }
+    }
+
+    /**
+     * @param  Collection<int, Email>  $copies
+     * @return list<array{name: string, mailbox_email: string}>
+     */
+    private function uniqueMailboxRows(Collection $copies): array
+    {
+        $mailboxes = [];
+        $seen = [];
+
+        foreach ($copies as $copy) {
+            $account = $copy->connectedAccount;
+
+            if ($account === null) {
+                continue;
+            }
+
+            $mailboxEmail = $account->email_address;
+
+            if ($mailboxEmail === '') {
+                continue;
+            }
+
+            $key = Str::lower($mailboxEmail);
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $mailboxes[] = [
+                'name' => $account->user?->name ?: ($account->display_name ?: $mailboxEmail),
+                'mailbox_email' => $mailboxEmail,
+            ];
+        }
+
+        return $mailboxes;
     }
 }
