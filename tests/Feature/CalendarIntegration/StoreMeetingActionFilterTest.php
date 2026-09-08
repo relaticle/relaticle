@@ -57,6 +57,82 @@ it('stores events declined by self so RSVP can still be changed', function (): v
         ->and(Meeting::query()->first()?->response_status)->toBe(AttendeeResponseStatus::DECLINED);
 });
 
+it('defaults a host meeting with no self response to accepted', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'email_address' => 'host@example.com',
+    ]));
+
+    (app(StoreMeetingAction::class))->execute(new NormalizedMeetingPayload(
+        providerEventId: 'evt-host-default',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'Call',
+        description: null,
+        location: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        allDay: false,
+        organizerEmail: 'host@example.com',
+        organizerName: 'Host',
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: null,
+        htmlLink: null,
+        attendees: [],
+    ), $account);
+
+    expect(Meeting::query()->first()?->response_status)->toBe(AttendeeResponseStatus::ACCEPTED);
+});
+
+it('keeps a host RSVP when the next sync has no self response', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'email_address' => 'host@example.com',
+    ]));
+
+    $first = new NormalizedMeetingPayload(
+        providerEventId: 'evt-host-keep',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'Call',
+        description: null,
+        location: null,
+        startsAt: Carbon::now()->addDay(),
+        endsAt: Carbon::now()->addDay()->addHour(),
+        allDay: false,
+        organizerEmail: 'host@example.com',
+        organizerName: 'Host',
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: AttendeeResponseStatus::TENTATIVE,
+        htmlLink: null,
+        attendees: [],
+    );
+
+    (app(StoreMeetingAction::class))->execute($first, $account);
+
+    (app(StoreMeetingAction::class))->execute(new NormalizedMeetingPayload(
+        providerEventId: 'evt-host-keep',
+        providerRecurringEventId: null,
+        icalUid: null,
+        title: 'Call',
+        description: null,
+        location: null,
+        startsAt: $first->startsAt,
+        endsAt: $first->endsAt,
+        allDay: false,
+        organizerEmail: 'host@example.com',
+        organizerName: 'Host',
+        status: CalendarEventStatus::CONFIRMED,
+        visibility: CalendarVisibility::DEFAULT,
+        selfResponseStatus: null,
+        htmlLink: null,
+        attendees: [],
+    ), $account);
+
+    expect(Meeting::query()->where('provider_event_id', 'evt-host-keep')->first()?->response_status)
+        ->toBe(AttendeeResponseStatus::TENTATIVE);
+});
+
 it('stores events older than 90 days', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
     (app(StoreMeetingAction::class))->execute(payload([

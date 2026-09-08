@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Policies\MeetingPolicy;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -16,7 +17,7 @@ use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 
-mutates(MeetingRsvpActions::class, MeetingDetailInfolist::class, MeetingHeaderEntry::class);
+mutates(MeetingRsvpActions::class, MeetingDetailInfolist::class, MeetingHeaderEntry::class, MeetingPolicy::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -75,6 +76,30 @@ it('labels the RSVP dropdown with the current response after the mailbox answers
 
 it('shows RSVP actions on the meeting card for invitations the mailbox owner can answer', function (): void {
     $meeting = meetingRsvpInvitation($this->account);
+
+    livewire(ListMeetings::class)
+        ->assertActionVisible([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('acceptMeeting'),
+        ])
+        ->assertActionVisible([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('maybeMeeting'),
+        ])
+        ->assertActionVisible([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('declineMeeting'),
+        ]);
+});
+
+it('shows RSVP actions when the signed-in user is the host even without a self attendee', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->account->team_id,
+        'connected_account_id' => $this->account->getKey(),
+        'provider_event_id' => 'evt-host-1',
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+        'organizer_email' => $this->account->email_address,
+    ]);
 
     livewire(ListMeetings::class)
         ->assertActionVisible([

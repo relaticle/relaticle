@@ -118,28 +118,84 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
     {
         $this->assertRespondable($status);
 
-        $self = new EventAttendee;
-        $self->setEmail($this->account->email_address);
-        $self->setResponseStatus($status->value);
-
-        $patch = new GoogleEvent;
-        $patch->setAttendees([$self]);
-        $patch->setAttendeesOmitted(true);
-
         try {
+            $event = $this->client->events->get('primary', $eventId);
+            $attendee = $this->selfAttendeeFrom($event);
+            $patch = new GoogleEvent;
+            $sendUpdates = 'all';
+
+            if ($attendee instanceof EventAttendee) {
+                $attendee->setResponseStatus($status->value);
+                $patch->setAttendees([$attendee]);
+                $patch->setAttendeesOmitted(true);
+            } elseif ($this->accountIsOrganizer($event)) {
+                $attendee = $this->newSelfAttendee($event->getOrganizer()?->getEmail());
+                $attendee->setOrganizer(true);
+                $attendee->setResponseStatus($status->value);
+                $patch->setAttendees([...$this->attendeesFrom($event), $attendee]);
+                $sendUpdates = 'none';
+            } else {
+                $attendee = $this->newSelfAttendee();
+                $attendee->setResponseStatus($status->value);
+                $patch->setAttendees([$attendee]);
+                $patch->setAttendeesOmitted(true);
+            }
+
             $this->client->events->patch('primary', $eventId, $patch, [
-                'sendUpdates' => 'all',
+                'sendUpdates' => $sendUpdates,
             ]);
         } catch (Throwable $e) {
             throw Exceptions\MeetingResponseFailed::fromProvider($e);
         }
     }
 
+    private function selfAttendeeFrom(GoogleEvent $event): ?EventAttendee
+    {
+        $attendees = $this->attendeesFrom($event);
+        $emailMatch = null;
+        $accountEmail = strtolower($this->account->email_address);
+
+        foreach ($attendees as $attendee) {
+            if ($attendee->getSelf()) {
+                return $attendee;
+            }
+
+            if ($emailMatch === null && strtolower((string) $attendee->getEmail()) === $accountEmail) {
+                $emailMatch = $attendee;
+            }
+        }
+
+        return $emailMatch;
+    }
+
+    /**
+     * @return list<EventAttendee>
+     */
+    private function attendeesFrom(GoogleEvent $event): array
+    {
+        return array_values($event->getAttendees() ?: []);
+    }
+
+    private function accountIsOrganizer(GoogleEvent $event): bool
+    {
+        $email = $event->getOrganizer()?->getEmail();
+
+        return is_string($email)
+            && $email !== ''
+            && strtolower($email) === strtolower($this->account->email_address);
+    }
+
+    private function newSelfAttendee(?string $email = null): EventAttendee
+    {
+        $attendee = new EventAttendee;
+        $attendee->setEmail($email ?? $this->account->email_address);
+
+        return $attendee;
+    }
+
     private function assertRespondable(AttendeeResponseStatus $status): void
     {
-        if ($status === AttendeeResponseStatus::NEEDS_ACTION) {
-            throw new InvalidArgumentException('Cannot reset an RSVP to needsAction.');
-        }
+        throw_if($status === AttendeeResponseStatus::NEEDS_ACTION, InvalidArgumentException::class, 'Cannot reset an RSVP to needsAction.');
     }
 
     private function normalizeGoogleEvent(GoogleEvent $event): CalendarEventData

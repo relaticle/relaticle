@@ -57,6 +57,10 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
                 ])
                 ->throw();
         } catch (Throwable $e) {
+            if ($this->organizerCannotRespond($e)) {
+                return;
+            }
+
             throw MeetingResponseFailed::fromProvider($e);
         }
     }
@@ -274,11 +278,24 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             'accepted' => 'accepted',
             'declined' => 'declined',
             'tentativelyAccepted' => 'tentative',
-            // The organizer implicitly accepts their own meeting.
-            'organizer' => 'accepted',
+            // Graph marks the host as "organizer", not accepted/declined.
+            // Leave it empty so a host RSVP chosen in Relaticle is not reset on sync.
+            'organizer' => null,
             'none', 'notResponded' => 'needsAction',
             default => null,
         };
+    }
+
+    private function organizerCannotRespond(Throwable $e): bool
+    {
+        if (! $e instanceof RequestException || $e->response->status() !== 400) {
+            return false;
+        }
+
+        return str_contains(
+            strtolower($e->getMessage().' '.$e->response->body()),
+            'organizer',
+        );
     }
 
     /**

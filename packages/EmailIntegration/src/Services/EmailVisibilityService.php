@@ -81,7 +81,7 @@ final class EmailVisibilityService
 
     public function isMeetingHiddenFromViewer(Meeting $meeting, User $viewer): bool
     {
-        $meeting->loadMissing(['attendees', 'connectedAccount']);
+        $meeting->loadMissing(['attendees.contact', 'connectedAccount']);
 
         $attendeeAddresses = $meeting->attendees
             ->pluck('email_address')
@@ -269,7 +269,7 @@ final class EmailVisibilityService
 
     public function meetingCountsTowardCommunicationIntelligence(Meeting $meeting): bool
     {
-        $meeting->loadMissing(['attendees', 'connectedAccount']);
+        $meeting->loadMissing(['attendees.contact', 'connectedAccount']);
 
         $addresses = $meeting->attendees
             ->pluck('email_address')

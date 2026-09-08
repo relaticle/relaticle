@@ -139,7 +139,7 @@ final class MeetingResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
-            ->with(['connectedAccount', 'team', 'attendees']);
+            ->with(['connectedAccount', 'team', 'attendees.contact']);
 
         $user = auth()->user();
 

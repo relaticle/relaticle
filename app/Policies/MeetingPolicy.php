@@ -11,7 +11,6 @@ use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
-use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 final readonly class MeetingPolicy
@@ -48,13 +47,12 @@ final readonly class MeetingPolicy
             return false;
         }
 
-        $account = $meeting->connectedAccount;
+        $account = ConnectedAccount::query()
+            ->whereKey($meeting->connected_account_id)
+            ->where('user_id', $user->getKey())
+            ->first();
 
         if (! $account instanceof ConnectedAccount) {
-            return false;
-        }
-
-        if ($account->user_id !== $user->getKey()) {
             return false;
         }
 
@@ -62,15 +60,6 @@ final readonly class MeetingPolicy
             return false;
         }
 
-        if ($meeting->status === CalendarEventStatus::CANCELLED) {
-            return false;
-        }
-
-        $self = $meeting->attendees->first(
-            fn (MeetingAttendee $attendee): bool => $attendee->is_self
-                || $attendee->email_address === strtolower($account->email_address),
-        );
-
-        return $self instanceof MeetingAttendee;
+        return $meeting->status !== CalendarEventStatus::CANCELLED;
     }
 }

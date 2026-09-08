@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 
 final readonly class RespondToMeetingAction
@@ -22,9 +23,7 @@ final readonly class RespondToMeetingAction
     {
         abort_unless($user->can('respond', $meeting), 403);
 
-        if ($status === AttendeeResponseStatus::NEEDS_ACTION) {
-            throw new InvalidArgumentException('Cannot reset an RSVP to needsAction.');
-        }
+        throw_if($status === AttendeeResponseStatus::NEEDS_ACTION, InvalidArgumentException::class, 'Cannot reset an RSVP to needsAction.');
 
         $account = $meeting->connectedAccount;
         abort_unless($account instanceof ConnectedAccount, 403);
@@ -35,13 +34,26 @@ final readonly class RespondToMeetingAction
 
         $meeting->update(['response_status' => $status]);
 
-        $meeting->attendees()
+        $self = $meeting->attendees()
             ->where(function (Builder $query) use ($account): void {
                 $query->where('is_self', true)
                     ->orWhere('email_address', strtolower($account->email_address));
             })
-            ->update(['response_status' => $status]);
+            ->first();
 
-        return $meeting->refresh()->load(['attendees', 'connectedAccount']);
+        if ($self instanceof MeetingAttendee) {
+            $self->update(['response_status' => $status]);
+        } else {
+            $meeting->attendees()->create([
+                'email_address' => strtolower($account->email_address),
+                'name' => $account->display_name,
+                'response_status' => $status,
+                'is_organizer' => $meeting->organizer_email !== null
+                    && strtolower($meeting->organizer_email) === strtolower($account->email_address),
+                'is_self' => true,
+            ]);
+        }
+
+        return $meeting->refresh()->load(['attendees.contact', 'connectedAccount']);
     }
 }
