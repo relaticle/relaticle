@@ -6,17 +6,21 @@ namespace Relaticle\EmailIntegration\Services;
 
 use Google\Service\Calendar;
 use Google\Service\Calendar\Event as GoogleEvent;
+use Google\Service\Calendar\EventAttendee;
 use Google\Service\Exception;
 use Illuminate\Support\Facades\Date;
+use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\GoogleClientFactory;
+use Throwable;
 
 final readonly class GoogleCalendarService implements CalendarServiceInterface
 {
-    private function __construct(
+    public function __construct(
         private ConnectedAccount $account,
         private Calendar $client,
     ) {}
@@ -108,6 +112,34 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         } while ($pageToken !== null);
 
         return new Data\CalendarSyncResult(events: $events, nextSyncToken: $nextSyncToken);
+    }
+
+    public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void
+    {
+        $this->assertRespondable($status);
+
+        $self = new EventAttendee;
+        $self->setEmail($this->account->email_address);
+        $self->setResponseStatus($status->value);
+
+        $patch = new GoogleEvent;
+        $patch->setAttendees([$self]);
+        $patch->setAttendeesOmitted(true);
+
+        try {
+            $this->client->events->patch('primary', $eventId, $patch, [
+                'sendUpdates' => 'all',
+            ]);
+        } catch (Throwable $e) {
+            throw Exceptions\MeetingResponseFailed::fromProvider($e);
+        }
+    }
+
+    private function assertRespondable(AttendeeResponseStatus $status): void
+    {
+        if ($status === AttendeeResponseStatus::NEEDS_ACTION) {
+            throw new InvalidArgumentException('Cannot reset an RSVP to needsAction.');
+        }
     }
 
     private function normalizeGoogleEvent(GoogleEvent $event): CalendarEventData

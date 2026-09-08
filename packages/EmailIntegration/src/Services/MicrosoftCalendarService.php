@@ -7,12 +7,16 @@ namespace Relaticle\EmailIntegration\Services;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
+use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
+use Throwable;
 
 final readonly class MicrosoftCalendarService implements CalendarServiceInterface
 {
@@ -35,6 +39,26 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     public function fetchDelta(string $syncToken): CalendarSyncResult
     {
         return $this->drainOnePage($syncToken, isInitial: false);
+    }
+
+    public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void
+    {
+        $action = match ($status) {
+            AttendeeResponseStatus::ACCEPTED => 'accept',
+            AttendeeResponseStatus::DECLINED => 'decline',
+            AttendeeResponseStatus::TENTATIVE => 'tentativelyAccept',
+            AttendeeResponseStatus::NEEDS_ACTION => throw new InvalidArgumentException('Cannot reset an RSVP to needsAction.'),
+        };
+
+        try {
+            $this->clientFactory->make($this->account)
+                ->post('/me/events/'.rawurlencode($eventId).'/'.$action, [
+                    'sendResponse' => true,
+                ])
+                ->throw();
+        } catch (Throwable $e) {
+            throw MeetingResponseFailed::fromProvider($e);
+        }
     }
 
     /**

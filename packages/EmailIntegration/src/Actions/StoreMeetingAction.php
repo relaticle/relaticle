@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
-use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -106,11 +105,8 @@ final readonly class StoreMeetingAction
         if ($payload->visibility->isPrivate()) {
             return true;
         }
-        if ($payload->status === CalendarEventStatus::CANCELLED) {
-            return true;
-        }
 
-        return $payload->selfResponseStatus === AttendeeResponseStatus::DECLINED;
+        return $payload->status === CalendarEventStatus::CANCELLED;
     }
 
     private function softDeleteExisting(ConnectedAccount $account, string $providerEventId): void

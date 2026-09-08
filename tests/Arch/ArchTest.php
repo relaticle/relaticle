@@ -229,6 +229,7 @@ arch('package service layers avoid mutation')
         // Exceptions necessarily extend a base throwable:
         'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
         'Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired',
+        'Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
         'Relaticle\ImportWizard\Support\EntityLinkResolver',
         'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
@@ -250,6 +251,7 @@ arch('package service layers avoid inheritance')
         // Exceptions necessarily extend a base throwable:
         'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
         'Relaticle\EmailIntegration\Services\Exceptions\MailHistoryExpired',
+        'Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed',
     ]);
 
 arch('main app must not depend on SystemAdmin module')
