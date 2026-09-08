@@ -13,6 +13,7 @@ use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function (): void {
     Filament::setCurrentPanel(Filament::getPanel('app'));
@@ -186,7 +187,14 @@ describe('login destinations - domain-routed panel', function (): void {
         LoadConfiguration::alwaysUse(null);
         $this->refreshApplication();
 
+        // The rebuilt container reads the database name from the environment
+        // again, losing the per-worker name, and it resolves the connection
+        // during boot, so the restored name only takes effect after a purge.
         config(["database.connections.{$connection}.database" => $database]);
+        DB::purge($connection);
+
+        // LazilyRefreshDatabase armed its rollback on the container that was
+        // just replaced. Without this the block's writes commit for real.
         $this->beginDatabaseTransaction();
     });
 
