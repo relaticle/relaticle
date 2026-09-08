@@ -7,9 +7,9 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
@@ -99,7 +99,7 @@ final readonly class RecordCommunicationMetrics
         }
     }
 
-    private function advanceMeetingMetrics(string $table, string $id, Carbon $startsAt): void
+    private function advanceMeetingMetrics(string $table, string $id, CarbonInterface $startsAt): void
     {
         DB::table($table)
             ->where('id', $id)
@@ -109,7 +109,7 @@ final readonly class RecordCommunicationMetrics
         $this->advanceTimestamp($table, $id, 'last_interaction_at', $startsAt);
     }
 
-    private function advanceTimestamp(string $table, string $id, string $column, Carbon $startsAt): void
+    private function advanceTimestamp(string $table, string $id, string $column, CarbonInterface $startsAt): void
     {
         DB::table($table)
             ->where('id', $id)

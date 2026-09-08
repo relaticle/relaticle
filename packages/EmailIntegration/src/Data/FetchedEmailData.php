@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Data;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -22,7 +22,7 @@ final readonly class FetchedEmailData
         public ?string $inReplyTo,
         public ?string $subject,
         public ?string $snippet,
-        public Carbon $sentAt,
+        public CarbonInterface $sentAt,
         public EmailDirection $direction,
         public ?EmailFolder $folder,
         public bool $hasAttachments,

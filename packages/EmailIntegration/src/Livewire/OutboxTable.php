@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -21,7 +22,6 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\On;
@@ -224,7 +224,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
      * undo. That delay is not a scheduled send; the queued tab should show it
      * immediately, matching the outbox badge.
      */
-    private function queuedDueCutoff(): Carbon
+    private function queuedDueCutoff(): CarbonInterface
     {
         return now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));
     }

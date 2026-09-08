@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Data;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 final readonly class CalendarPushChannelData
 {
@@ -12,6 +12,6 @@ final readonly class CalendarPushChannelData
         public string $channelId,
         public ?string $resourceId,
         public string $verificationToken,
-        public Carbon $expiresAt,
+        public CarbonInterface $expiresAt,
     ) {}
 }

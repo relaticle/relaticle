@@ -13,9 +13,9 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
@@ -745,7 +745,7 @@ final class EmailVisibilityService
         return $domain !== '' ? $domain : null;
     }
 
-    private function timestampOrNull(mixed $value): ?Carbon
+    private function timestampOrNull(mixed $value): ?CarbonInterface
     {
         if (blank($value)) {
             return null;
@@ -761,7 +761,7 @@ final class EmailVisibilityService
      *
      * @return array{0: ConnectionStrength, 1: ?string}
      */
-    private function connectionFor(Company|Opportunity|People $record, User $viewer, Carbon $now): array
+    private function connectionFor(Company|Opportunity|People $record, User $viewer, CarbonInterface $now): array
     {
         $emailScores = $record->emails()
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))

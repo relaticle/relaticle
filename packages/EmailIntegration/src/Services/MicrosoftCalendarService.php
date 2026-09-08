@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
@@ -258,17 +258,17 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         );
     }
 
-    private function historyStart(): Carbon
+    private function historyStart(): CarbonInterface
     {
         return Date::parse('1990-01-01T00:00:00Z');
     }
 
-    private function horizon(): Carbon
+    private function horizon(): CarbonInterface
     {
         return Date::now()->addYears(self::WINDOW_YEARS);
     }
 
-    private function calendarWindowUrl(Carbon $start): string
+    private function calendarWindowUrl(CarbonInterface $start): string
     {
         $end = $start->copy()->addYears(self::WINDOW_YEARS);
         $horizon = $this->horizon();
@@ -286,7 +286,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     {
         $end = $this->endDateTimeFromUrl($currentUrl);
 
-        if (! $end instanceof Carbon) {
+        if (! $end instanceof CarbonInterface) {
             return null;
         }
 
@@ -297,7 +297,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         return $this->calendarWindowUrl($end);
     }
 
-    private function endDateTimeFromUrl(string $url): ?Carbon
+    private function endDateTimeFromUrl(string $url): ?CarbonInterface
     {
         $query = parse_url($url, PHP_URL_QUERY);
 

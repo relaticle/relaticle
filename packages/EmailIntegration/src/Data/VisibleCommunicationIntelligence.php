@@ -4,34 +4,34 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Data;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Relaticle\EmailIntegration\Enums\ConnectionStrength;
 
 final readonly class VisibleCommunicationIntelligence
 {
     public function __construct(
         public int $emailCount = 0,
-        public ?Carbon $firstEmailAt = null,
-        public ?Carbon $lastEmailAt = null,
-        public ?Carbon $firstMeetingAt = null,
-        public ?Carbon $lastMeetingAt = null,
-        public ?Carbon $nextMeetingAt = null,
+        public ?CarbonInterface $firstEmailAt = null,
+        public ?CarbonInterface $lastEmailAt = null,
+        public ?CarbonInterface $firstMeetingAt = null,
+        public ?CarbonInterface $lastMeetingAt = null,
+        public ?CarbonInterface $nextMeetingAt = null,
         public ConnectionStrength $connectionStrength = ConnectionStrength::None,
         public ?string $strongestConnectionName = null,
     ) {}
 
-    public function firstInteractionAt(): ?Carbon
+    public function firstInteractionAt(): ?CarbonInterface
     {
         return $this->earlier($this->firstEmailAt, $this->firstMeetingAt);
     }
 
-    public function lastInteractionAt(): ?Carbon
+    public function lastInteractionAt(): ?CarbonInterface
     {
-        if (! $this->lastEmailAt instanceof Carbon) {
+        if (! $this->lastEmailAt instanceof CarbonInterface) {
             return $this->lastMeetingAt;
         }
 
-        if (! $this->lastMeetingAt instanceof Carbon) {
+        if (! $this->lastMeetingAt instanceof CarbonInterface) {
             return $this->lastEmailAt;
         }
 
@@ -40,13 +40,13 @@ final readonly class VisibleCommunicationIntelligence
             : $this->lastMeetingAt;
     }
 
-    private function earlier(?Carbon $left, ?Carbon $right): ?Carbon
+    private function earlier(?CarbonInterface $left, ?CarbonInterface $right): ?CarbonInterface
     {
-        if (! $left instanceof Carbon) {
+        if (! $left instanceof CarbonInterface) {
             return $right;
         }
 
-        if (! $right instanceof Carbon) {
+        if (! $right instanceof CarbonInterface) {
             return $left;
         }
 
