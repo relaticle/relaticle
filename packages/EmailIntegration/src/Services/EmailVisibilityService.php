@@ -15,12 +15,13 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
+use Relaticle\EmailIntegration\Enums\ConnectionStrength;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -149,6 +150,9 @@ final class EmailVisibilityService
     /**
      * Communication-intelligence metrics scoped to mail and meetings the viewer may
      * see on this record. Denormalized CRM counters include hidden teammate mail.
+     *
+     * Includes first and last interaction, email and calendar timestamps, the next
+     * meeting, connection strength, and the teammate with the strongest tie.
      */
     public function visibleCommunicationIntelligence(Company|Opportunity|People $record, User $viewer): VisibleCommunicationIntelligence
     {
@@ -156,31 +160,42 @@ final class EmailVisibilityService
             return new VisibleCommunicationIntelligence;
         }
 
-        $emailAggregates = $record->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+        $emailsQuery = $record
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+
+        $this->preferredCopies->restrictToPreferredCopies($emailsQuery->getQuery(), $viewer);
+
+        $emailAggregates = $emailsQuery
             ->reorder()
             ->toBase()
             ->selectRaw('count(*) as email_count')
-            ->selectRaw('coalesce(sum(case when emails.direction = ? then 1 else 0 end), 0) as inbound_email_count', [EmailDirection::INBOUND->value])
-            ->selectRaw('coalesce(sum(case when emails.direction = ? then 1 else 0 end), 0) as outbound_email_count', [EmailDirection::OUTBOUND->value])
+            ->selectRaw('min(emails.sent_at) as first_email_at')
             ->selectRaw('max(emails.sent_at) as last_email_at')
             ->first();
 
-        $lastMeetingAt = $record->meetings()
+        $now = now();
+
+        $meetingAggregates = $record->meetings()
             ->withGlobalScope('visible', new VisibleMeetingScope($viewer))
             ->reorder()
-            ->max('starts_at');
+            ->toBase()
+            ->selectRaw('min(starts_at) as first_meeting_at')
+            ->selectRaw('max(starts_at) as last_meeting_at')
+            ->selectRaw('min(case when starts_at > ? then starts_at end) as next_meeting_at', [$now])
+            ->first();
+
+        [$connectionStrength, $strongestConnectionName] = $this->connectionFor($record, $viewer, $now);
 
         return new VisibleCommunicationIntelligence(
             emailCount: (int) ($emailAggregates->email_count ?? 0),
-            inboundEmailCount: (int) ($emailAggregates->inbound_email_count ?? 0),
-            outboundEmailCount: (int) ($emailAggregates->outbound_email_count ?? 0),
-            lastEmailAt: filled($emailAggregates->last_email_at)
-                ? Date::parse((string) $emailAggregates->last_email_at)
-                : null,
-            lastMeetingAt: filled($lastMeetingAt)
-                ? Date::parse((string) $lastMeetingAt)
-                : null,
+            firstEmailAt: $this->timestampOrNull($emailAggregates->first_email_at ?? null),
+            lastEmailAt: $this->timestampOrNull($emailAggregates->last_email_at ?? null),
+            firstMeetingAt: $this->timestampOrNull($meetingAggregates->first_meeting_at ?? null),
+            lastMeetingAt: $this->timestampOrNull($meetingAggregates->last_meeting_at ?? null),
+            nextMeetingAt: $this->timestampOrNull($meetingAggregates->next_meeting_at ?? null),
+            connectionStrength: $connectionStrength,
+            strongestConnectionName: $strongestConnectionName,
         );
     }
 
@@ -724,5 +739,92 @@ final class EmailVisibilityService
         $domain = Str::afterLast($email, '@');
 
         return $domain !== '' ? $domain : null;
+    }
+
+    private function timestampOrNull(mixed $value): ?Carbon
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        return Date::parse((string) $value);
+    }
+
+    /**
+     * Recency-weighted frequency of visible emails and meetings, per teammate.
+     * Connection strength is the workspace total. Strongest connection is the
+     * teammate with the highest score among mail the viewer can see.
+     *
+     * @return array{0: ConnectionStrength, 1: ?string}
+     */
+    private function connectionFor(Company|Opportunity|People $record, User $viewer, Carbon $now): array
+    {
+        $emailScores = $record->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->reorder()
+            ->toBase()
+            ->select('emails.user_id')
+            ->selectRaw('coalesce(sum(case when emails.sent_at > ? then 5 when emails.sent_at > ? then 3 when emails.sent_at > ? then 2 when emails.sent_at > ? then 1 else 0.25 end), 0) as score', [
+                $now->copy()->subDays(7),
+                $now->copy()->subDays(30),
+                $now->copy()->subDays(90),
+                $now->copy()->subDays(365),
+            ])
+            ->whereNotNull('emails.sent_at')
+            ->groupBy('emails.user_id')
+            ->pluck('score', 'user_id');
+
+        $meetingAccountScores = $record->meetings()
+            ->withGlobalScope('visible', new VisibleMeetingScope($viewer))
+            ->reorder()
+            ->toBase()
+            ->select('meetings.connected_account_id')
+            ->selectRaw('coalesce(sum(case when meetings.starts_at > ? then 5 when meetings.starts_at > ? then 3 when meetings.starts_at > ? then 2 when meetings.starts_at > ? then 1 else 0.25 end), 0) as score', [
+                $now->copy()->subDays(7),
+                $now->copy()->subDays(30),
+                $now->copy()->subDays(90),
+                $now->copy()->subDays(365),
+            ])
+            ->groupBy('meetings.connected_account_id')
+            ->pluck('score', 'connected_account_id');
+
+        $accountUserIds = $meetingAccountScores->isEmpty()
+            ? collect()
+            : ConnectedAccount::query()
+                ->whereIn('id', $meetingAccountScores->keys())
+                ->pluck('user_id', 'id');
+
+        $scores = [];
+
+        foreach ($emailScores as $userId => $score) {
+            $scores[(string) $userId] = (float) $score;
+        }
+
+        foreach ($meetingAccountScores as $accountId => $score) {
+            $userId = $accountUserIds->get($accountId);
+
+            if ($userId === null) {
+                continue;
+            }
+
+            $key = (string) $userId;
+            $scores[$key] = ($scores[$key] ?? 0.0) + (float) $score;
+        }
+
+        $total = array_sum($scores);
+
+        if ($scores === []) {
+            return [ConnectionStrength::None, null];
+        }
+
+        arsort($scores);
+        $strongestUserId = array_key_first($scores);
+
+        $strongest = User::query()->whereKey($strongestUserId)->value('name');
+
+        return [
+            ConnectionStrength::fromScore($total),
+            is_string($strongest) && $strongest !== '' ? $strongest : null,
+        ];
     }
 }

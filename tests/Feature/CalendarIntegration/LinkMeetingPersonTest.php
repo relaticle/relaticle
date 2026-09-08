@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 mutates(LinkMeetingAction::class);
@@ -229,6 +230,84 @@ it('does not auto-create a company for a www-prefixed public domain', function (
     (app(LinkMeetingAction::class))->execute($meeting->fresh());
 
     expect(Company::query()->where('team_id', $team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company for a www-prefixed configured public domain', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    config()->set('email-integration.public_domains', [
+        ...((array) config('email-integration.public_domains', [])),
+        'www.example.com',
+    ]);
+
+    $countBefore = Company::query()->where('team_id', $team->id)->count();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Public Domain Attendee',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(Company::query()->where('team_id', $team->id)->count())->toBe($countBefore)
+        ->and(People::query()->where('team_id', $team->id)->where('name', 'Public Domain Attendee')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company for a www-prefixed team public domain', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+    Filament::setTenant($team);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+    ]));
+    $team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    PublicEmailDomain::factory()->create([
+        'team_id' => $team->id,
+        'domain' => 'www.example.com',
+    ]);
+
+    $countBefore = Company::query()->where('team_id', $team->id)->count();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Team Public Domain Attendee',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect(Company::query()->where('team_id', $team->id)->count())->toBe($countBefore)
+        ->and(People::query()->where('team_id', $team->id)->where('name', 'Team Public Domain Attendee')->exists())->toBeTrue();
 });
 
 it('does not auto-create a person or company when the connected account is soft-deleted', function (): void {

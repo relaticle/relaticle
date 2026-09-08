@@ -70,6 +70,8 @@ return [
     ],
     'list_row' => [
         'via' => 'via :name',
+        'via_mailboxes' => '{1}via 1 mailbox|[2,*]via :count mailboxes',
+        'access_granted_via' => 'Access granted via',
         'timestamp_yesterday' => 'Yesterday, :time',
         'request_access' => 'Request access from :name',
         'requested' => 'Requested',

@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Livewire;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Services\AvatarService;
@@ -126,6 +127,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public ?string $accountId = null;
 
+    /**
+     * Record this compose was opened from. The queued send is linked immediately
+     * so it appears on that record's Emails tab without waiting for Gmail import.
+     */
+    public ?string $linkRecordType = null;
+
+    public ?string $linkRecordId = null;
+
     /** @var list<string> */
     public array $to = [];
 
@@ -183,7 +192,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * A same-named `$payload['draftId']` entry is never populated by either
      * caller; only a literal `draftId` parameter is.
      *
-     * @param  array{to?: list<string>}  $payload
+     * @param  array{to?: list<string>, linkRecordType?: class-string, linkRecordId?: string}  $payload
      */
     #[On('composer:open')]
     public function open(array $payload = [], ?string $draftId = null): void
@@ -212,6 +221,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->accountId = (string) $account->getKey();
         $this->to = $payload['to'] ?? [];
+        $this->linkRecordType = $payload['linkRecordType'] ?? null;
+        $this->linkRecordId = $payload['linkRecordId'] ?? null;
         $this->privacyTier = resolve(PrivacyService::class)
             ->defaultTierForUser($this->authUser())->value;
 
@@ -429,23 +440,29 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachmentPaths = [...$pendingPaths, ...$copiedPaths];
         $attachmentNames = [...$pendingNames, ...$copiedNames];
 
-        $email = resolve(SendEmailAction::class)->execute([
-            'connected_account_id' => (string) $this->accountId,
-            'subject' => $renderer->renderContent((string) $this->subject),
-            'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
-            'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
-            'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
-            'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
-            'in_reply_to_email_id' => $this->inReplyToEmailId,
-            'creation_source' => $this->creationSource(),
-            'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
-            'batch_id' => null,
-            // Interactive sends from the composer keep the undo-send window (matches
-            // the surface being replaced, HasEmailComposeActions::buildSendData()).
-            'priority' => EmailPriority::PRIORITY,
-            'attachments' => $attachmentPaths,
-            'attachment_file_names' => $attachmentNames,
-        ]);
+        $linkRecord = $this->linkRecord();
+
+        $email = resolve(SendEmailAction::class)->execute(
+            data: [
+                'connected_account_id' => (string) $this->accountId,
+                'subject' => $renderer->renderContent((string) $this->subject),
+                'body_html' => $renderer->renderForSending($this->withQuotedBody($bodyHtml)),
+                'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
+                'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
+                'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
+                'in_reply_to_email_id' => $this->inReplyToEmailId,
+                'creation_source' => $this->creationSource(),
+                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
+                'batch_id' => null,
+                // Interactive sends from the composer keep the undo-send window (matches
+                // the surface being replaced, HasEmailComposeActions::buildSendData()).
+                'priority' => EmailPriority::PRIORITY,
+                'attachments' => $attachmentPaths,
+                'attachment_file_names' => $attachmentNames,
+            ],
+            linkToType: $linkRecord === null ? null : $linkRecord::class,
+            linkToId: $linkRecord?->getKey(),
+        );
 
         if ($this->draftId !== null) {
             // Best-effort: two tabs open on the same draft, or a retried request,
@@ -460,7 +477,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         resolve(QueuedSendNotifier::class)->send($email);
 
         $this->closeComposer();
-        $this->dispatch('composer:sent');
+        $this->dispatch('composer:sent', emailId: $email->getKey());
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
         $this->dispatch('outbox:changed');
@@ -1458,8 +1475,33 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'sourceEmailId', 'inReplyToEmailId', 'quotedBodyHtml']);
+        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'sourceEmailId', 'inReplyToEmailId', 'quotedBodyHtml', 'linkRecordType', 'linkRecordId']);
         $this->resetErrorBag();
+    }
+
+    private function linkRecord(): Company|Opportunity|People|null
+    {
+        $type = $this->linkRecordType;
+        $id = $this->linkRecordId;
+
+        if (! is_string($type) || $id === null || $id === '') {
+            return null;
+        }
+
+        if (! in_array($type, [Company::class, Opportunity::class, People::class], true)) {
+            return null;
+        }
+
+        $record = $type::query()
+            ->whereKey($id)
+            ->where('team_id', $this->authUser()->current_team_id)
+            ->first();
+
+        if ($record instanceof Company || $record instanceof Opportunity || $record instanceof People) {
+            return $record;
+        }
+
+        return null;
     }
 
     private function defaultSignatureFor(?string $accountId): ?EmailSignature

@@ -374,6 +374,58 @@ it('does not auto-create a company for a www-prefixed public domain', function (
     expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create a company for a www-prefixed configured public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    config()->set('email-integration.public_domains', [
+        ...((array) config('email-integration.public_domains', [])),
+        'www.example.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Public Domain Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Public Domain Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company for a www-prefixed team public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    PublicEmailDomain::factory()->create([
+        'team_id' => $this->team->id,
+        'domain' => 'www.example.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Team Public Domain Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Team Public Domain Contact')->exists())->toBeTrue();
+});
+
 it('auto-creates a company when auto_create_companies is true', function (): void {
     $this->team->update([
         'contact_creation_mode' => ContactCreationMode::All,

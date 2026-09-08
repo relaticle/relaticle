@@ -250,6 +250,45 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->and($email->scheduled_for)->not->toBeNull();
 });
 
+it('links a queued send to the record the composer was opened from', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
+
+    Livewire::test(EmailComposer::class)
+        ->call('open', [
+            'linkRecordType' => People::class,
+            'linkRecordId' => $person->getKey(),
+        ])
+        ->assertSet('linkRecordType', People::class)
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Linked to person')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertDispatched('composer:sent');
+
+    $email = Email::query()->where('subject', 'Linked to person')->sole();
+
+    expect($person->emails()->whereKey($email->getKey())->exists())->toBeTrue();
+});
+
+it('does not link a queued send to a record from another workspace', function (): void {
+    $foreign = User::factory()->withTeam()->create();
+    $person = People::factory()->recycle([$foreign, $foreign->currentTeam])->create();
+
+    Livewire::test(EmailComposer::class)
+        ->call('open', [
+            'linkRecordType' => People::class,
+            'linkRecordId' => $person->getKey(),
+        ])
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not link')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Should not link')->sole();
+
+    expect($person->emails()->whereKey($email->getKey())->exists())->toBeFalse();
+});
+
 it('offers undo on the queued toast for the undo window', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')

@@ -52,6 +52,22 @@ abstract class BaseRecordEmailsPage extends Page
         $this->record = $this->resolveRecord($record);
     }
 
+    /**
+     * A send from this record belongs on All, not Inbox. Inbox is inbound only
+     * and would hide the just-queued outbound copy.
+     */
+    public function showQueuedSendOnRecord(?string $emailId = null): void
+    {
+        $this->folder = EmailFolder::All;
+        $this->search = '';
+
+        if (filled($emailId)) {
+            $this->selectedEmailId = $emailId;
+        }
+
+        unset($this->emails);
+    }
+
     protected function getCrmRecord(): Model
     {
         return $this->getRecord();
@@ -76,7 +92,10 @@ abstract class BaseRecordEmailsPage extends Page
      */
     protected function getListeners(): array
     {
-        return ['reply-email' => 'openReplyModal'];
+        return [
+            'reply-email' => 'openReplyModal',
+            'composer:sent' => 'showQueuedSendOnRecord',
+        ];
     }
 
     /**
@@ -132,7 +151,11 @@ abstract class BaseRecordEmailsPage extends Page
 
         resolve(PreferredEmailCopyService::class)->restrictToPreferredCopies($query->getQuery(), $user);
 
-        return $query->latest('sent_at')->paginate(20);
+        $paginator = $query->latest('sent_at')->paginate(20);
+
+        resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $record);
+
+        return $paginator;
     }
 
     /**
