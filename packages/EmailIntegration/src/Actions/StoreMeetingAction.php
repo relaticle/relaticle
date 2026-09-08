@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\NormalizedMeetingPayload;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -32,6 +33,8 @@ final readonly class StoreMeetingAction
                 ->where('provider_event_id', $payload->providerEventId)
                 ->first();
 
+            $responseStatus = $this->resolveSelfResponseStatus($payload, $account, $meeting);
+
             $attributes = [
                 'team_id' => $account->team_id,
                 'connected_account_id' => $account->getKey(),
@@ -48,7 +51,7 @@ final readonly class StoreMeetingAction
                 'organizer_name' => $payload->organizerName,
                 'status' => $payload->status,
                 'visibility' => $payload->visibility,
-                'response_status' => $payload->selfResponseStatus,
+                'response_status' => $responseStatus,
                 'html_link' => $payload->htmlLink,
                 'deleted_at' => null,
             ];
@@ -67,7 +70,9 @@ final readonly class StoreMeetingAction
                 $meeting->attendees()->create([
                     'email_address' => $attendee->emailAddress,
                     'name' => $attendee->name,
-                    'response_status' => $attendee->responseStatus,
+                    'response_status' => $attendee->isSelf
+                        ? ($attendee->responseStatus ?? $responseStatus)
+                        : $attendee->responseStatus,
                     'is_organizer' => $attendee->isOrganizer,
                     'is_self' => $attendee->isSelf,
                 ]);
@@ -98,6 +103,28 @@ final readonly class StoreMeetingAction
         }
 
         return $meeting;
+    }
+
+    private function resolveSelfResponseStatus(
+        NormalizedMeetingPayload $payload,
+        ConnectedAccount $account,
+        ?Meeting $meeting,
+    ): ?AttendeeResponseStatus {
+        if ($payload->selfResponseStatus instanceof AttendeeResponseStatus) {
+            return $payload->selfResponseStatus;
+        }
+
+        if ($meeting instanceof Meeting && $meeting->response_status instanceof AttendeeResponseStatus) {
+            return $meeting->response_status;
+        }
+
+        $organizerEmail = $payload->organizerEmail;
+
+        if ($organizerEmail !== null && strtolower($organizerEmail) === strtolower($account->email_address)) {
+            return AttendeeResponseStatus::ACCEPTED;
+        }
+
+        return null;
     }
 
     private function shouldSkip(NormalizedMeetingPayload $payload): bool

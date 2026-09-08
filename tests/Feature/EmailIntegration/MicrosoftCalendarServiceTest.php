@@ -10,6 +10,7 @@ use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Services\MicrosoftCalendarService;
 
@@ -90,6 +91,7 @@ it('maps Graph attendee response codes to the canonical vocabulary', function ()
                     'attendees' => [
                         ['emailAddress' => ['address' => 'tent@example.com'], 'status' => ['response' => 'tentativelyAccepted']],
                         ['emailAddress' => ['address' => 'none@example.com'], 'status' => ['response' => 'notResponded']],
+                        ['emailAddress' => ['address' => 'org@example.com'], 'status' => ['response' => 'organizer']],
                     ],
                 ],
             ],
@@ -101,8 +103,10 @@ it('maps Graph attendee response codes to the canonical vocabulary', function ()
         ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
 
     // tentativelyAccepted -> tentative, notResponded -> needsAction (Google's vocab).
+    // organizer is not an RSVP. Leave it empty so a host status chosen in Relaticle is kept.
     expect($result->events[0]->attendees[0]['response_status'])->toBe('tentative')
-        ->and($result->events[0]->attendees[1]['response_status'])->toBe('needsAction');
+        ->and($result->events[0]->attendees[1]['response_status'])->toBe('needsAction')
+        ->and($result->events[0]->attendees[2]['response_status'])->toBeNull();
 });
 
 it('maps Graph "personal" sensitivity to private so the event is treated as private', function (): void {
@@ -217,4 +221,37 @@ it('posts tentativelyAccept for maybe', function (): void {
         ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
+});
+
+it('does not fail when Graph rejects the host responding to their own meeting', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/tentativelyAccept' => Http::response([
+            'error' => [
+                'code' => 'ErrorInvalidRequest',
+                'message' => 'Your request can\'t be completed. You can\'t respond to this meeting because you\'re the organizer.',
+            ],
+        ], 400),
+    ]);
+
+    (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
+});
+
+it('still fails when Graph returns a server error that mentions organizer', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/events/evt-1/decline' => Http::response([
+            'error' => [
+                'code' => 'UnknownError',
+                'message' => 'The organizer service is unavailable.',
+            ],
+        ], 500),
+    ]);
+
+    expect(fn () => (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->respondToEvent('evt-1', AttendeeResponseStatus::DECLINED))
+        ->toThrow(MeetingResponseFailed::class);
 });

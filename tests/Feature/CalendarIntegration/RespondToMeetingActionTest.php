@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Team;
 use App\Models\User;
+use App\Policies\MeetingPolicy;
 use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
@@ -15,7 +16,7 @@ use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(RespondToMeetingAction::class);
+mutates(RespondToMeetingAction::class, MeetingPolicy::class);
 
 /**
  * @param  array<string, mixed>  $overrides
@@ -146,6 +147,37 @@ it('lets the mailbox owner change RSVP when they are the host', function (): voi
     expect($updated->response_status)->toBe(AttendeeResponseStatus::TENTATIVE)
         ->and($updated->attendees->first()?->response_status)->toBe(AttendeeResponseStatus::TENTATIVE)
         ->and($updated->trashed())->toBeFalse();
+});
+
+it('lets the mailbox owner change RSVP when they are the host even without an attendee row', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($user, $user->currentTeam);
+    $meeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'provider_event_id' => 'evt-rsvp-1',
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+        'status' => CalendarEventStatus::CONFIRMED,
+        'organizer_email' => $account->email_address,
+    ]);
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('evt-rsvp-1', AttendeeResponseStatus::TENTATIVE);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    $updated = app(RespondToMeetingAction::class)->execute($user, $meeting, AttendeeResponseStatus::TENTATIVE);
+
+    expect($updated->response_status)->toBe(AttendeeResponseStatus::TENTATIVE)
+        ->and($updated->attendees)->toHaveCount(1)
+        ->and($updated->attendees->first()?->is_self)->toBeTrue()
+        ->and($updated->attendees->first()?->is_organizer)->toBeTrue()
+        ->and($updated->attendees->first()?->response_status)->toBe(AttendeeResponseStatus::TENTATIVE);
 });
 
 it('forbids a teammate from changing someone else\'s RSVP', function (): void {

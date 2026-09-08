@@ -32,7 +32,7 @@ final class MeetingAttendeeEntry extends Entry
         }
 
         $name = $record->name ?: $record->email_address;
-        $contact = $record->getRelationValue('contact');
+        $contact = $record->relationLoaded('contact') ? $record->getRelation('contact') : null;
 
         return [
             'name' => $name,

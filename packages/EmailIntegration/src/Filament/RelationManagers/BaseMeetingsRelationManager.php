@@ -49,7 +49,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     $query->whereRaw('0 = 1');
                 }
 
-                return $query->with(['team', 'attendees', 'connectedAccount']);
+                return $query->with(['team', 'attendees.contact', 'connectedAccount']);
             })
             ->columns([
                 TextColumn::make('title')

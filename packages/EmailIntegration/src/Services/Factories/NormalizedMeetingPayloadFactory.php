@@ -18,6 +18,9 @@ final readonly class NormalizedMeetingPayloadFactory
         $attendees = [];
         $selfResponse = null;
         $normalizedAccountEmail = strtolower($accountEmail);
+        $hasSelf = false;
+        $hasOrganizer = false;
+        $organizerEmail = $event->organizerEmail !== null ? strtolower($event->organizerEmail) : null;
 
         foreach ($event->attendees as $att) {
             $email = $att['email'];
@@ -26,6 +29,11 @@ final readonly class NormalizedMeetingPayloadFactory
 
             if ($isSelf) {
                 $selfResponse = $response;
+                $hasSelf = true;
+            }
+
+            if ($att['is_organizer'] || ($organizerEmail !== null && $email === $organizerEmail)) {
+                $hasOrganizer = true;
             }
 
             $attendees[] = new NormalizedAttendee(
@@ -34,6 +42,26 @@ final readonly class NormalizedMeetingPayloadFactory
                 responseStatus: $response,
                 isOrganizer: $att['is_organizer'],
                 isSelf: $isSelf,
+            );
+        }
+
+        $isSelfOrganizer = $organizerEmail === $normalizedAccountEmail;
+
+        if (! $hasSelf && $isSelfOrganizer) {
+            $attendees[] = new NormalizedAttendee(
+                emailAddress: $normalizedAccountEmail,
+                name: $event->organizerName,
+                responseStatus: $selfResponse,
+                isOrganizer: true,
+                isSelf: true,
+            );
+        } elseif ($organizerEmail !== null && ! $hasOrganizer && ! $isSelfOrganizer) {
+            $attendees[] = new NormalizedAttendee(
+                emailAddress: $organizerEmail,
+                name: $event->organizerName,
+                responseStatus: null,
+                isOrganizer: true,
+                isSelf: false,
             );
         }
 
