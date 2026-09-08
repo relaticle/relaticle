@@ -68,8 +68,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function (): void {
     if (Feature::active(SocialAuth::class)) {
         // Confirmation intent, not login: a linked provider re-authenticated here
-        // proves current access to that identity for one sensitive operation. Kept
-        // route names Task 5's own link-provider routes must not rename.
+        // proves current access to that identity for one sensitive operation.
+        // Distinct from the link routes below, which establish a new association.
         Route::get('/auth/confirm/redirect/{provider}', IdentityConfirmationRedirectController::class)
             ->name('auth.socialite.confirm.redirect')
             ->middleware('throttle:10,1,socialite-confirm-redirect');

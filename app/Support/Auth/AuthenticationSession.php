@@ -37,8 +37,8 @@ final readonly class AuthenticationSession
 
     /**
      * The only sensitive operations that may consume a scoped, one-use identity
-     * confirmation grant. Keep in sync with the plan's allowlist; a caller for an
-     * operation outside this list has no legitimate reason to mint a grant.
+     * confirmation grant. A caller for an operation outside this list has no
+     * legitimate reason to mint one.
      *
      * @var list<string>
      */

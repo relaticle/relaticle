@@ -165,8 +165,7 @@ return [
     |
     | Bounds for the six-digit email code flow: how often one email/purpose
     | pair may be sent a new code, and how often one source IP may trigger a
-    | send across every purpose. Tune these independently of the rollout
-    | flags a later change adds alongside them.
+    | send across every purpose.
     |
     */
 

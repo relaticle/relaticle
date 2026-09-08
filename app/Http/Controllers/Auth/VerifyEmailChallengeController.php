@@ -7,8 +7,8 @@ namespace App\Http\Controllers\Auth;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Registered now so the route surface is complete; redemption itself is a
- * later task's action. Every call refuses deterministically until then.
+ * Placeholder for code redemption, which has no caller yet. Refuses every call
+ * deterministically rather than leaving the route surface incomplete.
  */
 final readonly class VerifyEmailChallengeController
 {
