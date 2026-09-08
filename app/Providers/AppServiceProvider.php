@@ -40,10 +40,17 @@ use App\Services\GitHubService;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\BrandColors;
 use App\Support\Markdown\TableAwareLeagueDriver;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
+use Filament\Auth\Notifications\ResetPassword;
+use Filament\Auth\Notifications\VerifyEmail;
+use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Verified;
@@ -56,6 +63,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -98,8 +106,14 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        Date::use(CarbonImmutable::class);
+
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
+        $this->app->bind(VerifyEmail::class, \App\Notifications\Auth\VerifyEmail::class);
+        $this->app->bind(VerifyEmailChange::class, \App\Notifications\Auth\VerifyEmailChange::class);
+        $this->app->bind(ResetPassword::class, \App\Notifications\Auth\ResetPassword::class);
+        $this->app->bind(NoticeOfEmailChangeRequest::class, \App\Notifications\Auth\NoticeOfEmailChangeRequest::class);
 
         // Ink registers its public routes from packageBooted(), which runs after every
         // provider's register(). Read the config key App\Features\Blog resolves from
@@ -132,7 +146,7 @@ final class AppServiceProvider extends ServiceProvider
         // worker that touches two workspaces. Rebinding per resolve gives each
         // lookup its own step objects, so once() memoizes within one lookup as
         // intended. Registration lives here because a fresh registry starts empty.
-        $this->app->bind(OnboardingSteps::class, function (): OnboardingSteps {
+        $this->app->bind(function (): OnboardingSteps {
             $steps = new OnboardingSteps;
 
             ActivationSteps::registerOn($steps);
@@ -161,6 +175,12 @@ final class AppServiceProvider extends ServiceProvider
                 MakeFilamentUserCommand::class,
             ]);
         }
+
+        // Panels register their own palette on boot and override this, so it only
+        // takes effect where no panel is active: the invitation, join, and
+        // scheduled-deletion interstitials, which would otherwise render
+        // Filament's default amber instead of the brand color.
+        FilamentColor::register(['primary' => BrandColors::primary()]);
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);

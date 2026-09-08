@@ -74,6 +74,18 @@ present.
 
 ## 4. Login flow (both panels, Filament stock login)
 
+**UPDATE (verified: 2026-09-03, app panel, path-routed `astana-v1`):** the app login is
+now identifier-first (PR #285). `/app/login` renders only `id="form.email"` plus a
+"Continue" submit; there is no `form.password` on the first step, so the eval recipe
+below returns `no-inputs`. Two things that worked:
+
+- Herd's cert fails Chromium's name check (`ERR_CERT_COMMON_NAME_INVALID`). Export
+  `AGENT_BROWSER_IGNORE_HTTPS_ERRORS=1` (or pass `--ignore-https-errors`) on every call.
+- Local login pages render one-click `laravel-login-link` buttons labelled by email
+  (`owner@relaticle.test`, `trial@relaticle.test`, ...). Click one via eval:
+  `[...document.querySelectorAll("button[type=submit]")].find(b=>b.innerText.trim()==="owner@relaticle.test").click()`
+  and you land on `/app/<team-slug>` (`acme-sales` for owner) with no password step.
+
 **CORRECTION (verified: 2026-06-12, review PR 336):** the `input[name="email"]` selector
 is WRONG. It matches a **hidden** input belonging to the `laravel-login-link` dev package
 (the page has hidden `_token`/`email`/`key`/`guard`/`user_model` inputs from that form).
@@ -232,3 +244,13 @@ Never use tinker or DB writes to fix or fake a result. An on-screen error is a f
 
 For any deliverable screenshot, invoke `Skill('screenshot-with-callout')` per shot
 (annotate → verify-crop → shoot → read-back). Throwaway debug shots exempt.
+
+## 9. Eval and rendering hints (verified: 2026-09-07)
+
+- `agent-browser eval` runs every call in the same page scope. A top-level `const x`
+  declared in one eval throws `Identifier 'x' has already been declared` in the next.
+  Wrap evals in an IIFE: `agent-browser eval '(()=>{ const x=...; return JSON.stringify(x) })()'`.
+- To screenshot a feature-flag branch without flipping the shared `.env`, render it to
+  a file and open that: `php artisan tinker --execute '\Laravel\Pennant\Feature::define(\App\Features\Billing::class, false); file_put_contents(".context/off.html", view("pricing")->render());'`
+  then `agent-browser open "file://$(pwd)/.context/off.html"`. Vite assets resolve to the
+  absolute `APP_URL`, so the page styles correctly from `file://`.

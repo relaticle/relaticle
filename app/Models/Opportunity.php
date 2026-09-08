@@ -11,6 +11,7 @@ use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
 use App\Observers\OpportunityObserver;
+use Carbon\CarbonImmutable;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -31,7 +32,7 @@ use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
 
 /**
- * @property Carbon|null $deleted_at
+ * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
  * @property Carbon|null $last_email_at
  * @property Carbon|null $last_interaction_at

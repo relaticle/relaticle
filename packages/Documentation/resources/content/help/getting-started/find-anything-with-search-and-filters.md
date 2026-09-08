@@ -1,6 +1,6 @@
 ---
 title: Find anything with search and filters
-description: Search across every record from the sidebar, or filter any list.
+description: Find instructions for searching Relaticle records and filtering lists of companies, people, opportunities, tasks and notes.
 order: 7
 updated: "2026-08-12"
 related: [help/getting-started/use-custom-fields, help/getting-started/import-your-existing-data]

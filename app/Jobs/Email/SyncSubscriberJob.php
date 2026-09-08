@@ -8,15 +8,13 @@ use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use App\Support\Email\SubscriberProfile;
 use App\Support\Email\SubscriberProfileDeriver;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Spatie\MailcoachSdk\Exceptions\InvalidData;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
 use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
@@ -32,7 +30,7 @@ use Spatie\MailcoachSdk\Resources\Subscriber;
 #[Backoff(60, 300, 900, 3600)]
 final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Queueable;
 
     /**
      * Bounds the uniqueness lock. Completion and failure both release it, but a
@@ -71,7 +69,7 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 
         $profile = $deriver->derive($user);
 
-        if ($profile->matchesStored($user)) {
+        if (! $profile->needsSync($user)) {
             return;
         }
 
@@ -85,11 +83,17 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
             $this->release(max($exception->retryAfter, 10));
 
             return;
+        } catch (InvalidData $exception) {
+            $user->forceFill(['rejected_subscriber_profile_hash' => $profile->hash()])->saveQuietly();
+            $this->fail($exception);
+
+            return;
         }
 
         $user->forceFill([
             'mailcoach_subscriber_uuid' => $uuid,
             'subscriber_profile_hash' => $profile->hash(),
+            'rejected_subscriber_profile_hash' => null,
         ])->saveQuietly();
     }
 

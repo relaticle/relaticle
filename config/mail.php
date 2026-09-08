@@ -137,4 +137,22 @@ return [
         'name' => env('MAIL_REPLY_TO_NAME'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Settings
+    |--------------------------------------------------------------------------
+    |
+    | Markdown mailables render through a theme CSS file under
+    | resources/views/vendor/mail/html/themes.
+    |
+    */
+
+    'markdown' => [
+        'theme' => env('MAIL_MARKDOWN_THEME', 'relaticle'),
+
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
 ];

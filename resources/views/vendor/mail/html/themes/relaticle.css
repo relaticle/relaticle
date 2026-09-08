@@ -1,0 +1,374 @@
+/* Relaticle mail theme. Hex only: Gmail drops the whole inline style
+   attribute when it meets oklch(), and classic Outlook ignores it.
+   Primary scale from resources/css/theme.css:
+   50 #f5f3ff 100 #ede9fe 200 #ddd6fe 300 #c4b5fd 400 #a78bfa
+   500 #8b5cf6 600 #7c3aed 700 #6d28d9 800 #5b21b6 900 #4c1d95 950 #2e1065 */
+
+/* Base */
+
+body,
+body *:not(html):not(style):not(br):not(tr):not(code) {
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    position: relative;
+}
+
+body {
+    -webkit-text-size-adjust: none;
+    background-color: #f4f4f5;
+    color: #3f3f46;
+    height: 100%;
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+    width: 100% !important;
+}
+
+p,
+ul,
+ol,
+blockquote {
+    line-height: 1.5;
+    text-align: start;
+}
+
+a {
+    color: #6d28d9;
+    text-decoration: underline;
+}
+
+a img {
+    border: none;
+}
+
+/* Typography */
+
+h1 {
+    color: #18181b;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 32px;
+    margin: 0 0 16px;
+    text-align: start;
+}
+
+h2 {
+    color: #18181b;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 28px;
+    margin: 24px 0 8px;
+    text-align: start;
+}
+
+h3 {
+    color: #18181b;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    margin: 16px 0 8px;
+    text-align: start;
+}
+
+p {
+    color: #3f3f46;
+    font-size: 16px;
+    line-height: 24px;
+    margin: 0 0 16px;
+    text-align: start;
+}
+
+p.sub {
+    color: #52525b;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+img {
+    max-width: 100%;
+}
+
+/* Layout */
+
+.wrapper {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    background-color: #f4f4f5;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.content {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+/* Header */
+
+.header {
+    padding: 32px 0 24px;
+    text-align: center;
+}
+
+.logo {
+    display: block;
+    height: 45px;
+    max-height: 45px;
+    width: 140px;
+}
+
+/* Preheader */
+
+.preheader {
+    color: #f4f4f5;
+    display: none;
+    font-size: 1px;
+    line-height: 1px;
+    max-height: 0;
+    max-width: 0;
+    mso-hide: all;
+    opacity: 0;
+    overflow: hidden;
+    visibility: hidden;
+}
+
+/* Body */
+
+.body {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    background-color: #f4f4f5;
+    border-bottom: 1px solid #f4f4f5;
+    border-top: 1px solid #f4f4f5;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.inner-body {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 600px;
+    background-color: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    margin: 0 auto;
+    padding: 0;
+    width: 600px;
+}
+
+.inner-body a {
+    word-break: break-word;
+}
+
+.content-cell {
+    max-width: 100vw;
+    padding: 40px;
+}
+
+/* Subcopy */
+
+.subcopy {
+    border-top: 1px solid #e4e4e7;
+    margin-top: 24px;
+    padding-top: 24px;
+}
+
+.subcopy p {
+    color: #52525b;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+/* Footer */
+
+.footer {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 600px;
+    margin: 0 auto;
+    padding: 0;
+    text-align: center;
+    width: 600px;
+}
+
+.footer-cell {
+    color: #52525b;
+    font-size: 14px;
+    line-height: 20px;
+    padding: 24px 40px 40px;
+    text-align: center;
+}
+
+.footer-cell p {
+    color: #52525b;
+    font-size: 14px;
+    line-height: 20px;
+    margin: 0 0 8px;
+    text-align: center;
+}
+
+.footer-cell a {
+    color: #52525b;
+    text-decoration: underline;
+}
+
+.footer-links a {
+    margin: 0 6px;
+}
+
+/* Buttons */
+
+.action {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 24px auto;
+    padding: 0;
+    text-align: start;
+    width: 100%;
+    float: unset;
+}
+
+.button-wrap {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+}
+
+.button {
+    -webkit-text-size-adjust: none;
+    border-radius: 6px;
+    color: #ffffff;
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 24px;
+    overflow: hidden;
+    text-decoration: none;
+}
+
+.button-primary,
+.button-blue,
+.button-green,
+.button-success,
+.button-red,
+.button-error {
+    background-color: #7c3aed;
+    border-bottom: 10px solid #7c3aed;
+    border-left: 24px solid #7c3aed;
+    border-right: 24px solid #7c3aed;
+    border-top: 10px solid #7c3aed;
+    color: #ffffff;
+}
+
+/* Panels */
+
+.panel {
+    border-left: 4px solid #7c3aed;
+    margin: 24px 0;
+}
+
+.panel-content {
+    background-color: #f5f3ff;
+    color: #3f3f46;
+    padding: 16px;
+}
+
+.panel-content p {
+    color: #3f3f46;
+    margin: 0;
+}
+
+.panel-item {
+    padding: 0;
+}
+
+.panel-item p:last-of-type {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Lists */
+
+.list {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 0 0 24px;
+    width: 100%;
+}
+
+.list-title {
+    color: #18181b;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    padding: 0 0 8px;
+    text-transform: uppercase;
+}
+
+.list-row {
+    border-top: 1px solid #e4e4e7;
+    padding: 12px 0;
+}
+
+.list-label {
+    color: #18181b;
+    font-size: 16px;
+    line-height: 24px;
+}
+
+.list-label a {
+    color: #18181b;
+}
+
+.list-value {
+    color: #3f3f46;
+    font-size: 16px;
+    line-height: 24px;
+}
+
+.list-meta {
+    color: #52525b;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+/* Tables */
+
+.table table {
+    -premailer-cellpadding: 0;
+    -premailer-cellspacing: 0;
+    -premailer-width: 100%;
+    margin: 24px auto;
+    width: 100%;
+}
+
+.table th {
+    border-bottom: 1px solid #e4e4e7;
+    color: #18181b;
+    margin: 0;
+    padding-bottom: 8px;
+}
+
+.table td {
+    color: #3f3f46;
+    font-size: 16px;
+    line-height: 24px;
+    margin: 0;
+    padding: 10px 0;
+}
+
+/* Utilities */
+
+.break-all {
+    word-break: break-all;
+}

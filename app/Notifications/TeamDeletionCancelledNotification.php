@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Team;
+use Filament\Facades\Filament;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -27,9 +28,10 @@ final class TeamDeletionCancelledNotification extends Notification implements Sh
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("{$this->team->name} deletion has been cancelled")
-            ->line("The scheduled deletion of {$this->team->name} has been cancelled.")
-            ->line('The team and all its data are safe. No further action is needed.')
-            ->salutation('Thank you for using Relaticle.');
+            ->subject(__('mail.team_deletion_cancelled.subject', ['team' => $this->team->name]))
+            ->markdown('mail.notifications.team-deletion-cancelled', [
+                'teamName' => $this->team->name,
+                'teamUrl' => Filament::getPanel('app')->getUrl($this->team),
+            ]);
     }
 }

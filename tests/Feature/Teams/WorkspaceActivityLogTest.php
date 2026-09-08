@@ -18,11 +18,6 @@ use Livewire\Features\SupportTesting\Testable;
 
 mutates(ActivityLog::class);
 
-/**
- * The slide-over body is rendered by the panel layout, which a component test
- * never boots — so the diff is read off the mounted action's own view, which is
- * the exact markup the panel would print.
- */
 function slideOverChanges(Testable $component): string
 {
     return (string) $component->instance()->getMountedAction()->getModalContent();
@@ -228,10 +223,6 @@ test('a create and a delete in one request both stay on the record', function ()
         ->assertSee(__('teams.activity.events.deleted'));
 });
 
-/**
- * Each custom field that moves is logged as its own row, so a save touching
- * three fields writes three siblings, not one.
- */
 function seedCustomFieldRow(object $test, Company $company, string $batch, string $label, string $old, string $new): Activity
 {
     return Activity::withoutGlobalScopes()->create([
@@ -382,14 +373,11 @@ test('a shared filtered url renders already filtered', function (): void {
 test('a custom field edit reads as an update, not its raw event name', function (): void {
     $company = Company::factory()->for($this->team)->create(['name' => 'Field Edited Co']);
 
-    activity()
-        ->performedOn($company)
-        ->causedBy($this->owner)
-        ->event('custom_field_changes')
-        ->log('custom field changed');
+    $row = seedCustomFieldRow($this, $company, (string) Str::uuid(), 'ICP', 'No', 'Yes');
 
     livewire(ActivityLog::class)
         ->assertOk()
+        ->assertCanSeeTableRecords([$row])
         ->assertSee(__('teams.activity.events.updated'))
         ->assertDontSee('custom_field_changes');
 });

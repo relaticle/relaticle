@@ -25,6 +25,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -32,7 +33,6 @@ use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -299,7 +299,7 @@ final class ResetDemoAccountCommand extends Command
             ->withoutGlobalScopes()
             ->pluck('id', 'name');
 
-        /** @var array<string, array{company: string, person: string, opportunity: string, status: string, due_at: Carbon, assigned: bool}> $specifications */
+        /** @var array<string, array{company: string, person: string, opportunity: string, status: string, due_at: CarbonImmutable, assigned: bool}> $specifications */
         $specifications = [
             'Follow up with Dylan' => [
                 'company' => 'Figma',

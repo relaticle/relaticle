@@ -37,7 +37,8 @@ final class ListCompanies extends ListRecords
                 Action::make('import')
                     ->label(__('filament/resources/company.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportCompanies::getUrl()),
+                    ->url(ImportCompanies::getUrl())
+                    ->visible(ImportCompanies::canAccess(...)),
                 ExportAction::make()->exporter(CompanyExporter::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Notifications\NotificationType;
 use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
@@ -10,12 +11,16 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\EmailAttachmentController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
+use App\Http\Controllers\Mail\UnsubscribeController;
 use App\Http\Controllers\PrivacyPolicyController;
+use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
+use App\Http\Middleware\ThrottleBeforeAuthentication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Session\Middleware\AuthenticateSession;
@@ -67,6 +72,16 @@ Route::get('/.well-known/security.txt', function (): Response {
     ]);
 })->name('securityTxt');
 
+Route::middleware(['signed', 'throttle:30,1,mail-unsubscribe', 'no-referrer'])->group(function (): void {
+    Route::get('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'show'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe');
+
+    Route::post('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'store'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe.store');
+});
+
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);
     Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
@@ -74,6 +89,7 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     Route::get('/pricing', fn () => view('pricing'))->name('pricing');
     Route::get('/press', fn () => view('press'))->name('press');
     Route::get('/ai', fn () => view('ai'))->name('ai');
+    Route::get('/ai-native-crm', fn () => view('ai-native-crm'))->name('aiNativeCrm');
     Route::get('/self-hosted', fn () => view('self-hosted'))->name('selfHosted');
     Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
     Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
@@ -83,9 +99,47 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');
 
-Route::get('/team-invitations/{invitation}', AcceptTeamInvitationController::class)
-    ->middleware(['signed', 'auth', 'verified', AuthenticateSession::class])
-    ->name('team-invitations.accept');
+Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+    // Separate buckets: a shared one lets repeated views of the invite page
+    // spend the allowance the accept POST needs.
+    Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
+        ->name('team-invitations.token.accept');
+
+    Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
+        ->middleware(['auth', 'verified', AuthenticateSession::class])
+        ->name('email-attachments.download');
+
+    Route::get('/email-attachments/{attachment}/inline', EmailAttachmentController::class)
+        ->middleware(['auth', 'verified', AuthenticateSession::class])
+        ->name('email-attachments.inline');
+
+    Route::post('/invitations/{token}', [AcceptTeamInvitationController::class, 'store'])
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
+        ->name('team-invitations.token.join');
+
+    // Signing out returns here rather than to the marketing home, so the invitee
+    // lands back on the invitation instead of losing it with the session.
+    Route::post('/invitations/{token}/switch-account', SwitchInvitationAccountController::class)
+        ->where('token', '[A-Za-z0-9]{40}')
+        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-switch')
+        ->name('team-invitations.token.switch');
+});
+
+Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])
+    ->group(function (): void {
+        Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
+            ->where('token', '[A-Za-z0-9]{40}')
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-show')
+            ->name('teams.join');
+
+        Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
+            ->where('token', '[A-Za-z0-9]{40}')
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-confirm')
+            ->name('teams.join.confirm');
+    });
 
 Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
     ->middleware(['auth', 'verified', AuthenticateSession::class])
@@ -94,21 +148,6 @@ Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
 Route::get('/email-attachments/{attachment}/inline', EmailAttachmentController::class)
     ->middleware(['auth', 'verified', AuthenticateSession::class])
     ->name('email-attachments.inline');
-
-Route::middleware(['auth', 'verified', AuthenticateSession::class])
-    ->group(function (): void {
-        // Separate buckets: a shared one lets repeated views of the invite page
-        // spend the allowance the accept POST needs.
-        Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
-            ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware('throttle:10,1,team-join-show')
-            ->name('teams.join');
-
-        Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
-            ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware('throttle:10,1,team-join-confirm')
-            ->name('teams.join.confirm');
-    });
 
 // Legacy documentation redirects. Two indexed generations point here: the
 // original /documentation/* URLs and the /docs/* generation retired 2026-08-13
@@ -143,3 +182,8 @@ if (Feature::active(Documentation::class)) {
 Route::get('/discord', function () {
     return redirect()->away(config('services.discord.invite_url'));
 })->name('discord');
+
+if (app()->environment('local')) {
+    Route::get('/dev/mail', [MailPreviewController::class, 'index'])->name('dev.mail.index');
+    Route::get('/dev/mail/{mail}', [MailPreviewController::class, 'show'])->name('dev.mail.show');
+}

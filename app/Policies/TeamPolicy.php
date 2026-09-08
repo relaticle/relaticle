@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
@@ -45,11 +46,30 @@ final readonly class TeamPolicy
     }
 
     /**
+     * Owner and Admin may invite, revoke, and change member roles.
+     * Renaming, deleting, billing, and custom fields stay owner-only.
+     */
+    public function manageMembers(User $user, Team $team): bool
+    {
+        return $user->ownsTeam($team)
+            || $user->hasTeamRoleForTeamId($team->id, TeamRole::Admin->value);
+    }
+
+    /**
+     * Granting or revoking Admin is the owner's alone, so an Admin cannot
+     * escalate a peer or themselves.
+     */
+    public function promoteToAdmin(User $user, Team $team): bool
+    {
+        return $user->ownsTeam($team);
+    }
+
+    /**
      * Determine whether the user can add team members.
      */
     public function addTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->manageMembers($user, $team);
     }
 
     /**
@@ -57,7 +77,7 @@ final readonly class TeamPolicy
      */
     public function updateTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->manageMembers($user, $team);
     }
 
     /**
@@ -65,7 +85,7 @@ final readonly class TeamPolicy
      */
     public function removeTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->manageMembers($user, $team);
     }
 
     /**

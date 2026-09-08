@@ -1,7 +1,7 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
 
-    $title = __('Self-Hosted CRM: Deploy Relaticle on Your Own Server').' - Relaticle';
+    $title = __('Self-hosted CRM: Run it on your server').' - Relaticle';
     $description = __('Deploy Relaticle, the open-source AGPL-3.0 CRM, on your own server with two Docker commands. Unlimited users, no per-seat pricing, and your data stays yours.');
 
     $quickStartLines = [

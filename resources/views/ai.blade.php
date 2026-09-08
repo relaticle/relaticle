@@ -129,6 +129,11 @@
                     {{ __('See it work') }}
                 </x-marketing.button>
             </div>
+
+            <a href="{{ route('aiNativeCrm') }}" class="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
+                {{ __('What makes a CRM AI-native?') }}
+                <x-ri-arrow-right-line class="w-3.5 h-3.5"/>
+            </a>
         </div>
     </section>
 

@@ -6,7 +6,7 @@ use App\Features\OnboardSeed;
 use App\Mail\TaskDigestMail;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -47,7 +47,7 @@ function userWithDueTask(string $timezone, bool $digestEmail = true): User
 }
 
 it('queues a digest for a user at 08:00 local time', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
     $user = userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
@@ -56,7 +56,7 @@ it('queues a digest for a user at 08:00 local time', function (): void {
 });
 
 it('does not queue outside 08:00 local time', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 09:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 09:00:00', 'UTC'));
     userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
@@ -66,7 +66,7 @@ it('does not queue outside 08:00 local time', function (): void {
 
 it('filters recipients by timezone so only users at their local 08:00 are queued', function (): void {
     // At 23:00 UTC, Asia/Tokyo (UTC+9) is 08:00 the next day, while UTC is 23:00.
-    $this->travelTo(Carbon::parse('2026-06-29 23:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 23:00:00', 'UTC'));
     $tokyo = userWithDueTask('Asia/Tokyo');
     $utc = userWithDueTask('UTC');
 
@@ -77,7 +77,7 @@ it('filters recipients by timezone so only users at their local 08:00 are queued
 });
 
 it('suppresses the digest when the user has no due tasks', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
     User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
@@ -86,7 +86,7 @@ it('suppresses the digest when the user has no due tasks', function (): void {
 });
 
 it('does not queue when the digest email channel is off', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
     userWithDueTask('UTC', digestEmail: false);
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();

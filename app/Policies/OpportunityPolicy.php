@@ -6,11 +6,13 @@ namespace App\Policies;
 
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Policies\Concerns\ChecksTeamWriteAccess;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class OpportunityPolicy
 {
+    use ChecksTeamWriteAccess;
     use HandlesAuthorization;
 
     public function viewAny(User $user): bool
@@ -25,32 +27,32 @@ final readonly class OpportunityPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->canCreateInCurrentTeam($user);
     }
 
     public function update(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeamId($opportunity->team_id);
+        return $this->canWriteInTeam($user, $opportunity->team_id);
     }
 
     public function delete(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeamId($opportunity->team_id);
+        return $this->canWriteInTeam($user, $opportunity->team_id);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->canCreateInCurrentTeam($user);
     }
 
     public function restore(User $user, Opportunity $opportunity): bool
     {
-        return $user->belongsToTeamId($opportunity->team_id);
+        return $this->canWriteInTeam($user, $opportunity->team_id);
     }
 
     public function restoreAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->canCreateInCurrentTeam($user);
     }
 
     public function forceDelete(User $user): bool

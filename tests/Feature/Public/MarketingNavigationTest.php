@@ -171,3 +171,11 @@ it('renders the works-with strip on the homepage with a link to the developer do
         ->and($strip)->toContain('href="'.route('documentation.index').'"')
         ->and($strip)->toContain('21,000+');
 });
+
+it('shows one product hunt badge per theme in the footer', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect($html)->toContain('https://www.producthunt.com/products/relaticle?embed=true')
+        ->and($html)->toContain('featured.svg?post_id=1238864&amp;theme=light')
+        ->and($html)->toContain('featured.svg?post_id=1238864&amp;theme=dark');
+});

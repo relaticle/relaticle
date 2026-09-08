@@ -1,6 +1,6 @@
 ---
 title: Self-Hosting Guide
-description: Deploy Relaticle with Docker or manually.
+description: Get Docker Compose, Coolify and Dokploy deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
 order: 1
 updated: "2026-08-30"
 ---

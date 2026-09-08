@@ -14,6 +14,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -74,10 +75,16 @@ final class SystemAdminPanelProvider extends PanelProvider
             Gate::policy($model, $policy);
         }
 
-        // Table and Schema configuration is global, so both callbacks have to check
-        // which panel is actually serving the request before they touch the format.
+        Column::configureUsing(fn (Column $column): Column => $this->isCurrentPanel()
+            ? $column->toggleable()
+            : $column);
+
+        // Filament configuration is global, so panel-specific callbacks must guard
+        // against changing customer-facing components.
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
             : $table);
 
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()

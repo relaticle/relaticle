@@ -27,9 +27,10 @@ final class TeamMemberRemovedNotification extends Notification implements Should
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject("You've been removed from {$this->team->name}")
-            ->line("You have been removed from the {$this->team->name} team.")
-            ->line('You will no longer have access to this team\'s data.')
-            ->salutation('Thank you for using Relaticle.');
+            ->subject(__('mail.team_member_removed.subject', ['team' => $this->team->name]))
+            ->markdown('mail.notifications.team-member-removed', [
+                'teamName' => $this->team->name,
+                'appUrl' => url()->getAppUrl(),
+            ]);
     }
 }

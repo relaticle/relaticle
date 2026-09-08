@@ -9,7 +9,7 @@
 @endphp
 
 <x-guest-layout
-    :title="$seoTitle . ' - ' . config('app.name') . ' Blog'"
+    :title="$seoTitle . ' - ' . config('app.name')"
     :description="$seoDescription"
     :ogTitle="$seoTitle"
     :ogDescription="$seoDescription"

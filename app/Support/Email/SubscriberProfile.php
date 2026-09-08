@@ -29,6 +29,20 @@ final readonly class SubscriberProfile
             && $user->subscriber_profile_hash === $this->hash();
     }
 
+    /**
+     * Mailcoach answered this exact profile with a 422. That is permanent for the
+     * payload, so it is only worth offering again once the profile changes.
+     */
+    public function wasRejected(User $user): bool
+    {
+        return $user->rejected_subscriber_profile_hash === $this->hash();
+    }
+
+    public function needsSync(User $user): bool
+    {
+        return ! $this->matchesStored($user) && ! $this->wasRejected($user);
+    }
+
     public function hash(): string
     {
         return hash('sha256', json_encode(
