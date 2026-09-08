@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 /**
  * @property string $id
@@ -46,6 +47,10 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
  * @property int $initial_calendar_sync_imported
  * @property string|null $calendar_sync_cursor
  * @property Carbon|null $last_calendar_synced_at
+ * @property string|null $calendar_push_channel_id
+ * @property string|null $calendar_push_resource_id
+ * @property string|null $calendar_push_verification_token
+ * @property Carbon|null $calendar_push_expires_at
  */
 final class ConnectedAccount extends Model
 {
@@ -78,6 +83,10 @@ final class ConnectedAccount extends Model
         'initial_calendar_sync_imported',
         'calendar_sync_cursor',
         'last_calendar_synced_at',
+        'calendar_push_channel_id',
+        'calendar_push_resource_id',
+        'calendar_push_verification_token',
+        'calendar_push_expires_at',
         'status',
         'last_error',
         'sync_inbox',
@@ -92,6 +101,7 @@ final class ConnectedAccount extends Model
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
         'last_calendar_synced_at' => 'datetime',
+        'calendar_push_expires_at' => 'datetime',
         'initial_sync_imported' => 'integer',
         'initial_sync_estimated' => 'integer',
         'initial_calendar_sync_imported' => 'integer',
@@ -101,6 +111,7 @@ final class ConnectedAccount extends Model
         'capabilities' => 'array',
         'access_token' => 'encrypted',
         'refresh_token' => 'encrypted',
+        'calendar_push_verification_token' => 'encrypted',
         'daily_send_limit' => 'integer',
         'hourly_send_limit' => 'integer',
     ];
@@ -286,6 +297,50 @@ final class ConnectedAccount extends Model
         }
 
         return $this->hasCalendar() && $this->calendar_sync_cursor === null;
+    }
+
+    public function isCalendarSyncing(): bool
+    {
+        return MailboxSyncTracker::isCalendarSyncing($this);
+    }
+
+    public function isEmailSyncing(): bool
+    {
+        return MailboxSyncTracker::isEmailSyncing($this);
+    }
+
+    public function showsSyncProgress(): bool
+    {
+        return $this->isImportingHistory() || $this->isCalendarSyncing() || $this->isEmailSyncing();
+    }
+
+    public function isIncrementalSyncing(): bool
+    {
+        return ! $this->isImportingHistory() && ($this->isCalendarSyncing() || $this->isEmailSyncing());
+    }
+
+    public function incrementalSyncStatusLabel(): ?string
+    {
+        if ($this->isImportingHistory()) {
+            return null;
+        }
+
+        $emailSyncing = $this->isEmailSyncing();
+        $calendarSyncing = $this->isCalendarSyncing();
+
+        if ($emailSyncing && $calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_email_and_calendar');
+        }
+
+        if ($calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_calendar');
+        }
+
+        if ($emailSyncing) {
+            return __('filament/pages/email-accounts.importing_email');
+        }
+
+        return null;
     }
 
     /**

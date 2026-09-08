@@ -19,9 +19,11 @@ use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
+use Relaticle\EmailIntegration\Actions\StopCalendarPushChannelAction;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 use function Filament\Support\generate_icon_html;
 
@@ -130,6 +132,7 @@ trait HasConnectedAccountActions
                 $account = $this->findOwnedAccountOrFail($arguments);
 
                 if ($account->hasCalendar()) {
+                    resolve(StopCalendarPushChannelAction::class)->execute($account);
                     $account->disableCalendar();
                     $this->afterAccountChanged();
 
@@ -152,7 +155,8 @@ trait HasConnectedAccountActions
             ->action(function (array $arguments): void {
                 $account = $this->findOwnedAccountOrFail($arguments);
 
-                dispatch(new IncrementalCalendarSyncJob($account));
+                MailboxSyncTracker::markCalendarStarted($account);
+                dispatch(new IncrementalCalendarSyncJob($account, reconcileAfter: true));
 
                 Notification::make()
                     ->success()

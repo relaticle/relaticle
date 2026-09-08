@@ -17,7 +17,7 @@ function payload(array $overrides = []): NormalizedMeetingPayload
 {
     return new NormalizedMeetingPayload(
         providerEventId: $overrides['providerEventId'] ?? 'evt-'.fake()->uuid(),
-        providerRecurringEventId: null,
+        providerRecurringEventId: $overrides['providerRecurringEventId'] ?? null,
         icalUid: null,
         title: 'Quarterly Sync',
         description: null,
@@ -47,6 +47,97 @@ it('skips cancelled events', function (): void {
     (app(StoreMeetingAction::class))->execute(payload(['status' => CalendarEventStatus::CANCELLED]), $account);
 
     expect(Meeting::query()->count())->toBe(0);
+});
+
+it('soft-deletes existing meeting when it is cancelled in the provider calendar', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+    $existing = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'evt-cancelled',
+    ]);
+
+    (app(StoreMeetingAction::class))->execute(payload([
+        'providerEventId' => 'evt-cancelled',
+        'status' => CalendarEventStatus::CANCELLED,
+    ]), $account);
+
+    expect($existing->fresh()?->trashed())->toBeTrue();
+});
+
+it('soft-deletes only one occurrence when a single recurring instance is cancelled', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+    $first = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250908',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+    $second = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250909',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+
+    (app(StoreMeetingAction::class))->execute(payload([
+        'providerEventId' => 'series_20250908',
+        'providerRecurringEventId' => 'series-master',
+        'status' => CalendarEventStatus::CANCELLED,
+    ]), $account);
+
+    expect($first->fresh()?->trashed())->toBeTrue()
+        ->and($second->fresh()?->trashed())->toBeFalse();
+});
+
+it('soft-deletes only one occurrence when a single recurring instance becomes private', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+    $first = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250908',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+    $second = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250909',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+
+    (app(StoreMeetingAction::class))->execute(payload([
+        'providerEventId' => 'series_20250908',
+        'providerRecurringEventId' => 'series-master',
+        'visibility' => CalendarVisibility::PRIVATE,
+    ]), $account);
+
+    expect($first->fresh()?->trashed())->toBeTrue()
+        ->and($second->fresh()?->trashed())->toBeFalse();
+});
+
+it('soft-deletes all meetings in a recurring series when the series master is cancelled', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create());
+    $first = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250908',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+    $second = Meeting::factory()->create([
+        'connected_account_id' => $account->getKey(),
+        'team_id' => $account->team_id,
+        'provider_event_id' => 'series_20250909',
+        'provider_recurring_event_id' => 'series-master',
+    ]);
+
+    (app(StoreMeetingAction::class))->execute(payload([
+        'providerEventId' => 'series-master',
+        'providerRecurringEventId' => null,
+        'status' => CalendarEventStatus::CANCELLED,
+    ]), $account);
+
+    expect($first->fresh()?->trashed())->toBeTrue()
+        ->and($second->fresh()?->trashed())->toBeTrue();
 });
 
 it('stores events declined by self so RSVP can still be changed', function (): void {

@@ -7,6 +7,7 @@ use Google\Service\Calendar;
 use Google\Service\Calendar\Event;
 use Google\Service\Calendar\EventAttendee;
 use Google\Service\Calendar\EventOrganizer;
+use Google\Service\Calendar\Events as EventsResource;
 use Google\Service\Calendar\Resource\Events;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -220,4 +221,40 @@ it('adds the host when Google omits the attendees list', function (): void {
 
     (new GoogleCalendarService($account, $calendar))
         ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
+});
+
+it('requests deleted events during incremental sync and maps cancellations to tombstones', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $cancelled = new Event;
+    $cancelled->setId('evt-deleted');
+    $cancelled->setStatus('cancelled');
+
+    $eventsList = new EventsResource;
+    $eventsList->setItems([$cancelled]);
+    $eventsList->setNextSyncToken('next-token');
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->with('primary', [
+            'syncToken' => 'sync-token',
+            'singleEvents' => true,
+            'showDeleted' => true,
+            'maxResults' => 250,
+        ])
+        ->andReturn($eventsList);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $result = (new GoogleCalendarService($account, $calendar))->fetchDelta('sync-token');
+
+    expect($result->nextSyncToken)->toBe('next-token')
+        ->and($result->events)->toHaveCount(1)
+        ->and($result->events[0]->providerEventId)->toBe('evt-deleted')
+        ->and($result->events[0]->status)->toBe('cancelled');
 });

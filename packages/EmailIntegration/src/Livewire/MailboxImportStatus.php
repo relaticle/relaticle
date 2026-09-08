@@ -39,7 +39,7 @@ final class MailboxImportStatus extends Component
     {
         $this->ownedAccountsCache = null;
 
-        foreach ($this->importingOwnedAccounts() as $account) {
+        foreach ($this->syncingOwnedAccounts() as $account) {
             $id = (string) $account->getKey();
 
             if (! in_array($id, $this->seenImportingIds, true)) {
@@ -66,7 +66,7 @@ final class MailboxImportStatus extends Component
     }
 
     /**
-     * @return list<array{id: string, email: string, imported: int, meetingsImported: int, hasCalendar: bool, percent: int, importing: bool, settings_url: string}>
+     * @return list<array{id: string, email: string, imported: int, meetingsImported: int, hasCalendar: bool, percent: ?int, importing: bool, incrementalOnly: bool, incrementalLabel: ?string, settings_url: string}>
      */
     public function visibleMailboxes(): array
     {
@@ -83,9 +83,13 @@ final class MailboxImportStatus extends Component
                 continue;
             }
 
-            if (! $account->isImportingHistory() && ! in_array($id, $this->seenImportingIds, true)) {
+            if (! $account->showsSyncProgress() && ! in_array($id, $this->seenImportingIds, true)) {
                 continue;
             }
+
+            $incrementalOnly = $account->isIncrementalSyncing();
+            $percent = $incrementalOnly ? null : $account->initialSyncProgressPercent();
+            $incrementalLabel = $account->incrementalSyncStatusLabel();
 
             $rows[] = [
                 'id' => $id,
@@ -93,8 +97,10 @@ final class MailboxImportStatus extends Component
                 'imported' => $account->initial_sync_imported,
                 'meetingsImported' => $account->initial_calendar_sync_imported,
                 'hasCalendar' => $account->hasCalendar(),
-                'percent' => $account->initialSyncProgressPercent(),
-                'importing' => $account->isImportingHistory(),
+                'percent' => $percent,
+                'importing' => $account->showsSyncProgress(),
+                'incrementalOnly' => $incrementalOnly,
+                'incrementalLabel' => $incrementalLabel,
                 'settings_url' => EmailAccountSettingsPage::getUrl(['account' => $id]),
             ];
         }
@@ -116,10 +122,10 @@ final class MailboxImportStatus extends Component
     /**
      * @return Collection<int, ConnectedAccount>
      */
-    private function importingOwnedAccounts(): Collection
+    private function syncingOwnedAccounts(): Collection
     {
         return $this->ownedAccounts()
-            ->filter(fn (ConnectedAccount $account): bool => $account->isImportingHistory());
+            ->filter(fn (ConnectedAccount $account): bool => $account->showsSyncProgress());
     }
 
     /**

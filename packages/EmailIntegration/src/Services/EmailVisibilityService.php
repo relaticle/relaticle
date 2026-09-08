@@ -81,9 +81,9 @@ final class EmailVisibilityService
 
     public function isMeetingHiddenFromViewer(Meeting $meeting, User $viewer): bool
     {
-        $meeting->loadMissing(['attendees.contact', 'connectedAccount']);
+        $meeting->loadMissing(['connectedAccount']);
 
-        $attendeeAddresses = $meeting->attendees
+        $attendeeAddresses = $meeting->attendees()
             ->pluck('email_address')
             ->filter()
             ->values()
@@ -106,6 +106,10 @@ final class EmailVisibilityService
         }
 
         if ($isOwner) {
+            return false;
+        }
+
+        if (resolve(MeetingRespondentResolver::class)->userIdentityIsListedAttendee($viewer, $meeting)) {
             return false;
         }
 

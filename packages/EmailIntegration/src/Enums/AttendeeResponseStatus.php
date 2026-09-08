@@ -20,7 +20,7 @@ enum AttendeeResponseStatus: string implements HasColor, HasLabel
             self::ACCEPTED => 'Accepted',
             self::DECLINED => 'Declined',
             self::TENTATIVE => 'Maybe',
-            self::NEEDS_ACTION => 'No Response',
+            self::NEEDS_ACTION => 'Pending',
         };
     }
 

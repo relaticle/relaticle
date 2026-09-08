@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Exceptions\MeetingResponseFailed;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 final class MeetingRsvpActions
 {
@@ -61,19 +62,19 @@ final class MeetingRsvpActions
 
     private static function groupLabel(?Meeting $record): string
     {
-        $status = self::currentStatus($record);
-
-        if ($status === AttendeeResponseStatus::NEEDS_ACTION) {
-            return __('filament/resources/meeting.actions.rsvp.label');
-        }
-
-        return $status->getLabel();
+        return self::currentStatus($record)->getLabel();
     }
 
     private static function currentStatus(?Meeting $record): AttendeeResponseStatus
     {
         if (! $record instanceof Meeting) {
             return AttendeeResponseStatus::NEEDS_ACTION;
+        }
+
+        $user = auth()->user();
+
+        if ($user instanceof User) {
+            return resolve(MeetingRespondentResolver::class)->viewerResponseStatus($user, $record);
         }
 
         return $record->response_status ?? AttendeeResponseStatus::NEEDS_ACTION;
@@ -91,7 +92,7 @@ final class MeetingRsvpActions
             ->icon($icon)
             ->color($color)
             ->authorize('respond')
-            ->disabled(fn (Meeting $record): bool => $record->response_status === $status)
+            ->disabled(fn (Meeting $record): bool => self::currentStatus($record) === $status)
             ->action(function (Meeting $record) use ($status): void {
                 $user = auth()->user();
                 abort_unless($user instanceof User, 403);

@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 mutates(InitialCalendarSyncJob::class);
 
@@ -378,5 +379,6 @@ it('does not advance the initial calendar import while page events are still mis
     Bus::assertDispatchedTimes(InitialCalendarSyncJob::class, 0);
     expect($account->fresh()?->calendar_sync_cursor)->toBeNull()
         ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
-        ->and($account->fresh()?->last_error)->toContain('2 event(s)');
+        ->and($account->fresh()?->last_error)->toContain('2 event(s)')
+        ->and(MailboxSyncTracker::isCalendarSyncing($account))->toBeFalse();
 });

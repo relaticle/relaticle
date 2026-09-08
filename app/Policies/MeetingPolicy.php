@@ -9,15 +9,18 @@ use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 final readonly class MeetingPolicy
 {
     use HandlesAuthorization;
 
-    public function __construct(private EmailVisibilityService $visibility) {}
+    public function __construct(
+        private EmailVisibilityService $visibility,
+        private MeetingRespondentResolver $respondentResolver,
+    ) {}
 
     public function viewAny(User $user): bool
     {
@@ -47,19 +50,10 @@ final readonly class MeetingPolicy
             return false;
         }
 
-        $account = ConnectedAccount::query()
-            ->whereKey($meeting->connected_account_id)
-            ->where('user_id', $user->getKey())
-            ->first();
-
-        if (! $account instanceof ConnectedAccount) {
+        if ($meeting->status === CalendarEventStatus::CANCELLED) {
             return false;
         }
 
-        if (! $account->isActive() || ! $account->hasCalendar()) {
-            return false;
-        }
-
-        return $meeting->status !== CalendarEventStatus::CANCELLED;
+        return $this->respondentResolver->canRespond($user, $meeting);
     }
 }

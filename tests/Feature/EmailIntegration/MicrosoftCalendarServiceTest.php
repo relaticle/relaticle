@@ -255,3 +255,43 @@ it('still fails when Graph returns a server error that mentions organizer', func
         ->respondToEvent('evt-1', AttendeeResponseStatus::DECLINED))
         ->toThrow(MeetingResponseFailed::class);
 });
+
+it('paginates listActiveProviderEventIds across nextLink pages and time windows', function (): void {
+    $this->travelTo('2020-01-01 00:00:00');
+
+    Http::fake(function (Request $request) {
+        $url = urldecode($request->url());
+
+        if (str_contains($url, 'startDateTime=1990-01-01') && ! str_contains($url, '$skiptoken=')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-1', 'isCancelled' => false],
+                ],
+                '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=PAGE2',
+            ]);
+        }
+
+        if (str_contains($url, '$skiptoken=PAGE2')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-1-page-2', 'isCancelled' => false],
+                ],
+            ]);
+        }
+
+        if (str_contains($url, 'startDateTime=1995-01-01')) {
+            return Http::response([
+                'value' => [
+                    ['id' => 'evt-window-2', 'isCancelled' => false],
+                ],
+            ]);
+        }
+
+        return Http::response(['value' => []]);
+    });
+
+    $ids = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+        ->listActiveProviderEventIds();
+
+    expect($ids)->toContain('evt-window-1', 'evt-window-1-page-2', 'evt-window-2');
+});

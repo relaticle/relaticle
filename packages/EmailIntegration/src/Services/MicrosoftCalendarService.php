@@ -9,6 +9,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -62,6 +63,104 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             }
 
             throw MeetingResponseFailed::fromProvider($e);
+        }
+    }
+
+    public function listActiveProviderEventIds(): array
+    {
+        $ids = [];
+        $windowStart = $this->historyStart();
+        $horizon = $this->horizon();
+
+        while ($windowStart->lt($horizon)) {
+            $url = $this->calendarWindowUrl($windowStart);
+
+            do {
+                $response = $this->clientFactory->make($this->account)
+                    ->get($url)
+                    ->throw()
+                    ->json();
+
+                foreach ($response['value'] ?? [] as $event) {
+                    if (isset($event['@removed']) || ($event['isCancelled'] ?? false)) {
+                        continue;
+                    }
+
+                    $id = $event['id'] ?? null;
+
+                    if (is_string($id) && $id !== '') {
+                        $ids[] = $id;
+                    }
+                }
+
+                $nextLink = $response['@odata.nextLink'] ?? null;
+
+                if (is_string($nextLink) && $nextLink !== '') {
+                    $url = $nextLink;
+
+                    continue;
+                }
+
+                break;
+            } while (true);
+
+            $windowEnd = $windowStart->copy()->addYears(self::WINDOW_YEARS);
+
+            if ($windowEnd->gte($horizon)) {
+                break;
+            }
+
+            $windowStart = $windowEnd;
+        }
+
+        return $ids;
+    }
+
+    public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?CalendarPushChannelData
+    {
+        $expiresAt = now()->addDays(2);
+
+        try {
+            $response = $this->clientFactory->make($this->account)
+                ->post('/subscriptions', [
+                    'changeType' => 'created,updated,deleted',
+                    'notificationUrl' => $webhookUrl,
+                    'resource' => 'me/events',
+                    'expirationDateTime' => $expiresAt->utc()->format('Y-m-d\TH:i:s\Z'),
+                    'clientState' => $verificationToken,
+                ])
+                ->throw()
+                ->json();
+        } catch (Throwable) {
+            return null;
+        }
+
+        $subscriptionId = (string) ($response['id'] ?? '');
+
+        if ($subscriptionId === '') {
+            return null;
+        }
+
+        $expiration = $response['expirationDateTime'] ?? null;
+
+        return new CalendarPushChannelData(
+            channelId: $subscriptionId,
+            resourceId: null,
+            verificationToken: $verificationToken,
+            expiresAt: is_string($expiration) && $expiration !== ''
+                ? Date::parse($expiration)
+                : $expiresAt,
+        );
+    }
+
+    public function stopPushChannel(string $channelId, ?string $resourceId): void
+    {
+        try {
+            $this->clientFactory->make($this->account)
+                ->delete('/subscriptions/'.rawurlencode($channelId))
+                ->throw();
+        } catch (Throwable) {
+            // The subscription may already be gone.
         }
     }
 

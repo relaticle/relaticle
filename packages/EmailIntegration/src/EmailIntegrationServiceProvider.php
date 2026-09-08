@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
+use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
@@ -116,6 +117,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 DispatchOutboxCommand::class,
                 IncrementalCalendarSyncCommand::class,
                 IncrementalEmailSyncCommand::class,
+                RenewCalendarPushChannelsCommand::class,
             ]);
         }
     }
