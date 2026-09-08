@@ -147,7 +147,7 @@ it('skips people with no known email address', function (): void {
 
     $this->assertDatabaseHas('emailables', [
         'email_id' => $email->getKey(),
-        'emailable_type' => People::class,
+        'emailable_type' => $withEmail->getMorphClass(),
         'emailable_id' => $withEmail->id,
     ]);
 });

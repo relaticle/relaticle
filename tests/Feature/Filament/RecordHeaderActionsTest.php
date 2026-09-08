@@ -12,6 +12,7 @@ use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -211,7 +212,7 @@ it('does not badge private teammate mail or emails linked to another record', fu
     expect(emailsHeaderBadge($page, $owner))->toBe('1');
 })->with(recordEmailsHeaderPages());
 
-it('scopes communication intelligence on the person view to visible mail only', function (): void {
+it('renders scoped communication intelligence once on the person view', function (): void {
     $person = People::factory()->recycle([$this->user, $this->team])->create([
         'email_count' => 99,
         'inbound_email_count' => 50,
@@ -228,9 +229,31 @@ it('scopes communication intelligence on the person view to visible mail only', 
         'is_internal' => false,
     ]);
 
-    $metrics = resolve(EmailVisibilityService::class)->visibleCommunicationIntelligence($person, $this->user);
+    DB::flushQueryLog();
+    DB::enableQueryLog();
 
-    expect($metrics->emailCount)->toBe(1)
-        ->and($metrics->inboundEmailCount)->toBe(1)
-        ->and($metrics->outboundEmailCount)->toBe(0);
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertOk()
+        ->assertSee(__('filament/communication-intelligence.heading'))
+        ->assertSee(__('filament/communication-intelligence.groups.connection'))
+        ->assertSee(__('filament/communication-intelligence.groups.email'))
+        ->assertSee(__('filament/communication-intelligence.groups.calendar'))
+        ->assertSeeHtml('isCollapsed: true')
+        ->assertSee(__('filament/communication-intelligence.fields.last_interaction.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.last_email.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.connection_strength.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.strongest_connection.label'))
+        ->assertDontSee('Total Emails')
+        ->assertSchemaStateSet([
+            'visible_connection_strength' => __('filament/communication-intelligence.connection_strength.weak'),
+            'visible_strongest_connection' => $this->user->name,
+        ]);
+
+    $emailCountAggregates = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'as email_count'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect($emailCountAggregates)->toBe(1);
 });

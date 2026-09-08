@@ -35,7 +35,7 @@ final readonly class VisibleMeetingScope implements Scope
         $teamId = $this->viewer->current_team_id;
 
         $builder
-            ->where('team_id', $teamId)
+            ->where($model->qualifyColumn('team_id'), $teamId)
             ->where(function (Builder $visibilityQuery) use ($viewerId, $teamId): void {
                 $this->excludeMeetingsMatchingMailboxBlocklist($visibilityQuery);
                 $this->excludeMeetingsWithBlockedOrganizerMatchingMailboxBlocklist($visibilityQuery);

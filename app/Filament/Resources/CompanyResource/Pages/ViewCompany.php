@@ -116,9 +116,7 @@ final class ViewCompany extends ViewRecord
                     ])->grow(false),
                 ])->columnSpan('full'),
 
-                CommunicationIntelligenceInfolist::section(
-                    'filament/resources/company.pages.view.communication_intelligence',
-                ),
+                CommunicationIntelligenceInfolist::section(),
 
             ]);
     }

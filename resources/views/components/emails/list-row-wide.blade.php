@@ -99,7 +99,38 @@
             </span>
 
             <span class="flex shrink-0 items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-                @if (filled($mailboxViaName))
+                @if (count($email->accessMailboxes) >= 2)
+                    <span
+                        x-data="{ open: false }"
+                        x-on:mouseenter="open = true"
+                        x-on:mouseleave="open = false"
+                        x-on:click.stop
+                        class="relative flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400"
+                    >
+                        <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <span class="whitespace-nowrap">{{ trans_choice('filament/pages/email-inbox.list_row.via_mailboxes', count($email->accessMailboxes), ['count' => count($email->accessMailboxes)]) }}</span>
+                        <span
+                            x-cloak
+                            x-show="open"
+                            x-transition
+                            class="absolute right-0 top-full z-30 mt-1 w-64 rounded-lg bg-gray-900 p-3 text-left text-white shadow-lg"
+                            role="tooltip"
+                        >
+                            <span class="mb-2 block text-[11px] font-medium text-gray-300">{{ __('filament/pages/email-inbox.list_row.access_granted_via') }}</span>
+                            @foreach ($email->accessMailboxes as $mailbox)
+                                <span class="flex items-center gap-2 py-1">
+                                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-700 text-[10px] font-semibold">
+                                        {{ mb_strtoupper(mb_substr($mailbox['name'], 0, 1)) }}
+                                    </span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-xs font-medium">{{ $mailbox['name'] }}</span>
+                                        <span class="block truncate text-[11px] text-gray-400">{{ $mailbox['mailbox_email'] }}</span>
+                                    </span>
+                                </span>
+                            @endforeach
+                        </span>
+                    </span>
+                @elseif (filled($mailboxViaName))
                     <span class="flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400">
                         <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                         <span class="max-w-[7rem] truncate">{{ __('filament/pages/email-inbox.list_row.via', ['name' => $mailboxViaName]) }}</span>
