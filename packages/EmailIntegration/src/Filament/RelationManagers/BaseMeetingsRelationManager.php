@@ -9,15 +9,10 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -26,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
+use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -85,8 +81,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->query(fn (Builder $q): Builder => $q->where('starts_at', '<', now())),
             ])
             ->recordActions([
-                ViewAction::make()
-                    ->schema(fn (Schema $schema): Schema => $this->detailSchema($schema)),
+                MeetingDetailInfolist::viewAction(),
                 Action::make('linkToRecord')
                     ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
                     ->icon(Heroicon::Link)
@@ -130,34 +125,6 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                             ->send();
                     }),
             ]);
-    }
-
-    protected function detailSchema(Schema $schema): Schema
-    {
-        return $schema->components([
-            Section::make('Meeting')->schema([
-                TextEntry::make('title'),
-                TextEntry::make('starts_at')->dateTime('M j, Y · g:i a'),
-                TextEntry::make('ends_at')->dateTime('M j, Y · g:i a'),
-                TextEntry::make('location')->default('—'),
-                TextEntry::make('organizer_name')->label(__('filament/relation-managers/meetings.fields.organizer.label')),
-            ]),
-            Section::make('Attendees')->schema([
-                RepeatableEntry::make('attendees')->schema([
-                    TextEntry::make('name')->default(fn (Model $record): string => $record->email_address),  // @phpstan-ignore-line
-                    TextEntry::make('email_address')->label(__('filament/relation-managers/meetings.fields.email_address.label')),
-                    TextEntry::make('response_status')->badge(),
-                ]),
-            ]),
-            Section::make('Description')->schema([
-                TextEntry::make('description')->html()->default('(no description)'),
-            ]),
-            Section::make('Link')->schema([
-                TextEntry::make('html_link')
-                    ->label(__('filament/relation-managers/meetings.fields.html_link.label'))
-                    ->url(fn (Model $record): ?string => $record->html_link, shouldOpenInNewTab: true),  // @phpstan-ignore-line
-            ]),
-        ]);
     }
 
     /** @return array<string, string> */

@@ -6,13 +6,8 @@ namespace Relaticle\EmailIntegration\Filament\Resources;
 
 use App\Models\Team;
 use App\Models\User;
-use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\IconPosition;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -23,10 +18,10 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
-use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 
 final class MeetingResource extends Resource
@@ -53,33 +48,7 @@ final class MeetingResource extends Resource
 
     public static function infolist(Schema $schema): Schema
     {
-        return $schema->components([
-            Section::make('Meeting')->schema([
-                TextEntry::make('title'),
-                TextEntry::make('starts_at')->dateTime('M j, Y · g:i a'),
-                TextEntry::make('ends_at')->dateTime('M j, Y · g:i a'),
-                TextEntry::make('location')->default('—'),
-                TextEntry::make('organizer_name')->label(__('filament/resources/meeting.fields.organizer.label')),
-            ]),
-            Section::make('Attendees')->schema([
-                RepeatableEntry::make('attendees')->schema([
-                    TextEntry::make('name')->default(fn (MeetingAttendee $record): string => $record->email_address),
-                    TextEntry::make('email_address')->label(__('filament/resources/meeting.fields.email_address.label')),
-                    TextEntry::make('response_status')->badge(),
-                ]),
-            ]),
-            Section::make('Description')->schema([
-                TextEntry::make('description')->html()->default('(no description)'),
-            ]),
-            Section::make('Link')->schema([
-                TextEntry::make('html_link')
-                    ->label(__('filament/resources/meeting.fields.html_link.label'))
-                    ->color('primary')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->iconPosition(IconPosition::After)
-                    ->url(fn (Meeting $record): ?string => $record->html_link, shouldOpenInNewTab: true),
-            ]),
-        ]);
+        return MeetingDetailInfolist::configure($schema);
     }
 
     public static function table(Table $table): Table
@@ -135,7 +104,7 @@ final class MeetingResource extends Resource
                     ->options(AttendeeResponseStatus::class),
             ])
             ->recordActions([
-                ViewAction::make(),
+                MeetingDetailInfolist::viewAction(),
             ])
             ->emptyStateIcon('heroicon-o-calendar-days')
             ->emptyStateHeading(fn (): string => self::hasMailbox()

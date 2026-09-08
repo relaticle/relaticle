@@ -8,19 +8,24 @@ use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManag
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(MeetingsRelationManager::class, BaseMeetingsRelationManager::class, EmailVisibilityService::class);
+mutates(MeetingsRelationManager::class, BaseMeetingsRelationManager::class, EmailVisibilityService::class, MeetingDetailInfolist::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
     $this->actingAs($this->user);
     $this->team = $this->user->currentTeam;
     Filament::setTenant($this->team);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
 
     $this->account = ConnectedAccount::withoutEvents(
         fn () => ConnectedAccount::factory()->create([
@@ -87,4 +92,34 @@ it('hides meetings on a protected person', function (): void {
     ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertCanNotSeeTableRecords([$meeting]);
+});
+
+it('shows the shared meeting detail in the relation manager view modal', function (): void {
+    $person = People::factory()->for($this->team)->create();
+    $starts = now()->startOfHour();
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Shared Detail Meeting',
+        'starts_at' => $starts,
+        'ends_at' => $starts->copy()->addHour(),
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    $meeting->people()->attach($person, ['link_source' => 'manual']);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Host Person',
+        'is_organizer' => true,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    livewire(MeetingsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Shared Detail Meeting')
+        ->assertMountedActionModalSee('Host Person')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'))
+        ->assertMountedActionModalSee($person->name);
 });
