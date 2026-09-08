@@ -24,7 +24,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'profile_photo_path' => ['nullable', 'string', 'max:255'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
-            'locale' => ['nullable', 'string', Rule::in(ChatLocales::CODES)],
+            'locale' => ['sometimes', 'required', 'string', Rule::in(ChatLocales::CODES)],
         ])->validateWithBag('updateProfileInformation');
 
         $this->assertEmailChangeIsVerified($user, (string) $input['email']);
@@ -83,8 +83,8 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
     }
 
     /**
-     * Clearing the select writes null, a deliberate "use the default". An absent
-     * key means the caller is not managing the attribute, so it is left alone.
+     * A present but empty value writes null, a deliberate "use the default". An
+     * absent key means the caller is not managing the attribute, so it is left alone.
      *
      * @param  array<string, mixed>  $input
      * @return array<string, string|null>

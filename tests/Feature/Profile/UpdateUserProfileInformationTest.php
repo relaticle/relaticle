@@ -828,6 +828,22 @@ describe('locale', function () {
         expect($user->fresh()->locale)->toBeNull();
     });
 
+    test('rejects an explicitly empty locale', function (?string $submitted) {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-empty@example.com',
+            'locale' => 'da',
+        ]);
+        $this->actingAs($user);
+
+        expect(fn () => $this->action->update($user, [
+            'name' => $user->name,
+            'email' => 'locale-empty@example.com',
+            'locale' => $submitted,
+        ]))->toThrow(ValidationException::class);
+
+        expect($user->fresh()->locale)->toBe('da');
+    })->with([null, '']);
+
     test('an absent locale key leaves the stored value alone', function () {
         $user = User::factory()->withTeam()->create([
             'email' => 'locale-keep@example.com',
