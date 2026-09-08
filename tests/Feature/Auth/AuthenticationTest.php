@@ -195,6 +195,24 @@ test('a recovery code completes pending password MFA', function (): void {
     $this->assertAuthenticatedAs($user);
 });
 
+test('the MFA challenge offers an autofillable code field and a recovery mode', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withTeam()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('two-factor.login'));
+
+    $this->get(route('two-factor.login'))
+        ->assertOk()
+        ->assertSee('autocomplete="one-time-code"', false)
+        ->assertDontSee('name="recovery_code"', false);
+
+    $this->get(route('two-factor.login', ['recovery' => 1]))
+        ->assertOk()
+        ->assertSee('name="recovery_code"', false);
+});
+
 test('an invalid TOTP cannot complete pending password MFA', function (): void {
     $user = User::factory()->withConfirmedMfa()->create();
 

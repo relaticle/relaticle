@@ -51,7 +51,13 @@ test('the confirm-identity mfa page renders', function () {
 
     $this->get(route('identity.confirm.mfa'))
         ->assertOk()
-        ->assertSee(__('auth.mfa.heading'));
+        ->assertSee(__('auth.mfa.heading'))
+        ->assertSee('autocomplete="one-time-code"', false)
+        ->assertDontSee('name="recovery_code"', false);
+
+    $this->get(route('identity.confirm.mfa', ['recovery' => 1]))
+        ->assertOk()
+        ->assertSee('name="recovery_code"', false);
 });
 
 test('redirecting to google for a fresh provider confirmation requests account selection', function () {
@@ -96,6 +102,19 @@ test('the mfa follow-up completes a pending passkey ceremony with the correct co
     $code = resolve(Google2FA::class)->getCurrentOtp($secret);
 
     $this->post(route('identity.confirm.mfa.store'), ['code' => $code])
+        ->assertRedirect();
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+    expect(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
+});
+
+test('the mfa follow-up accepts a recovery code for a pending passkey ceremony', function () {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    IdentityConfirmation::markMfaPending($user, null);
+
+    $this->post(route('identity.confirm.mfa.store'), ['recovery_code' => 'recovery-code-one'])
         ->assertRedirect();
 
     expect(session('auth.password_confirmed_at'))->not->toBeNull();

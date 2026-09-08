@@ -11,6 +11,7 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\OneTimeCodeInput;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
@@ -335,7 +336,7 @@ final class ConfirmIdentityAction extends Action
                 ->required($usesPasswordField)
                 ->rule($passwordRule),
             $user->hasEnabledTwoFactorAuthentication()
-                ? TextInput::make('code')
+                ? OneTimeCodeInput::make('code')
                     ->label(__('auth.mfa.code'))
                     ->visible($usesPasswordField)
                     ->required($usesPasswordField)

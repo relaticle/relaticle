@@ -10,7 +10,7 @@ use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\AuthenticationSession;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\OneTimeCodeInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
@@ -127,7 +127,7 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalHeading(__('profile.sections.mfa.enable_heading'))
             ->modalWidth(Width::Medium)
             ->schema([
-                TextInput::make('code')
+                OneTimeCodeInput::make('code')
                     ->label(__('profile.sections.mfa.code_label'))
                     ->required()
                     ->rule($this->pendingCodeRule()),
