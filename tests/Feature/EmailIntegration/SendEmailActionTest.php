@@ -229,10 +229,12 @@ it('links the queued email to a CRM record via emailables', function (): void {
 
     $this->assertDatabaseHas('emailables', [
         'email_id' => $email->getKey(),
-        'emailable_type' => People::class,
+        'emailable_type' => $person->getMorphClass(),
         'emailable_id' => $person->id,
         'link_source' => 'manual',
     ]);
+
+    expect($person->emails()->whereKey($email->getKey())->exists())->toBeTrue();
 });
 
 it('rejects sending through a connected account owned by another user', function (): void {

@@ -7,13 +7,16 @@ use App\Models\CustomField;
 use App\Models\People;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Relaticle\EmailIntegration\Enums\ConnectionStrength;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(EmailVisibilityService::class);
+mutates(EmailVisibilityService::class, VisibleMeetingScope::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create([
@@ -168,8 +171,35 @@ it('scopes communication intelligence metrics to mail the viewer can see', funct
     $metrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
 
     expect($metrics->emailCount)->toBe(1)
-        ->and($metrics->inboundEmailCount)->toBe(1)
-        ->and($metrics->outboundEmailCount)->toBe(0);
+        ->and($metrics->lastEmailAt)->not->toBeNull()
+        ->and($metrics->firstEmailAt)->not->toBeNull()
+        ->and($metrics->connectionStrength)->not->toBe(ConnectionStrength::None);
+});
+
+it('computes calendar intelligence without an ambiguous team_id join', function (): void {
+    $person = People::factory()->for($this->team)->create();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $startsAt = now()->addDay();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $account->getKey(),
+        'starts_at' => $startsAt,
+        'ends_at' => $startsAt->copy()->addHour(),
+    ]);
+
+    $person->meetings()->attach($meeting->getKey());
+
+    $metrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
+
+    expect($metrics->nextMeetingAt?->toDateTimeString())->toBe($startsAt->toDateTimeString())
+        ->and($metrics->lastMeetingAt?->toDateTimeString())->toBe($startsAt->toDateTimeString())
+        ->and($metrics->strongestConnectionName)->toBe($this->user->name);
 });
 
 it('counts one preferred copy when the same rfc message is synced twice', function (): void {
@@ -214,7 +244,48 @@ it('counts one preferred copy when the same rfc message is synced twice', functi
 
     expect($metrics->emailCount)->toBe(1)
         ->and($metrics->emailCount)->toBe($this->service->visibleEmailCount($person, $this->user))
-        ->and($metrics->inboundEmailCount)->toBe(1)
-        ->and($metrics->outboundEmailCount)->toBe(0)
+        ->and($metrics->firstEmailAt?->toDateTimeString())->toBe($preferredSentAt->toDateTimeString())
         ->and($metrics->lastEmailAt?->toDateTimeString())->toBe($preferredSentAt->toDateTimeString());
+});
+
+it('counts one preferred copy for every viewer of the same rfc message', function (): void {
+    $person = People::factory()->for($this->team)->create();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $coworker = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+    ]));
+
+    $messageId = '<workspace-sent@example.com>';
+
+    $ownerInbound = Email::factory()->inbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $account->getKey(),
+        'rfc_message_id' => $messageId,
+        'is_internal' => false,
+    ]);
+    $coworkerOutbound = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+        'rfc_message_id' => $messageId,
+        'is_internal' => false,
+    ]);
+
+    $person->emails()->attach([$ownerInbound->getKey(), $coworkerOutbound->getKey()]);
+
+    $ownerMetrics = $this->service->visibleCommunicationIntelligence($person, $this->user);
+    $coworkerMetrics = $this->service->visibleCommunicationIntelligence($person, $coworker);
+
+    expect($ownerMetrics->emailCount)->toBe(1)
+        ->and($coworkerMetrics->emailCount)->toBe(1);
 });

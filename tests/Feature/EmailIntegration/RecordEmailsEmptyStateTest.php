@@ -30,8 +30,9 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
-mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailVisibilityService::class, HasEmailReaderActions::class);
+mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailVisibilityService::class, HasEmailReaderActions::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -537,6 +538,68 @@ it('keeps the emails tab visible on an opportunity', function (): void {
     livewire(OpportunityEmailsPage::class, ['record' => $opportunity->getKey()])
         ->assertSee('Visible on the deal')
         ->assertDontSee(__('filament/pages/record-emails.protected.heading'));
+});
+
+it('shows via two mailboxes using connected mailbox addresses not workspace logins', function (): void {
+    $this->user->update(['email' => 'owner@relaticle.test']);
+
+    $coworker = User::factory()->create([
+        'current_team_id' => $this->team->id,
+        'email' => 'editor@relaticle.test',
+    ]);
+    $this->team->users()->attach($coworker, ['role' => 'editor']);
+
+    $ownerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'whitesharkdevs@gmail.com',
+        'display_name' => 'White Shark',
+    ]));
+
+    $coworkerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'email_address' => 'mail2asmitnepali99@gmail.com',
+        'display_name' => 'Editor Mailbox',
+    ]));
+
+    $messageId = '<via-two-mailboxes@example.com>';
+
+    $ownerCopy = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $ownerAccount->getKey(),
+        'rfc_message_id' => $messageId,
+        'subject' => 'Shared thread',
+        'is_internal' => false,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    $coworkerCopy = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $coworker->id,
+        'connected_account_id' => $coworkerAccount->getKey(),
+        'rfc_message_id' => $messageId,
+        'subject' => 'Shared thread',
+        'is_internal' => false,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    EmailParticipant::query()->create([
+        'email_id' => $ownerCopy->getKey(),
+        'email_address' => 'petter.qa@gmail.com',
+        'name' => 'Petter',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $this->person->emails()->attach([$ownerCopy->getKey(), $coworkerCopy->getKey()]);
+
+    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->assertSee(trans_choice('filament/pages/email-inbox.list_row.via_mailboxes', 2, ['count' => 2]))
+        ->assertSee('whitesharkdevs@gmail.com')
+        ->assertSee('mail2asmitnepali99@gmail.com')
+        ->assertDontSee('owner@relaticle.test')
+        ->assertDontSee('editor@relaticle.test');
 });
 
 it('shows the imported mailbox name on record email list rows', function (): void {

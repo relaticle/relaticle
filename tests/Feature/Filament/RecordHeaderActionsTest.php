@@ -234,15 +234,19 @@ it('renders scoped communication intelligence once on the person view', function
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->assertOk()
-        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.heading'))
-        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.email_count.label'))
-        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.inbound_email_count.label'))
-        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.outbound_email_count.label'))
-        ->assertSee(__('filament/resources/person.pages.view.communication_intelligence.fields.last_email.label'))
+        ->assertSee(__('filament/communication-intelligence.heading'))
+        ->assertSee(__('filament/communication-intelligence.groups.connection'))
+        ->assertSee(__('filament/communication-intelligence.groups.email'))
+        ->assertSee(__('filament/communication-intelligence.groups.calendar'))
+        ->assertSeeHtml('isCollapsed: true')
+        ->assertSee(__('filament/communication-intelligence.fields.last_interaction.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.last_email.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.connection_strength.label'))
+        ->assertSee(__('filament/communication-intelligence.fields.strongest_connection.label'))
+        ->assertDontSee('Total Emails')
         ->assertSchemaStateSet([
-            'visible_email_count' => 1,
-            'visible_inbound_email_count' => 1,
-            'visible_outbound_email_count' => 0,
+            'visible_connection_strength' => __('filament/communication-intelligence.connection_strength.weak'),
+            'visible_strongest_connection' => $this->user->name,
         ]);
 
     $emailCountAggregates = collect(DB::getQueryLog())
