@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\ManagePasskeys;
 use App\Models\User;
+use App\Models\UserSocialAccount;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkey;
+use PragmaRX\Google2FA\Google2FA;
 
-mutates(ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
+mutates(ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class, AuthenticationSession::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -104,16 +109,30 @@ it('requires a password for a password user registering their first passkey', fu
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
 
-it('confirms registration without a password for passwordless users', function (): void {
+it('requires fresh proof before a passwordless session can register a passkey', function (): void {
     $this->actingAs(User::factory()->create(['password' => null]));
 
     livewire(ManagePasskeys::class)
         ->callAction('registerPasskey')
-        ->assertHasNoActionErrors()
-        ->assertActionHalted()
-        ->assertDispatched('passkey-register');
+        ->assertNotDispatched('passkey-register');
 
-    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('offers a linked provider for fresh proof without setting a confirmation timestamp', function (): void {
+    $user = User::factory()->create(['password' => null]);
+    $this->actingAs($user);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)
+        ->mountAction('registerPasskey')
+        ->assertMountedActionModalSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']));
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
 });
 
 it('runs the confirmation ceremony when a password user with a passkey adds another', function (): void {
@@ -247,24 +266,29 @@ it('re-confirms when removing a passkey even inside the freshness window', funct
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
-it('completes the deletion when the ceremony refreshed the proof after the attempt began', function (): void {
-    $this->actingAs(User::factory()->create(['password' => null]));
-    $passkey = createPasskey(auth()->user(), 'Existing Key');
-    session()->put('auth.password_confirmed_at', time());
+it('completes the deletion once the ceremony has already satisfied this attempt', function (): void {
+    $user = User::factory()->create(['password' => null]);
+    $this->actingAs($user);
+    $passkey = createPasskey($user, 'Existing Key');
 
-    livewire(ManagePasskeys::class)
-        ->callAction('deletePasskey', data: ['confirm_started_at' => (string) (time() - 10)], arguments: ['passkeyId' => $passkey->id])
+    $component = livewire(ManagePasskeys::class)
+        ->mountAction('deletePasskey', arguments: ['passkeyId' => $passkey->id]);
+
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $component->callMountedAction()
         ->assertNotDispatched('confirm-identity-ceremony');
 
     expect(Passkey::find($passkey->id))->toBeNull();
 });
 
-it('ignores a client-supplied attempt marker when adding a passkey', function (): void {
+it('ignores a client-supplied attempt id when adding a passkey', function (): void {
     $this->actingAs(User::factory()->create(['password' => null]));
     createPasskey(auth()->user(), 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey', data: ['confirm_started_at' => '0'])
+        ->callAction('registerPasskey', data: ['identity_attempt_id' => 'forged-attempt-id'])
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony')
         ->assertNotDispatched('passkey-register');
@@ -272,25 +296,112 @@ it('ignores a client-supplied attempt marker when adding a passkey', function ()
     expect(IdentityConfirmation::confirmedRecently())->toBeFalse();
 });
 
-it('ignores a client-supplied attempt marker when removing a passkey', function (): void {
+it('ignores a client-supplied attempt id when removing a passkey', function (): void {
     $this->actingAs(User::factory()->create(['password' => null]));
     $passkey = createPasskey(auth()->user(), 'Existing Key');
 
     livewire(ManagePasskeys::class)
-        ->callAction('deletePasskey', data: ['confirm_started_at' => '0'], arguments: ['passkeyId' => $passkey->id])
+        ->callAction('deletePasskey', data: ['identity_attempt_id' => 'forged-attempt-id'], arguments: ['passkeyId' => $passkey->id])
         ->assertActionHalted()
         ->assertDispatched('confirm-identity-ceremony');
 
     expect(Passkey::find($passkey->id))->not->toBeNull();
 });
 
+it('does not let a forged attempt id fall through to an unrelated fresh generic confirmation when deleting a passkey', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+    $passkey = createPasskey(auth()->user(), 'Existing Key');
+
+    IdentityConfirmation::markConfirmed();
+
+    livewire(ManagePasskeys::class)
+        ->callAction('deletePasskey', data: ['identity_attempt_id' => 'forged-attempt-id'], arguments: ['passkeyId' => $passkey->id])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('does not let a forged attempt id fall through to an unrelated fresh generic confirmation when adding a passkey', function (): void {
+    $this->actingAs(User::factory()->create(['password' => null]));
+    createPasskey(auth()->user(), 'Existing Key');
+
+    IdentityConfirmation::markConfirmed();
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', data: ['identity_attempt_id' => 'forged-attempt-id'])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony')
+        ->assertNotDispatched('passkey-register');
+});
+
+it('does not let an expired attempt id fall through to an unrelated fresh generic confirmation', function (): void {
+    $user = User::factory()->create(['password' => null]);
+    $this->actingAs($user);
+    $passkey = createPasskey($user, 'Existing Key');
+
+    $component = livewire(ManagePasskeys::class)
+        ->mountAction('deletePasskey', arguments: ['passkeyId' => $passkey->id]);
+
+    $attemptId = $component->get('mountedActions.0.data.identity_attempt_id');
+
+    session()->forget('auth.operation');
+    IdentityConfirmation::markConfirmed();
+
+    $component->set('mountedActions.0.data.identity_attempt_id', $attemptId)
+        ->callMountedAction()
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+// --- MFA --------------------------------------------------------------------
+
+it('requires an MFA code before a password confirmation completes for an enrolled user', function (): void {
+    $this->actingAs(User::factory()->withConfirmedMfa()->create());
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['password' => 'password'])
+        ->assertHasActionErrors(['code'])
+        ->assertNotDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('rejects an incorrect MFA code even with the correct password', function (): void {
+    $this->actingAs(User::factory()->withConfirmedMfa()->create());
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['password' => 'password', 'code' => 'invalid'])
+        ->assertHasActionErrors(['code'])
+        ->assertNotDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('completes registration once the correct MFA code accompanies the password', function (): void {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $code = resolve(Google2FA::class)->getCurrentOtp($secret);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['password' => 'password', 'code' => $code])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register');
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
 // --- Naming ---------------------------------------------------------------
 
 it('registers without asking for a name', function (): void {
-    $this->actingAs(User::factory()->create(['password' => null]));
+    $this->actingAs(User::factory()->create());
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey')
+        ->callAction('registerPasskey', ['password' => 'password'])
         ->assertHasNoActionErrors()
         ->assertDispatched('passkey-register');
 });
@@ -330,4 +441,70 @@ it('does not rename a passkey belonging to another user', function (): void {
         ->callAction('renamePasskey', data: ['name' => 'Hijacked'], arguments: ['passkeyId' => $passkey->id]);
 
     expect($passkey->refresh()->name)->toBe('Not Mine');
+});
+
+it('rejects a direct delete-passkey request when only the generic window is confirmed, never a delete_passkey grant', function (): void {
+    $passkey = createPasskey($this->user, 'Direct Route Target');
+
+    $this->postJson(route('password.confirm.store'), ['password' => 'password'])
+        ->assertNoContent();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))
+        ->assertUnprocessable();
+
+    expect(Passkey::find($passkey->id))->not->toBeNull();
+});
+
+it('allows a direct delete-passkey request once a matching delete_passkey grant is proven', function (): void {
+    $passkey = createPasskey($this->user, 'Direct Route Target');
+
+    AuthenticationSession::startOperation($this->user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($this->user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))
+        ->assertOk();
+
+    expect(Passkey::find($passkey->id))->toBeNull();
+});
+
+it('rejects a direct delete-passkey request when the proven grant targets a different passkey', function (): void {
+    $target = createPasskey($this->user, 'Not The Target');
+    $decoy = createPasskey($this->user, 'Proven For This One');
+
+    AuthenticationSession::startOperation($this->user, 'delete_passkey', (string) $decoy->id);
+    AuthenticationSession::proveOperation($this->user, 'delete_passkey', (string) $decoy->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $target->id]))
+        ->assertUnprocessable();
+
+    expect(Passkey::find($target->id))->not->toBeNull();
+});
+
+it('spends a delete_passkey grant on first use, so a replayed request against a different passkey fails', function (): void {
+    $first = createPasskey($this->user, 'First');
+    $second = createPasskey($this->user, 'Second');
+
+    AuthenticationSession::startOperation($this->user, 'delete_passkey', (string) $first->id);
+    AuthenticationSession::proveOperation($this->user, 'delete_passkey', (string) $first->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $first->id]))->assertOk();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $second->id]))
+        ->assertUnprocessable();
+
+    expect(Passkey::find($second->id))->not->toBeNull();
+});
+
+it('rejects a direct add-passkey request when only the generic window is confirmed, never an add_passkey grant', function (): void {
+    $this->postJson(route('password.confirm.store'), ['password' => 'password'])
+        ->assertNoContent();
+
+    $this->postJson(route('passkey.store'), ['name' => 'Attacker Device'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity');
+
+    expect($this->user->passkeys()->count())->toBe(0);
 });

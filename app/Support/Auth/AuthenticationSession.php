@@ -11,6 +11,8 @@ use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Laravel\Passkeys\Passkey;
 
 final readonly class AuthenticationSession
@@ -19,7 +21,33 @@ final readonly class AuthenticationSession
 
     private const string COMPLETED_KEY = 'auth.completed';
 
+    private const string OPERATION_KEY = 'auth.operation';
+
+    private const string ATTEMPT_KEY = 'auth.attempt';
+
+    private const string PROVIDER_CONFIRM_KEY = 'auth.confirm.provider_grant';
+
     private const int LIFETIME_MINUTES = 10;
+
+    private const int OPERATION_LIFETIME_MINUTES = 15;
+
+    /**
+     * The only sensitive operations that may consume a scoped, one-use identity
+     * confirmation grant. Keep in sync with the plan's allowlist; a caller for an
+     * operation outside this list has no legitimate reason to mint a grant.
+     *
+     * @var list<string>
+     */
+    private const array ALLOWED_OPERATIONS = [
+        'add_passkey',
+        'delete_passkey',
+        'set_password',
+        'link_provider',
+        'unlink_provider',
+        'change_email',
+        'email_sign_in',
+        'manage_mfa',
+    ];
 
     public static function begin(User $user, AuthMethod $method, ?string $credentialId, bool $remember): void
     {
@@ -79,10 +107,220 @@ final readonly class AuthenticationSession
         session()->forget([
             self::SESSION_KEY,
             self::COMPLETED_KEY,
+            self::OPERATION_KEY,
+            self::ATTEMPT_KEY,
+            self::PROVIDER_CONFIRM_KEY,
             'auth.password_confirmed_at',
             'login.id',
             'login.remember',
         ]);
+    }
+
+    /**
+     * Mint a server-bound attempt for one allowlisted sensitive operation. The
+     * returned id is safe to hand to the client (e.g. as a hidden form field):
+     * it names the grant but cannot forge one, since every check below re-derives
+     * the fingerprint from server-side state the client cannot see or set.
+     */
+    public static function startOperation(User $user, string $operation, ?string $targetId): string
+    {
+        throw_unless(in_array($operation, self::ALLOWED_OPERATIONS, true), InvalidArgumentException::class, "Unsupported identity-confirmation operation: {$operation}");
+
+        $id = (string) Str::ulid();
+
+        session()->put(self::OPERATION_KEY, [
+            'id' => $id,
+            'user_id' => (string) $user->getAuthIdentifier(),
+            'operation' => $operation,
+            'target_id' => $targetId,
+            'fingerprint' => self::operationFingerprint($user, $operation, $targetId),
+            'expires_at' => now()->addMinutes(self::OPERATION_LIFETIME_MINUTES)->getTimestamp(),
+        ]);
+
+        return $id;
+    }
+
+    /**
+     * @return array{}|array{id: string, user_id: string, operation: string, target_id: string|null, fingerprint: string, expires_at: int, proven: bool}
+     */
+    public static function pendingOperation(): array
+    {
+        $pending = session()->get(self::OPERATION_KEY);
+
+        if (! is_array($pending)) {
+            return [];
+        }
+
+        if (
+            ! isset($pending['id'], $pending['user_id'], $pending['operation'], $pending['fingerprint'], $pending['expires_at'])
+            || ! is_string($pending['id'])
+            || ! is_string($pending['user_id'])
+            || ! is_string($pending['operation'])
+            || ! in_array($pending['operation'], self::ALLOWED_OPERATIONS, true)
+            || ! array_key_exists('target_id', $pending)
+            || (! is_string($pending['target_id']) && $pending['target_id'] !== null)
+            || ! is_string($pending['fingerprint'])
+            || ! is_int($pending['expires_at'])
+        ) {
+            return [];
+        }
+
+        return [
+            'id' => $pending['id'],
+            'user_id' => $pending['user_id'],
+            'operation' => $pending['operation'],
+            'target_id' => $pending['target_id'],
+            'fingerprint' => $pending['fingerprint'],
+            'expires_at' => $pending['expires_at'],
+            'proven' => ($pending['proven'] ?? false) === true,
+        ];
+    }
+
+    /**
+     * Mark a minted grant as identity-proven. Proof alone never spends the grant:
+     * the actual mutation (same request or a later one, e.g. the browser's own
+     * WebAuthn registration POST) must still call requireOperation()/
+     * consumeOperation() at the point of the write, or the proof is worthless.
+     */
+    public static function proveOperation(User $user, string $operation, ?string $targetId): void
+    {
+        $pending = self::pendingOperation();
+
+        if (! self::operationMatches($pending, $user, $operation, $targetId)) {
+            throw ValidationException::withMessages([
+                'identity' => [__('auth.confirm.required')],
+            ]);
+        }
+
+        $pending['proven'] = true;
+
+        session()->put(self::OPERATION_KEY, $pending);
+    }
+
+    /**
+     * Reject a missing, expired, foreign, retargeted, tampered, or unproven grant.
+     * A grant minted before a credential change (password set, passkey added or
+     * removed, MFA enrolled or dropped) fails the fingerprint check and counts as
+     * stale. This is the actual authorization check for a mutation: call it at
+     * the point of the write, not only at the point identity was proven.
+     */
+    public static function requireOperation(User $user, string $operation, ?string $targetId): void
+    {
+        $pending = self::pendingOperation();
+
+        if ($pending === [] || ! self::operationMatches($pending, $user, $operation, $targetId) || ! $pending['proven']) {
+            throw ValidationException::withMessages([
+                'identity' => [__('auth.confirm.required')],
+            ]);
+        }
+    }
+
+    /**
+     * Atomically consume a proven grant so it cannot authorize a second write.
+     * Call this at the moment the mutation actually happens, never earlier.
+     */
+    public static function consumeOperation(User $user, string $operation, ?string $targetId): void
+    {
+        self::requireOperation($user, $operation, $targetId);
+
+        $pending = self::pendingOperation();
+
+        if ($pending === [] || ! self::claim($pending['id'], $pending['expires_at'])) {
+            throw ValidationException::withMessages([
+                'identity' => [__('auth.confirm.required')],
+            ]);
+        }
+
+        session()->forget(self::OPERATION_KEY);
+    }
+
+    /**
+     * Bind the operation grant in flight to a provider-confirmation redirect
+     * about to leave the app. The single OPERATION_KEY slot can be overwritten
+     * by an unrelated modal opened in another tab while the OAuth round trip is
+     * in progress; the callback must trust only the grant it stashed here, never
+     * whatever happens to occupy the slot when the user returns.
+     */
+    public static function stashOperationForProviderConfirm(): void
+    {
+        $pending = self::pendingOperation();
+
+        session()->put(self::PROVIDER_CONFIRM_KEY, $pending['id'] ?? null);
+    }
+
+    /**
+     * One-time read of the grant id stashed before a provider-confirmation
+     * redirect. Returns null if none was stashed, already consumed, or the
+     * request never went through stashOperationForProviderConfirm().
+     */
+    public static function consumeStashedProviderOperationGrantId(): ?string
+    {
+        $id = session()->pull(self::PROVIDER_CONFIRM_KEY);
+
+        return is_string($id) ? $id : null;
+    }
+
+    /**
+     * @param  array{}|array{id: string, user_id: string, operation: string, target_id: string|null, fingerprint: string, expires_at: int, proven: bool}  $pending
+     */
+    private static function operationMatches(array $pending, User $user, string $operation, ?string $targetId): bool
+    {
+        if ($pending === [] || $pending['expires_at'] <= now()->getTimestamp()) {
+            return false;
+        }
+
+        if ($pending['user_id'] !== (string) $user->getAuthIdentifier() || $pending['operation'] !== $operation || $pending['target_id'] !== $targetId) {
+            return false;
+        }
+
+        return hash_equals($pending['fingerprint'], self::operationFingerprint($user, $operation, $targetId));
+    }
+
+    private static function operationFingerprint(User $user, string $operation, ?string $targetId): string
+    {
+        $key = hash_hkdf('sha256', self::decodedAppKey(), 32, 'relaticle.auth.operation.v1');
+
+        return hash_hmac('sha256', implode('|', [
+            (string) $user->getAuthIdentifier(),
+            $operation,
+            $targetId ?? '',
+            (string) $user->getRawOriginal('password'),
+            (string) $user->getRawOriginal('two_factor_secret'),
+            (string) $user->getRawOriginal('two_factor_confirmed_at'),
+        ]), $key);
+    }
+
+    /**
+     * Mint a server-bound genesis marker for an always-confirm action that has no
+     * allowlisted operation of its own (account deletion, session logout). The
+     * client only ever sees the opaque id; the timestamp it names never leaves
+     * the server, so it cannot be lowered to make a stale confirmation look fresh.
+     */
+    public static function beginAttempt(): string
+    {
+        $id = (string) Str::ulid();
+
+        session()->put(self::ATTEMPT_KEY, [
+            'id' => $id,
+            'started_at' => now()->getTimestamp(),
+        ]);
+
+        return $id;
+    }
+
+    /**
+     * The attempt's genesis timestamp, or PHP_INT_MAX for a missing or forged id
+     * so a caller comparing "confirmed after this started" always fails safe.
+     */
+    public static function attemptStartedAt(string $id): int
+    {
+        $attempt = session()->get(self::ATTEMPT_KEY);
+
+        if (! is_array($attempt) || ($attempt['id'] ?? null) !== $id || ! is_int($attempt['started_at'] ?? null)) {
+            return PHP_INT_MAX;
+        }
+
+        return $attempt['started_at'];
     }
 
     public static function isValidFor(User $user): bool

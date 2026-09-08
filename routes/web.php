@@ -8,6 +8,9 @@ use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
 use App\Http\Controllers\AlternativesController;
 use App\Http\Controllers\Auth\CallbackController;
+use App\Http\Controllers\Auth\IdentityConfirmationCallbackController;
+use App\Http\Controllers\Auth\IdentityConfirmationMfaController;
+use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
@@ -55,6 +58,27 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
 
     Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
+});
+
+Route::middleware('auth')->group(function (): void {
+    if (Feature::active(SocialAuth::class)) {
+        // Confirmation intent, not login: a linked provider re-authenticated here
+        // proves current access to that identity for one sensitive operation. Kept
+        // route names Task 5's own link-provider routes must not rename.
+        Route::get('/auth/confirm/redirect/{provider}', IdentityConfirmationRedirectController::class)
+            ->name('auth.socialite.confirm.redirect')
+            ->middleware('throttle:10,1,socialite-confirm-redirect');
+        Route::get('/auth/confirm/callback/{provider}', IdentityConfirmationCallbackController::class)
+            ->name('auth.socialite.confirm.callback')
+            ->middleware('throttle:10,1,socialite-confirm-callback');
+    }
+
+    Route::get('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'show'])
+        ->name('identity.confirm.mfa');
+
+    Route::post('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'store'])
+        ->middleware('throttle:5,1,identity-confirm-mfa')
+        ->name('identity.confirm.mfa.store');
 });
 
 Route::get('/.well-known/security.txt', function (): Response {

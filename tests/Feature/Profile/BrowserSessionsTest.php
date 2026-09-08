@@ -47,6 +47,44 @@ test('blocked without confirmation', function (): void {
         ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
 });
 
+test('a passkey-only user (no password, no social account) can log out other sessions through the ceremony', function (): void {
+    config(['session.driver' => 'database']);
+
+    $user = User::factory()->withTeam()->create(['password' => null]);
+    $this->actingAs($user);
+
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Only Key',
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    $component = Livewire::test(LogoutOtherBrowserSessions::class)
+        ->callAction('deleteBrowserSessions')
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    IdentityConfirmation::markConfirmed();
+
+    $component->callMountedAction()
+        ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
+});
+
+test('a social-only user can log out other sessions through the real modal after a realistic delay', function (): void {
+    config(['session.driver' => 'database']);
+
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    session()->put('auth.password_confirmed_at', time());
+
+    $this->travel(10)->seconds();
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->callAction('deleteBrowserSessions')
+        ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
+});
+
 test('password user with a passkey triggers the ceremony', function (): void {
     $this->actingAs($user = User::factory()->withTeam()->create());
     session()->forget('auth.password_confirmed_at');

@@ -9,7 +9,9 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Contracts\User\CreatesNewSocialUsers;
+use App\Http\Controllers\Auth\IdentityConfirmationController;
 use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasskeyConfirmationController;
 use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Listeners\MarkTwoFactorEnrollmentCompleteListener;
@@ -18,6 +20,7 @@ use Filament\Facades\Filament;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -25,7 +28,9 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
+use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
 use Laravel\Fortify\Http\Controllers\TwoFactorAuthenticatedSessionController;
+use Laravel\Passkeys\Http\Controllers\PasskeyConfirmationController as VendorPasskeyConfirmationController;
 use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -39,6 +44,12 @@ final class FortifyServiceProvider extends ServiceProvider
         // The vendor controller authenticates before resolving its response, so a
         // response-only override cannot enforce MFA; swap the whole controller.
         $this->app->bind(PasskeyLoginController::class, PasskeySessionController::class);
+
+        // Both vendor controllers mark the session confirmed directly on success;
+        // ours routes the same proof through ConfirmIdentity so a scoped operation
+        // grant and enrolled MFA apply identically to every confirmation path.
+        $this->app->bind(ConfirmablePasswordController::class, IdentityConfirmationController::class);
+        $this->app->bind(VendorPasskeyConfirmationController::class, PasskeyConfirmationController::class);
     }
 
     public function boot(): void
@@ -80,5 +91,38 @@ final class FortifyServiceProvider extends ServiceProvider
          */
         RateLimiter::for('passkeys', fn (Request $request): Limit => Limit::perMinute(30)
             ->by($request->user()?->getAuthIdentifier() ?? (string) $request->ip()));
+
+        $this->requireOperationGrantsOnVendorRoutes();
+    }
+
+    /**
+     * Fortify and the standalone Laravel\Passkeys package both register routes
+     * named passkey.store/passkey.destroy; whichever provider boots last wins
+     * the route collection, so neither package's own config middleware key is
+     * reliable here. Appending directly to the final, already-registered route
+     * objects inside a booted() callback works regardless of that ordering.
+     */
+    private function requireOperationGrantsOnVendorRoutes(): void
+    {
+        $this->app->booted(function (): void {
+            $operationsByRouteName = [
+                'passkey.store' => 'add_passkey',
+                'passkey.destroy' => 'delete_passkey',
+                'two-factor.enable' => 'manage_mfa',
+                'two-factor.disable' => 'manage_mfa',
+            ];
+
+            // Route::name() is fluent, applied after the route is first added to
+            // the collection, so the name-index cache (getByName()) is not yet
+            // populated for a route registered inside another provider's own
+            // boot(). Matching each route's own getName() sidesteps that cache.
+            foreach ($this->app->make(Router::class)->getRoutes()->getRoutes() as $route) {
+                $operation = $operationsByRouteName[$route->getName()] ?? null;
+
+                if ($operation !== null) {
+                    $route->middleware("require-operation:{$operation}");
+                }
+            }
+        });
     }
 }

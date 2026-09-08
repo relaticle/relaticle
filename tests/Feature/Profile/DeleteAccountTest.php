@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use App\Notifications\UserDeletionScheduledNotification;
 use App\Support\Auth\IdentityConfirmation;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Passkeys\Passkey;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 
 mutates(DeleteAccount::class, User::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
@@ -38,6 +42,32 @@ test('blocked without a fresh confirmation', function (): void {
         ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('a passkey-only user (no password, no social account) can delete their account through the ceremony', function (): void {
+    $user = User::factory()->withPersonalTeam()->create(['password' => null]);
+    $this->actingAs($user);
+
+    Passkey::create([
+        'user_id' => $user->id,
+        'name' => 'Only Key',
+        'credential_id' => 'cred-'.uniqid(),
+        'credential' => [],
+    ]);
+
+    $component = Livewire::test(DeleteAccount::class)
+        ->callAction(TestAction::make('deleteAccount')->schemaComponent(), data: ['confirm_email' => $user->email])
+        ->assertActionHalted()
+        ->assertDispatched('confirm-identity-ceremony');
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+
+    IdentityConfirmation::markConfirmed();
+
+    $component->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });
 
 test('password user with a passkey triggers the ceremony', function (): void {
@@ -114,16 +144,76 @@ test('wrong password is rejected', function (): void {
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
-test('social user deletes without confirmation', function (): void {
-    Notification::fake();
-
+test('social user without a fresh confirmation is blocked from deleting', function (): void {
     $this->actingAs($user = User::factory()->withPersonalTeam()->socialOnly()->create());
 
     Livewire::test(DeleteAccount::class)
         ->call('deleteAccount')
+        ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('social user completes deletion after confirming through their linked provider', function (): void {
+    Notification::fake();
+
+    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $this->actingAs($user);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'confirmed-google-id',
+    ]);
+
+    $socialiteUser = new SocialiteUser;
+    $socialiteUser->id = 'confirmed-google-id';
+    $socialiteUser->name = $user->name;
+    $socialiteUser->email = $user->email;
+
+    Socialite::fake(SocialiteProvider::GOOGLE->value, $socialiteUser);
+
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
         ->assertRedirect();
 
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+
+    $this->travel(10)->seconds();
+
+    livewire(DeleteAccount::class)
+        ->callAction('deleteAccount', data: ['confirm_email' => $user->email])
+        ->assertHasNoActionErrors();
+
     expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
+});
+
+test('a provider identity mismatch does not confirm a pending deletion', function (): void {
+    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $this->actingAs($user);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'the-real-linked-id',
+    ]);
+
+    $socialiteUser = new SocialiteUser;
+    $socialiteUser->id = 'a-different-id';
+    $socialiteUser->name = $user->name;
+    $socialiteUser->email = $user->email;
+
+    Socialite::fake(SocialiteProvider::GOOGLE->value, $socialiteUser);
+
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+
+    Livewire::test(DeleteAccount::class)
+        ->call('deleteAccount')
+        ->assertNotified(__('profile.notifications.identity_confirmation_failed.title'));
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
 test('user cannot schedule deletion when owning team with members', function (): void {

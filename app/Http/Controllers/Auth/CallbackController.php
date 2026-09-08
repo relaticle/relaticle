@@ -8,6 +8,7 @@ use App\Actions\Auth\BeginAuthentication;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
+use App\Http\Controllers\Auth\Concerns\ResolvesSocialiteUsers;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\EmailAddress;
@@ -17,12 +18,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
-use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Throwable;
 
 final readonly class CallbackController
 {
+    use ResolvesSocialiteUsers;
+
     public function __construct(private BeginAuthentication $beginAuthentication) {}
 
     public function __invoke(
@@ -57,15 +59,6 @@ final readonly class CallbackController
 
             return $this->handleError($this->parseProviderError($e->getMessage(), $provider->value));
         }
-    }
-
-    /**
-     * @throws InvalidStateException
-     * @throws Throwable
-     */
-    private function retrieveSocialUser(string $provider): SocialiteUser
-    {
-        return Socialite::driver($provider)->user();
     }
 
     private function resolveUser(
@@ -152,22 +145,6 @@ final readonly class CallbackController
         return EmailAddress::canonicalize(
             $socialUser->getEmail() ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId()),
         );
-    }
-
-    private function parseProviderError(string $exceptionMessage, string $provider): string
-    {
-        $errorPatterns = [
-            'invalid_request' => 'Invalid authentication request. Please try again.',
-            'access_denied' => 'Access was denied. Please authorize the application to continue.',
-        ];
-
-        foreach ($errorPatterns as $pattern => $message) {
-            if (str_contains($exceptionMessage, $pattern)) {
-                return $message;
-            }
-        }
-
-        return sprintf('Failed to authenticate with %s.', ucfirst($provider));
     }
 
     private function handleError(string $message): RedirectResponse

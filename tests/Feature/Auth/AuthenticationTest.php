@@ -9,6 +9,7 @@ use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\ResetPassword;
 use App\Filament\Pages\Dashboard;
 use App\Http\Controllers\Auth\MfaChallengeController;
+use App\Http\Controllers\Auth\PasskeyConfirmationController;
 use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
 use App\Models\Team;
@@ -39,6 +40,7 @@ use Webauthn\TrustPath\EmptyTrustPath;
 
 mutates(Login::class, PasswordSessionController::class, MfaChallengeController::class);
 mutates(AuthenticatePasskey::class, PasskeySessionController::class);
+mutates(PasskeyConfirmationController::class);
 
 function base64UrlEncodeForPasskeyTest(string $bytes): string
 {
@@ -443,6 +445,59 @@ test('the passkey login endpoint rejects a submission with no prior options requ
         ->assertJsonValidationErrors(['credential']);
 
     $this->assertGuest('web');
+});
+
+test('a well-formed passkey assertion confirms identity through the installed verifier', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $options = $this->getJson(route('passkey.confirm-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    storePasskeyAssertionFor($user, $assertion);
+
+    $this->postJson(route('passkey.confirm'), $assertion['payload'])
+        ->assertOk()
+        ->assertJson(['confirmed' => true]);
+
+    expect(session('auth.password_confirmed_at'))->not->toBeNull();
+});
+
+test('a well-formed passkey assertion for an MFA-enrolled user waits for the code instead of confirming', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+
+    $options = $this->getJson(route('passkey.confirm-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    storePasskeyAssertionFor($user, $assertion);
+
+    $this->postJson(route('passkey.confirm'), $assertion['payload'])
+        ->assertOk()
+        ->assertJson(['confirmed' => false, 'redirect' => route('identity.confirm.mfa')]);
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+test('a passkey confirmation rejects a credential registered to a different user', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $confirmingUser = User::factory()->withTeam()->create();
+    $this->actingAs($confirmingUser);
+
+    $options = $this->getJson(route('passkey.confirm-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    storePasskeyAssertionFor($owner, $assertion);
+
+    $this->postJson(route('passkey.confirm'), $assertion['payload'])
+        ->assertUnprocessable();
+
+    expect(session('auth.password_confirmed_at'))->toBeNull();
+    $this->assertAuthenticatedAs($confirmingUser);
 });
 
 test('a passkey revoked while its MFA challenge is pending cannot complete authentication', function (): void {

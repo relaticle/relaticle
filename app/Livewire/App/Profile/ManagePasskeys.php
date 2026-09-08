@@ -7,7 +7,7 @@ namespace App\Livewire\App\Profile;
 use App\Actions\Passkeys\RenamePasskey;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
-use App\Support\Auth\IdentityConfirmation;
+use App\Support\Auth\AuthenticationSession;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
@@ -65,11 +65,11 @@ final class ManagePasskeys extends BaseLivewireComponent
     }
 
     /**
-     * Confirm the user's identity (passkey ceremony, password fallback, or session alone
-     * for passwordless accounts), then run the browser registration ceremony.
-     * markConfirmed() is always called before dispatching so the subsequent register POST
-     * satisfies the vendor RequirePassword middleware. Even for passwordless accounts the
-     * identity gate would otherwise short-circuit.
+     * Confirm the user's identity (passkey ceremony or password), then run the browser
+     * registration ceremony. A user with neither a password nor a passkey has nothing
+     * left to prove inline: ConfirmIdentityAction halts instead of proceeding, and the
+     * add_passkey grant this mints is only spent later, at the passkey.store request the
+     * browser makes once the ceremony completes (see RequireOperationGrant).
      *
      * No name is collected here. The AAGUID that identifies the authenticator only exists
      * once the ceremony has completed, so a name asked for up front is a guess at
@@ -84,10 +84,9 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.passkeys.add_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->operation('add_passkey')
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
             ->confirmedUsing(function (Action $action): void {
-                IdentityConfirmation::markConfirmed();
-
                 $this->dispatch('passkey-register');
 
                 $action->halt();
@@ -150,14 +149,20 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->size(Size::Small)
             ->color('danger')
             ->alwaysConfirm()
-            ->confirmedUsing(function (array $arguments, DeletePasskey $deletePasskey): void {
-                $this->performDelete((int) ($arguments['passkeyId'] ?? 0), $deletePasskey);
+            ->operation('delete_passkey', fn (array $arguments): ?string => isset($arguments['passkeyId']) ? (string) $arguments['passkeyId'] : null)
+            ->confirmedUsing(function (?string $operationTarget, DeletePasskey $deletePasskey): void {
+                $this->performDelete((int) ($operationTarget ?? 0), $deletePasskey);
             });
     }
 
     private function performDelete(int $passkeyId, DeletePasskey $deletePasskey): void
     {
         $user = $this->authUser();
+
+        // Re-check and spend the grant against the id actually being deleted,
+        // at the point of the write. Proving identity earlier in this request
+        // authorizes nothing by itself; only this call does.
+        AuthenticationSession::consumeOperation($user, 'delete_passkey', (string) $passkeyId);
 
         $passkey = $user->passkeys()->whereKey($passkeyId)->first();
 

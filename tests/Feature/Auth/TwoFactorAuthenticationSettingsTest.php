@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
+use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Models\User;
+use App\Support\Auth\AuthenticationSession;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 use Laravel\Jetstream\Http\Livewire\TwoFactorAuthenticationForm;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
-mutates(User::class);
+mutates(User::class, RequireIdentityConfirmation::class);
 
 test('two factor authentication can be enabled', function () {
     $this->actingAs($user = User::factory()->create()->fresh());
@@ -79,6 +81,38 @@ test('confirming TOTP enrollment marks the session complete so the next request 
 
     $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))->assertOk();
     $this->assertAuthenticatedAs($user);
+})->skip(function () {
+    return ! Features::canManageTwoFactorAuthentication();
+}, 'Two factor authentication is not enabled.');
+
+test('disabling MFA through the direct Fortify route requires its own proven manage_mfa grant, not just a generic confirmation', function () {
+    $user = User::factory()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+
+    $this->deleteJson(route('two-factor.disable'))
+        ->assertStatus(423)
+        ->assertJson(['message' => __('auth.confirm.required')]);
+
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $code = resolve(Google2FA::class)->getCurrentOtp($secret);
+
+    $this->postJson(route('password.confirm.store'), ['password' => 'password', 'code' => $code])
+        ->assertNoContent();
+
+    $this->deleteJson(route('two-factor.disable'))
+        ->assertUnprocessable()
+        ->assertJson(['message' => __('auth.confirm.required')]);
+
+    expect($user->fresh()->two_factor_secret)->not->toBeNull();
+
+    AuthenticationSession::startOperation($user, 'manage_mfa', null);
+    AuthenticationSession::proveOperation($user, 'manage_mfa', null);
+
+    $this->deleteJson(route('two-factor.disable'))
+        ->assertOk();
+
+    expect($user->fresh()->two_factor_secret)->toBeNull();
 })->skip(function () {
     return ! Features::canManageTwoFactorAuthentication();
 }, 'Two factor authentication is not enabled.');
