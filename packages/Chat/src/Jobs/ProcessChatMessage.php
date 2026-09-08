@@ -207,6 +207,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
                 'role' => $this->user->ownsTeam($this->team) ? 'owner' : 'member',
+                'language' => $this->user->chatLanguageName(),
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
