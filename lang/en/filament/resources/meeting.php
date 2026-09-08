@@ -4,6 +4,37 @@ declare(strict_types=1);
 
 return [
     'navigation_label' => 'Meetings',
+    'view' => [
+        'heading' => 'Meeting',
+    ],
+    'time' => [
+        'all_day' => 'All day',
+    ],
+    'sections' => [
+        'participants' => [
+            'heading' => 'Participants',
+            'empty' => 'No participants',
+        ],
+        'linked_records' => [
+            'heading' => 'Linked records',
+        ],
+        'description' => [
+            'heading' => 'Description',
+        ],
+    ],
+    'attendees' => [
+        'host' => 'Host',
+    ],
+    'actions' => [
+        'link_records' => [
+            'label' => 'Link records',
+        ],
+    ],
+    'linked_record_types' => [
+        'people' => 'Person',
+        'companies' => 'Company',
+        'opportunities' => 'Opportunity',
+    ],
     'fields' => [
         'organizer' => [
             'label' => 'Organizer',
@@ -12,7 +43,7 @@ return [
             'label' => 'Email',
         ],
         'html_link' => [
-            'label' => 'Open in Google Calendar',
+            'label' => 'Open in calendar',
         ],
     ],
 
