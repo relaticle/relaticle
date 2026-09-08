@@ -11,14 +11,12 @@ use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
@@ -30,6 +28,7 @@ final readonly class LinkMeetingAction
         private CompanyDomainMatcher $domainMatcher,
         private AutomatedSenderMatcher $automatedSender,
         private EmailVisibilityService $visibility,
+        private RecordCommunicationMetrics $metrics,
     ) {}
 
     public function execute(Meeting $meeting): void
@@ -77,7 +76,7 @@ final readonly class LinkMeetingAction
                 if ($company instanceof Company) {
                     $attendee->update(['company_id' => $company->getKey()]);
                     if ($this->autoAttach($meeting->companies(), $company->getKey()) && $countsTowardIntelligence) {
-                        $this->updateCompanyMetrics($company, $meeting);
+                        $this->metrics->incrementMeetingMetrics($company, $meeting);
                     }
                 }
             }
@@ -95,7 +94,7 @@ final readonly class LinkMeetingAction
             if ($person) {
                 $attendee->update(['contact_id' => $person->getKey()]);
                 if ($this->autoAttach($meeting->people(), $person->getKey()) && $countsTowardIntelligence) {
-                    $this->updatePersonMetrics($person, $meeting);
+                    $this->metrics->incrementMeetingMetrics($person, $meeting);
                 }
 
                 if ($person->company_id) {
@@ -108,7 +107,7 @@ final readonly class LinkMeetingAction
 
                 foreach ($opportunities as $opportunity) {
                     if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey()) && $countsTowardIntelligence) {
-                        $this->updateOpportunityMetrics($opportunity, $meeting);
+                        $this->metrics->incrementMeetingMetrics($opportunity, $meeting);
                     }
                 }
             }
@@ -144,47 +143,6 @@ final readonly class LinkMeetingAction
         $relation->attach($relatedId, ['link_source' => 'auto']);
 
         return true;
-    }
-
-    private function updatePersonMetrics(People $person, Meeting $meeting): void
-    {
-        $this->advanceMetrics($person->getTable(), $person->getKey(), $meeting->starts_at);
-    }
-
-    private function updateCompanyMetrics(Company $company, Meeting $meeting): void
-    {
-        $this->advanceMetrics($company->getTable(), $company->getKey(), $meeting->starts_at);
-    }
-
-    private function updateOpportunityMetrics(Opportunity $opportunity, Meeting $meeting): void
-    {
-        $this->advanceMetrics($opportunity->getTable(), $opportunity->getKey(), $meeting->starts_at);
-    }
-
-    /**
-     * Increments `meeting_count` and monotonically advances `last_meeting_at` / `last_interaction_at`.
-     * The timestamps are guarded at the SQL level so parallel workers processing events out of
-     * chronological order (e.g. the 90-day backfill) cannot regress a newer value to an older one.
-     */
-    private function advanceMetrics(string $table, string $id, Carbon $startsAt): void
-    {
-        DB::table($table)
-            ->where('id', $id)
-            ->update(['meeting_count' => DB::raw('meeting_count + 1')]);
-
-        $this->advanceTimestamp($table, $id, 'last_meeting_at', $startsAt);
-        $this->advanceTimestamp($table, $id, 'last_interaction_at', $startsAt);
-    }
-
-    private function advanceTimestamp(string $table, string $id, string $column, Carbon $startsAt): void
-    {
-        DB::table($table)
-            ->where('id', $id)
-            ->where(fn (QueryBuilder $q) => $q
-                ->whereNull($column)
-                ->orWhere($column, '<', $startsAt)
-            )
-            ->update([$column => $startsAt]);
     }
 
     /** @return Collection<int, lowercase-string> */
