@@ -12,6 +12,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -96,7 +97,7 @@ final class CommunicationIntelligenceInfolist
             ->columns(1)
             ->columnSpanFull()
             ->collapsible()
-            ->collapsed(fn (People|Company|Opportunity $record): bool => self::metrics($record)->lastInteractionAt() === null);
+            ->collapsed(fn (People|Company|Opportunity $record): bool => ! self::metrics($record)->lastInteractionAt() instanceof Carbon);
     }
 
     /**
