@@ -341,6 +341,94 @@ it('marks body-referenced gmail attachment-disposition cid images inline', funct
         ->and($data->attachments[0]['is_inline'])->toBeTrue();
 });
 
+it('imports a file when the gmail payload itself is the attachment', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $payload = new MessagePart;
+    $payload->setMimeType('application/pdf');
+    $payload->setFilename('invoice.pdf');
+    $payload->setHeaders([
+        new MessagePartHeader(['name' => 'Message-ID', 'value' => '<msg@example.test>']),
+        new MessagePartHeader(['name' => 'Subject', 'value' => 'Invoice']),
+        new MessagePartHeader(['name' => 'From', 'value' => 'Sender <sender@example.test>']),
+        new MessagePartHeader(['name' => 'To', 'value' => 'Owner <owner@example.test>']),
+        new MessagePartHeader(['name' => 'Content-Disposition', 'value' => 'attachment; filename="invoice.pdf"']),
+    ]);
+    $payload->setBody(new MessagePartBody([
+        'attachmentId' => 'pdf-attachment-id',
+        'size' => 2048,
+    ]));
+
+    $message = new Message([
+        'id' => 'gmail-msg-root-pdf',
+        'threadId' => 'gmail-thread-root-pdf',
+        'internalDate' => (string) (now()->timestamp * 1000),
+        'labelIds' => ['INBOX'],
+        'snippet' => 'Invoice',
+    ]);
+    $message->setPayload($payload);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('get')
+        ->once()
+        ->with('me', 'gmail-msg-root-pdf', ['format' => 'full'])
+        ->andReturn($message);
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_messages = $messages;
+
+    $data = new GmailService($account, $gmail)->fetchMessage('gmail-msg-root-pdf');
+
+    expect($data->hasAttachments)->toBeTrue()
+        ->and($data->attachments)->toHaveCount(1)
+        ->and($data->attachments[0]['filename'])->toBe('invoice.pdf')
+        ->and($data->attachments[0]['mime_type'])->toBe('application/pdf')
+        ->and($data->attachments[0]['size'])->toBe(2048)
+        ->and($data->attachments[0]['attachment_id'])->toBe('pdf-attachment-id')
+        ->and($data->attachments[0]['is_inline'])->toBeFalse();
+});
+
+it('does not treat a root text payload as an attachment', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $payload = new MessagePart;
+    $payload->setMimeType('text/plain');
+    $payload->setHeaders([
+        new MessagePartHeader(['name' => 'Message-ID', 'value' => '<msg@example.test>']),
+        new MessagePartHeader(['name' => 'Subject', 'value' => 'Hello']),
+        new MessagePartHeader(['name' => 'From', 'value' => 'Sender <sender@example.test>']),
+        new MessagePartHeader(['name' => 'To', 'value' => 'Owner <owner@example.test>']),
+    ]);
+    $payload->setBody(new MessagePartBody([
+        'data' => rtrim(strtr(base64_encode('Hello'), '+/', '-_'), '='),
+        'size' => 5,
+    ]));
+
+    $message = new Message([
+        'id' => 'gmail-msg-plain',
+        'threadId' => 'gmail-thread-plain',
+        'internalDate' => (string) (now()->timestamp * 1000),
+        'labelIds' => ['INBOX'],
+        'snippet' => 'Hello',
+    ]);
+    $message->setPayload($payload);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('get')
+        ->once()
+        ->with('me', 'gmail-msg-plain', ['format' => 'full'])
+        ->andReturn($message);
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_messages = $messages;
+
+    $data = new GmailService($account, $gmail)->fetchMessage('gmail-msg-plain');
+
+    expect($data->hasAttachments)->toBeFalse()
+        ->and($data->attachments)->toBe([])
+        ->and($data->bodyText)->toBe('Hello');
+});
+
 it('keeps unreferenced gmail attachment-disposition cid images downloadable', function (): void {
     $account = ConnectedAccount::factory()->make();
 
