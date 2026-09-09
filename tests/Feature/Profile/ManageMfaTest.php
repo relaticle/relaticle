@@ -91,6 +91,55 @@ test('an invalid code leaves MFA off', function (): void {
     expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeFalse();
 });
 
+test('setup rejects a code for an authenticator replaced in another tab', function (): void {
+    $this->freezeTime();
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+
+    $firstTab = Livewire::test(ManageMfa::class)
+        ->callAction('enableMfa', ['password' => 'password']);
+    $firstSecret = $firstTab->get('pendingSecret');
+    $secondTab = Livewire::test(ManageMfa::class)
+        ->callAction('enableMfa', ['password' => 'password']);
+    $secondSecret = $secondTab->get('pendingSecret');
+
+    $firstTab->setActionData(['code' => resolve(Google2FA::class)->getCurrentOtp($firstSecret)])
+        ->callMountedAction()
+        ->assertActionMounted('confirmMfa')
+        ->assertHasActionErrors(['code']);
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeFalse();
+    expect(Fortify::currentEncrypter()->decrypt($user->fresh()->two_factor_secret))->toBe($secondSecret);
+
+    $secondTab->setActionData(['code' => resolve(Google2FA::class)->getCurrentOtp($secondSecret)])
+        ->callMountedAction()
+        ->assertActionMounted('saveRecoveryCodes');
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
+});
+
+test('a stale settings tab cannot replace an enrolled authenticator', function (): void {
+    $this->freezeTime();
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $staleTab = Livewire::test(ManageMfa::class);
+    $activeTab = Livewire::test(ManageMfa::class)
+        ->callAction('enableMfa', ['password' => 'password']);
+    $secret = $activeTab->get('pendingSecret');
+    $activeTab->setActionData(['code' => resolve(Google2FA::class)->getCurrentOtp($secret)])
+        ->callMountedAction();
+    $this->travel(1)->minutes();
+    $this->actingAs($user->fresh());
+
+    $staleTab->callAction('enableMfa', [
+        'password' => 'password',
+        'code' => resolve(Google2FA::class)->getCurrentOtp($secret),
+    ]);
+
+    expect(Fortify::currentEncrypter()->decrypt($user->fresh()->two_factor_secret))->toBe($secret);
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
+});
+
 test('turning MFA off requires the password and the current code', function (): void {
     $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
@@ -184,3 +233,60 @@ test('leaving recovery codes hides them while leaving MFA on', function (string 
 
     expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
 })->with(['finish' => 'callMountedAction', 'close' => 'unmountAction']);
+
+test('a user who signs in with a recovery code can disable MFA with another recovery code', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
+        ->assertRedirect(route('two-factor.login'));
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertRedirect();
+    $this->assertAuthenticatedAs($user);
+
+    Livewire::test(ManageMfa::class)
+        ->callAction('disableMfa', [
+            'password' => 'password',
+            'use_recovery_code' => true,
+            'recovery_code' => 'recovery-code-two',
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified(__('profile.sections.mfa.disabled_notification'));
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeFalse()
+        ->and($user->fresh()->two_factor_secret)->toBeNull()
+        ->and($user->fresh()->two_factor_recovery_codes)->toBeNull();
+});
+
+test('a wrong password does not spend a recovery code while disabling MFA', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    $codes = $user->recoveryCodes();
+
+    Livewire::test(ManageMfa::class)
+        ->callAction('disableMfa', [
+            'password' => 'incorrect-password',
+            'use_recovery_code' => true,
+            'recovery_code' => 'recovery-code-one',
+        ])
+        ->assertHasActionErrors(['password']);
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
+        ->and($user->fresh()->recoveryCodes())->toBe($codes);
+});
+
+test('an invalid recovery code cannot disable MFA', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    $codes = $user->recoveryCodes();
+
+    Livewire::test(ManageMfa::class)
+        ->callAction('disableMfa', [
+            'password' => 'password',
+            'use_recovery_code' => true,
+            'recovery_code' => 'invalid-recovery-code',
+        ])
+        ->assertHasActionErrors(['recovery_code']);
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
+        ->and($user->fresh()->recoveryCodes())->toBe($codes);
+});

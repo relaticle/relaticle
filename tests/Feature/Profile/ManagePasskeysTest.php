@@ -2,18 +2,24 @@
 
 declare(strict_types=1);
 
+use App\Actions\Passkeys\DeletePasskey;
 use App\Enums\SocialiteProvider;
+use App\Features\SocialAuth;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\ManagePasskeys;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Database\Factories\UserFactory;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkey;
+use Laravel\Pennant\Feature;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use PragmaRX\Google2FA\Google2FA;
 
-mutates(ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class, AuthenticationSession::class);
+mutates(DeletePasskey::class, ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class, AuthenticationSession::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -133,6 +139,57 @@ it('offers a linked provider for fresh proof without setting a confirmation time
         ->assertMountedActionModalSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']));
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('resumes first passkey registration after returning from the linked provider', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    $grantId = AuthenticationSession::pendingOperation()['id'];
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))
+        ->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect();
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey')
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register');
+
+    expect(AuthenticationSession::pendingOperation()['id'])->toBe($grantId);
+});
+
+it('does not reuse a provider confirmation for another operation', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    $this->actingAs($user);
+    AuthenticationSession::startOperation($user, 'set_password', null);
+    AuthenticationSession::proveOperation($user, 'set_password', null);
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey')
+        ->assertNotDispatched('passkey-register');
+});
+
+it('does not reuse an expired provider confirmation', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    $this->actingAs($user);
+    AuthenticationSession::startOperation($user, 'add_passkey', null);
+    AuthenticationSession::proveOperation($user, 'add_passkey', null);
+    $this->travel(16)->minutes();
+
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey')
+        ->assertNotDispatched('passkey-register');
 });
 
 it('runs the confirmation ceremony when a password user with a passkey adds another', function (): void {
@@ -270,6 +327,7 @@ it('completes the deletion once the ceremony has already satisfied this attempt'
     $user = User::factory()->create(['password' => null]);
     $this->actingAs($user);
     $passkey = createPasskey($user, 'Existing Key');
+    $backup = createPasskey($user, 'Backup Key');
 
     $component = livewire(ManagePasskeys::class)
         ->mountAction('deletePasskey', arguments: ['passkeyId' => $passkey->id]);
@@ -281,6 +339,77 @@ it('completes the deletion once the ceremony has already satisfied this attempt'
         ->assertNotDispatched('confirm-identity-ceremony');
 
     expect(Passkey::find($passkey->id))->toBeNull();
+    $this->assertModelExists($backup);
+});
+
+it('keeps the last primary method after passkey confirmation', function (): void {
+    $user = User::factory()->create(['password' => null]);
+    $this->actingAs($user);
+    $passkey = createPasskey($user, 'Only Key');
+    $component = livewire(ManagePasskeys::class)
+        ->mountAction('deletePasskey', arguments: ['passkeyId' => $passkey->id]);
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $component->callMountedAction()->assertNotified(__('auth.link.last_method'));
+
+    $this->assertModelExists($passkey);
+});
+
+it('returns 422 when direct passkey deletion would remove the last primary method', function (bool $mfa): void {
+    $user = User::factory()->when($mfa, fn (UserFactory $factory): UserFactory => $factory->withConfirmedMfa())->create(['password' => null]);
+    $this->actingAs($user);
+    $passkey = createPasskey($user, 'Only Key');
+    AuthenticationSession::markComplete($user);
+    AuthenticationSession::startOperation($user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity');
+
+    $this->assertModelExists($passkey);
+})->with(['without MFA' => false, 'MFA is not a primary method' => true]);
+
+it('can remove its only passkey when a linked provider remains available', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create(['user_id' => $user->id, 'provider_name' => SocialiteProvider::GOOGLE->value]);
+    $passkey = createPasskey($user, 'Only Key');
+    AuthenticationSession::startOperation($user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))->assertOk();
+
+    $this->assertModelMissing($passkey);
+});
+
+it('does not count a disabled provider as another primary method', function (): void {
+    $user = User::factory()->socialOnly()->create();
+    $this->actingAs($user);
+    Feature::deactivate(SocialAuth::class);
+    UserSocialAccount::factory()->create(['user_id' => $user->id, 'provider_name' => SocialiteProvider::GOOGLE->value]);
+    $passkey = createPasskey($user, 'Only Key');
+    AuthenticationSession::startOperation($user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))->assertUnprocessable();
+
+    $this->assertModelExists($passkey);
+});
+
+it('returns 403 for another accounts passkey even with a matching proven grant', function (): void {
+    $passkey = createPasskey(User::factory()->create(), 'Other Account Key');
+    AuthenticationSession::startOperation($this->user, 'delete_passkey', (string) $passkey->id);
+    AuthenticationSession::proveOperation($this->user, 'delete_passkey', (string) $passkey->id);
+    IdentityConfirmation::markConfirmed();
+
+    $this->deleteJson(route('passkey.destroy', ['passkey' => $passkey->id]))->assertForbidden();
+
+    $this->assertModelExists($passkey);
 });
 
 it('ignores a client-supplied attempt id when adding a passkey', function (): void {

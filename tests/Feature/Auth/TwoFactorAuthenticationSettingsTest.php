@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
 use App\Http\Middleware\RequireIdentityConfirmation;
+use App\Livewire\App\Profile\ManageMfa;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 use Laravel\Jetstream\Http\Livewire\TwoFactorAuthenticationForm;
@@ -106,8 +108,8 @@ test('disabling MFA through the direct Fortify route requires its own proven man
 
     expect($user->fresh()->two_factor_secret)->not->toBeNull();
 
-    AuthenticationSession::startOperation($user, 'manage_mfa', null);
-    AuthenticationSession::proveOperation($user, 'manage_mfa', null);
+    AuthenticationSession::startOperation($user, 'manage_mfa', 'disable');
+    AuthenticationSession::proveOperation($user, 'manage_mfa', 'disable');
 
     $this->deleteJson(route('two-factor.disable'))
         ->assertOk();
@@ -169,8 +171,8 @@ test('a proven manage_mfa grant still reaches the two-factor secret', function (
     $this->postJson(route('password.confirm.store'), ['password' => 'password', 'code' => $code])
         ->assertNoContent();
 
-    AuthenticationSession::startOperation($user, 'manage_mfa', null);
-    AuthenticationSession::proveOperation($user, 'manage_mfa', null);
+    AuthenticationSession::startOperation($user, 'manage_mfa', 'show_secret_key');
+    AuthenticationSession::proveOperation($user, 'manage_mfa', 'show_secret_key');
 
     $this->getJson(route('two-factor.secret-key'))
         ->assertOk()
@@ -178,3 +180,32 @@ test('a proven manage_mfa grant still reaches the two-factor secret', function (
 })->skip(function () {
     return ! Features::canManageTwoFactorAuthentication();
 }, 'Two factor authentication is not enabled.');
+
+test('a recovery-code viewing confirmation cannot authorize another MFA operation', function (string $method, string $routeName): void {
+    $this->freezeTime();
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $recoveryCodes = $user->recoveryCodes();
+    $exceptionHandler = Exceptions::handler();
+    Livewire::test(ManageMfa::class)->mountAction('showRecoveryCodes');
+    Exceptions::setHandler($exceptionHandler);
+
+    $this->postJson(route('password.confirm.store'), [
+        'password' => 'password',
+        'code' => resolve(Google2FA::class)->getCurrentOtp($secret),
+    ])->assertNoContent();
+
+    $this->json($method, route($routeName))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity');
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
+    expect($user->fresh()->recoveryCodes())->toBe($recoveryCodes);
+})->with([
+    'disable MFA' => ['DELETE', 'two-factor.disable'],
+    'regenerate recovery codes' => ['POST', 'two-factor.regenerate-recovery-codes'],
+    'show the secret' => ['GET', 'two-factor.secret-key'],
+    'show the QR code' => ['GET', 'two-factor.qr-code'],
+]);

@@ -9,7 +9,6 @@ use App\Models\User;
 use Laravel\Passkeys\Actions\VerifyPasskey;
 use Laravel\Passkeys\Exceptions\InvalidPasskeyException;
 use Laravel\Passkeys\Passkeys;
-use Webauthn\Exception\WebauthnException;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
@@ -22,11 +21,7 @@ final readonly class AuthenticatePasskey
 
     public function execute(PublicKeyCredential $credential, PublicKeyCredentialRequestOptions $options, bool $remember): string
     {
-        try {
-            $passkey = ($this->verifyPasskey)($credential, $options);
-        } catch (WebauthnException) {
-            throw InvalidPasskeyException::make('Unable to verify passkey. Please try again.');
-        }
+        $passkey = ($this->verifyPasskey)($credential, $options);
 
         if (! Passkeys::allowsLogin(request(), $passkey)) {
             throw InvalidPasskeyException::make('Unable to sign in with this account.');

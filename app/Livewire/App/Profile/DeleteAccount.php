@@ -73,7 +73,7 @@ final class DeleteAccount extends BaseLivewireComponent
             ->confirmedUsing(fn (): Redirector|RedirectResponse|null => $this->deleteAccount());
     }
 
-    public function deleteAccount(): Redirector|RedirectResponse|null
+    private function deleteAccount(): Redirector|RedirectResponse|null
     {
         $user = $this->authUser();
 

@@ -417,6 +417,40 @@ test('a verified passkey satisfies enrolled MFA at login', function (): void {
     expect(AuthenticationSession::completeFor($user))->toBeTrue();
 });
 
+test('a malformed passkey signature is rejected without authenticating', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $options = $this->getJson(route('passkey.login-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    $passkey = storePasskeyAssertionFor($user, $assertion);
+    $assertion['payload']['credential']['response']['signature'] = base64UrlEncodeForPasskeyTest(str_repeat("\0", 64));
+
+    $this->postJson(route('passkey.login'), $assertion['payload'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['credential']);
+
+    $this->assertGuest();
+    expect($passkey->refresh()->last_used_at)->toBeNull();
+});
+
+test('a malformed passkey signature cannot prove a sensitive operation', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    AuthenticationSession::startOperation($user, 'set_password', null);
+    $options = $this->getJson(route('passkey.confirm-options'))->json('options');
+    $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
+    $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
+    $passkey = storePasskeyAssertionFor($user, $assertion);
+    $assertion['payload']['credential']['response']['signature'] = base64UrlEncodeForPasskeyTest(str_repeat("\0", 64));
+
+    $this->postJson(route('passkey.confirm'), $assertion['payload'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['credential']);
+
+    expect(AuthenticationSession::pendingOperation()['proven'])->toBeFalse()
+        ->and($passkey->refresh()->last_used_at)->toBeNull();
+});
+
 test('a passkey without user verification cannot satisfy MFA at login', function (): void {
     $user = User::factory()->withConfirmedMfa()->create();
     $options = $this->getJson(route('passkey.login-options'))->json('options');

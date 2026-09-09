@@ -21,14 +21,14 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class RequireOperationGrant
 {
-    public function handle(Request $request, Closure $next, string $operation): Response
+    public function handle(Request $request, Closure $next, string $operation, ?string $target = null): Response
     {
         $user = $request->user();
 
         abort_unless($user instanceof User, 403);
 
         try {
-            AuthenticationSession::consumeOperation($user, $operation, $this->targetId($request, $operation));
+            AuthenticationSession::consumeOperation($user, $operation, $this->targetId($request, $operation, $target));
         } catch (ValidationException $exception) {
             throw_if($request->wantsJson(), $exception);
 
@@ -38,10 +38,10 @@ final readonly class RequireOperationGrant
         return $next($request);
     }
 
-    private function targetId(Request $request, string $operation): ?string
+    private function targetId(Request $request, string $operation, ?string $target): ?string
     {
         if ($operation !== 'delete_passkey') {
-            return null;
+            return $target;
         }
 
         $passkey = $request->route('passkey');

@@ -94,6 +94,10 @@ arch('avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        // Replace laravel/passkeys actions through the container; PHP forbids a
+        // readonly class extending a non-readonly one.
+        'App\Actions\Passkeys\DeletePasskey',
+        'App\Actions\Passkeys\VerifyPasskey',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
@@ -142,6 +146,10 @@ arch('avoid inheritance')
     ->classes()
     ->toExtendNothing()
     ->ignoring([
+        // Replace laravel/passkeys actions through the container, so they must
+        // extend the class they stand in for.
+        'App\Actions\Passkeys\DeletePasskey',
+        'App\Actions\Passkeys\VerifyPasskey',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',

@@ -55,6 +55,12 @@
                     </p>
                 </div>
 
+                @if (session('error'))
+                    <p role="alert" class="mt-5 text-sm text-danger-600 dark:text-danger-400">{{ session('error') }}</p>
+                @endif
+
+                <x-input-error for="identity" role="alert" class="mt-5" />
+
                 @if ($hasPassword)
                     <form
                         method="POST"

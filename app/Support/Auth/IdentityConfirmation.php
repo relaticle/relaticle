@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Support\Auth;
 
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -179,10 +181,22 @@ final readonly class IdentityConfirmation
         }
 
         try {
-            $secret = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+            return Cache::lock('mfa-verify:'.$user->getAuthIdentifier(), 10)->block(5, function () use ($user, $code): bool {
+                $currentUser = User::query()->find($user->getKey());
 
-            return resolve(TwoFactorAuthenticationProvider::class)->verify($secret, $code);
-        } catch (Throwable) {
+                if (! $currentUser instanceof User || ! $currentUser->hasEnabledTwoFactorAuthentication()) {
+                    return false;
+                }
+
+                try {
+                    $secret = Fortify::currentEncrypter()->decrypt((string) $currentUser->two_factor_secret);
+
+                    return resolve(TwoFactorAuthenticationProvider::class)->verify($secret, $code);
+                } catch (Throwable) {
+                    return false;
+                }
+            });
+        } catch (LockTimeoutException) {
             return false;
         }
     }

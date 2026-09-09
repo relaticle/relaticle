@@ -16,6 +16,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Laravel\Passkeys\Actions\DeletePasskey;
 use Laravel\Passkeys\Passkey;
 use Livewire\Attributes\Locked;
@@ -170,7 +171,13 @@ final class ManagePasskeys extends BaseLivewireComponent
             return;
         }
 
-        $deletePasskey($user, $passkey);
+        try {
+            $deletePasskey($user, $passkey);
+        } catch (ValidationException $exception) {
+            $this->sendNotification($exception->validator->errors()->first(), type: 'danger');
+
+            return;
+        }
 
         $this->loadPasskeys();
 

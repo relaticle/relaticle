@@ -22,13 +22,13 @@ test('every sensitive vendor write route still carries its operation grant', fun
 })->with([
     ['passkey.store', 'add_passkey'],
     ['passkey.destroy', 'delete_passkey'],
-    ['two-factor.enable', 'manage_mfa'],
-    ['two-factor.disable', 'manage_mfa'],
-    ['two-factor.confirm', 'manage_mfa'],
-    ['two-factor.qr-code', 'manage_mfa'],
-    ['two-factor.secret-key', 'manage_mfa'],
-    ['two-factor.recovery-codes', 'manage_mfa'],
-    ['two-factor.regenerate-recovery-codes', 'manage_mfa'],
+    ['two-factor.enable', 'manage_mfa,enable'],
+    ['two-factor.disable', 'manage_mfa,disable'],
+    ['two-factor.confirm', 'manage_mfa,confirm'],
+    ['two-factor.qr-code', 'manage_mfa,show_qr_code'],
+    ['two-factor.secret-key', 'manage_mfa,show_secret_key'],
+    ['two-factor.recovery-codes', 'manage_mfa,show_recovery_codes'],
+    ['two-factor.regenerate-recovery-codes', 'manage_mfa,regenerate_recovery_codes'],
 ]);
 
 test('the password.confirm alias still resolves to the application middleware', function (): void {

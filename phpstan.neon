@@ -104,9 +104,6 @@ parameters:
         -
             identifier: app.architecture.eloquentWriteOutsideAction
             path: app/Livewire/App/AccessTokens/ManageAccessTokens.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Livewire/App/Profile/UpdatePassword.php
     stubFiles:
         - stubs/Mailcoach.stub
 

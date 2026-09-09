@@ -18,9 +18,11 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
 use LogicException;
 
@@ -132,7 +134,7 @@ final class ConfirmIdentityAction extends Action
             return $action;
         });
 
-        $this->action(function (array $data, Action $action): mixed {
+        $this->action(function (array $data, Action $action, ?Schema $schema): mixed {
             $user = $this->confirmingUser();
             $operation = $this->pendingOperationFor($data);
 
@@ -155,6 +157,26 @@ final class ConfirmIdentityAction extends Action
                     // validate, and a linked-provider offer (if any) is completed
                     // out of band, never by resubmitting this form.
                     $action->halt();
+                }
+
+                $recovery = (bool) ($data['use_recovery_code'] ?? false);
+
+                try {
+                    IdentityConfirmation::requireMfaProof(
+                        $user,
+                        $recovery ? null : ($data['code'] ?? null),
+                        $recovery ? ($data['recovery_code'] ?? null) : null,
+                    );
+                } catch (ValidationException $exception) {
+                    $field = $recovery ? 'recovery_code' : 'code';
+
+                    // A password field only exists inside a mounted schema, so
+                    // reaching here without one is impossible.
+                    assert($schema instanceof Schema);
+
+                    throw ValidationException::withMessages([
+                        $schema->getStatePath().'.'.$field => $exception->errors()[$field],
+                    ]);
                 }
 
                 IdentityConfirmation::confirmOperation($user, $operation);
@@ -254,10 +276,32 @@ final class ConfirmIdentityAction extends Action
         }
 
         return [
-            Hidden::make('identity_attempt_id')->default(fn (): string => $this->operation !== null
-                ? AuthenticationSession::startOperation($this->confirmingUser(), $this->operation, $this->resolveTarget())
-                : AuthenticationSession::beginAttempt()),
+            Hidden::make('identity_attempt_id')->default(fn (): string => $this->createAttempt()),
         ];
+    }
+
+    private function createAttempt(): string
+    {
+        if ($this->operation === null) {
+            return AuthenticationSession::beginAttempt();
+        }
+
+        $user = $this->confirmingUser();
+        $target = $this->resolveTarget();
+        $pending = AuthenticationSession::pendingOperation();
+
+        // A provider-only account proves itself out of band, so a fresh attempt
+        // here would discard the grant the OAuth round trip just proved.
+        if ($pending !== [] && ! $user->hasPassword() && ! $user->hasPasskey()) {
+            try {
+                AuthenticationSession::requireOperation($user, $this->operation, $target);
+
+                return $pending['id'];
+            } catch (ValidationException) {
+            }
+        }
+
+        return AuthenticationSession::startOperation($user, $this->operation, $target);
     }
 
     private function resolveTarget(): ?string
@@ -335,29 +379,53 @@ final class ConfirmIdentityAction extends Action
                 ->visible($usesPasswordField)
                 ->required($usesPasswordField)
                 ->rule($passwordRule),
-            $user->hasEnabledTwoFactorAuthentication()
-                ? OneTimeCodeInput::make('code')
-                    ->label(__('auth.mfa.code'))
-                    ->visible($usesPasswordField)
-                    ->required($usesPasswordField)
-                    ->rule($this->mfaCodeRule($user))
-                : null,
+            ...$this->mfaFields($user, $usesPasswordField),
         ]));
     }
 
-    private function mfaCodeRule(User $user): ValidationRule
+    /**
+     * @return array<int, Component>
+     */
+    private function mfaFields(User $user, Closure $usesPasswordField): array
     {
-        return new readonly class($user) implements ValidationRule
-        {
-            public function __construct(private User $user) {}
+        if (! $user->hasEnabledTwoFactorAuthentication()) {
+            return [];
+        }
 
-            public function validate(string $attribute, mixed $value, Closure $fail): void
-            {
-                if (! IdentityConfirmation::verifyMfaCode($this->user, (string) $value, null)) {
-                    $fail(__('auth.mfa.invalid'));
-                }
-            }
-        };
+        $usesCode = fn (Get $get): bool => $usesPasswordField($get) && ! (bool) $get('use_recovery_code');
+        $usesRecoveryCode = fn (Get $get): bool => $usesPasswordField($get) && (bool) $get('use_recovery_code');
+
+        return [
+            Hidden::make('use_recovery_code')->default(false),
+            OneTimeCodeInput::make('code')
+                ->label(__('auth.mfa.code'))
+                ->visible($usesCode)
+                ->required($usesCode),
+            TextInput::make('recovery_code')
+                ->label(__('auth.mfa.recovery_code'))
+                ->placeholder(__('auth.mfa.recovery_placeholder'))
+                ->autocomplete('off')
+                ->visible($usesRecoveryCode)
+                ->required($usesRecoveryCode),
+            Actions::make([
+                Action::make('useRecoveryCode')
+                    ->label(__('auth.mfa.use_recovery_code'))
+                    ->link()
+                    ->visible(fn (Get $get): bool => ! (bool) $get('use_recovery_code'))
+                    ->action(function (Set $set): void {
+                        $set('code', null);
+                        $set('use_recovery_code', true);
+                    }),
+                Action::make('useAuthenticatorCode')
+                    ->label(__('auth.mfa.use_code'))
+                    ->link()
+                    ->visible(fn (Get $get): bool => (bool) $get('use_recovery_code'))
+                    ->action(function (Set $set): void {
+                        $set('recovery_code', null);
+                        $set('use_recovery_code', false);
+                    }),
+            ])->visible($usesPasswordField),
+        ];
     }
 
     /**

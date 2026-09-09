@@ -7,8 +7,8 @@ namespace App\Livewire\App\Profile;
 use App\Actions\Auth\ConfirmMfaEnrollment;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
+use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
-use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\OneTimeCodeInput;
 use Filament\Forms\Components\ViewField;
@@ -16,12 +16,12 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Actions\DisableTwoFactorAuthentication;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
 use Laravel\Fortify\Actions\GenerateNewRecoveryCodes;
-use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Locked;
 use Throwable;
@@ -65,7 +65,7 @@ final class ManageMfa extends BaseLivewireComponent
 
     public function refreshState(): void
     {
-        $this->enabled = $this->authUser()->hasEnabledTwoFactorAuthentication();
+        $this->enabled = $this->authUser()->refresh()->hasEnabledTwoFactorAuthentication();
     }
 
     public function enableMfaAction(): ConfirmIdentityAction
@@ -76,21 +76,32 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.identity_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
-            ->operation('manage_mfa')
+            ->operation('manage_mfa', 'enable')
             ->visible(fn (): bool => ! $this->enabled)
             ->modalSubmitActionLabel(__('profile.sections.mfa.continue'))
             ->confirmedUsing(function (): void {
                 $user = $this->authUser();
 
-                AuthenticationSession::consumeOperation($user, 'manage_mfa', null);
+                DB::transaction(function () use ($user): void {
+                    $lockedUser = User::query()->whereKey($user->getKey())->lockForUpdate()->firstOrFail();
 
-                resolve(EnableTwoFactorAuthentication::class)($user, force: true);
+                    AuthenticationSession::consumeOperation($lockedUser, 'manage_mfa', 'enable');
 
-                $fresh = $user->fresh();
-                $this->pendingQrSvg = $fresh?->twoFactorQrCodeSvg();
-                $this->pendingSecret = Fortify::currentEncrypter()->decrypt((string) $fresh?->two_factor_secret);
+                    if ($lockedUser->hasEnabledTwoFactorAuthentication()) {
+                        return;
+                    }
 
-                $this->replaceMountedAction('confirmMfa');
+                    resolve(EnableTwoFactorAuthentication::class)($lockedUser, force: true);
+
+                    $this->pendingQrSvg = $lockedUser->twoFactorQrCodeSvg();
+                    $this->pendingSecret = Fortify::currentEncrypter()->decrypt((string) $lockedUser->two_factor_secret);
+                });
+
+                $this->refreshState();
+
+                if (! $this->enabled) {
+                    $this->replaceMountedAction('confirmMfa');
+                }
             });
     }
 
@@ -109,11 +120,16 @@ final class ManageMfa extends BaseLivewireComponent
                 OneTimeCodeInput::make('code')
                     ->autofocus()
                     ->label(__('profile.sections.mfa.code_label'))
-                    ->required()
-                    ->rule($this->pendingCodeRule()),
+                    ->required(),
             ])
-            ->action(function (): void {
-                resolve(ConfirmMfaEnrollment::class)->execute($this->authUser());
+            ->action(function (array $data, Schema $schema): void {
+                try {
+                    resolve(ConfirmMfaEnrollment::class)->execute($this->authUser(), (string) $this->pendingSecret, (string) $data['code']);
+                } catch (ValidationException) {
+                    throw ValidationException::withMessages([
+                        $schema->getStatePath().'.code' => __('profile.sections.mfa.code_invalid'),
+                    ]);
+                }
 
                 $this->pendingQrSvg = null;
                 $this->pendingSecret = null;
@@ -169,13 +185,13 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.disable_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
-            ->operation('manage_mfa')
+            ->operation('manage_mfa', 'disable')
             ->visible(fn (): bool => $this->enabled)
             ->modalSubmitActionLabel(__('profile.sections.mfa.disable'))
             ->confirmedUsing(function (): void {
                 $user = $this->authUser();
 
-                AuthenticationSession::consumeOperation($user, 'manage_mfa', null);
+                AuthenticationSession::consumeOperation($user, 'manage_mfa', 'disable');
 
                 resolve(DisableTwoFactorAuthentication::class)($user);
 
@@ -197,12 +213,12 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.recovery_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
-            ->operation('manage_mfa')
+            ->operation('manage_mfa', 'show_recovery_codes')
             ->visible(fn (): bool => $this->enabled)
             ->confirmedUsing(function (): void {
                 $user = $this->authUser();
 
-                AuthenticationSession::consumeOperation($user, 'manage_mfa', null);
+                AuthenticationSession::consumeOperation($user, 'manage_mfa', 'show_recovery_codes');
 
                 $this->revealedRecoveryCodes = $this->readRecoveryCodes();
             });
@@ -216,12 +232,12 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.recovery_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
-            ->operation('manage_mfa')
+            ->operation('manage_mfa', 'regenerate_recovery_codes')
             ->visible(fn (): bool => $this->enabled)
             ->confirmedUsing(function (): void {
                 $user = $this->authUser();
 
-                AuthenticationSession::consumeOperation($user, 'manage_mfa', null);
+                AuthenticationSession::consumeOperation($user, 'manage_mfa', 'regenerate_recovery_codes');
 
                 resolve(GenerateNewRecoveryCodes::class)($user);
 
@@ -249,22 +265,5 @@ final class ManageMfa extends BaseLivewireComponent
         } catch (Throwable) {
             return [];
         }
-    }
-
-    private function pendingCodeRule(): ValidationRule
-    {
-        return new readonly class(fn (): ?string => $this->pendingSecret) implements ValidationRule
-        {
-            public function __construct(private Closure $secret) {}
-
-            public function validate(string $attribute, mixed $value, Closure $fail): void
-            {
-                $secret = ($this->secret)();
-
-                if (! is_string($secret) || ! resolve(TwoFactorAuthenticationProvider::class)->verify($secret, (string) $value)) {
-                    $fail(__('profile.sections.mfa.code_invalid'));
-                }
-            }
-        };
     }
 }

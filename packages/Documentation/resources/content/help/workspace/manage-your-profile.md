@@ -25,8 +25,9 @@ your own local time.
 
 Open the **Security** tab for your password, passkeys, two-factor authentication, and browser sessions.
 
-**Update Password** needs your current password. If you signed up with a
-social account and never set one, the same section offers **Set Password**.
+Enter and confirm your new password, then choose **Save**.
+Confirm your identity with a passkey, password, or linked provider.
+Accounts without a password show **Set Password** in the same section.
 
 ## Passkeys
 
@@ -37,8 +38,8 @@ was added, and when it was last used.
 **Add passkey** confirms it's you, then hands over to your browser or
 password manager to create the key. Relaticle names it after the
 authenticator it recognises. Use **Rename** if you'd rather label it by device.
-**Remove** takes a passkey out of your account; that device can no longer
-sign you in, so keep a password or a second passkey if it's your only one.
+**Remove** takes a passkey out of your account; that device can no longer sign you in.
+Relaticle keeps your last sign-in method. Add another passkey or set a password before removing it.
 
 Next time you sign in, type your email and the passkey prompt appears on its
 own. On a device that already holds one, the email field offers it as you

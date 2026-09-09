@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Laravel\Passkeys\Actions\VerifyPasskey;
-use Laravel\Passkeys\Exceptions\InvalidPasskeyException;
-use Webauthn\Exception\WebauthnException;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
@@ -128,11 +126,7 @@ final readonly class ConfirmIdentity
             ]);
         }
 
-        try {
-            ($this->verifyPasskey)($credential, $options, $user);
-        } catch (WebauthnException) {
-            throw InvalidPasskeyException::make('Unable to verify passkey. Please try again.');
-        }
+        ($this->verifyPasskey)($credential, $options, $user);
     }
 
     /**

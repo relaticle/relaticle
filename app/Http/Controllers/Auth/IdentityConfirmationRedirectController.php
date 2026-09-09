@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Auth;
 
 use App\Enums\SocialiteProvider;
+use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Auth\LoginDestination;
+use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -19,12 +22,22 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  */
 final readonly class IdentityConfirmationRedirectController
 {
-    public function __invoke(SocialiteProvider $provider): RedirectResponse
+    public function __invoke(Request $request, SocialiteProvider $provider, LoginDestination $destination): RedirectResponse
     {
-        // The operation grant in flight (if any) must survive the OAuth round
-        // trip identified by its own id, not by "whatever is in the session
-        // slot when the user returns": a second modal opened in another tab
-        // while the provider redirect is in progress overwrites that slot.
+        $user = $request->user();
+        $referrer = $request->headers->get('referer');
+
+        if (
+            $user instanceof User
+            && AuthenticationSession::pendingOperation() !== []
+            && ! $request->session()->has('url.intended')
+            && is_string($referrer)
+            && $referrer !== route('password.confirm')
+            && $destination->resolve($user, $referrer) === $referrer
+        ) {
+            $request->session()->put('url.intended', $referrer);
+        }
+
         AuthenticationSession::stashOperationForProviderConfirm();
 
         /** @var AbstractProvider $driver */

@@ -8,6 +8,8 @@ use App\Actions\Fortify\CreateNewSocialUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Actions\Passkeys\DeletePasskey;
+use App\Actions\Passkeys\VerifyPasskey;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Http\Controllers\Auth\IdentityConfirmationController;
 use App\Http\Controllers\Auth\MfaChallengeController;
@@ -30,6 +32,8 @@ use Laravel\Fortify\Fortify;
 use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
 use Laravel\Fortify\Http\Controllers\ConfirmablePasswordController;
 use Laravel\Fortify\Http\Controllers\TwoFactorAuthenticatedSessionController;
+use Laravel\Passkeys\Actions\DeletePasskey as VendorDeletePasskey;
+use Laravel\Passkeys\Actions\VerifyPasskey as VendorVerifyPasskey;
 use Laravel\Passkeys\Http\Controllers\PasskeyConfirmationController as VendorPasskeyConfirmationController;
 use Laravel\Passkeys\Http\Controllers\PasskeyLoginController;
 
@@ -40,6 +44,8 @@ final class FortifyServiceProvider extends ServiceProvider
         $this->app->singleton(CreatesNewSocialUsers::class, CreateNewSocialUser::class);
         $this->app->bind(AuthenticatedSessionController::class, PasswordSessionController::class);
         $this->app->bind(TwoFactorAuthenticatedSessionController::class, MfaChallengeController::class);
+        $this->app->bind(VendorDeletePasskey::class, DeletePasskey::class);
+        $this->app->bind(VendorVerifyPasskey::class, VerifyPasskey::class);
 
         // The vendor controller authenticates before resolving its response, so a
         // response-only override cannot enforce MFA; swap the whole controller.
@@ -105,19 +111,19 @@ final class FortifyServiceProvider extends ServiceProvider
     private function requireOperationGrantsOnVendorRoutes(): void
     {
         $this->app->booted(function (): void {
-            $operationsByRouteName = [
+            $grantParametersByRouteName = [
                 'passkey.store' => 'add_passkey',
                 'passkey.destroy' => 'delete_passkey',
-                'two-factor.enable' => 'manage_mfa',
-                'two-factor.disable' => 'manage_mfa',
+                'two-factor.enable' => 'manage_mfa,enable',
+                'two-factor.disable' => 'manage_mfa,disable',
                 // Reading the secret or the recovery codes hands over a durable
                 // second factor, and regenerating them locks the owner out, so
                 // each needs the same grant as enabling or disabling.
-                'two-factor.confirm' => 'manage_mfa',
-                'two-factor.qr-code' => 'manage_mfa',
-                'two-factor.secret-key' => 'manage_mfa',
-                'two-factor.recovery-codes' => 'manage_mfa',
-                'two-factor.regenerate-recovery-codes' => 'manage_mfa',
+                'two-factor.confirm' => 'manage_mfa,confirm',
+                'two-factor.qr-code' => 'manage_mfa,show_qr_code',
+                'two-factor.secret-key' => 'manage_mfa,show_secret_key',
+                'two-factor.recovery-codes' => 'manage_mfa,show_recovery_codes',
+                'two-factor.regenerate-recovery-codes' => 'manage_mfa,regenerate_recovery_codes',
             ];
 
             // Route::name() is fluent, applied after the route is first added to
@@ -125,7 +131,7 @@ final class FortifyServiceProvider extends ServiceProvider
             // populated for a route registered inside another provider's own
             // boot(). Matching each route's own getName() sidesteps that cache.
             foreach ($this->app->make(Router::class)->getRoutes()->getRoutes() as $route) {
-                $operation = $operationsByRouteName[$route->getName()] ?? null;
+                $operation = $grantParametersByRouteName[$route->getName()] ?? null;
 
                 if ($operation !== null) {
                     $route->middleware("require-operation:{$operation}");
