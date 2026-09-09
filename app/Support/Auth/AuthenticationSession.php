@@ -249,11 +249,8 @@ final readonly class AuthenticationSession
     }
 
     /**
-     * Remember which action to re-open once the user returns from a provider
-     * confirmation. The round trip is a full page load, so the Livewire
-     * component that opened the modal is gone by the time they come back; the
-     * descriptor is written entirely server-side, and re-opening a modal
-     * authorizes nothing by itself.
+     * The provider round trip is a full page load, so the Livewire component
+     * holding the modal is destroyed before the user returns.
      *
      * @param  array<string, mixed>  $arguments
      */
@@ -270,9 +267,8 @@ final readonly class AuthenticationSession
     }
 
     /**
-     * One-time read for the component named in the descriptor, and only once the
-     * proof it was waiting on actually landed. A descriptor left behind by an
-     * abandoned or failed round trip is never returned; it expires instead.
+     * One-time read, for the named component only, and only once the proof it
+     * was waiting on landed.
      *
      * @return array{action: string, arguments: array<string, mixed>}|null
      */
@@ -282,11 +278,10 @@ final readonly class AuthenticationSession
 
         if (
             ! is_array($resume)
-            || ! isset($resume['user_id'], $resume['component'], $resume['action'], $resume['expires_at'])
+            || ! isset($resume['user_id'], $resume['component'], $resume['action'], $resume['arguments'], $resume['expires_at'])
             || ! is_string($resume['user_id'])
             || ! is_string($resume['component'])
             || ! is_string($resume['action'])
-            || ! isset($resume['arguments'])
             || ! is_array($resume['arguments'])
             || ! is_int($resume['expires_at'])
             || ! array_key_exists('grant_id', $resume)
@@ -295,21 +290,17 @@ final readonly class AuthenticationSession
             return null;
         }
 
-        if ($resume['expires_at'] <= now()->getTimestamp()) {
-            session()->forget(self::RESUME_KEY);
-
-            return null;
-        }
-
+        // A sibling component on the same page must not consume a descriptor
+        // addressed elsewhere; once it is ours it is spent either way.
         if ($resume['user_id'] !== (string) $user->getAuthIdentifier() || $resume['component'] !== $component) {
             return null;
         }
 
-        if (! self::resumeProofSatisfied($resume['grant_id'])) {
+        session()->forget(self::RESUME_KEY);
+
+        if ($resume['expires_at'] <= now()->getTimestamp() || ! self::resumeProofSatisfied($resume['grant_id'])) {
             return null;
         }
-
-        session()->forget(self::RESUME_KEY);
 
         /** @var array<string, mixed> $arguments */
         $arguments = $resume['arguments'];

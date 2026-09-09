@@ -126,6 +126,17 @@ test('provider confirmation preserves the settings page for a scoped operation',
         ->assertSessionHas('url.intended', $settingsUrl);
 });
 
+test('provider confirmation preserves the settings page for an action with no scoped operation', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
+
+    $this->from($settingsUrl)
+        ->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))
+        ->assertRedirect()
+        ->assertSessionHas('url.intended', $settingsUrl);
+});
+
 test('provider confirmation rejects an external return location', function (): void {
     $user = User::factory()->withTeam()->socialOnly()->create();
     $this->actingAs($user);

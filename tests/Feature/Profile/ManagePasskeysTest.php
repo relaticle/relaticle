@@ -6,6 +6,7 @@ use App\Actions\Passkeys\DeletePasskey;
 use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
 use App\Filament\Actions\ConfirmIdentityAction;
+use App\Livewire\App\Profile\ManageMfa;
 use App\Livewire\App\Profile\ManagePasskeys;
 use App\Models\User;
 use App\Models\UserSocialAccount;
@@ -220,6 +221,51 @@ it('does not reopen an action recorded for another user', function (): void {
     $this->actingAs(User::factory()->withTeam()->create());
 
     livewire(ManagePasskeys::class)->assertActionNotMounted();
+});
+
+it('does not reopen the modal once the descriptor has expired', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect();
+
+    $this->travelTo(now()->addMinutes(16));
+
+    livewire(ManagePasskeys::class)->assertActionNotMounted();
+});
+
+it('does not reopen the action on a component it was not recorded for', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect();
+
+    livewire(ManageMfa::class)->assertActionNotMounted();
+    livewire(ManagePasskeys::class)->assertActionMounted('registerPasskey');
 });
 
 it('does not reuse a provider confirmation for another operation', function (): void {

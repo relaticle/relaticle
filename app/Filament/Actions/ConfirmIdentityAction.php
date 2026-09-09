@@ -110,8 +110,8 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
-     * Opt out when the action reads form state that a full-page provider round
-     * trip destroys: a re-opened modal would validate or target an empty form.
+     * Opt out when the action reads page form state, which the full-page
+     * provider round trip destroys.
      */
     public function resumable(bool $condition = true): static
     {
@@ -492,11 +492,13 @@ final class ConfirmIdentityAction extends Action
 
     private function rememberResumableAction(): void
     {
-        $livewire = $this->getLivewire();
-
-        if (! $this->resumable || ! $livewire instanceof LivewireComponent) {
+        if (! $this->resumable) {
             return;
         }
+
+        $livewire = $this->getLivewire();
+
+        assert($livewire instanceof LivewireComponent);
 
         AuthenticationSession::rememberResumableAction(
             $this->confirmingUser(),
