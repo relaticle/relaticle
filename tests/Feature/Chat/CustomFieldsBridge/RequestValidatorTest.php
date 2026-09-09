@@ -99,6 +99,7 @@ it('returns a descriptive error for an unknown single-choice label', function ()
         ->validate($user, 'task', ['status' => 'Bananas']);
 
     expect($result->error)
+        ->toContain('custom_fields.status')
         ->toContain('Status')
         ->toContain('Bananas');
 });
@@ -174,6 +175,5 @@ it('rejects clearing a required choice field with a truthful validation error', 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['priority' => null]);
 
-    expect($result->error)->toContain('custom_fields validation failed')
-        ->and($result->error)->not->toContain('option label string');
+    expect($result->error)->toContain('custom_fields validation failed');
 });

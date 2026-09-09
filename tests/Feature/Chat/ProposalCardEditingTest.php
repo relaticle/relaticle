@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\CustomFieldType;
 use App\Features\OnboardSeed;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -82,6 +83,31 @@ it('saves an edited custom field through ProposalEditor without executing', func
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['custom_fields'][$field->code])->toBe($optionIds[1]);
     expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+});
+
+it('accepts an option id when another option shares its label case-insensitively', function (): void {
+    Bus::fake();
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    $doneId = $field->options->firstWhere('name', 'Done')->id;
+    CustomFieldOption::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'custom_field_id' => $field->getKey(),
+        'name' => 'DONE',
+        'sort_order' => 99,
+    ]);
+    $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', $field->code)
+        ->set("data.custom_fields.{$field->code}", $doneId)
+        ->call('saveField')
+        ->assertSet('editingFieldCode', null)
+        ->assertHasNoErrors();
+
+    $fresh = $action->fresh();
+    expect($fresh->status)->toBe(PendingActionStatus::Pending)
+        ->and($fresh->action_data['custom_fields'][$field->code])->toBe((string) $doneId);
 });
 
 it('preserves other custom fields when only one is edited', function (): void {

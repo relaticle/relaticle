@@ -34,7 +34,14 @@ final readonly class CustomFieldsRequestValidator
         try {
             $normalized = $this->input->normalize($teamId, $entityType, $rawCustomFields);
         } catch (ValidationException $exception) {
-            return new CustomFieldsValidationResult(cleanFields: [], error: implode('; ', $exception->validator->errors()->all()));
+            $messages = collect($exception->validator->errors()->messages())
+                ->flatMap(fn (array $errors, string $key): array => array_map(
+                    fn (string $error): string => "{$key}: {$error}",
+                    $errors,
+                ))
+                ->implode('; ');
+
+            return new CustomFieldsValidationResult(cleanFields: [], error: $messages);
         }
 
         $clean = is_array($normalized) ? $normalized : $rawCustomFields;
