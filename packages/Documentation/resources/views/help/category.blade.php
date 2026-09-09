@@ -1,5 +1,5 @@
 <x-documentation::shell
-    :title="__(':title - :brand Help Centre', ['title' => $category->title, 'brand' => config('app.name')])"
+    :title="__(':title - :brand', ['title' => $category->title, 'brand' => config('app.name')])"
     :description="$category->description"
     :nav="$nav"
     :current-path="$currentPath">

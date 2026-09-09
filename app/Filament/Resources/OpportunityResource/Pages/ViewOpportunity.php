@@ -17,6 +17,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 
@@ -27,7 +28,16 @@ final class ViewOpportunity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->label(__('filament/resources/opportunity.pages.view.actions.edit.label'))
+                ->after(function (): void {
+                    $this->getRecord()
+                        ->refresh()
+                        ->load(['company', 'contact', 'customFieldValues.customField.options']);
+
+                    resolve(PartialsComponentHook::class)->forceRender($this);
+                }),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')

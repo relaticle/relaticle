@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
@@ -21,7 +22,7 @@ mutates(ChatInterface::class);
  * grouped (`data-grouped` on the later bubble); a calendar-day change between
  * two adjacent messages renders exactly one `data-day-separator` marker.
  */
-function transcriptShapeInsertMessage(string $conversationId, User $user, string $content, Carbon $at): void
+function transcriptShapeInsertMessage(string $conversationId, User $user, string $content, CarbonImmutable $at): void
 {
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),
@@ -48,7 +49,7 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 10:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 10:00:00', 'UTC');
 
     // Chronological order: a message from yesterday, then three today, the
     // first pair one minute apart (must group), the third four minutes after
@@ -97,7 +98,7 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
  * tests/Feature/Chat/MessagePaginationTest.php for this exact ordering
  * concern.
  */
-function transcriptShapeInsertSequencedMessages(string $conversationId, User $user, int $count, Carbon $baseline, string $prefix = 'seq'): void
+function transcriptShapeInsertSequencedMessages(string $conversationId, User $user, int $count, CarbonImmutable $baseline, string $prefix = 'seq'): void
 {
     $rows = [];
 
@@ -172,7 +173,7 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
@@ -245,7 +246,7 @@ it('guards against a duplicate load when triggered again while one is already in
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
@@ -296,7 +297,7 @@ it('clears the in-flight guard on a failed request, so history loading is not pe
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
@@ -360,7 +361,7 @@ it('auto-loads on mount when a short first page leaves the sentinel visible with
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     // One more than PAGE_SIZE (50): the initial fetch returns the newest 50
     // and reports hasMoreMessages = true, leaving exactly one message behind.
     transcriptShapeInsertSequencedMessages($conversationId, $user, 51, $baseline);
@@ -665,7 +666,7 @@ it('renders the sticky transcript pills at their natural height inside the zero-
     // Two calendar days so the transcript carries a day separator for the
     // sticky date pill to mirror; ids stay lexicographically ordered across
     // both batches ('dayA-…' sorts before 'dayB-…').
-    $baseline = Carbon::parse('2026-08-19 08:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline->copy()->subDay(), 'dayA');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline, 'dayB');
 
@@ -732,7 +733,7 @@ it('shows the scroll-to-bottom button whenever the transcript is scrolled up, wi
         $conversationId,
         $user,
         40,
-        Carbon::parse('2026-08-19 08:00:00', 'UTC'),
+        Date::parse('2026-08-19 08:00:00', 'UTC'),
     );
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
@@ -807,7 +808,7 @@ it('focuses the message editor on open and grows its width with the text', funct
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $team->getKey(), 'edit affordance', $conversationId);
 
-    $baseline = Carbon::parse('2026-08-19 09:00:00', 'UTC');
+    $baseline = Date::parse('2026-08-19 09:00:00', 'UTC');
     transcriptShapeInsertMessage($conversationId, $user, 'short', $baseline);
 
     $page = ChatBrowser::logIn($user, $team->slug, $conversationId)

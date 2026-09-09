@@ -10,7 +10,7 @@ use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Relaticle\Flowforge\Board;
 
 mutates(OpportunitiesBoard::class);
@@ -124,7 +124,7 @@ it('opens the edit action when a card is clicked', function (): void {
  */
 it('buckets the close-date badge against the user calendar, not the server clock', function (): void {
     // 23:00 UTC on the 18th is already 08:00 on the 19th in Tokyo.
-    $this->travelTo(Carbon::parse('2026-08-18 23:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-08-18 23:00:00', 'UTC'));
 
     $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
     Filament::setCurrentPanel(Filament::getPanel('app'));
@@ -136,7 +136,7 @@ it('buckets the close-date badge against the user calendar, not the server clock
 
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
     $opportunity->saveCustomFieldValue($this->stageField, $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
-    $opportunity->saveCustomFieldValue($closeField, Carbon::parse('2026-08-19 00:00:00', 'UTC'));
+    $opportunity->saveCustomFieldValue($closeField, Date::parse('2026-08-19 00:00:00', 'UTC'));
 
     livewire(OpportunitiesBoard::class)
         ->assertSee('Closes Today')
@@ -152,7 +152,7 @@ it('buckets the close-date badge against the user calendar, not the server clock
  */
 it('does not walk a close date back a day for a viewer west of utc', function (): void {
     // 16:00 UTC on the 19th is 09:00 the same morning in Los Angeles.
-    $this->travelTo(Carbon::parse('2026-08-19 16:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-08-19 16:00:00', 'UTC'));
 
     $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
     Filament::setCurrentPanel(Filament::getPanel('app'));
@@ -164,7 +164,7 @@ it('does not walk a close date back a day for a viewer west of utc', function ()
 
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
     $opportunity->saveCustomFieldValue($this->stageField, $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
-    $opportunity->saveCustomFieldValue($closeField, Carbon::parse('2026-08-19 00:00:00', 'UTC'));
+    $opportunity->saveCustomFieldValue($closeField, Date::parse('2026-08-19 00:00:00', 'UTC'));
 
     livewire(OpportunitiesBoard::class)
         ->assertSee('Closes Today')

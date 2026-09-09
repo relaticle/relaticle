@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8ef8500149ba7fe14703be0ce92983fc",
+    "content-hash": "7037543fdc2e53d0dca61afa117b216e",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -677,16 +677,16 @@
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
-            "version": "3.2.0",
+            "version": "3.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/CarbonPHP/carbon-doctrine-types.git",
-                "reference": "18ba5ddfec8976260ead6e866180bd5d2f71aa1d"
+                "reference": "5fa5eacafd9ef47c8c6ab9143fc901ba0194d3dc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/CarbonPHP/carbon-doctrine-types/zipball/18ba5ddfec8976260ead6e866180bd5d2f71aa1d",
-                "reference": "18ba5ddfec8976260ead6e866180bd5d2f71aa1d",
+                "url": "https://api.github.com/repos/CarbonPHP/carbon-doctrine-types/zipball/5fa5eacafd9ef47c8c6ab9143fc901ba0194d3dc",
+                "reference": "5fa5eacafd9ef47c8c6ab9143fc901ba0194d3dc",
                 "shasum": ""
             },
             "require": {
@@ -701,6 +701,11 @@
                 "phpunit/phpunit": "^10.3"
             },
             "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "3.x-dev"
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Carbon\\Doctrine\\": "src/Carbon/Doctrine/"
@@ -726,7 +731,7 @@
             ],
             "support": {
                 "issues": "https://github.com/CarbonPHP/carbon-doctrine-types/issues",
-                "source": "https://github.com/CarbonPHP/carbon-doctrine-types/tree/3.2.0"
+                "source": "https://github.com/CarbonPHP/carbon-doctrine-types/tree/3.2.1"
             },
             "funding": [
                 {
@@ -742,7 +747,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-02-09T16:56:22+00:00"
+            "time": "2026-09-06T14:11:38+00:00"
         },
         {
             "name": "chillerlan/php-qrcode",
@@ -10412,30 +10417,32 @@
         },
         {
             "name": "scalar/laravel",
-            "version": "0.2.1",
+            "version": "0.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/scalar/laravel.git",
-                "reference": "5f6dace4740a082df5058804430f12af01925810"
+                "reference": "02c5307e73be858eebd1c640fd1b8e0222b8d1e2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/scalar/laravel/zipball/5f6dace4740a082df5058804430f12af01925810",
-                "reference": "5f6dace4740a082df5058804430f12af01925810",
+                "url": "https://api.github.com/repos/scalar/laravel/zipball/02c5307e73be858eebd1c640fd1b8e0222b8d1e2",
+                "reference": "02c5307e73be858eebd1c640fd1b8e0222b8d1e2",
                 "shasum": ""
             },
             "require": {
-                "illuminate/contracts": "^10.0||^11.0||^12.0||^13.0",
-                "php": "^8.2||^8.3",
+                "illuminate/contracts": "^11.0||^12.0||^13.0",
+                "php": "^8.2",
                 "spatie/laravel-package-tools": "^1.16"
             },
             "require-dev": {
+                "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.14",
-                "nunomaduro/collision": "^8.7.0||^7.10.0",
-                "orchestra/testbench": "^8.0||^9.0||^10.0||^11.0",
-                "pestphp/pest": "^2.3.4||^3.7.4||^4.0",
-                "pestphp/pest-plugin-arch": "^2.7.0||^3.0.0||^4.0",
-                "pestphp/pest-plugin-laravel": "^2.3.0||^3.1.0||^4.0"
+                "nunomaduro/collision": "^8.7.0",
+                "orchestra/testbench": "^9.0||^10.0||^11.0",
+                "pestphp/pest": "^3.7.4||^4.0||^5.0",
+                "pestphp/pest-plugin-arch": "^3.0.0||^4.0||^5.0",
+                "pestphp/pest-plugin-laravel": "^3.1.0||^4.0||^5.0",
+                "pestphp/pest-plugin-type-coverage": "^3.0||^4.0||^5.0"
             },
             "type": "library",
             "extra": {
@@ -10475,9 +10482,9 @@
             ],
             "support": {
                 "issues": "https://github.com/scalar/laravel/issues",
-                "source": "https://github.com/scalar/laravel/tree/0.2.1"
+                "source": "https://github.com/scalar/laravel/tree/0.4.0"
             },
-            "time": "2026-03-23T14:14:34+00:00"
+            "time": "2026-08-24T12:16:35+00:00"
         },
         {
             "name": "scrivo/highlight.php",

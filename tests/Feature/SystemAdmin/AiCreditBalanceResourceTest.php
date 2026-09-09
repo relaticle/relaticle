@@ -32,7 +32,8 @@ it('lists balances across all tenants', function (): void {
         ->assertCanSeeTableRecords([$b1, $b2])
         ->assertCanRenderTableColumn('team.name')
         ->assertCanRenderTableColumn('credits_remaining')
-        ->assertCanRenderTableColumn('credits_used');
+        ->assertCanRenderTableColumn('credits_used')
+        ->assertCanRenderTableColumn('period_ends_at');
 });
 
 it('filters by low balance', function (): void {

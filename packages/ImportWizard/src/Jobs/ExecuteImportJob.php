@@ -8,7 +8,7 @@ use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -723,7 +723,7 @@ final class ExecuteImportJob implements ShouldQueue
              * than refusing the row, so fail it and let the existing failed-row path
              * surface the column and the offending value.
              */
-            if (! $parsed instanceof Carbon) {
+            if (! $parsed instanceof CarbonImmutable) {
                 throw new UnparsableDateException($cf->name, $value, $format);
             }
 

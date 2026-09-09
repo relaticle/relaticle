@@ -88,7 +88,7 @@ final class Billing extends Page
     {
         $team = $this->team();
 
-        if (! $this->user()->ownsTeam($team) || $team->subscribed()) {
+        if (! $this->user()->ownsTeam($team) || $team->subscribed() || $team->plan === Plan::Enterprise) {
             return;
         }
 
@@ -161,7 +161,7 @@ final class Billing extends Page
             'hasHostedAccess' => $hasHostedAccess,
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('team_id', $team->getKey())->first(),
-            'activating' => $this->checkout === 'success' && ! $team->subscribed(),
+            'activating' => $this->checkout === 'success' && ! $team->subscribed() && $team->plan !== Plan::Enterprise,
             'creditsFulfilling' => $this->credits === 'success',
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
         ];

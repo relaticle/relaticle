@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Notifications\NotificationType;
 use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptTeamInvitationController;
@@ -10,8 +11,10 @@ use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
+use App\Http\Controllers\Mail\UnsubscribeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
@@ -68,6 +71,16 @@ Route::get('/.well-known/security.txt', function (): Response {
     ]);
 })->name('securityTxt');
 
+Route::middleware(['signed', 'throttle:30,1,mail-unsubscribe', 'no-referrer'])->group(function (): void {
+    Route::get('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'show'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe');
+
+    Route::post('/mail/unsubscribe/{user}/{type}', [UnsubscribeController::class, 'store'])
+        ->whereIn('type', [NotificationType::TaskDigest->value])
+        ->name('mail.unsubscribe.store');
+});
+
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);
     Route::get('/terms-of-service', TermsOfServiceController::class)->name('terms.show');
@@ -75,6 +88,7 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     Route::get('/pricing', fn () => view('pricing'))->name('pricing');
     Route::get('/press', fn () => view('press'))->name('press');
     Route::get('/ai', fn () => view('ai'))->name('ai');
+    Route::get('/ai-native-crm', fn () => view('ai-native-crm'))->name('aiNativeCrm');
     Route::get('/self-hosted', fn () => view('self-hosted'))->name('selfHosted');
     Route::get('/compare/relaticle-vs-{competitor}', [ComparisonController::class, 'show'])->name('compare.show');
     Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
@@ -151,3 +165,8 @@ if (Feature::active(Documentation::class)) {
 Route::get('/discord', function () {
     return redirect()->away(config('services.discord.invite_url'));
 })->name('discord');
+
+if (app()->environment('local')) {
+    Route::get('/dev/mail', [MailPreviewController::class, 'index'])->name('dev.mail.index');
+    Route::get('/dev/mail/{mail}', [MailPreviewController::class, 'show'])->name('dev.mail.show');
+}

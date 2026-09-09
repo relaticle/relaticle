@@ -14,6 +14,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Support\Facades\Log;
+use Spatie\MailcoachSdk\Exceptions\InvalidData;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
 use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
@@ -68,7 +69,7 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 
         $profile = $deriver->derive($user);
 
-        if ($profile->matchesStored($user)) {
+        if (! $profile->needsSync($user)) {
             return;
         }
 
@@ -82,11 +83,17 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
             $this->release(max($exception->retryAfter, 10));
 
             return;
+        } catch (InvalidData $exception) {
+            $user->forceFill(['rejected_subscriber_profile_hash' => $profile->hash()])->saveQuietly();
+            $this->fail($exception);
+
+            return;
         }
 
         $user->forceFill([
             'mailcoach_subscriber_uuid' => $uuid,
             'subscriber_profile_hash' => $profile->hash(),
+            'rejected_subscriber_profile_hash' => null,
         ])->saveQuietly();
     }
 

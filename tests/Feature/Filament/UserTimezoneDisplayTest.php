@@ -10,10 +10,10 @@ use App\Models\Note;
 use App\Models\People;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -24,7 +24,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
  * 2026-08-18 23:30 UTC is 2026-08-19 08:30 in Tokyo, deliberately across the date
  * line, so a test that only compares the clock time cannot pass by accident.
  */
-function knownInstant(): Carbon
+function knownInstant(): CarbonImmutable
 {
     return Date::parse('2026-08-18 23:30:00', 'UTC');
 }

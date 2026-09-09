@@ -24,7 +24,7 @@ it('renders exactly one Accept Invitation CTA in the body', function (): void {
 
     $rendered = (new TeamInvitationMail($invitation, $rawToken))->render();
 
-    expect(substr_count($rendered, __('teams.mail.invitation.action')))->toBe(1);
+    expect(substr_count($rendered, __('mail.team_invitation.cta')))->toBe(1);
 });
 
 it('does not contain a Create Account button', function (): void {
@@ -56,7 +56,7 @@ it('mentions the team name and the expires-in phrase when expires_at is set', fu
     $rendered = (new TeamInvitationMail($invitation, $rawToken))->render();
 
     expect($rendered)->toContain('Acme Co')
-        ->and($rendered)->toContain('expires');
+        ->and($rendered)->toContain(__('mail.team_invitation.expiry', ['expiry' => '1 week from now']));
 });
 
 it('omits the expiry phrase when expires_at is null', function (): void {
@@ -91,6 +91,8 @@ it('renders an accept URL for the token route containing the raw token, not the 
     expect($rendered)->toContain(route('team-invitations.token.accept', ['token' => $rawToken]))
         ->and($rendered)->not->toContain((string) $invitation->token)
         ->and(TeamInvitation::findByRawToken($rawToken)?->is($invitation))->toBeTrue();
+
+    (new TeamInvitationMail($invitation, $rawToken))->assertSeeInText(__('mail.team_invitation.cta').': '.route('team-invitations.token.accept', ['token' => $rawToken]));
 });
 
 it('names the inviter in the subject and body when the invitation has an inviter', function (): void {
@@ -107,9 +109,9 @@ it('names the inviter in the subject and body when the invitation has an inviter
     $mail = new TeamInvitationMail($invitation, $rawToken);
 
     expect($mail->envelope()->subject)->toBe(
-        __('teams.mail.invitation.subject', ['inviter' => 'Ana Reyes', 'team' => 'Acme Co'])
+        __('mail.team_invitation.subject', ['inviter' => 'Ana Reyes', 'team' => 'Acme Co'])
     )->and($mail->render())->toContain(
-        __('teams.mail.invitation.line_with_inviter', ['inviter' => 'Ana Reyes', 'team' => 'Acme Co', 'role' => 'Editor'])
+        __('mail.team_invitation.line_with_inviter', ['inviter' => 'Ana Reyes', 'team' => 'Acme Co', 'role' => 'Editor'])
     );
 });
 
@@ -128,10 +130,10 @@ it('falls back to team-only subject and body copy when the invitation has no inv
 
     expect($invitation->inviter_id)->toBeNull()
         ->and($mail->envelope()->subject)->toBe(
-            __('teams.mail.invitation.subject_without_inviter', ['team' => 'Acme Co'])
+            __('mail.team_invitation.subject_without_inviter', ['team' => 'Acme Co'])
         )
         ->and($mail->render())->toContain(
-            __('teams.mail.invitation.line', ['team' => 'Acme Co', 'role' => 'Editor'])
+            __('mail.team_invitation.line', ['team' => 'Acme Co', 'role' => 'Editor'])
         );
 });
 

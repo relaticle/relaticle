@@ -1,12 +1,13 @@
 @php
-    $headingContext = $category->name ?? $tag->name ?? null;
-    $title = $headingContext
-        ? $headingContext.' - '.config('app.name').' Blog'
-        : config('app.name').' - Engineering Blog';
+    $title = match (true) {
+        isset($category) => __(':name: CRM Blog', ['name' => $category->name]),
+        isset($tag) => __(':name: CRM Blog Posts', ['name' => $tag->name]),
+        default => __('CRM Guides, Comparisons and Engineering'),
+    }.' - '.config('app.name');
     $description = match (true) {
-        isset($category) => 'Posts about '.$category->name.' from the Relaticle engineering team.',
-        isset($tag) => 'Posts tagged "'.$tag->name.'" from the Relaticle engineering team.',
-        default => 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.',
+        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $category->name]),
+        isset($tag) => __('Read Relaticle posts tagged :name about using an open-source CRM, from setup to working with records.', ['name' => $tag->name]),
+        default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom fields and moving CRM records.'),
     };
 
     // Listings paginate, so page 2+ must self-canonicalise or a post reachable only

@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Models;
 
 use App\Models\Concerns\HasTeam;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 
@@ -31,8 +31,8 @@ use Relaticle\Chat\Enums\PendingActionStatus;
  * @property array<string, mixed> $action_data
  * @property array<string, mixed> $display_data
  * @property PendingActionStatus $status
- * @property Carbon $expires_at
- * @property Carbon|null $resolved_at
+ * @property CarbonImmutable $expires_at
+ * @property CarbonImmutable|null $resolved_at
  * @property array<string, mixed>|null $result_data
  */
 #[Fillable([

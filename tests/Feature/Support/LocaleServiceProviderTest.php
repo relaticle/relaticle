@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Providers\LocaleServiceProvider;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Number;
 
@@ -15,11 +14,11 @@ afterEach(function (): void {
     Number::useLocale($defaultLocale);
 });
 
-it('localizes Carbon dates when app locale is set', function (): void {
+it('localizes dates when app locale is set', function (): void {
     app()->setLocale('fr');
     (new LocaleServiceProvider(app()))->boot();
 
-    $formatted = Carbon::parse('2026-05-09')->translatedFormat('F');
+    $formatted = Date::parse('2026-05-09')->translatedFormat('F');
 
     expect($formatted)->toBe('mai');
 });

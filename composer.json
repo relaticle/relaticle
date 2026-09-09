@@ -46,7 +46,7 @@
         "relaticle/custom-fields": "^3.8.0",
         "relaticle/flowforge": "^4.0",
         "relaticle/ink": "^2.3",
-        "scalar/laravel": "^0.2.0",
+        "scalar/laravel": "^0.4.0",
         "sentry/sentry-laravel": "^4.13",
         "socialiteproviders/microsoft": "^4.10",
         "spatie/cpu-load-health-check": "^1.0",

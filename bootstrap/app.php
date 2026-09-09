@@ -139,6 +139,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'webhooks/*',
+            'mail/unsubscribe/*',
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request): string {

@@ -165,6 +165,22 @@ Treat every change like it's going through senior code review:
   `->update(['used_at' => now()])`. The pgsql connection pins `'timezone' => 'UTC'` so the two
   agree today. Do not rely on that. It is the safety net, not the contract.
 
+## Dates
+
+- Dates are immutable application-wide. `AppServiceProvider::register()` calls
+  `Date::use(CarbonImmutable::class)`, so `now()`, `today()`, the `Date` facade, and
+  every `datetime` cast return `CarbonImmutable`
+- Never name the mutable `Carbon` class in code. `CarbonImmutable` does not extend it,
+  so a type hint becomes a TypeError and an `instanceof` check silently turns false.
+  `tests/Arch/ConventionsTest.php` fails on a bare `Carbon` anywhere in `app/`,
+  `packages/`, `database/`, or `tests/`
+- Type a date as `CarbonImmutable` when our own `Date::` factory or a model cast
+  produced it. Use `CarbonInterface` when a vendor may still hand you a mutable date
+- Build dates through `now()`, `today()`, or the `Date` facade. A hardcoded `Carbon::`
+  static call bypasses the factory, and `CarbonToDateFacadeRector` rewrites it
+- Steer the clock in tests with `$this->travelTo()`. `Carbon::setTestNow()` names the
+  mutable class, so `CarbonSetTestNowToTravelToRector` rewrites it
+
 ## Pre-Commit Quality Checks
 
 Before committing any changes, always run these checks in order:

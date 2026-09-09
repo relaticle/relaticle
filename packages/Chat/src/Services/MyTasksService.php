@@ -7,9 +7,9 @@ namespace Relaticle\Chat\Services;
 use App\Filament\Resources\TaskResource;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -91,7 +91,7 @@ final readonly class MyTasksService
                 id: (string) $row->id,
                 title: (string) $row->title,
                 dueAt: $dueAt,
-                severity: $dueAt instanceof Carbon ? $this->severity($dueAt, $startOfToday, $startOfDayAfter) : null,
+                severity: $dueAt instanceof CarbonImmutable ? $this->severity($dueAt, $startOfToday, $startOfDayAfter) : null,
                 editUrl: $editUrl,
             );
         })->values();
@@ -153,7 +153,7 @@ final readonly class MyTasksService
         return $meta;
     }
 
-    private function severity(Carbon $dueAt, Carbon $startOfToday, Carbon $startOfDayAfter): string
+    private function severity(CarbonImmutable $dueAt, CarbonImmutable $startOfToday, CarbonImmutable $startOfDayAfter): string
     {
         if ($dueAt->lt($startOfToday)) {
             return 'overdue';

@@ -1,34 +1,19 @@
-<x-mail::message>
-# {{ $greetingName }}, here's your task digest
+<x-mail::message :reason="__('mail.footer.reason.digest')" :settings-url="$settingsUrl" :unsubscribe-url="$unsubscribeUrl">
+<x-slot:preheader>{{ $preheader }}</x-slot:preheader>
+# {{ __('mail.task_digest.heading', ['name' => $greetingName]) }}
 
-@foreach($payload->teams as $team)
-## {{ $team->teamName }}
+@foreach($sections as $section)
+## {{ $section['name'] }}
 
-@if(count($team->overdue) > 0)
-**Overdue**
-
-@foreach($team->overdue as $task)
-- [{{ $task->title }}]({{ $task->editUrl }}), due {{ $task->dueAt->format('M j, Y') }}
-@endforeach
+@if($section['overdue'] !== [])
+<x-mail::list :title="__('mail.task_digest.overdue')" :rows="$section['overdue']" />
 @endif
-
-@if(count($team->upcoming) > 0)
-**Upcoming**
-
-@foreach($team->upcoming as $task)
-- [{{ $task->title }}]({{ $task->editUrl }}), due {{ $task->dueAt->format('M j, Y') }}
-@endforeach
+@if($section['upcoming'] !== [])
+<x-mail::list :title="__('mail.task_digest.due_today')" :rows="$section['upcoming']" />
 @endif
-
 @endforeach
 
 <x-mail::button :url="$tasksUrl">
-View all my tasks
+{{ __('mail.task_digest.cta') }}
 </x-mail::button>
-
-<x-slot:subcopy>
-{{ $companyName }}@if($companyAddress !== '') · {{ $companyAddress }}@endif
-
-[Manage notification settings]({{ $manageSettingsUrl }})
-</x-slot:subcopy>
 </x-mail::message>

@@ -11,7 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Board;
 
@@ -162,7 +162,7 @@ it('opens the edit action when a card is clicked', function (): void {
  * wrong bucket is the wrong plan for the day.
  */
 it('buckets the due-date badge against the user calendar, not the server clock', function (): void {
-    $this->travelTo(Carbon::parse('2026-08-18 13:50:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-08-18 13:50:00', 'UTC'));
 
     $this->user->forceFill(['timezone' => 'Asia/Tokyo'])->save();
     Filament::setCurrentPanel(Filament::getPanel('app'));
@@ -178,7 +178,7 @@ it('buckets the due-date badge against the user calendar, not the server clock',
     // 23:30 UTC on the 18th is 08:30 on the 19th in Tokyo. At the moment above the
     // Tokyo calendar already reads the 18th at 22:50, so this is due *tomorrow* there
     // while a UTC reader would still call it today.
-    $task->saveCustomFieldValue($dueField, Carbon::parse('2026-08-18 23:30:00', 'UTC'));
+    $task->saveCustomFieldValue($dueField, Date::parse('2026-08-18 23:30:00', 'UTC'));
 
     livewire(TasksBoard::class)
         ->assertSee('Due Tomorrow')

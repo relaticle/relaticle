@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Relaticle\ImportWizard\Enums\DateFormat;
 
 it('parses every example it advertises in the format picker', function (DateFormat $format, bool $withTime): void {
     foreach ($format->getExamples($withTime) as $example) {
         expect($format->parse($example, $withTime))
-            ->toBeInstanceOf(Carbon::class, "{$format->value} advertises '{$example}' but cannot parse it");
+            ->toBeInstanceOf(CarbonImmutable::class, "{$format->value} advertises '{$example}' but cannot parse it");
     }
 })->with([
     'iso date' => [DateFormat::ISO, false],
@@ -50,19 +50,19 @@ it('reads an ambiguous date according to the chosen convention', function (): vo
 });
 
 it('zeroes the time a date-only format does not carry', function (): void {
-    Carbon::setTestNow('2024-06-01 13:45:59');
+    $this->travelTo('2024-06-01 13:45:59');
 
     expect(DateFormat::EUROPEAN->parse('15/05/2024')?->format('H:i:s'))->toBe('00:00:00');
 
-    Carbon::setTestNow();
+    $this->travelBack();
 });
 
 it('zeroes the seconds a minute-precision format does not carry', function (): void {
-    Carbon::setTestNow('2024-06-01 13:45:59');
+    $this->travelTo('2024-06-01 13:45:59');
 
     expect(DateFormat::EUROPEAN->parse('15/05/2024 16:00', withTime: true)?->format('H:i:s'))->toBe('16:00:00');
 
-    Carbon::setTestNow();
+    $this->travelBack();
 });
 
 it('reads a naive datetime in the importer timezone and stores it as UTC', function (): void {

@@ -1,6 +1,6 @@
 ---
 title: Getting started
-description: Set up your workspace and add your first records.
+description: "Get setup steps for your Relaticle workspace and its five record types: companies, people, opportunities, tasks and notes."
 order: 1
 ---
 

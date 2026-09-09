@@ -13,6 +13,7 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Filament\Actions\Action;
@@ -27,7 +28,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -230,13 +230,13 @@ final class TeamMembers extends BaseLivewireComponent implements Tables\Contract
 
     // Purely temporal, never a repeat of the status badge: the badge says which
     // state the invitation is in, this says since or until when.
-    private function subtitle(bool $isInvitation, ?Carbon $expiresAt, string $email): ?string
+    private function subtitle(bool $isInvitation, ?CarbonImmutable $expiresAt, string $email): ?string
     {
         if (! $isInvitation) {
             return $email;
         }
 
-        if (! $expiresAt instanceof Carbon) {
+        if (! $expiresAt instanceof CarbonImmutable) {
             return null;
         }
 

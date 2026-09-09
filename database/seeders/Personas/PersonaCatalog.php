@@ -89,6 +89,16 @@ final class PersonaCatalog
             ),
 
             new Persona(
+                slug: 'enterprise',
+                email: 'enterprise@'.self::DOMAIN,
+                name: 'Elena Enterprise',
+                workspace: 'Northstar Operations',
+                purpose: 'Managed Enterprise access, usage, and support contact without self-service checkout.',
+                expect: BillingStatus::Enterprise,
+                team: ['plan' => Plan::Enterprise],
+            ),
+
+            new Persona(
                 slug: 'pro',
                 email: 'pro@'.self::DOMAIN,
                 name: 'Pedro Pro',

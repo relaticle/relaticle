@@ -27,10 +27,10 @@ final class UserDeletionCancelledNotification extends Notification implements Sh
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Your account deletion has been cancelled')
-            ->greeting("Welcome back, {$this->user->name}!")
-            ->line('Your account deletion has been cancelled. Your account and data are safe.')
-            ->line('No further action is needed.')
-            ->salutation('Thank you for staying with Relaticle.');
+            ->subject(__('mail.account_deletion_cancelled.subject'))
+            ->markdown('mail.notifications.account-deletion-cancelled', [
+                'name' => explode(' ', $this->user->name)[0],
+                'appUrl' => url()->getAppUrl(),
+            ]);
     }
 }
