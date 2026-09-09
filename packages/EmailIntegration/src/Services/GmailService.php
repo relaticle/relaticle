@@ -408,6 +408,8 @@ final readonly class GmailService implements MailServiceInterface
 
     /**
      * Recursively walk MIME parts and collect attachment metadata.
+     * The current part is inspected, not only its children, because an
+     * attachment-only message puts the file on the root payload.
      * Covers both file attachments (Content-Disposition: attachment) and
      * inline images (Content-Disposition: inline with Content-ID).
      *
@@ -418,47 +420,46 @@ final readonly class GmailService implements MailServiceInterface
     {
         $attachments = [];
 
+        $partHeaders = collect($payload->getHeaders())
+            ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
+
+        $disposition = $partHeaders->get('content-disposition')?->getValue() ?? '';
+        $filename = $payload->getFilename();
+
+        $contentId = $partHeaders->get('content-id')?->getValue();
+        if ($contentId !== null) {
+            $contentId = trim($contentId, '<>');
+        }
+
+        $mimeType = (string) $payload->getMimeType();
+        $lowerDisposition = strtolower($disposition);
+        $isInline = $contentId !== null && (
+            str_starts_with($lowerDisposition, 'inline') ||
+            isset($referencedContentIds[mb_strtolower($contentId)])
+        );
+
+        $isMultipart = str_starts_with(mb_strtolower($mimeType), 'multipart/');
+
+        if (! $isMultipart && (filled($filename) || str_starts_with($lowerDisposition, 'attachment') || $isInline)) {
+            $body = $payload->getBody();
+            // getAttachmentId() returns empty string when not present (large attachments have it set)
+            $gmailAttachmentId = $body->getAttachmentId();
+            $attachmentId = filled($gmailAttachmentId) ? $gmailAttachmentId : null;
+
+            $attachments[] = [
+                'filename' => filled($filename) ? $filename : null,
+                'mime_type' => $mimeType,
+                'size' => $body->getSize(),
+                'content_id' => $contentId,
+                'attachment_id' => $attachmentId,
+                // For small attachments (<25 KB) the binary is inlined; large ones have an attachment_id
+                'inline_data' => $attachmentId === null ? ($body->getData() ?: null) : null,
+                'is_inline' => $isInline,
+            ];
+        }
+
         foreach ($payload->getParts() as $part) {
-            $partHeaders = collect($part->getHeaders())
-                ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
-
-            $disposition = $partHeaders->get('content-disposition')?->getValue() ?? '';
-            $filename = $part->getFilename();
-
-            $contentId = $partHeaders->get('content-id')?->getValue();
-            if ($contentId !== null) {
-                $contentId = trim($contentId, '<>');
-            }
-
-            $mimeType = (string) $part->getMimeType();
-            $lowerDisposition = strtolower($disposition);
-            $isInline = $contentId !== null && (
-                str_starts_with($lowerDisposition, 'inline') ||
-                isset($referencedContentIds[mb_strtolower($contentId)])
-            );
-
-            if (filled($filename) || str_starts_with($lowerDisposition, 'attachment') || $isInline) {
-                $body = $part->getBody();
-                // getAttachmentId() returns empty string when not present (large attachments have it set)
-                $gmailAttachmentId = $body->getAttachmentId();
-                $attachmentId = filled($gmailAttachmentId) ? $gmailAttachmentId : null;
-
-                $attachments[] = [
-                    'filename' => filled($filename) ? $filename : null,
-                    'mime_type' => $mimeType,
-                    'size' => $body->getSize(),
-                    'content_id' => $contentId,
-                    'attachment_id' => $attachmentId,
-                    // For small attachments (<25 KB) the binary is inlined; large ones have an attachment_id
-                    'inline_data' => $attachmentId === null ? ($body->getData() ?: null) : null,
-                    'is_inline' => $isInline,
-                ];
-            }
-
-            // Recurse into multipart containers (e.g. multipart/mixed, multipart/related)
-            if ($part->getParts()) {
-                $attachments = array_merge($attachments, $this->extractAttachments($part, $referencedContentIds));
-            }
+            $attachments = array_merge($attachments, $this->extractAttachments($part, $referencedContentIds));
         }
 
         return $attachments;
