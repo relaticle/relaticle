@@ -128,6 +128,35 @@ it('paginates delta with @odata.nextLink and surfaces new + read ids + new curso
         ->and($delta->newCursor)->toContain('$deltatoken=FRESH');
 });
 
+it('maps a Graph drafts-folder message as an inbound draft', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
+            'value' => [['id' => 'drafts-folder-id', 'displayName' => 'Drafts']],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response([
+            'id' => 'DRAFT1',
+            'internetMessageId' => '<draft@example.com>',
+            'conversationId' => 'thread-draft',
+            'subject' => 'Unsent',
+            'bodyPreview' => 'Still writing',
+            'receivedDateTime' => '2026-01-15T10:00:00Z',
+            'isRead' => true,
+            'hasAttachments' => false,
+            'parentFolderId' => 'drafts-folder-id',
+            'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
+            'toRecipients' => [['emailAddress' => ['address' => 'prospect@example.com', 'name' => 'Prospect']]],
+            'ccRecipients' => [],
+            'bccRecipients' => [],
+            'body' => ['contentType' => 'html', 'content' => '<p>Still writing</p>'],
+        ]),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('DRAFT1');
+
+    expect($email->direction)->toBe(EmailDirection::INBOUND)
+        ->and($email->folder)->toBe(EmailFolder::Drafts);
+});
+
 it('maps a Graph message payload to FetchedEmailData', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([

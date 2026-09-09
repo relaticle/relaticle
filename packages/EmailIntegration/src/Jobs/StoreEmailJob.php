@@ -13,6 +13,7 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -74,6 +75,16 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             }
 
             throw $exception;
+        }
+
+        // Provider drafts are unsent. Gmail drafts carry DRAFT and not SENT, so
+        // fetchMessage() classifies them as inbound. Skip them here rather than
+        // in a provider service so it covers Gmail and Microsoft, and both the
+        // initial backfill and incremental syncs. Otherwise they store as SYNCED
+        // with the account's sharing default, and teammates can read them
+        // through linked CRM records.
+        if ($fetched->folder === EmailFolder::Drafts) {
+            return;
         }
 
         // Honour the account's inbox/sent toggles. Gated here rather than in a
