@@ -194,7 +194,8 @@ final readonly class GmailService implements MailServiceInterface
 
     /**
      * Send a new email or reply to an existing thread.
-     * Pass `in_reply_to` and `thread_id` in $data to send as a reply.
+     * Pass `in_reply_to` to send as a reply. Pass `thread_id` only when it
+     * belongs to this mailbox; Gmail rejects a thread id from another account.
      *
      * @param array{
      *     subject: string,
@@ -212,15 +213,15 @@ final readonly class GmailService implements MailServiceInterface
      */
     public function sendMessage(array $data): array
     {
-        $isReply = isset($data['in_reply_to']);
         $raw = $this->buildMimeMessage($data, $data['in_reply_to'] ?? null);
 
         $message = new Message;
         $message->setRaw(rtrim(strtr(base64_encode($raw), '+/', '-_'), '='));
 
-        if ($isReply) {
-            assert(isset($data['thread_id']), 'thread_id is required when in_reply_to is set');
-            $message->setThreadId($data['thread_id']);
+        $threadId = $data['thread_id'] ?? null;
+
+        if (is_string($threadId) && $threadId !== '') {
+            $message->setThreadId($threadId);
         }
 
         $sent = $this->gmail->users_messages->send('me', $message);
