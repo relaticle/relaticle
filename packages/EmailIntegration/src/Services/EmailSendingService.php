@@ -120,14 +120,10 @@ final readonly class EmailSendingService
      * Read the stored bytes for each attachment so the provider can serialize them
      * into the outgoing message.
      *
-     * @return array<int, array{filename: string, mime_type: string, content: string}>
+     * @return array<int, array{filename: string, mime_type: string, content: string, is_inline: bool, content_id: ?string}>
      */
     private function resolveAttachments(Email $email): array
     {
-        if (! $email->has_attachments) {
-            return [];
-        }
-
         $disk = Storage::disk(EmailAttachment::DISK);
 
         return $email->attachments
@@ -136,6 +132,8 @@ final readonly class EmailSendingService
                 'filename' => (string) $attachment->filename,
                 'mime_type' => (string) $attachment->mime_type,
                 'content' => (string) $disk->get((string) $attachment->storage_path),
+                'is_inline' => (bool) $attachment->is_inline,
+                'content_id' => $attachment->content_id,
             ])
             ->values()
             ->all();
