@@ -24,6 +24,9 @@ return [
     ],
     'attendees' => [
         'host' => 'Host',
+        'guest' => 'Guest',
+        'show_more' => 'Show more',
+        'show_less' => 'Show less',
     ],
     'actions' => [
         'link_records' => [
