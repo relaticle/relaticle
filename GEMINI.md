@@ -227,6 +227,24 @@ Do not add new PHPStan ignores without approval. All parameters and return types
   Never put it behind an `app()->environment()` branch inside `app/Actions/` or
   other production code.
 
+## Comments
+
+Write code that needs no comment. In a finished diff, 90%+ of the code carries zero
+comments: names, small methods, and a test named for the behaviour say it all. A comment
+is the exception that admits the code could not.
+
+- A comment states only what code cannot: a non-obvious *why*, a magic value's source, or
+  a warning against a refactor that looks safe. Never what the code does.
+- Cap it at 2 lines. Longer rationale belongs in the PR body or the commit, not the file.
+- Never narrate the diff (`// added to fix X`), argue it (*without this*, *otherwise*,
+  *this ensures*), or carry traceability (ticket IDs, criterion tags). The reviewer reads
+  the PR; the next reader reads the code.
+- No comments in tests. The test name carries the intent.
+- Docblocks carry types, generics, and array shapes PHPStan cannot infer. Never prose.
+  This overrides the composed Boost PHP rule that prefers docblocks over inline comments.
+- Draft with comments if it helps you think. Before handing over the diff, re-read every
+  `//` you added and delete any the code already says.
+
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`

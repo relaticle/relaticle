@@ -69,8 +69,10 @@ return RectorConfig::configure()
             __DIR__.'/app/Filament/Imports/*',
         ],
         PrivatizeFinalClassMethodRector::class => [
-            // Filament expects protected visibility for lifecycle hooks
+            // Filament runs lifecycle hooks through callHook() in BasePage scope,
+            // so a private hook on a final page is a fatal error at runtime.
             __DIR__.'/app/Filament/Imports/*',
+            __DIR__.'/app/Filament/Pages/*',
         ],
         ArrayToFirstClassCallableRector::class => [
             // class_exists has optional bool param that conflicts with Collection::first signature
