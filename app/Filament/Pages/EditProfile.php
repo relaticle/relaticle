@@ -8,6 +8,7 @@ use App\Filament\Clusters\Settings;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Livewire\App\Profile\ManagePasskeys;
+use App\Livewire\App\Profile\UpdateLandingPage;
 use App\Livewire\App\Profile\UpdatePassword;
 use App\Livewire\App\Profile\UpdateProfileInformation;
 use Filament\Clusters\Cluster;
@@ -37,6 +38,7 @@ final class EditProfile extends Page
     {
         return $schema->components([
             Livewire::make(UpdateProfileInformation::class),
+            Livewire::make(UpdateLandingPage::class),
             Livewire::make(UpdatePassword::class),
             Livewire::make(ManagePasskeys::class),
             Livewire::make(LogoutOtherBrowserSessions::class),

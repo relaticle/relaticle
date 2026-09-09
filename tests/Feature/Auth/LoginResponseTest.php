@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\PeopleResource;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\PasskeyLoginResponse;
 use App\Models\Team;
@@ -58,6 +59,27 @@ it('falls back to the dashboard when there is no intended url', function (): voi
     $target = loginResponseFor($user, null);
 
     expect($target)->toBe(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+});
+
+it('lands on the user preferred landing page when there is no intended url', function (): void {
+    $user = User::factory()->withTeam()->create([
+        'landing_page' => 'people',
+    ]);
+
+    $target = loginResponseFor($user, null);
+
+    expect($target)->toBe(PeopleResource::getUrl('index', ['tenant' => $user->currentTeam]));
+});
+
+it('prefers an accessible deep link over the landing page preference', function (): void {
+    $user = User::factory()->withTeam()->create([
+        'landing_page' => 'people',
+    ]);
+    $team = $user->currentTeam;
+
+    $target = loginResponseFor($user, "/app/{$team->slug}/companies");
+
+    expect($target)->toEndWith("/app/{$team->slug}/companies");
 });
 
 it('falls back to the dashboard when the intended url has no resolvable workspace slug', function (): void {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
-use App\Filament\Pages\Dashboard;
+use App\Enums\LandingPage;
 use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -28,7 +28,7 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
             return redirect()->intended(Filament::getUrl());
         }
 
-        $dashboard = Dashboard::getUrl(['tenant' => $user->currentTeam]);
+        $landingPage = LandingPage::fromUser($user)->url($user->currentTeam);
 
         // Honour a pre-login deep link only when it points at a workspace the
         // user can actually access. A stale or cross-tenant `url.intended`
@@ -40,7 +40,7 @@ final readonly class LoginResponse implements \Filament\Auth\Http\Responses\Cont
             return redirect()->to($intended);
         }
 
-        return redirect()->to($dashboard);
+        return redirect()->to($landingPage);
     }
 
     private function intendedIsAccessible(string $intended, User $user): bool
