@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Http\Requests\Api\V1\Concerns\NormalizesCustomFields;
 use App\Models\Task;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -13,6 +14,13 @@ use Illuminate\Validation\Rule;
 
 final class UpdateTaskRequest extends FormRequest
 {
+    use NormalizesCustomFields;
+
+    protected function customFieldEntityType(): string
+    {
+        return 'task';
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Http\Requests\Api\V1\Concerns\NormalizesCustomFields;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
@@ -12,6 +13,13 @@ use Illuminate\Validation\Rule;
 
 final class UpdateOpportunityRequest extends FormRequest
 {
+    use NormalizesCustomFields;
+
+    protected function customFieldEntityType(): string
+    {
+        return 'opportunity';
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
