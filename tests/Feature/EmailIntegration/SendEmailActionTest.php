@@ -472,3 +472,58 @@ it('reads attachment bytes into the provider payload when sending', function ():
         ->and($captured['attachments'][0]['mime_type'])->not->toBeEmpty()
         ->and($captured['attachments'][0]['content'])->toBe('attachment body');
 });
+
+it('persists inline cid attachments and includes them in the provider payload', function (): void {
+    Storage::fake('local');
+
+    $path = UploadedFile::fake()
+        ->createWithContent('logo.png', 'png-bytes')
+        ->store('email-attachments', 'local');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Fwd with logo',
+        'body_html' => '<p><img src="cid:logo@example.test"></p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::FORWARD,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$path],
+        'attachment_file_names' => [$path => 'logo.png'],
+        'attachment_attributes' => [$path => [
+            'is_inline' => true,
+            'content_id' => 'logo@example.test',
+        ]],
+    ]);
+
+    $attachment = $email->attachments()->first();
+
+    expect($email->has_attachments)->toBeFalse()
+        ->and($attachment->is_inline)->toBeTrue()
+        ->and($attachment->content_id)->toBe('logo@example.test');
+
+    $captured = null;
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturnUsing(function (array $payload) use (&$captured): array {
+        $captured = $payload;
+
+        return [
+            'provider_message_id' => 'pm',
+            'thread_id' => 'th',
+            'rfc_message_id' => $payload['rfc_message_id'] ?? '<x@example.com>',
+        ];
+    });
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    app(EmailSendingService::class)->send($email->refresh());
+
+    expect($captured['attachments'])->toHaveCount(1)
+        ->and($captured['attachments'][0]['is_inline'])->toBeTrue()
+        ->and($captured['attachments'][0]['content_id'])->toBe('logo@example.test')
+        ->and($captured['attachments'][0]['content'])->toBe('png-bytes');
+});

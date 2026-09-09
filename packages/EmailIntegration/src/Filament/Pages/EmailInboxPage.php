@@ -43,6 +43,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
@@ -209,10 +210,7 @@ final class EmailInboxPage extends Page
         $query->where('status', '!=', EmailStatus::DRAFT);
 
         if (filled($this->search)) {
-            $query->where(function (Builder $q): void {
-                $q->where('subject', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('snippet', 'ilike', '%'.$this->search.'%');
-            });
+            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
         }
 
         return $query->latest('sent_at')->paginate(20);
@@ -474,14 +472,6 @@ final class EmailInboxPage extends Page
      */
     private function submitReplyForward(array $data, string $mode): void
     {
-        if (filled($data['quoted_body_html'] ?? '')) {
-            $quotedSection = $mode === 'forward'
-                ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$data['quoted_body_html']
-                : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$data['quoted_body_html'].'</blockquote>';
-
-            $data['body_html'] = ($data['body_html'] ?? '').$quotedSection;
-        }
-
         $source = match ($mode) {
             'reply_all' => EmailCreationSource::REPLY_ALL,
             'forward' => EmailCreationSource::FORWARD,
@@ -644,10 +634,18 @@ final class EmailInboxPage extends Page
     {
         $renderer = resolve(EmailTemplateRenderService::class);
 
+        $bodyHtml = $renderer->renderForSending((string) $data['body_html']);
+
+        if (filled($data['quoted_body_html'] ?? '')) {
+            $bodyHtml .= $source === EmailCreationSource::FORWARD
+                ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$data['quoted_body_html']
+                : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$data['quoted_body_html'].'</blockquote>';
+        }
+
         return [
             'connected_account_id' => $data['connected_account_id'],
             'subject' => $renderer->renderContent((string) $data['subject']),
-            'body_html' => $renderer->renderForSending((string) $data['body_html']),
+            'body_html' => $bodyHtml,
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),
             'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['bcc'] ?? []),
