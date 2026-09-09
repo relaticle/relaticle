@@ -438,11 +438,19 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
+        [$forwardedPaths, $forwardedNames, $unavailable] = $this->copyForwardedSourceAttachments();
+
+        if ($unavailable !== []) {
+            $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: true);
+            $this->deleteCopiedAttachmentFiles($forwardedPaths);
+
+            return;
+        }
+
         $renderer = resolve(EmailTemplateRenderService::class);
 
         [$pendingPaths, $pendingNames] = $this->storeAttachments();
         [$copiedPaths, $copiedNames] = $this->copySavedAttachments();
-        [$forwardedPaths, $forwardedNames] = $this->copyForwardedSourceAttachments();
 
         $attachmentPaths = [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths];
         $attachmentNames = [...$pendingNames, ...$copiedNames, ...$forwardedNames];
@@ -1344,18 +1352,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * them onto a draft. After persist, {@see $savedAttachments} holds draft
      * ids and this becomes a no-op. The source files themselves stay put.
      *
-     * @return array{0: list<string>, 1: array<string, string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: list<string>}
      */
     private function copyForwardedSourceAttachments(): array
     {
         if ($this->replyMode !== 'forward' || $this->sourceEmailId === null || $this->savedAttachments === []) {
-            return [[], []];
+            return [[], [], []];
         }
 
         $source = $this->replyableEmail($this->sourceEmailId);
 
         if (! $source instanceof Email || $this->authUser()->cannot('viewBody', $source)) {
-            return [[], []];
+            return [[], [], []];
         }
 
         $attachments = EmailAttachment::query()
@@ -1382,17 +1390,39 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             $names[$copy] = (string) $attachment->filename;
         }
 
-        if ($unavailable !== []) {
-            Notification::make()
-                ->warning()
-                ->title(__('filament/emails/composer.notifications.attachment_unavailable.title'))
-                ->body(__('filament/emails/composer.notifications.attachment_unavailable.body', [
-                    'files' => implode(', ', $unavailable),
-                ]))
-                ->send();
-        }
+        return [$paths, $names, $unavailable];
+    }
 
-        return [$paths, $names];
+    /**
+     * @param  list<string>  $filenames
+     */
+    private function notifyUnavailableForwardedAttachments(array $filenames, bool $abortingSend): void
+    {
+        $key = $abortingSend
+            ? 'filament/emails/composer.notifications.send_attachment_unavailable'
+            : 'filament/emails/composer.notifications.attachment_unavailable';
+
+        $notification = Notification::make()
+            ->title(__($key.'.title'))
+            ->body(__($key.'.body', [
+                'files' => implode(', ', $filenames),
+            ]));
+
+        $abortingSend ? $notification->danger() : $notification->warning();
+
+        $notification->send();
+    }
+
+    /**
+     * @param  list<string>  $paths
+     */
+    private function deleteCopiedAttachmentFiles(array $paths): void
+    {
+        $disk = Storage::disk(EmailAttachment::DISK);
+
+        foreach ($paths as $path) {
+            $disk->delete($path);
+        }
     }
 
     private function copyAttachmentFile(EmailAttachment $attachment): ?string
@@ -1472,7 +1502,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         [$attachmentPaths, $attachmentNames] = $this->storeAttachments();
-        [$forwardedPaths, $forwardedNames] = $this->copyForwardedSourceAttachments();
+        [$forwardedPaths, $forwardedNames, $unavailable] = $this->copyForwardedSourceAttachments();
+
+        if ($unavailable !== []) {
+            $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: false);
+        }
 
         $draft = resolve(SaveEmailDraftAction::class)->execute(
             user: $this->authUser(),
