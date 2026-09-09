@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,7 @@ use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -363,6 +365,22 @@ it('marks email as internal when all participants are team members', function ()
     $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->is_internal)->toBeTrue();
+});
+
+it('stamps the mailbox workspace privacy default when the owner has switched current team', function (): void {
+    $this->user->update(['default_email_sharing_tier' => null]);
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+
+    $otherTeam = Team::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+    ]);
+    $this->user->teams()->attach($otherTeam, ['role' => 'admin']);
+    $this->user->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account->fresh(), makeFetchedEmailData());
+
+    expect($email->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
 it('treats a member as internal even when their active team is a different team', function (): void {

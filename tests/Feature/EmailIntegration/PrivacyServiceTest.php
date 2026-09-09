@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -258,6 +259,31 @@ it('defaultTierForUser falls back to team default when user has no preference', 
     $tier = $this->service->defaultTierForUser($this->owner->fresh());
 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('defaultTierForUser prefers the user setting over the mailbox workspace default', function (): void {
+    $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+
+    $tier = $this->service->defaultTierForUser($this->owner->fresh(), $this->team);
+
+    expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('defaultTierForUser uses the mailbox workspace default instead of the owner current team', function (): void {
+    $this->owner->update(['default_email_sharing_tier' => null]);
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+
+    $otherTeam = Team::factory()->create([
+        'user_id' => $this->owner->getKey(),
+        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+    ]);
+    $this->owner->teams()->attach($otherTeam, ['role' => 'admin']);
+    $this->owner->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+
+    $tier = $this->service->defaultTierForUser($this->owner->fresh(), $this->team);
+
+    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
 it('defaultTierForUser returns metadata-only when the user has no current team', function (): void {
