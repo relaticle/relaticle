@@ -149,6 +149,65 @@ it('ignores an in_reply_to_email_id that belongs to another team', function (): 
         ->and($email->in_reply_to)->toBeNull();
 });
 
+it('does not copy a provider thread id from a different sending mailbox', function (): void {
+    $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'other@example.com',
+        'display_name' => 'Other Mailbox',
+    ]));
+    $sharedEmail = Email::query()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $otherAccount->getKey(),
+        'rfc_message_id' => '<shared@example.com>',
+        'provider_message_id' => 'provider-shared',
+        'thread_id' => 'gmail-thread-from-other-mailbox',
+        'subject' => 'Shared mail',
+        'snippet' => 'Shared',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'status' => EmailStatus::SENT,
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Shared mail',
+        'body_html' => '<p>Reply from my mailbox</p>',
+        'to' => [['email' => 'someone@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => $sharedEmail->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    expect($reply->thread_id)->toBeNull()
+        ->and($reply->in_reply_to)->toBe('<shared@example.com>');
+
+    $captured = null;
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('sendMessage')->once()->andReturnUsing(function (array $payload) use (&$captured): array {
+        $captured = $payload;
+
+        return [
+            'provider_message_id' => 'provider-cross-mailbox',
+            'thread_id' => 'new-thread-in-sender-mailbox',
+            'rfc_message_id' => $payload['rfc_message_id'] ?? '<reply@example.com>',
+        ];
+    });
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    app(EmailSendingService::class)->send($reply);
+
+    expect($captured)->not->toHaveKey('thread_id')
+        ->and($captured['in_reply_to'])->toBe('<shared@example.com>');
+});
+
 it('syncs the email thread aggregate when an outbound reply is sent', function (): void {
     $original = Email::query()->create([
         'team_id' => $this->team->id,
