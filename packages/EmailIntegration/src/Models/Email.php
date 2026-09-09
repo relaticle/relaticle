@@ -324,6 +324,27 @@ final class Email extends Model
     }
 
     /**
+     * HTML to append when this message is replied to or forwarded. Prefers the
+     * stored HTML. A plain-text-only body is escaped so the original is not dropped.
+     */
+    public function quotedBodyHtml(): ?string
+    {
+        $html = $this->body?->body_html;
+
+        if (filled($html)) {
+            return $html;
+        }
+
+        $text = $this->body?->body_text;
+
+        if (blank($text)) {
+            return null;
+        }
+
+        return nl2br(e($text), false);
+    }
+
+    /**
      * Reply-all recipient addresses: the original sender PLUS the to/cc recipients
      * (never bcc), excluding the replying user's own account address. De-duplicated
      * case-insensitively. Operates on the loaded `participants` relation.

@@ -296,7 +296,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').$originalSubject;
 
         // Only quote the original body when the viewer is entitled to read it.
-        $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->body?->body_html : null;
+        $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->quotedBodyHtml() : null;
         $this->sourceEmailId = (string) $email->getKey();
         // A forward carries its source for display, but must not thread against it.
         $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
@@ -1450,7 +1450,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             default => 'reply',
         };
         $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
-        $this->quotedBodyHtml = $user->can('viewBody', $original) ? $original->body?->body_html : null;
+        $this->quotedBodyHtml = $user->can('viewBody', $original) ? $original->quotedBodyHtml() : null;
     }
 
     /**
