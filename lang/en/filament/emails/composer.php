@@ -71,6 +71,10 @@ return [
             'title' => 'Some attachments could not be included',
             'body' => 'Not attached: :files. Download them from the original email and add them here if you still need them.',
         ],
+        'send_attachment_unavailable' => [
+            'title' => 'Could not include some attachments',
+            'body' => 'The email was not sent. These files could not be downloaded: :files. Remove them, or try sending again.',
+        ],
         'draft_account_disconnected' => [
             'title' => 'Original account no longer connected',
             'body' => 'The account this draft was written from isn\'t connected anymore, so it\'s been switched to your default account. Double-check the sender before sending.',
