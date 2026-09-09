@@ -6,6 +6,7 @@ use Google\Client;
 use Google\Service\Calendar;
 use Google\Service\Calendar\Event;
 use Google\Service\Calendar\EventAttendee;
+use Google\Service\Calendar\EventDateTime;
 use Google\Service\Calendar\EventOrganizer;
 use Google\Service\Calendar\Events as EventsResource;
 use Google\Service\Calendar\Resource\Events;
@@ -271,6 +272,45 @@ it('returns null when Google has no event for the iCalendar UID', function (): v
 
     expect((new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('missing'))
         ->toBeNull();
+});
+
+it('converts timed Google events to UTC before persistence', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $start = new EventDateTime;
+    $start->setDateTime('2024-01-01T09:00:00+05:45');
+
+    $end = new EventDateTime;
+    $end->setDateTime('2024-01-01T10:00:00+05:45');
+
+    $event = new Event;
+    $event->setId('evt-timed');
+    $event->setStatus('confirmed');
+    $event->setSummary('Morning sync');
+    $event->setStart($start);
+    $event->setEnd($end);
+
+    $eventsList = new EventsResource;
+    $eventsList->setItems([$event]);
+    $eventsList->setNextSyncToken('next-token');
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->andReturn($eventsList);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $result = (new GoogleCalendarService($account, $calendar))->initialSync();
+
+    expect($result->events)->toHaveCount(1)
+        ->and($result->events[0]->startsAt->timezone->getName())->toBe('UTC')
+        ->and($result->events[0]->startsAt->toDateTimeString())->toBe('2024-01-01 03:15:00')
+        ->and($result->events[0]->endsAt->toDateTimeString())->toBe('2024-01-01 04:15:00');
 });
 
 it('requests deleted events during incremental sync and maps cancellations to tombstones', function (): void {

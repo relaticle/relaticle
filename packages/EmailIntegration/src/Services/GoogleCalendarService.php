@@ -317,12 +317,16 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
 
         // All-day events carry a bare Y-m-d with no zone; parse as UTC so a server in a
         // timezone behind UTC doesn't roll the stored date back a day.
-        $startsAt = $isAllDay ? Date::parse($startDate, 'UTC') : Date::parse((string) $start->getDateTime());
+        // Timed events include an offset in dateTime; convert to UTC before persistence
+        // because meetings.starts_at is timestamp without time zone.
+        $startsAt = $isAllDay
+            ? Date::parse($startDate, 'UTC')
+            : Date::parse((string) $start->getDateTime())->utc();
         // Google's all-day end.date is EXCLUSIVE (the day after the last day), so a 1-day
         // event spans start..start+1. Subtract a day to store the inclusive last day.
         $endsAt = $isAllDay
             ? Date::parse($endDate, 'UTC')->subDay()
-            : Date::parse((string) $end->getDateTime());
+            : Date::parse((string) $end->getDateTime())->utc();
 
         $attendees = [];
         foreach ($event->getAttendees() as $attendee) {
