@@ -20,8 +20,10 @@ use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
+use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
-mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class);
+mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -180,11 +182,11 @@ it('lists attendees with host and rsvp in the view modal', function (): void {
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
         ->assertMountedActionModalSee('Asmit Magan')
-        ->assertMountedActionModalSee('asmit@example.test')
+        ->assertMountedActionModalDontSee('asmit@example.test')
         ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'))
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel())
         ->assertMountedActionModalSee('Asmit Nepali')
-        ->assertMountedActionModalSee('guest@example.test')
+        ->assertMountedActionModalDontSee('guest@example.test')
         ->assertMountedActionModalSee(AttendeeResponseStatus::NEEDS_ACTION->getLabel());
 });
 
@@ -223,8 +225,51 @@ it('shows the current user attendee row when is_self is true', function (): void
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Current User')
-        ->assertMountedActionModalSee('self@example.test')
+        ->assertMountedActionModalDontSee('self@example.test')
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
+});
+
+it('prefers the linked person name over the calendar email', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $person = People::factory()->for($this->team)->create(['name' => 'Maya Chen']);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'maya@example.test',
+        'email_address' => 'maya@example.test',
+        'contact_id' => $person->id,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Maya Chen')
+        ->assertMountedActionModalDontSee('maya@example.test');
+});
+
+it('shows a name from the email when the calendar name is the email and there is no person', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'only@example.test',
+        'email_address' => 'only@example.test',
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Only')
+        ->assertMountedActionModalDontSee('only@example.test')
+        ->assertMountedActionModalDontSee(__('filament/resources/meeting.attendees.guest'));
 });
 
 it('shows link, location, and description when they are filled', function (): void {

@@ -40,6 +40,23 @@ return [
             'description' => 'Connect your mailbox to read and reply next to your records',
         ],
     ],
+    'meetings' => [
+        'heading' => 'Meetings',
+        'empty' => [
+            'title' => 'No meetings',
+            'description' => 'Pick a different date to plan ahead or review past meetings.',
+        ],
+        'date' => [
+            'today' => 'Today, :date',
+            'tomorrow' => 'Tomorrow, :date',
+            'yesterday' => 'Yesterday, :date',
+            'other' => ':weekday, :date',
+        ],
+        'previous_day' => 'Previous day',
+        'next_day' => 'Next day',
+        'open' => 'Open meeting',
+        'all_day' => 'All day',
+    ],
     'tasks' => [
         'heading' => 'Tasks',
         'view_all' => 'View all',
