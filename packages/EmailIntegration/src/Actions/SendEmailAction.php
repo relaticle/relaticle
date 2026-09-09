@@ -97,7 +97,13 @@ final readonly class SendEmailAction
                 // double-sending. See EmailSendingService::send().
                 'rfc_message_id' => $this->generateRfcMessageId($account),
                 'provider_message_id' => null,
-                'thread_id' => $inReplyTo?->thread_id,
+                // Gmail threadId / Graph conversationId exist only inside the
+                // mailbox that received the original. A reply from a shared
+                // inbox or a different connected account must not pass that
+                // foreign id to the sending mailbox.
+                'thread_id' => $inReplyTo !== null && $inReplyTo->connected_account_id === $account->getKey()
+                    ? $inReplyTo->thread_id
+                    : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
                 'subject' => $data['subject'],
                 'snippet' => mb_substr(strip_tags((string) $data['body_html']), 0, 255),
