@@ -28,7 +28,10 @@ return [
     'contains' => 'The :attribute field is missing a required value.',
     'current_password' => 'The password is incorrect.',
     'custom_field' => [
+        'unknown_option' => 'Option ":value" is not one of: :labels.',
         'ambiguous_option' => 'Option ":value" is ambiguous, pass the option ID.',
+        'single_option' => 'Pass a single option label or ID.',
+        'option_list' => 'Pass an array of option labels or IDs.',
     ],
     'date' => 'The :attribute field must be a valid date.',
     'date_equals' => 'The :attribute field must be a date equal to :date.',

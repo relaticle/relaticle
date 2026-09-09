@@ -9,6 +9,7 @@ use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
+use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Request;
@@ -68,9 +69,19 @@ abstract class BaseCreateTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
+        $customFields = resolve(CustomFieldInput::class)->normalize(
+            $user->currentTeam->getKey(),
+            $this->entityType(),
+            $request->get('custom_fields'),
+        );
+
+        if (is_array($customFields)) {
+            $request->merge(['custom_fields' => $customFields]);
+        }
+
         $rules = array_merge(
             $this->entityRules($user),
-            new ValidCustomFields($user->currentTeam->getKey(), $this->entityType())->toRules($request->get('custom_fields')),
+            new ValidCustomFields($user->currentTeam->getKey(), $this->entityType())->toRules($customFields),
         );
 
         $validated = $request->validate($rules);
