@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
     'summarizable_type',
     'summarizable_id',
     'summary',
+    'input_hash',
     'model_used',
     'prompt_tokens',
     'completion_tokens',
