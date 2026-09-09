@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFields\CustomFieldOptionMap;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -81,7 +82,7 @@ final readonly class CustomFieldsFilterTranslator
     /**
      * Choice fields match on option IDs; a field with no options passes through as sent.
      *
-     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
     private function translateOperand(string $code, array $entry, mixed $operand): mixed
     {
@@ -97,7 +98,7 @@ final readonly class CustomFieldsFilterTranslator
     }
 
     /**
-     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
     private function optionId(string $code, array $entry, mixed $label): string
     {
@@ -117,7 +118,7 @@ final readonly class CustomFieldsFilterTranslator
 
     /**
      * @param  list<string>  $codes
-     * @return array<string, array{ids: array<string, string>, labels: list<string>}>
+     * @return array<string, array{ids: array<string, list<string>>, labels: list<string>}>
      */
     private function optionsByCode(User $user, string $entityType, array $codes): array
     {

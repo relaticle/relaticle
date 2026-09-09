@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
+use App\Support\CustomFields\CustomFieldOptionMap;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Validator;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
