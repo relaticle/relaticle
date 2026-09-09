@@ -128,6 +128,35 @@ it('paginates delta with @odata.nextLink and surfaces new + read ids + new curso
         ->and($delta->newCursor)->toContain('$deltatoken=FRESH');
 });
 
+it('maps a Graph drafts-folder message as an inbound draft', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
+            'value' => [['id' => 'drafts-folder-id', 'displayName' => 'Drafts']],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response([
+            'id' => 'DRAFT1',
+            'internetMessageId' => '<draft@example.com>',
+            'conversationId' => 'thread-draft',
+            'subject' => 'Unsent',
+            'bodyPreview' => 'Still writing',
+            'receivedDateTime' => '2026-01-15T10:00:00Z',
+            'isRead' => true,
+            'hasAttachments' => false,
+            'parentFolderId' => 'drafts-folder-id',
+            'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
+            'toRecipients' => [['emailAddress' => ['address' => 'prospect@example.com', 'name' => 'Prospect']]],
+            'ccRecipients' => [],
+            'bccRecipients' => [],
+            'body' => ['contentType' => 'html', 'content' => '<p>Still writing</p>'],
+        ]),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('DRAFT1');
+
+    expect($email->direction)->toBe(EmailDirection::INBOUND)
+        ->and($email->folder)->toBe(EmailFolder::Drafts);
+});
+
 it('maps a Graph message payload to FetchedEmailData', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
@@ -244,6 +273,37 @@ it('includes file attachments in the /me/sendMail payload', function (): void {
             && $attachments[0]['name'] === 'report.pdf'
             && $attachments[0]['contentType'] === 'application/pdf'
             && $attachments[0]['contentBytes'] === base64_encode('PDF-BYTES');
+    });
+});
+
+it('marks cid images as inline file attachments on sendMail', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $service->sendMessage([
+        'subject' => 'Hi',
+        'body_html' => '<p><img src="cid:logo@example.test"></p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'attachments' => [[
+            'filename' => 'logo.png',
+            'mime_type' => 'image/png',
+            'content' => 'PNG-BYTES',
+            'is_inline' => true,
+            'content_id' => 'logo@example.test',
+        ]],
+    ]);
+
+    Http::assertSent(function (Request $r): bool {
+        $attachments = $r->data()['message']['attachments'] ?? [];
+
+        return $attachments !== []
+            && $attachments[0]['isInline'] === true
+            && $attachments[0]['contentId'] === 'logo@example.test'
+            && $attachments[0]['name'] === 'logo.png'
+            && $attachments[0]['contentBytes'] === base64_encode('PNG-BYTES');
     });
 });
 

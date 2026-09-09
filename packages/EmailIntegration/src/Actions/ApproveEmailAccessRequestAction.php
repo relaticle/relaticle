@@ -33,7 +33,7 @@ final readonly class ApproveEmailAccessRequestAction
         }
 
         // Don't grant a share to a requester who is no longer in the email's team.
-        abort_unless($requester->current_team_id === $email->team_id, 403);
+        abort_unless($requester->belongsToTeamId($email->team_id), 403);
 
         $tier = EmailPrivacyTier::from($accessRequest->tier_requested);
 

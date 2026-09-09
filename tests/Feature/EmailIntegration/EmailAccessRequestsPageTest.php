@@ -117,6 +117,7 @@ describe('Tab switching', function (): void {
 describe('approveAccessRequest action', function (): void {
     it('approves a pending request and sends a notification', function (): void {
         $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+        $this->team->users()->attach($requester, ['role' => 'editor']);
 
         $request = EmailAccessRequest::factory()->pending()->create([
             'owner_id' => $this->user->id,
