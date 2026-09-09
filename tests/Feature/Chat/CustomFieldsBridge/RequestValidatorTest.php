@@ -99,7 +99,7 @@ it('returns a descriptive error for an unknown single-choice label', function ()
         ->validate($user, 'task', ['status' => 'Bananas']);
 
     expect($result->error)
-        ->toContain('status')
+        ->toContain('Status')
         ->toContain('Bananas');
 });
 
