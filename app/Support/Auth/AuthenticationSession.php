@@ -180,6 +180,13 @@ final readonly class AuthenticationSession
         ];
     }
 
+    public static function cancelOperation(string $id): void
+    {
+        if ((self::pendingOperation()['id'] ?? null) === $id) {
+            session()->forget(self::OPERATION_KEY);
+        }
+    }
+
     /**
      * Mark a minted grant as identity-proven. Proof alone never spends the grant:
      * the actual mutation (same request or a later one, e.g. the browser's own

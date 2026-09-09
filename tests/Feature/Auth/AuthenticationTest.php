@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Auth\AuthenticatePasskey;
+use App\Actions\Auth\CancelAuthentication;
 use App\Enums\AuthMethod;
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
@@ -38,7 +39,7 @@ use Symfony\Component\Uid\Uuid;
 use Webauthn\CredentialRecord;
 use Webauthn\TrustPath\EmptyTrustPath;
 
-mutates(Login::class, PasswordSessionController::class, MfaChallengeController::class);
+mutates(CancelAuthentication::class, Login::class, PasswordSessionController::class, MfaChallengeController::class);
 mutates(AuthenticatePasskey::class, PasskeySessionController::class);
 mutates(PasskeyConfirmationController::class);
 
@@ -1221,4 +1222,31 @@ test('password login always remembers the session even without a checkbox', func
 
     $this->assertAuthenticated();
     expect($user->fresh()->remember_token)->not->toBeNull();
+});
+
+test('switching accounts cancels pending MFA without authenticating', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    $this->post(route('two-factor.cancel'))
+        ->assertRedirect(route('login'))
+        ->assertSessionMissing('auth.pending')
+        ->assertSessionMissing('login.id');
+
+    $this->assertGuest();
+    $this->get(route('two-factor.login'))->assertRedirect(route('login'));
+    $this->postJson(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertUnprocessable();
+    expect($user->fresh()->recoveryCodes())->toContain('recovery-code-one');
+});
+
+test('expired sign-in MFA shows a way to start again', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->travel(11)->minutes();
+
+    $this->get(route('two-factor.login'))
+        ->assertSee(__('auth.mfa.expired'))
+        ->assertSee(__('auth.mfa.restart'))
+        ->assertDontSee('autocomplete="one-time-code"', false);
 });

@@ -34,7 +34,7 @@ final readonly class VerifyMfa
         if (! $this->consumeValidFactor($user, $code, $recoveryCode)) {
             event(new TwoFactorAuthenticationFailed($user));
 
-            throw $this->invalid($recoveryCode, __('auth.mfa.invalid'));
+            throw $this->invalid($recoveryCode, __(blank($recoveryCode) ? 'auth.mfa.code_invalid' : 'auth.mfa.recovery_invalid'));
         }
 
         event(new ValidTwoFactorAuthenticationCodeProvided($user));

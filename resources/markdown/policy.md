@@ -63,7 +63,7 @@ We protect your data with:
 ## 5. Data Retention
 
 - **Active accounts:** Data is retained as long as your account is active
-- **Deleted accounts:** Data is deleted within 30 days of account deletion
+- **Scheduled account deletions:** Accounts and their personal data are removed after a 30-day grace period. Records in shared workspaces remain.
 - **Contact form submissions:** Retained for up to 12 months
 - **Server logs:** Retained for up to 90 days
 
@@ -74,10 +74,12 @@ You have the right to:
 - **Access** your personal data at any time through the application
 - **Export** your data via the application or REST API
 - **Correct** inaccurate personal data through your profile settings
-- **Delete** your account and associated data
+- **Request deletion** of your account and personal data
 - **Object** to data processing for specific purposes
 
 To exercise these rights, email privacy@relaticle.com or use [Contact Us](/contact). We will respond within 15 business days.
+
+To request account deletion, email privacy@relaticle.com or contact us. If **Delete Account** is available in your profile settings, you can schedule deletion there.
 
 ## 7. Cookies
 

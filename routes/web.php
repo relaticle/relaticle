@@ -14,6 +14,7 @@ use App\Http\Controllers\Auth\IdentityConfirmationMfaController;
 use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
 use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
+use App\Http\Controllers\Auth\MfaChallengeController;
 use App\Http\Controllers\Auth\RedirectController;
 use App\Http\Controllers\Auth\ResendEmailChallengeController;
 use App\Http\Controllers\Auth\VerifyEmailChallengeController;
@@ -58,6 +59,9 @@ Route::middleware('guest')->group(function () {
             ->middleware('throttle:10,1,socialite-callback');
     }
 
+    Route::post('/two-factor-challenge/cancel', [MfaChallengeController::class, 'destroy'])
+        ->name('two-factor.cancel');
+
     Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
 
     Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
@@ -89,6 +93,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'show'])
         ->name('identity.confirm.mfa');
+
+    Route::post('/identity/confirm/mfa/cancel', [IdentityConfirmationMfaController::class, 'destroy'])
+        ->name('identity.confirm.mfa.cancel');
 
     Route::post('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'store'])
         ->middleware('throttle:5,1,identity-confirm-mfa')

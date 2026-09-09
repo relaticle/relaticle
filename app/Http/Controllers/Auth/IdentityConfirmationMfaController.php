@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Auth\CancelIdentityConfirmation;
 use App\Actions\Auth\CompleteIdentityMfa;
+use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\Concerns\ResolvesConfirmingUser;
+use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -22,9 +25,24 @@ final readonly class IdentityConfirmationMfaController
 
     public function __construct(private CompleteIdentityMfa $completeIdentityMfa) {}
 
-    public function show(): View
+    public function show(Request $request): View
     {
-        return view('auth.confirm-identity-mfa');
+        $user = $this->user($request);
+
+        return view('auth.confirm-identity-mfa', [
+            'account' => $user->email,
+            'expired' => ! IdentityConfirmation::mfaPendingFor($user),
+        ]);
+    }
+
+    public function destroy(Request $request, CancelIdentityConfirmation $cancelIdentityConfirmation): Response
+    {
+        $user = $this->user($request);
+        $cancelIdentityConfirmation->execute($user);
+
+        return $user->currentTeam === null
+            ? to_route('dashboard')
+            : redirect()->to(Security::getUrl(['tenant' => $user->currentTeam], panel: 'app'));
     }
 
     public function store(Request $request): Response

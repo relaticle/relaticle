@@ -70,6 +70,12 @@ return [
             'status_disabled' => 'Two-factor authentication is off. Turn it on to protect your account if your password is ever stolen.',
             'enable' => 'Turn on',
             'disable' => 'Turn off',
+            'identity_description' => 'Confirm your identity before setting up your authenticator app.',
+            'continue' => 'Continue',
+            'setup_heading' => 'Set up your authenticator app',
+            'verify' => 'Verify and turn on',
+            'recovery_save_heading' => 'Save your recovery codes',
+            'recovery_saved' => 'I have saved my recovery codes',
             'enable_heading' => 'Turn on two-factor authentication',
             'enable_description' => 'Scan the code with your authenticator app, then enter the six-digit code it shows.',
             'disable_heading' => 'Turn off two-factor authentication',
@@ -165,6 +171,8 @@ return [
             'description' => 'Confirm it\'s you to log out of your other browser sessions across all of your devices.',
         ],
     ],
+
+    'security' => 'Security',
 
     'edit_profile' => 'Edit Profile',
 

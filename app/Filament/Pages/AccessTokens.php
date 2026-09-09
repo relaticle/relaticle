@@ -21,7 +21,7 @@ final class AccessTokens extends Page
 
     protected static ?string $slug = 'access-tokens';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 

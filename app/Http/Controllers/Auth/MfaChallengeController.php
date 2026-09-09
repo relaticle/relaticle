@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Auth\CancelAuthentication;
 use App\Actions\Auth\VerifyMfa;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
@@ -26,10 +27,21 @@ final readonly class MfaChallengeController
         if (! $request->hasSession() || ! $user instanceof User || ! AuthenticationSession::isValidFor($user) || ! $user->hasEnabledTwoFactorAuthentication()) {
             AuthenticationSession::clear();
 
+            if ($pending !== [] || session('errors')?->hasAny(['code', 'recovery_code'])) {
+                return view('auth.mfa-challenge', ['account' => null, 'expired' => true]);
+            }
+
             return to_route('login');
         }
 
-        return view('auth.mfa-challenge');
+        return view('auth.mfa-challenge', ['account' => $user->email, 'expired' => false]);
+    }
+
+    public function destroy(CancelAuthentication $cancelAuthentication): RedirectResponse
+    {
+        $cancelAuthentication->execute();
+
+        return to_route('login');
     }
 
     public function store(TwoFactorLoginRequest $request): Response

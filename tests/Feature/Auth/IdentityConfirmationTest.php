@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\CancelIdentityConfirmation;
 use App\Actions\Auth\CompleteIdentityMfa;
 use App\Enums\SocialiteProvider;
+use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\IdentityConfirmationController;
 use App\Http\Controllers\Auth\IdentityConfirmationMfaController;
 use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
@@ -19,6 +21,7 @@ use Webauthn\CredentialRecord;
 use Webauthn\TrustPath\EmptyTrustPath;
 
 mutates(
+    CancelIdentityConfirmation::class,
     IdentityConfirmationController::class,
     IdentityConfirmationMfaController::class,
     IdentityConfirmationRedirectController::class,
@@ -77,12 +80,13 @@ test('the confirm-identity page offers a linked provider for a passwordless user
 });
 
 test('the confirm-identity mfa page renders', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $this->actingAs($user);
+    IdentityConfirmation::markMfaPending($user, null);
 
     $this->get(route('identity.confirm.mfa'))
         ->assertOk()
-        ->assertSee(__('auth.mfa.heading'))
+        ->assertSee(__('auth.confirm.heading'))
         ->assertSee('autocomplete="one-time-code"', false)
         ->assertDontSee('name="recovery_code"', false);
 
@@ -182,4 +186,36 @@ test('a session that never completed login MFA can still reach the provider re-a
         ->assertRedirectContains('accounts.google.com');
 
     $this->assertAuthenticatedAs($user);
+});
+
+test('cancelling identity MFA preserves authentication and revokes its operation', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    $grant = AuthenticationSession::startOperation($user, 'manage_mfa', null);
+    IdentityConfirmation::markMfaPending($user, $grant);
+
+    $this->post(route('identity.confirm.mfa.cancel'))
+        ->assertRedirect(Security::getUrl(['tenant' => $user->currentTeam], panel: 'app'));
+
+    $this->assertAuthenticatedAs($user);
+    expect(AuthenticationSession::pendingOperation())->toBe([])
+        ->and(AuthenticationSession::completeFor($user))->toBeTrue()
+        ->and(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
+    $this->postJson(route('identity.confirm.mfa.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertUnprocessable();
+});
+
+test('cancelling identity MFA does not revoke an operation started in another tab', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    $grant = AuthenticationSession::startOperation($user, 'manage_mfa', null);
+    IdentityConfirmation::markMfaPending($user, $grant);
+    $otherGrant = AuthenticationSession::startOperation($user, 'add_passkey', null);
+
+    $this->post(route('identity.confirm.mfa.cancel'))->assertRedirect();
+
+    expect(AuthenticationSession::pendingOperation()['id'])->toBe($otherGrant)
+        ->and(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
 });

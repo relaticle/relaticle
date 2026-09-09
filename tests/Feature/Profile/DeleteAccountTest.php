@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\SocialiteProvider;
+use App\Features\AccountDeletion;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
@@ -12,11 +13,56 @@ use App\Support\Auth\IdentityConfirmation;
 use Filament\Actions\Testing\TestAction;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Passkeys\Passkey;
+use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 
 mutates(DeleteAccount::class, User::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
+
+beforeEach(function (): void {
+    Feature::define(AccountDeletion::class, true);
+});
+
+test('account deletion cannot be opened when the feature is disabled', function (): void {
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    Feature::deactivate(AccountDeletion::class);
+
+    Livewire::test(DeleteAccount::class)->assertForbidden();
+});
+
+test('an open deletion form cannot submit after the feature is disabled', function (): void {
+    Notification::fake();
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    session()->put('auth.password_confirmed_at', time());
+    $component = Livewire::test(DeleteAccount::class);
+    Feature::deactivate(AccountDeletion::class);
+
+    $component->call('deleteAccount')->assertForbidden();
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull()
+        ->and($user->personalTeam()->scheduled_deletion_at)->toBeNull();
+    Notification::assertNothingSent();
+});
+
+test('the legacy deletion form cannot bypass the disabled feature', function (): void {
+    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    Feature::deactivate(AccountDeletion::class);
+
+    Livewire::test('profile.delete-user-form')->assertForbidden();
+});
+
+test('the legacy deletion form uses the confirmed deletion schedule when enabled', function (): void {
+    Notification::fake();
+    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+
+    Livewire::test('profile.delete-user-form')
+        ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])
+        ->assertRedirect();
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
+    Notification::assertSentTo($user, UserDeletionScheduledNotification::class);
+});
 
 test('schedules deletion after a fresh confirmation', function (): void {
     Notification::fake();

@@ -142,7 +142,7 @@ final readonly class IdentityConfirmation
     {
         if (! self::verifyMfaCode($user, $code, $recoveryCode)) {
             throw ValidationException::withMessages([
-                blank($recoveryCode) ? 'code' : 'recovery_code' => [__('auth.mfa.invalid')],
+                blank($recoveryCode) ? 'code' : 'recovery_code' => [__(blank($recoveryCode) ? 'auth.mfa.code_invalid' : 'auth.mfa.recovery_invalid')],
             ]);
         }
     }

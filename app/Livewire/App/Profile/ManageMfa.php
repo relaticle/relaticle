@@ -26,22 +26,11 @@ use Laravel\Fortify\Fortify;
 use Livewire\Attributes\Locked;
 use Throwable;
 
-/**
- * Enrolment and removal for the second factor, the surface the rest of the
- * authentication work assumed existed. Every write here mints and spends a
- * `manage_mfa` grant, so the same proof the direct Fortify routes demand is
- * demanded here too.
- */
 final class ManageMfa extends BaseLivewireComponent
 {
     #[Locked]
     public bool $enabled = false;
 
-    /**
-     * Held only while the enrolment modal is open, and only after identity was
-     * proven. The secret is not a credential until the user confirms a code
-     * against it, but it still never reaches the page before that proof.
-     */
     #[Locked]
     public ?string $pendingQrSvg = null;
 
@@ -79,29 +68,20 @@ final class ManageMfa extends BaseLivewireComponent
         $this->enabled = $this->authUser()->hasEnabledTwoFactorAuthentication();
     }
 
-    /**
-     * Generates the secret only once identity is proven, then holds it in
-     * component state until the user confirms a code. An abandoned modal
-     * leaves the account exactly as it was: the secret is written but
-     * `two_factor_confirmed_at` stays null, so nothing is enforced yet.
-     */
     public function enableMfaAction(): ConfirmIdentityAction
     {
         return ConfirmIdentityAction::make('enableMfa')
             ->label(__('profile.sections.mfa.enable'))
             ->modalHeading(__('profile.sections.mfa.enable_heading'))
-            ->modalDescription(__('profile.sections.mfa.enable_description'))
+            ->modalDescription(__('profile.sections.mfa.identity_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
             ->operation('manage_mfa')
             ->visible(fn (): bool => ! $this->enabled)
-            ->modalSubmitActionLabel(__('profile.sections.mfa.enable'))
+            ->modalSubmitActionLabel(__('profile.sections.mfa.continue'))
             ->confirmedUsing(function (): void {
                 $user = $this->authUser();
 
-                // Spend the grant before writing the secret: the fingerprint binds
-                // two_factor_secret, so generating one invalidates the grant that
-                // authorized it and nothing downstream could ever consume it.
                 AuthenticationSession::consumeOperation($user, 'manage_mfa', null);
 
                 resolve(EnableTwoFactorAuthentication::class)($user, force: true);
@@ -110,24 +90,24 @@ final class ManageMfa extends BaseLivewireComponent
                 $this->pendingQrSvg = $fresh?->twoFactorQrCodeSvg();
                 $this->pendingSecret = Fortify::currentEncrypter()->decrypt((string) $fresh?->two_factor_secret);
 
-                // Close this modal rather than halting it: a still-mounted action
-                // makes the follow-up confirm resolve as a nested action inside it.
-                $this->unmountAction();
+                $this->replaceMountedAction('confirmMfa');
             });
     }
 
-    /**
-     * Spends the grant minted by the enrolment modal at the moment the second
-     * factor actually starts being enforced, never earlier.
-     */
     public function confirmMfaAction(): Action
     {
         return Action::make('confirmMfa')
             ->label(__('profile.sections.mfa.confirm'))
-            ->modalHeading(__('profile.sections.mfa.enable_heading'))
+            ->modalHeading(__('profile.sections.mfa.setup_heading'))
+            ->modalDescription(__('profile.sections.mfa.enable_description'))
             ->modalWidth(Width::Medium)
+            ->closeModalByClickingAway(false)
+            ->visible(fn (): bool => $this->pendingSecret !== null && ! $this->enabled)
+            ->modalContent(fn (): View => view('components.mfa-setup'))
+            ->modalSubmitActionLabel(__('profile.sections.mfa.verify'))
             ->schema([
                 OneTimeCodeInput::make('code')
+                    ->autofocus()
                     ->label(__('profile.sections.mfa.code_label'))
                     ->required()
                     ->rule($this->pendingCodeRule()),
@@ -138,12 +118,46 @@ final class ManageMfa extends BaseLivewireComponent
                 $this->pendingQrSvg = null;
                 $this->pendingSecret = null;
                 $this->refreshState();
+                $this->revealedRecoveryCodes = $this->readRecoveryCodes();
+                $this->replaceMountedAction('saveRecoveryCodes');
 
                 Notification::make()
                     ->title(__('profile.sections.mfa.enabled_notification'))
                     ->success()
                     ->send();
             });
+    }
+
+    public function saveRecoveryCodesAction(): Action
+    {
+        return Action::make('saveRecoveryCodes')
+            ->modalHeading(__('profile.sections.mfa.recovery_save_heading'))
+            ->modalDescription(__('profile.sections.mfa.recovery_description'))
+            ->modalWidth(Width::Medium)
+            ->closeModalByClickingAway(false)
+            ->visible(fn (): bool => $this->enabled && $this->revealedRecoveryCodes !== [])
+            ->modalContent(fn (): View => view('components.mfa-recovery-codes'))
+            ->modalSubmitActionLabel(__('profile.sections.mfa.recovery_saved'))
+            ->modalCancelAction(false)
+            ->action(function (): void {
+                $this->revealedRecoveryCodes = [];
+            });
+    }
+
+    public function unmountAction(bool|string|null $cancelParentActions = null): void
+    {
+        $finishingEnrollment = $this->getMountedAction()?->getName() === 'saveRecoveryCodes';
+
+        parent::unmountAction($cancelParentActions);
+
+        if ($this->mountedActions === []) {
+            $this->pendingQrSvg = null;
+            $this->pendingSecret = null;
+
+            if ($finishingEnrollment) {
+                $this->revealedRecoveryCodes = [];
+            }
+        }
     }
 
     public function disableMfaAction(): ConfirmIdentityAction
@@ -237,10 +251,6 @@ final class ManageMfa extends BaseLivewireComponent
         }
     }
 
-    /**
-     * Reads the secret through a closure, not a captured value: the action is
-     * built before enrolment generates one, so a snapshot would always be null.
-     */
     private function pendingCodeRule(): ValidationRule
     {
         return new readonly class(fn (): ?string => $this->pendingSecret) implements ValidationRule
