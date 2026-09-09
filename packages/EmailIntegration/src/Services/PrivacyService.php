@@ -59,10 +59,14 @@ final readonly class PrivacyService
     }
 
     /**
-     * Resolve the default tier to stamp on a newly synced email.
+     * Resolve the default tier to stamp on a newly created email.
      * User preference wins over workspace default.
+     *
+     * Pass the mailbox's workspace for background sync. `$user->current_team_id` is
+     * only the owner's currently selected workspace, so using it for imports would
+     * stamp another team's default onto this mailbox.
      */
-    public function defaultTierForUser(User $user): EmailPrivacyTier
+    public function defaultTierForUser(User $user, ?Team $workspace = null): EmailPrivacyTier
     {
         if ($user->default_email_sharing_tier) {
             return $user->default_email_sharing_tier;
@@ -71,7 +75,7 @@ final readonly class PrivacyService
         // Resolve the team explicitly (instead of $user->currentTeam, whose accessor
         // larastan types as never-null and which can auto-switch teams as a side
         // effect) so the null case, a user without a current team, is handled.
-        $team = $user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null;
+        $team = $workspace ?? ($user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null);
 
         if ($team === null) {
             return EmailPrivacyTier::METADATA_ONLY;
