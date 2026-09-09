@@ -17,25 +17,6 @@ use Webauthn\Exception\WebauthnException;
 use Webauthn\PublicKeyCredential;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
-/**
- * Scoped proof of identity for one sensitive operation. Verifies a fresh primary
- * proof (password, passkey, or an already-linked provider re-authenticated in
- * this same request) and, for enrolled MFA, a second factor, before confirming.
- *
- * A null attempt id serves only the generic 15-minute confirmation window
- * (Fortify's confirm-password page reached without a specific operation in
- * flight); a real attempt id must match the operation grant minted server-side
- * by AuthenticationSession::startOperation(), and that grant is consumed here,
- * never before.
- *
- * execute() returns the MFA continuation URL when a second factor is still
- * required, or an empty string once confirmation is complete; the redirect
- * destination in the success case is the caller's own concern (an HTTP
- * confirm-password endpoint has one, a Livewire modal does not). A passkey
- * ceremony that reaches this pending state completes through the sibling
- * CompleteIdentityMfa action instead, since the browser ceremony has no way to
- * collect an inline MFA code.
- */
 final readonly class ConfirmIdentity
 {
     public function __construct(private VerifyPasskey $verifyPasskey) {}
@@ -49,7 +30,7 @@ final readonly class ConfirmIdentity
 
         $this->verifyPrimaryProof($user, $method, $proof);
 
-        if ($user->hasEnabledTwoFactorAuthentication()) {
+        if ($method !== AuthMethod::PASSKEY && $user->hasEnabledTwoFactorAuthentication()) {
             $code = $proof['code'] ?? null;
             $recoveryCode = $proof['recovery_code'] ?? null;
 

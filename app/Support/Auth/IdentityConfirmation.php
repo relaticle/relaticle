@@ -69,14 +69,6 @@ final readonly class IdentityConfirmation
         return Hash::check($password, (string) $user->password);
     }
 
-    /**
-     * A passkey ceremony can supply its primary proof without an inline MFA code
-     * (the browser ceremony has nowhere to collect one); this marks the second
-     * factor as outstanding so a follow-up request can supply it alone. Binding
-     * to the operation grant's id (if any) lets the follow-up detect a grant
-     * minted by a second, unrelated modal silently taking over the single
-     * session slot while this MFA code was outstanding.
-     */
     public static function markMfaPending(User $user, ?string $operationGrantId): void
     {
         session()->put(self::MFA_PENDING_KEY, [

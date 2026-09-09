@@ -65,7 +65,7 @@ return [
         ],
         'mfa' => [
             'title' => 'Two-factor authentication',
-            'description' => 'Require a code from your authenticator app when you sign in.',
+            'description' => 'Require an authenticator code when you sign in without a passkey.',
             'status_enabled' => 'Two-factor authentication is on.',
             'status_disabled' => 'Two-factor authentication is off. Turn it on to protect your account if your password is ever stolen.',
             'enable' => 'Turn on',

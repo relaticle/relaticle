@@ -127,11 +127,12 @@ test('the mfa follow-up rejects a submission with no pending marker', function (
     expect(session('auth.password_confirmed_at'))->toBeNull();
 });
 
-test('the mfa follow-up completes a pending passkey ceremony with the correct code', function () {
+test('the mfa follow-up completes a pending password confirmation with the correct code', function (): void {
     $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
-    IdentityConfirmation::markMfaPending($user, null);
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('identity.confirm.mfa'));
 
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $code = resolve(Google2FA::class)->getCurrentOtp($secret);
@@ -143,11 +144,12 @@ test('the mfa follow-up completes a pending passkey ceremony with the correct co
     expect(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
 });
 
-test('the mfa follow-up accepts a recovery code for a pending passkey ceremony', function () {
+test('the mfa follow-up accepts a recovery code for a pending password confirmation', function (): void {
     $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
-    IdentityConfirmation::markMfaPending($user, null);
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('identity.confirm.mfa'));
 
     $this->post(route('identity.confirm.mfa.store'), ['recovery_code' => 'recovery-code-one'])
         ->assertRedirect();
@@ -156,11 +158,12 @@ test('the mfa follow-up accepts a recovery code for a pending passkey ceremony',
     expect(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
 });
 
-test('the mfa follow-up rejects an incorrect code for a pending passkey ceremony', function () {
+test('the mfa follow-up rejects an incorrect code for a pending password confirmation', function (): void {
     $user = User::factory()->withTeam()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
-    IdentityConfirmation::markMfaPending($user, null);
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('identity.confirm.mfa'));
 
     $this->post(route('identity.confirm.mfa.store'), ['code' => '000000'])
         ->assertSessionHasErrors('code');

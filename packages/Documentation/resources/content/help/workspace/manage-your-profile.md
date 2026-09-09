@@ -47,15 +47,21 @@ click into it.
 ## Confirming it's you
 
 Sensitive changes ask you to confirm your identity with a passkey or password.
-If you use two-factor authentication, you also enter an authentication code.
+A passkey confirms your identity with your fingerprint, face, or device PIN.
+If you use a password and have two-factor authentication enabled, also enter an authenticator code.
 
 If you only sign in with Google or Microsoft, confirm through that provider.
+You also enter an authenticator code if you have two-factor authentication enabled.
 
 ## Two-factor authentication
 
 In **Security**, choose **Turn on** under **Two-factor authentication**.
 Confirm your identity, scan the code with your authenticator app, and enter its six-digit code.
 Save your recovery codes before closing the setup modal.
+
+Signing in with a passkey satisfies two-factor authentication without an extra authenticator code.
+Signing in with a password, Google, or Microsoft still requires an authenticator code.
+Use a recovery code if you cannot access your authenticator app.
 
 ## Browser sessions
 

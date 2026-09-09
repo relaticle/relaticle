@@ -14,11 +14,6 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * The MFA follow-up to IdentityConfirmationController, reached only when a
- * passkey ceremony proved its primary factor but enrolled MFA is still owed
- * (the browser ceremony has no field to collect a code inline).
- */
 final readonly class IdentityConfirmationMfaController
 {
     use ResolvesConfirmingUser;

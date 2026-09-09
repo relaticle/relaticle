@@ -16,13 +16,6 @@ use Laravel\Passkeys\Actions\GenerateVerificationOptions;
 use Laravel\Passkeys\Http\Requests\PasskeyVerificationRequest;
 use Laravel\Passkeys\Support\WebAuthn;
 
-/**
- * Replaces the vendor PasskeyConfirmationController via container binding. The
- * vendor controller calls $session->passwordConfirmed() directly once the
- * assertion verifies; ours routes the same proof through ConfirmIdentity so
- * enrolled MFA and a scoped operation grant are applied identically to every
- * other confirmation path.
- */
 final readonly class PasskeyConfirmationController
 {
     public function __construct(private ConfirmIdentity $confirmIdentity) {}

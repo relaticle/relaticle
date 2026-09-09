@@ -9,12 +9,6 @@ use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Completes a confirmation whose primary proof (necessarily a passkey ceremony:
- * every other method can supply its MFA proof in the same request as
- * ConfirmIdentity::execute()) already succeeded and is awaiting only the
- * second factor.
- */
 final readonly class CompleteIdentityMfa
 {
     public function execute(User $user, ?string $code, ?string $recoveryCode): void

@@ -17,7 +17,7 @@ final readonly class BeginAuthentication
     {
         AuthenticationSession::begin($user, $method, $credentialId, $remember);
 
-        if ($user->hasEnabledTwoFactorAuthentication()) {
+        if ($method !== AuthMethod::PASSKEY && $user->hasEnabledTwoFactorAuthentication()) {
             event(new TwoFactorAuthenticationChallenged($user));
 
             return route('two-factor.login');
