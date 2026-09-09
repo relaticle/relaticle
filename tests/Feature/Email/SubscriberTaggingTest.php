@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Jobs\Email\SyncSubscriberJob;
+use App\Models\AiSummary;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     Queue::fake([SyncSubscriberJob::class]);
@@ -94,3 +96,40 @@ test('creating a second personal access token does not dispatch again', function
 
     Queue::assertNotPushed(SyncSubscriberJob::class);
 });
+
+test('creating the first ai summary dispatches a profile sync', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    $this->actingAs($user);
+
+    createAiSummaryForTeam($user->currentTeam->id);
+
+    Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
+});
+
+test('creating a second ai summary does not dispatch a sync again', function (): void {
+    $user = User::factory()->withTeam()->create();
+
+    $this->actingAs($user);
+
+    createAiSummaryForTeam($user->currentTeam->id);
+
+    Queue::fake([SyncSubscriberJob::class]);
+
+    createAiSummaryForTeam($user->currentTeam->id);
+
+    Queue::assertNotPushed(SyncSubscriberJob::class);
+});
+
+function createAiSummaryForTeam(string $teamId): AiSummary
+{
+    return AiSummary::query()->create([
+        'team_id' => $teamId,
+        'summarizable_type' => 'email_thread',
+        'summarizable_id' => (string) Str::ulid(),
+        'summary' => 'Follow up next week.',
+        'model_used' => 'gpt-4o-mini',
+        'prompt_tokens' => 10,
+        'completion_tokens' => 5,
+    ]);
+}
