@@ -24,7 +24,7 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
-mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
+mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, Email::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -270,7 +270,8 @@ it('inline composer prefills reply-all and forward from their modes', function (
         ->assertSet('subject', 'Fwd: Original Subject')
         // A forward has no recipient yet, and does not thread against the original.
         ->assertSet('to', [])
-        ->assertSet('inReplyToEmailId', null);
+        ->assertSet('inReplyToEmailId', null)
+        ->assertSet('quotedBodyHtml', '<p>Original body</p>');
 });
 
 it('a reply saved as a draft still threads when it is sent later', function (): void {
@@ -297,6 +298,150 @@ it('a reply saved as a draft still threads when it is sent later', function (): 
 
     expect($reply->in_reply_to)->toBe($this->inboundEmail->rfc_message_id)
         ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id);
+});
+
+it('includes the original plain-text body when quoting a reply or forward', function (string $mode, string $marker): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => "Please review the invoice by Friday.\nThanks, Acme Billing",
+    ]);
+
+    $composer = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, $mode)
+        ->set('bodyHtml', '<p>FYI</p>');
+
+    if ($mode === 'forward') {
+        $composer->set('to', ['forward-to@example.com']);
+    }
+
+    $composer->call('send')->assertHasNoErrors();
+
+    $outbound = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->firstOrFail();
+
+    expect($outbound->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('Thanks, Acme Billing')
+        ->toContain($marker);
+})->with([
+    'reply' => ['reply', 'blockquote'],
+    'forward' => ['forward', '---------- Forwarded message ----------'],
+]);
+
+it('escapes html in a plain-text original when quoting a forward', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => '<script>alert(1)</script>Please pay',
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>FYI</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $html = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail()
+        ->body
+        ->body_html;
+
+    expect($html)
+        ->toContain('Please pay')
+        ->toContain('alert(1)')
+        ->not->toContain('<script>alert(1)</script>');
+});
+
+it('restores the plain-text original when a saved forward is reopened', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>FYI</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    $composer = livewire(EmailComposer::class)
+        ->call('open', [], $draftId);
+
+    expect($composer->get('quotedBodyHtml'))
+        ->toContain('Please review the invoice by Friday.');
+
+    $composer->assertSee('Please review the invoice by Friday.');
+});
+
+it('includes the original plain-text body when forwarding from the relation manager', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['forward-to@example.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Fwd: Original Subject',
+                'body_html' => '<p>FYI</p>',
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'forward'],
+        );
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail();
+
+    expect($forward->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('---------- Forwarded message ----------');
+});
+
+it('includes the original plain-text body when forwarding from the inbox', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['forward-to@example.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Fwd: Original Subject',
+                'body_html' => '<p>FYI</p>',
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'forward'],
+        );
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail();
+
+    expect($forward->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('---------- Forwarded message ----------');
 });
 
 it('a forward saved as a draft keeps its source without threading against it', function (): void {
