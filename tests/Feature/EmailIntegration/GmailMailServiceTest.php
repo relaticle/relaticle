@@ -9,10 +9,14 @@ use Google\Service\Gmail\HistoryLabelAdded;
 use Google\Service\Gmail\HistoryLabelRemoved;
 use Google\Service\Gmail\HistoryMessageAdded;
 use Google\Service\Gmail\ListHistoryResponse;
+use Google\Service\Gmail\ListMessagesResponse;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartBody;
 use Google\Service\Gmail\MessagePartHeader;
+use Google\Service\Gmail\Profile;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
@@ -587,4 +591,99 @@ it('does not treat other Gmail history HTTP errors as an expired cursor', functi
 
     expect(fn () => new GmailService($account, $gmail)->fetchDelta('history-1'))
         ->toThrow(GoogleServiceException::class);
+});
+
+it('classifies a DRAFT-labeled message as an inbound draft', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $payload = new MessagePart;
+    $payload->setHeaders([
+        new MessagePartHeader(['name' => 'Message-ID', 'value' => '<draft@example.test>']),
+        new MessagePartHeader(['name' => 'Subject', 'value' => 'Unsent']),
+        new MessagePartHeader(['name' => 'From', 'value' => 'Owner <owner@example.test>']),
+        new MessagePartHeader(['name' => 'To', 'value' => 'Prospect <prospect@example.test>']),
+    ]);
+    $payload->setParts([]);
+
+    $message = new Message([
+        'id' => 'gmail-draft-1',
+        'threadId' => 'gmail-thread-draft',
+        'internalDate' => (string) (now()->timestamp * 1000),
+        'labelIds' => ['DRAFT'],
+        'snippet' => 'Unsent',
+    ]);
+    $message->setPayload($payload);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('get')
+        ->once()
+        ->with('me', 'gmail-draft-1', ['format' => 'full'])
+        ->andReturn($message);
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users_messages = $messages;
+
+    $data = new GmailService($account, $gmail)->fetchMessage('gmail-draft-1');
+
+    expect($data->direction)->toBe(EmailDirection::INBOUND)
+        ->and($data->folder)->toBe(EmailFolder::Drafts);
+});
+
+it('excludes drafts from the initial backfill listing', function (): void {
+    $account = ConnectedAccount::factory()->make();
+    $captured = [];
+
+    $profile = new Profile;
+    $profile->setHistoryId('1000');
+
+    $users = Mockery::mock();
+    $users->shouldReceive('getProfile')->once()->with('me')->andReturn($profile);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('listUsersMessages')
+        ->once()
+        ->andReturnUsing(function (string $userId, array $params) use (&$captured): ListMessagesResponse {
+            $captured = ['userId' => $userId, 'params' => $params];
+
+            return new ListMessagesResponse;
+        });
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users = $users;
+    $gmail->users_messages = $messages;
+
+    new GmailService($account, $gmail)->initialBackfill();
+
+    expect($captured['userId'])->toBe('me')
+        ->and($captured['params']['q'])->toBe('-in:drafts');
+});
+
+it('keeps the draft exclusion when the initial backfill is date-capped', function (): void {
+    $this->travelTo('2026-09-09 12:00:00');
+
+    $account = ConnectedAccount::factory()->make();
+    $captured = [];
+
+    $profile = new Profile;
+    $profile->setHistoryId('1000');
+
+    $users = Mockery::mock();
+    $users->shouldReceive('getProfile')->once()->with('me')->andReturn($profile);
+
+    $messages = Mockery::mock();
+    $messages->shouldReceive('listUsersMessages')
+        ->once()
+        ->andReturnUsing(function (string $userId, array $params) use (&$captured): ListMessagesResponse {
+            $captured = $params;
+
+            return new ListMessagesResponse;
+        });
+
+    $gmail = Mockery::mock(Gmail::class);
+    $gmail->users = $users;
+    $gmail->users_messages = $messages;
+
+    new GmailService($account, $gmail)->initialBackfill(90);
+
+    expect($captured['q'])->toBe('-in:drafts after:1781179200');
 });
