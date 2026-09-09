@@ -55,6 +55,7 @@ it('rejects an unknown label and lists the valid ones', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Bad', 'custom_fields' => ['status' => 'Blocked']])
         ->assertHasErrors()
+        ->assertSee('Status: option')
         ->assertSee('To do, In progress, Done');
 });
 
@@ -69,7 +70,28 @@ it('rejects a label shared by two options and asks for the id', function (): voi
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Ambiguous', 'custom_fields' => ['status' => 'done']])
         ->assertHasErrors()
+        ->assertSee('Status: option')
         ->assertSee('ambiguous');
+});
+
+it('rejects a nested value in a multi-select field', function (): void {
+    CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'markets',
+        'name' => 'Markets',
+        'type' => 'multi-select',
+        'sort_order' => 50,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Nested', 'custom_fields' => ['markets' => [['EU']]]])
+        ->assertHasErrors()
+        ->assertSee('Markets')
+        ->assertSee('array of option labels');
 });
 
 it('updates a multi-select field from mixed labels and ids', function (): void {

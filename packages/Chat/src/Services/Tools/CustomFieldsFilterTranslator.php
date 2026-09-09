@@ -110,7 +110,7 @@ final readonly class CustomFieldsFilterTranslator
 
         if ($this->optionMap->isAmbiguous($entry, $value)) {
             throw ValidationException::withMessages([
-                'custom_fields' => __('validation.custom_field.ambiguous_option', ['value' => $value]),
+                'custom_fields' => __('validation.custom_field.ambiguous_option', ['field' => $code, 'value' => $value]),
             ]);
         }
 

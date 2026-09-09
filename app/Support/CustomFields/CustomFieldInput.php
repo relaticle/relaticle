@@ -88,7 +88,7 @@ final readonly class CustomFieldInput
         }
 
         if (! is_string($value) && ! is_int($value)) {
-            $this->fail($field, __('validation.custom_field.single_option'));
+            $this->fail($field, __('validation.custom_field.single_option', ['field' => $field->name]));
         }
 
         return $this->resolveOption($field, (string) $value, $entry);
@@ -104,11 +104,17 @@ final readonly class CustomFieldInput
         }
 
         if (! is_array($value)) {
-            $this->fail($field, __('validation.custom_field.option_list'));
+            $this->fail($field, __('validation.custom_field.option_list', ['field' => $field->name]));
         }
 
         return array_values(array_map(
-            fn (mixed $item): string => $this->resolveOption($field, (string) $item, $entry),
+            function (mixed $item) use ($field, $entry): string {
+                if (! is_string($item) && ! is_int($item)) {
+                    $this->fail($field, __('validation.custom_field.option_list', ['field' => $field->name]));
+                }
+
+                return $this->resolveOption($field, (string) $item, $entry);
+            },
             $value,
         ));
     }
@@ -125,13 +131,14 @@ final readonly class CustomFieldInput
         }
 
         if ($this->optionMap->isAmbiguous($entry, $value)) {
-            $this->fail($field, __('validation.custom_field.ambiguous_option', ['value' => $value]));
+            $this->fail($field, __('validation.custom_field.ambiguous_option', ['field' => $field->name, 'value' => $value]));
         }
 
         $id = $this->optionMap->idFor($entry, $value);
 
         if ($id === null) {
             $this->fail($field, __('validation.custom_field.unknown_option', [
+                'field' => $field->name,
                 'value' => $value,
                 'labels' => implode(', ', $entry['labels']),
             ]));
