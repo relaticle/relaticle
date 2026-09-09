@@ -48,6 +48,7 @@ final readonly class SendEmailAction
      *     priority?: EmailPriority,
      *     attachments?: array<int, string>,
      *     attachment_file_names?: array<string, string>,
+     *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
      * }  $data
      * @param  class-string|null  $linkToType
      */
@@ -73,7 +74,13 @@ final readonly class SendEmailAction
         /** @var array<int, string> $attachmentPaths */
         $attachmentPaths = array_values($data['attachments'] ?? []);
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths): Email {
+        /** @var array<string, array{is_inline?: bool, content_id?: ?string}> $attachmentAttributes */
+        $attachmentAttributes = $data['attachment_attributes'] ?? [];
+
+        $hasDownloadableAttachments = collect($attachmentPaths)
+            ->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true);
+
+        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $hasDownloadableAttachments): Email {
             // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives
             // from a client-controlled hidden field and Email has no team global scope,
             // so an unscoped lookup would let a user thread their outbound mail onto
@@ -114,7 +121,7 @@ final readonly class SendEmailAction
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
                 'privacy_tier' => $data['privacy_tier'],
-                'has_attachments' => $attachmentPaths !== [],
+                'has_attachments' => $hasDownloadableAttachments,
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],
                 'batch_id' => $data['batch_id'] ?? null,
@@ -145,7 +152,7 @@ final readonly class SendEmailAction
                 }
             }
 
-            $this->storeAttachments($email, $attachmentPaths, $data['attachment_file_names'] ?? []);
+            $this->storeAttachments($email, $attachmentPaths, $data['attachment_file_names'] ?? [], $attachmentAttributes);
 
             if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
                 $linked = $linkToType::query()->whereKey($linkToId)->first();
@@ -168,8 +175,9 @@ final readonly class SendEmailAction
      *
      * @param  array<int, string>  $paths
      * @param  array<string, string>  $originalNames  storage path => original client filename
+     * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attributes
      */
-    private function storeAttachments(Email $email, array $paths, array $originalNames): void
+    private function storeAttachments(Email $email, array $paths, array $originalNames, array $attributes): void
     {
         $disk = Storage::disk(EmailAttachment::DISK);
 
@@ -184,6 +192,8 @@ final readonly class SendEmailAction
                 'mime_type' => $disk->mimeType($path) ?: 'application/octet-stream',
                 'size' => $disk->size($path),
                 'storage_path' => $path,
+                'is_inline' => $attributes[$path]['is_inline'] ?? false,
+                'content_id' => $attributes[$path]['content_id'] ?? null,
             ]);
         }
     }

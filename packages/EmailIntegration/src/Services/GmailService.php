@@ -212,6 +212,7 @@ final readonly class GmailService implements MailServiceInterface
      *     in_reply_to?: string,
      *     thread_id?: string,
      *     rfc_message_id?: string,
+     *     attachments?: array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>,
      * } $data
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
      */
@@ -293,12 +294,20 @@ final readonly class GmailService implements MailServiceInterface
         }
 
         $attachments = $data['attachments'] ?? [];
+        $inlineAttachments = [];
+        $fileAttachments = [];
+
+        foreach ($attachments as $attachment) {
+            if (($attachment['is_inline'] ?? false) === true && filled($attachment['content_id'] ?? null)) {
+                $inlineAttachments[] = $attachment;
+            } else {
+                $fileAttachments[] = $attachment;
+            }
+        }
 
         $headers[] = 'Subject: =?UTF-8?B?'.base64_encode((string) $data['subject']).'?=';
         $headers[] = 'MIME-Version: 1.0';
-        $headers[] = $attachments === []
-            ? 'Content-Type: multipart/alternative; boundary="boundary_relaticle"'
-            : 'Content-Type: multipart/mixed; boundary="mixed_relaticle"';
+        $headers[] = $this->rootContentTypeHeader($inlineAttachments !== [], $fileAttachments !== []);
         $headers[] = 'Date: '.now()->toRfc2822String();
 
         // Stamp our own Message-ID so a retry can find an already-sent copy via
@@ -322,28 +331,81 @@ final readonly class GmailService implements MailServiceInterface
             .($data['body_html'] ?? '')."\r\n\r\n"
             .'--boundary_relaticle--';
 
-        if ($attachments === []) {
+        if ($inlineAttachments === [] && $fileAttachments === []) {
             return implode("\r\n", $headers)."\r\n\r\n".$alternative;
         }
 
-        // Attachments present: nest the alternative body inside a multipart/mixed
-        // envelope, then append each file as a base64 attachment part.
+        if ($fileAttachments === []) {
+            return implode("\r\n", $headers)."\r\n\r\n".$this->mimeRelatedBody($alternative, $inlineAttachments);
+        }
+
         $raw = implode("\r\n", $headers)."\r\n\r\n";
         $raw .= "--mixed_relaticle\r\n";
-        $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
-        $raw .= $alternative."\r\n\r\n";
 
-        foreach ($attachments as $attachment) {
-            $filename = $this->sanitizeAttachmentFilename($attachment['filename']);
+        if ($inlineAttachments === []) {
+            $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
+            $raw .= $alternative."\r\n\r\n";
+        } else {
+            $raw .= "Content-Type: multipart/related; boundary=\"related_relaticle\"\r\n\r\n";
+            $raw .= $this->mimeRelatedBody($alternative, $inlineAttachments)."\r\n\r\n";
+        }
 
-            $raw .= "--mixed_relaticle\r\n";
-            $raw .= 'Content-Type: '.$attachment['mime_type'].'; name="'.$filename."\"\r\n";
-            $raw .= "Content-Transfer-Encoding: base64\r\n";
-            $raw .= 'Content-Disposition: attachment; filename="'.$filename."\"\r\n\r\n";
-            $raw .= chunk_split(base64_encode($attachment['content']))."\r\n";
+        foreach ($fileAttachments as $attachment) {
+            $raw .= $this->mimeAttachmentPart('mixed_relaticle', $attachment, inline: false);
         }
 
         return $raw.'--mixed_relaticle--';
+    }
+
+    private function rootContentTypeHeader(bool $hasInline, bool $hasFiles): string
+    {
+        if ($hasFiles) {
+            return 'Content-Type: multipart/mixed; boundary="mixed_relaticle"';
+        }
+
+        if ($hasInline) {
+            return 'Content-Type: multipart/related; boundary="related_relaticle"';
+        }
+
+        return 'Content-Type: multipart/alternative; boundary="boundary_relaticle"';
+    }
+
+    /**
+     * @param  array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>  $inlineAttachments
+     */
+    private function mimeRelatedBody(string $alternative, array $inlineAttachments): string
+    {
+        $raw = "--related_relaticle\r\n";
+        $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
+        $raw .= $alternative."\r\n\r\n";
+
+        foreach ($inlineAttachments as $attachment) {
+            $raw .= $this->mimeAttachmentPart('related_relaticle', $attachment, inline: true);
+        }
+
+        return $raw.'--related_relaticle--';
+    }
+
+    /**
+     * @param  array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}  $attachment
+     */
+    private function mimeAttachmentPart(string $boundary, array $attachment, bool $inline): string
+    {
+        $filename = $this->sanitizeAttachmentFilename($attachment['filename']);
+
+        $part = "--{$boundary}\r\n";
+        $part .= 'Content-Type: '.$attachment['mime_type'].'; name="'.$filename."\"\r\n";
+        $part .= "Content-Transfer-Encoding: base64\r\n";
+
+        if ($inline) {
+            $contentId = $this->sanitizeContentId((string) ($attachment['content_id'] ?? ''));
+            $part .= 'Content-ID: <'.$contentId.">\r\n";
+            $part .= 'Content-Disposition: inline; filename="'.$filename."\"\r\n\r\n";
+        } else {
+            $part .= 'Content-Disposition: attachment; filename="'.$filename."\"\r\n\r\n";
+        }
+
+        return $part.chunk_split(base64_encode($attachment['content']))."\r\n";
     }
 
     /**
@@ -353,6 +415,11 @@ final readonly class GmailService implements MailServiceInterface
     private function sanitizeAttachmentFilename(string $filename): string
     {
         return str_replace(['"', '\\', "\r", "\n"], '', $filename);
+    }
+
+    private function sanitizeContentId(string $contentId): string
+    {
+        return str_replace(['"', '\\', "\r", "\n", '<', '>'], '', $contentId);
     }
 
     private function formatAddress(string $name, string $email): string
