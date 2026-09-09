@@ -12,6 +12,7 @@ use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Database\Factories\UserFactory;
+use Filament\Facades\Filament;
 use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Passkey;
 use Laravel\Pennant\Feature;
@@ -136,9 +137,28 @@ it('offers a linked provider for fresh proof without setting a confirmation time
 
     livewire(ManagePasskeys::class)
         ->mountAction('registerPasskey')
-        ->assertMountedActionModalSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']));
+        ->assertMountedActionModalSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']))
+        ->assertMountedActionModalDontSee(__('profile.sections.passkeys.register'))
+        ->assertMountedActionModalDontSee(__('filament-actions::modal.actions.cancel.label'));
 
     expect(session('auth.password_confirmed_at'))->toBeNull();
+});
+
+it('links the provider offer outside the SPA so the OAuth redirect is followed', function (): void {
+    $user = User::factory()->create(['password' => null]);
+    $this->actingAs($user);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Filament::getPanel('app')->boot();
+
+    livewire(ManagePasskeys::class)
+        ->mountAction('registerPasskey')
+        ->assertMountedActionModalSeeHtml('href="'.e(route('auth.socialite.confirm.redirect', ['provider' => 'google'])).'"')
+        ->assertMountedActionModalDontSeeHtml('wire:navigate');
 });
 
 it('resumes first passkey registration after returning from the linked provider', function (): void {
@@ -162,7 +182,10 @@ it('resumes first passkey registration after returning from the linked provider'
         ->assertRedirect();
 
     livewire(ManagePasskeys::class)
-        ->callAction('registerPasskey')
+        ->mountAction('registerPasskey')
+        ->assertMountedActionModalSee(__('profile.sections.passkeys.register'))
+        ->assertMountedActionModalDontSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']))
+        ->callMountedAction()
         ->assertHasNoActionErrors()
         ->assertDispatched('passkey-register');
 
