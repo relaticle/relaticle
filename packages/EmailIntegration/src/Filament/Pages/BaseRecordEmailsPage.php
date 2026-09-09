@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
@@ -143,10 +144,7 @@ abstract class BaseRecordEmailsPage extends Page
         }
 
         if (filled($this->search)) {
-            $query->where(function (Builder $q): void {
-                $q->where('subject', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('snippet', 'ilike', '%'.$this->search.'%');
-            });
+            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
         }
 
         resolve(PreferredEmailCopyService::class)->restrictToPreferredCopies($query->getQuery(), $user);

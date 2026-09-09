@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
@@ -28,6 +29,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->team);
 
     $this->requester = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($this->requester, ['role' => 'editor']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'team_id' => $this->team->id,
@@ -188,6 +190,42 @@ describe('ApproveEmailAccessRequestAction', function (): void {
         expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
         expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0)
             ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(1);
+    });
+
+    it('approves when the requester switched workspaces but remains on the email team', function (): void {
+        $otherTeam = Team::factory()->create();
+        $otherTeam->users()->attach($this->requester, ['role' => 'editor']);
+        $this->requester->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+    });
+
+    it('aborts with 403 when the requester left the email team', function (): void {
+        $this->team->users()->detach($this->requester);
+
+        $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+            'requester_id' => $this->requester->id,
+            'owner_id' => $this->owner->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        Notification::fake();
+
+        expect(fn () => app(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner))
+            ->toThrow(HttpException::class);
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING);
+        expect(EmailShare::where('email_id', $this->email->getKey())->count())->toBe(0);
     });
 });
 
@@ -403,8 +441,6 @@ describe('CancelEmailAccessRequestAction', function (): void {
 
 describe('RequestEmailAccessAction', function (): void {
     it('creates a pending access request for a team member', function (): void {
-        $this->team->users()->attach($this->requester, ['role' => 'editor']);
-
         Notification::fake();
 
         $request = app(RequestEmailAccessAction::class)
@@ -416,8 +452,6 @@ describe('RequestEmailAccessAction', function (): void {
     });
 
     it('does not create a second pending request for the same email', function (): void {
-        $this->team->users()->attach($this->requester, ['role' => 'editor']);
-
         Notification::fake();
 
         $first = app(RequestEmailAccessAction::class)

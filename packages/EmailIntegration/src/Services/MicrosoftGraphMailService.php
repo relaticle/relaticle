@@ -206,12 +206,24 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         ];
 
         if (($data['attachments'] ?? []) !== []) {
-            $message['attachments'] = array_map(fn (array $attachment): array => [
-                '@odata.type' => '#microsoft.graph.fileAttachment',
-                'name' => $attachment['filename'],
-                'contentType' => $attachment['mime_type'],
-                'contentBytes' => base64_encode($attachment['content']),
-            ], $data['attachments']);
+            $message['attachments'] = array_map(function (array $attachment): array {
+                $payload = [
+                    '@odata.type' => '#microsoft.graph.fileAttachment',
+                    'name' => $attachment['filename'],
+                    'contentType' => $attachment['mime_type'],
+                    'contentBytes' => base64_encode($attachment['content']),
+                ];
+
+                if (($attachment['is_inline'] ?? false) === true) {
+                    $payload['isInline'] = true;
+
+                    if (filled($attachment['content_id'] ?? null)) {
+                        $payload['contentId'] = $attachment['content_id'];
+                    }
+                }
+
+                return $payload;
+            }, $data['attachments']);
         }
 
         if (isset($data['rfc_message_id'])) {

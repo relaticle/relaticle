@@ -29,10 +29,11 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
-mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailVisibilityService::class, HasEmailReaderActions::class, PreferredEmailCopyService::class);
+mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailSearchService::class, EmailVisibilityService::class, HasEmailReaderActions::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -629,6 +630,52 @@ it('shows the imported mailbox name on record email list rows', function (): voi
     livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
         ->assertSee(__('filament/pages/email-inbox.list_row.via', ['name' => 'Sales Inbox']))
         ->assertSee(__('filament/pages/email-inbox.list_row.opening'));
+});
+
+it('does not match hidden subject or snippet text when searching metadata-only emails', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $viewer = User::factory()->create(['current_team_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'editor']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $person = People::factory()->create([
+        'team_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'subject' => 'Quarterly forecast',
+        'snippet' => 'Secret preview text',
+    ]);
+
+    EmailParticipant::query()->create([
+        'email_id' => $email->id,
+        'email_address' => 'customer@acme.com',
+        'name' => 'Customer',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+        ->set('search', 'Quarterly forecast')
+        ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Quarterly forecast']))
+        ->set('search', 'Secret preview text')
+        ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Secret preview text']))
+        ->set('search', 'Customer')
+        ->assertSee('Customer');
 });
 
 it('shows a request access pill on record mailbox rows without body access', function (): void {

@@ -16,6 +16,7 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -31,6 +32,8 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
@@ -974,6 +977,179 @@ it('does not copy another user\'s saved draft attachment from client-controlled 
         ->sole();
 
     expect($email->attachments)->toHaveCount(0);
+});
+
+it('does not copy another email\'s attachments from client-controlled forward state', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+    $foreignEmail = Email::factory()->create([
+        'team_id' => $otherUser->current_team_id,
+        'user_id' => $otherUser->id,
+        'connected_account_id' => $otherAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    Storage::disk(EmailAttachment::DISK)->put('email-attachments/secret.pdf', 'secret');
+
+    $foreignAttachment = EmailAttachment::factory()->create([
+        'email_id' => $foreignEmail->getKey(),
+        'filename' => 'secret.pdf',
+        'storage_path' => 'email-attachments/secret.pdf',
+        'size' => 6,
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Forged forward attachment')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('replyMode', 'forward')
+        ->set('sourceEmailId', (string) $foreignEmail->getKey())
+        ->set('savedAttachments', [[
+            'id' => (string) $foreignAttachment->getKey(),
+            'filename' => 'secret.pdf',
+            'size' => 6,
+        ]])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Forged forward attachment')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments)->toHaveCount(0);
+});
+
+it('downloads a provider-stored attachment when forwarding', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $attachment = EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andReturn('gmail-contract-bytes');
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 18,
+        ]])
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentPath = (string) $forward->attachments->sole()->storage_path;
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+    Storage::disk(EmailAttachment::DISK)->assertExists($sentPath);
+    expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
+});
+
+it('does not queue a forward when a provider attachment cannot be downloaded', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $attachment = EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andThrow(new RuntimeException('provider unavailable'));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertSet('isOpen', true)
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 18,
+        ]])
+        ->assertNotified(__('filament/emails/composer.notifications.send_attachment_unavailable.title'));
+
+    expect(Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->exists())->toBeFalse();
 });
 
 it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
