@@ -40,8 +40,8 @@ use LogicException;
  * confirmedUsing() runs. The password path validates and marks confirmed
  * inline, with no ceremony. A user with neither a password nor a passkey has
  * no inline proof to give; if a linked provider offers one, it becomes the
- * modal's only footer action, a link the user must actually complete, never a
- * bypass.
+ * modal's only footer action, a round trip the user must actually complete,
+ * never a bypass.
  *
  * Irreversible actions opt into alwaysConfirm(): the freshness window is
  * ignored and a fresh proof is demanded on every attempt. Re-entry is scoped to
@@ -511,7 +511,7 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
-     * Four call sites resolve this per modal render, and each one costs a
+     * Resolved several times per modal render, and each resolution costs a
      * passkey-exists plus a social-account query. The action lives one request.
      */
     private function linkedProviderAccount(): ?UserSocialAccount
