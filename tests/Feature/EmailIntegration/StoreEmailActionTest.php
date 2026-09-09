@@ -268,6 +268,40 @@ it('stores inline attachment metadata', function (): void {
         ->assertExists((string) $attachment->storage_path);
 });
 
+it('stores embedded bytes for ordinary attachments that have no provider id', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $data = makeFetchedEmailData([
+        'hasAttachments' => true,
+        'attachments' => [
+            [
+                'filename' => 'notes.txt',
+                'mime_type' => 'text/plain',
+                'size' => 11,
+                'content_id' => null,
+                'attachment_id' => null,
+                'inline_data' => rtrim(strtr(base64_encode('hello-bytes'), '+/', '-_'), '='),
+                'is_inline' => false,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('notes.txt')
+        ->and($attachment->is_inline)->toBeFalse()
+        ->and($attachment->provider_attachment_id)->toBeNull()
+        ->and($attachment->storage_path)->not->toBeNull();
+
+    Storage::disk(EmailAttachment::DISK)
+        ->assertExists((string) $attachment->storage_path);
+
+    expect(Storage::disk(EmailAttachment::DISK)->get((string) $attachment->storage_path))
+        ->toBe('hello-bytes');
+});
+
 it('stores a nameless inline cid image with a generated filename', function (): void {
     $data = makeFetchedEmailData([
         'attachments' => [
