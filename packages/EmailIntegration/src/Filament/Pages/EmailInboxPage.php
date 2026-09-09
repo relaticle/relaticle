@@ -43,6 +43,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
@@ -209,10 +210,7 @@ final class EmailInboxPage extends Page
         $query->where('status', '!=', EmailStatus::DRAFT);
 
         if (filled($this->search)) {
-            $query->where(function (Builder $q): void {
-                $q->where('subject', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('snippet', 'ilike', '%'.$this->search.'%');
-            });
+            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
         }
 
         return $query->latest('sent_at')->paginate(20);
