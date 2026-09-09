@@ -34,8 +34,8 @@ return [
     ],
     'confirm' => [
         'heading' => 'Confirm your identity',
-        'description' => 'Please confirm your identity before continuing.',
-        'email_change_description' => 'Confirm your identity to change your email to :email.',
+        'description' => 'This is a sensitive change, so we need to check it\'s you.',
+        'email_change_description' => 'We will send a verification link to :email.',
         'continue' => 'Continue',
         'use_passkey' => 'Use your passkey instead',
         'passkey_waiting' => 'Waiting for your passkey…',

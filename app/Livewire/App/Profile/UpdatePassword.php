@@ -68,7 +68,9 @@ final class UpdatePassword extends BaseLivewireComponent
     {
         return ConfirmIdentityAction::make('save')
             ->label(__('profile.actions.save'))
-            ->modalHeading(__('auth.confirm.heading'))
+            ->modalHeading($this->authUser()->hasPassword()
+                ? __('profile.sections.update_password.title')
+                : __('profile.sections.set_password.title'))
             ->modalDescription(__('auth.confirm.description'))
             ->alwaysConfirm()
             ->operation('set_password')

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Actions\Auth\ConfirmIdentity;
 use App\Enums\AuthMethod;
+use App\Enums\SocialiteProvider;
 use App\Http\Controllers\Auth\Concerns\ResolvesConfirmingUser;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
@@ -28,11 +29,13 @@ final readonly class IdentityConfirmationController
     public function show(Request $request): View
     {
         $user = $this->user($request);
+        $provider = $user->socialAccounts()->first()?->provider_name;
 
         return view('auth.confirm-identity', [
             'hasPassword' => $user->hasPassword(),
             'hasPasskey' => $user->hasPasskey(),
-            'provider' => $user->socialAccounts()->first()?->provider_name,
+            'provider' => $provider,
+            'providerIcon' => $provider === null ? null : SocialiteProvider::tryFrom($provider)?->icon(),
         ]);
     }
 

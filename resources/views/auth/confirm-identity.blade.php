@@ -128,7 +128,7 @@
                         href="{{ route('auth.socialite.confirm.redirect', ['provider' => $provider]) }}"
                         class="mt-5 block"
                     >
-                        <x-filament::button color="gray" class="w-full justify-center" tag="span">
+                        <x-filament::button color="gray" :icon="$providerIcon" class="w-full justify-center" tag="span">
                             {{ __('auth.confirm.continue_with_provider', ['provider' => ucfirst($provider)]) }}
                         </x-filament::button>
                     </a>

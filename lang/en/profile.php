@@ -122,7 +122,7 @@ return [
             'cancel' => 'Cancel',
             'remove' => 'Remove',
             'remove_confirm_title' => 'Remove passkey',
-            'remove_confirm' => 'Remove this passkey? You will no longer be able to use it to sign in.',
+            'remove_confirm' => 'You will no longer be able to use it to sign in.',
         ],
     ],
 
@@ -168,7 +168,7 @@ return [
         ],
         'log_out_other_browsers' => [
             'title' => 'Log Out Other Browser Sessions',
-            'description' => 'Confirm it\'s you to log out of your other browser sessions across all of your devices.',
+            'description' => 'You will be signed out on all of your other devices.',
         ],
     ],
 

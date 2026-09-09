@@ -248,6 +248,13 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
+            // The socialite entry points answer with a 302 to the provider's own
+            // domain, and wire:navigate cannot follow a cross-origin redirect.
+            ->spaUrlExceptions([
+                '*/auth/redirect/*',
+                '*/auth/link/redirect/*',
+                '*/auth/confirm/redirect/*',
+            ])
             ->routes(function () use ($panel): void {
                 Route::get('/register', fn (): RedirectResponse => redirect()->to(Filament::getLoginUrl()))
                     ->name('auth.register');

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions;
 
+use App\Enums\SocialiteProvider;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Closure;
@@ -36,8 +38,9 @@ use LogicException;
  * then re-invokes callMountedAction. On re-entry the gate is satisfied and
  * confirmedUsing() runs. The password path validates and marks confirmed
  * inline, with no ceremony. A user with neither a password nor a passkey has
- * no inline proof to give; if a linked provider offers one, identityFields()
- * renders it as a link the user must actually complete, never as a bypass.
+ * no inline proof to give; if a linked provider offers one, it becomes the
+ * modal's only footer action, a link the user must actually complete, never a
+ * bypass.
  *
  * Irreversible actions opt into alwaysConfirm(): the freshness window is
  * ignored and a fresh proof is demanded on every attempt. Re-entry is scoped to
@@ -126,13 +129,21 @@ final class ConfirmIdentityAction extends Action
             ...$this->identityFields(),
         ]);
 
-        $this->modalSubmitAction(function (Action $action): Action {
+        $this->modalSubmitAction(function (Action $action): Action|false {
+            if ($this->providerProofPending()) {
+                return false;
+            }
+
             if ($this->confirmingUser()->hasPasskey()) {
                 $action->icon(Heroicon::FingerPrint);
             }
 
             return $action;
         });
+
+        $this->modalCancelAction(fn (Action $action): Action|false => $this->providerProofPending() ? false : $action);
+
+        $this->extraModalFooterActions(fn (): array => array_filter([$this->providerConfirmationAction()]));
 
         $this->action(function (array $data, Action $action, ?Schema $schema): mixed {
             $user = $this->confirmingUser();
@@ -321,7 +332,7 @@ final class ConfirmIdentityAction extends Action
         $user = $this->confirmingUser();
 
         if (! $user->hasPassword()) {
-            return $this->providerOffer($user);
+            return [];
         }
 
         $hasPasskey = $user->hasPasskey();
@@ -429,35 +440,50 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
-     * A user with no password and no passkey (a provider-only account) has
-     * nothing to prove inline. If a provider is linked, offer it as a real
-     * navigation to a fresh OAuth round trip; merely rendering this link marks
-     * nothing confirmed, only completing it does.
-     *
-     * @return array<int, Component>
+     * Rendering this marks nothing confirmed; only completing the round trip does.
      */
-    private function providerOffer(User $user): array
+    private function providerConfirmationAction(): ?Action
     {
-        if ($user->hasPasskey()) {
-            return [];
+        $account = $this->linkedProviderAccount();
+
+        if (! $account instanceof UserSocialAccount || ! $this->providerProofPending()) {
+            return null;
         }
 
-        $account = $user->socialAccounts()->first();
+        return Action::make('confirmWithProvider')
+            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
+            ->icon(SocialiteProvider::tryFrom($account->provider_name)?->icon())
+            ->url(route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name]));
+    }
 
-        if (! $account) {
-            return [];
+    /**
+     * False once the round trip returns proven, so the normal submit action
+     * comes back and the operation can actually finish.
+     */
+    private function providerProofPending(): bool
+    {
+        if (! $this->linkedProviderAccount() instanceof UserSocialAccount) {
+            return false;
         }
 
-        return [
-            Placeholder::make('providerOfferHint')
-                ->hiddenLabel()
-                ->content(__('auth.confirm.description')),
-            Actions::make([
-                Action::make('confirmWithProvider')
-                    ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
-                    ->url(fn (): string => route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name])),
-            ]),
-        ];
+        if ($this->operation !== null) {
+            $pending = AuthenticationSession::pendingOperation();
+
+            return $pending === [] || ! $pending['proven'];
+        }
+
+        return ! IdentityConfirmation::confirmedRecently($this->alwaysConfirm ? null : $this->within);
+    }
+
+    private function linkedProviderAccount(): ?UserSocialAccount
+    {
+        $user = $this->confirmingUser();
+
+        if ($user->hasPassword() || $user->hasPasskey()) {
+            return null;
+        }
+
+        return $user->socialAccounts()->first();
     }
 
     private function confirmingUser(): User
