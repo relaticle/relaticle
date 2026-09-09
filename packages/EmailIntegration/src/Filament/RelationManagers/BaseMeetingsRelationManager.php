@@ -19,12 +19,15 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 abstract class BaseMeetingsRelationManager extends RelationManager
 {
@@ -43,6 +46,19 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
                 if ($user instanceof User) {
                     $query->withGlobalScope('visible', new VisibleMeetingScope($user));
+
+                    // Choose from this record's visible copies before pagination. Missing UIDs remain separate.
+                    $identity = "COALESCE('uid:' || NULLIF(meetings.ical_uid, ''), 'id:' || meetings.id)";
+                    $copies = (clone $query)
+                        ->select('meetings.id')
+                        ->distinct([DB::raw($identity), 'meetings.starts_at'])
+                        ->reorder()
+                        ->orderByRaw($identity)
+                        ->oldest('meetings.starts_at')
+                        ->orderByRaw('CASE WHEN meetings.connected_account_id IN (SELECT id FROM connected_accounts WHERE user_id = ?) THEN 0 ELSE 1 END', [$user->getKey()])
+                        ->orderBy('meetings.id');
+
+                    $query->whereIn('meetings.id', $copies);
                 }
 
                 if ($this->hidesOwnerMailbox()) {
@@ -66,6 +82,13 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->badge(),
                 TextColumn::make('response_status')
                     ->label(__('filament/relation-managers/meetings.columns.response_status.label'))
+                    ->state(function (Meeting $record): ?AttendeeResponseStatus {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            ? resolve(MeetingRespondentResolver::class)->viewerResponseStatus($user, $record)
+                            : null;
+                    })
                     ->badge(),
             ])
             ->defaultSort('starts_at', 'desc')
@@ -76,9 +99,9 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             ->emptyStateDescription(fn (): ?string => ($this->recordMailboxHiddenCopy() ?? [])['description'] ?? null)
             ->filters([
                 Filter::make('upcoming')
-                    ->query(fn (Builder $q): Builder => $q->where('starts_at', '>=', now())),
+                    ->query(fn (Builder $query): Builder => $query->where('starts_at', '>=', now())),
                 Filter::make('past')
-                    ->query(fn (Builder $q): Builder => $q->where('starts_at', '<', now())),
+                    ->query(fn (Builder $query): Builder => $query->where('starts_at', '<', now())),
             ])
             ->recordActions([
                 MeetingDetailInfolist::viewAction(),
