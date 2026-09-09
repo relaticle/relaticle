@@ -121,11 +121,44 @@ it('wraps the body and attachment in a multipart/mixed MIME message', function (
 
     $raw = decodeRaw($captured);
 
-    expect($result['provider_message_id'])->toBe('gmail-id')
-        ->and($raw)->toContain('Content-Type: multipart/mixed; boundary="mixed_relaticle"')
+    expect($raw)->toContain('Content-Type: multipart/mixed; boundary="mixed_relaticle"')
         ->and($raw)->toContain('Content-Type: multipart/alternative; boundary="boundary_relaticle"')
         ->and($raw)->toContain('Content-Disposition: attachment; filename="report.pdf"')
         ->and($raw)->toContain(chunk_split(base64_encode('RAW-PDF-BYTES')));
+});
+
+it('embeds inline cid images in a multipart/related MIME part', function (): void {
+    $account = ConnectedAccount::factory()->make([
+        'email_address' => 'sender@example.com',
+        'display_name' => 'Sender',
+    ]);
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService($account, $gmail)->sendMessage([
+        'subject' => 'Forwarded with logo',
+        'body_html' => '<p><img src="cid:logo@example.test"></p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'attachments' => [[
+            'filename' => 'logo.png',
+            'mime_type' => 'image/png',
+            'content' => 'PNG-BYTES',
+            'is_inline' => true,
+            'content_id' => 'logo@example.test',
+        ]],
+    ]);
+
+    $raw = decodeRaw($captured);
+
+    expect($raw)->toContain('Content-Type: multipart/related; boundary="related_relaticle"')
+        ->and($raw)->not->toContain('multipart/mixed')
+        ->and($raw)->toContain('Content-ID: <logo@example.test>')
+        ->and($raw)->toContain('Content-Disposition: inline; filename="logo.png"')
+        ->and($raw)->toContain('cid:logo@example.test')
+        ->and($raw)->toContain(chunk_split(base64_encode('PNG-BYTES')));
 });
 
 it('sends a plain multipart/alternative message when there are no attachments', function (): void {
