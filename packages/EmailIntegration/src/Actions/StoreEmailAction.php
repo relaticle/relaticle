@@ -162,15 +162,14 @@ final readonly class StoreEmailAction
     }
 
     /**
+     * Persist Gmail-inlined bytes. Small parts (<25 KB) arrive as body data with
+     * no attachment ID, including ordinary files, so downloads 404 unless we store them.
+     *
      * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
      * @param  list<string>  $storedInlinePaths
      */
     private function storeInlineData(Email $email, array $attachment, array &$storedInlinePaths): ?string
     {
-        if (($attachment['is_inline'] ?? false) === false) {
-            return null;
-        }
-
         if (blank($attachment['inline_data'])) {
             return null;
         }
