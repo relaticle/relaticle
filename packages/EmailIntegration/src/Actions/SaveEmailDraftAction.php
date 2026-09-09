@@ -48,6 +48,7 @@ final readonly class SaveEmailDraftAction
      *     creation_source?: ?EmailCreationSource,
      *     attachments?: list<string>,
      *     attachment_file_names?: array<string, string>,
+     *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
      * }  $data
      */
     public function execute(User $user, array $data, ?string $draftId = null): Email
@@ -112,7 +113,7 @@ final readonly class SaveEmailDraftAction
                 'body_text' => strip_tags((string) $data['body_html']),
             ]);
 
-            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? []);
+            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? [], $data['attachment_attributes'] ?? []);
 
             $draft->participants()->delete();
 
@@ -169,8 +170,9 @@ final readonly class SaveEmailDraftAction
      *
      * @param  list<string>  $paths
      * @param  array<string, string>  $originalNames  storage path => original client filename
+     * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attributes
      */
-    private function attachFiles(Email $draft, array $paths, array $originalNames): void
+    private function attachFiles(Email $draft, array $paths, array $originalNames, array $attributes): void
     {
         $disk = Storage::disk(EmailAttachment::DISK);
 
@@ -190,9 +192,11 @@ final readonly class SaveEmailDraftAction
                 'mime_type' => $disk->mimeType($path) ?: 'application/octet-stream',
                 'size' => $disk->size($path),
                 'storage_path' => $path,
+                'is_inline' => $attributes[$path]['is_inline'] ?? false,
+                'content_id' => $attributes[$path]['content_id'] ?? null,
             ]);
         }
 
-        $draft->update(['has_attachments' => $draft->attachments()->exists()]);
+        $draft->update(['has_attachments' => $draft->attachments()->where('is_inline', false)->exists()]);
     }
 }
