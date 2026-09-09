@@ -102,11 +102,21 @@ final readonly class CustomFieldsFilterTranslator
      */
     private function optionId(string $code, array $entry, mixed $label): string
     {
-        $id = $this->optionMap->idFor($entry, (string) $label);
+        $value = (string) $label;
+
+        if (in_array($value, array_merge(...array_values($entry['ids'])), true)) {
+            return $value;
+        }
+
+        if ($this->optionMap->isAmbiguous($entry, $value)) {
+            throw ValidationException::withMessages([
+                'custom_fields' => __('validation.custom_field.ambiguous_option', ['value' => $value]),
+            ]);
+        }
+
+        $id = $this->optionMap->idFor($entry, $value);
 
         if ($id === null) {
-            // The stored casing, not the lowercased match keys. This string is read
-            // by the assistant and echoed to the user.
             throw ValidationException::withMessages([
                 'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
                     implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
