@@ -85,6 +85,7 @@ final class ManagePasskeys extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.passkeys.add_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->resumable()
             ->operation('add_passkey')
             ->modalSubmitActionLabel(__('profile.sections.passkeys.register'))
             ->confirmedUsing(function (Action $action): void {

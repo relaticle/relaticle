@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
@@ -60,9 +61,13 @@ final class ConfirmIdentityAction extends Action
 
     private ?string $operation = null;
 
-    private bool $resumable = true;
+    private bool $resumable = false;
 
     private Closure|string|null $target = null;
+
+    private bool $providerAccountResolved = false;
+
+    private ?UserSocialAccount $providerAccount = null;
 
     /** @var array<int, Component> */
     private array $prependedSchema = [];
@@ -110,8 +115,8 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
-     * Opt out when the action reads page form state, which the full-page
-     * provider round trip destroys.
+     * Re-open this action when the provider round trip returns. Off by default:
+     * an action that reads page form state would come back to an empty one.
      */
     public function resumable(bool $condition = true): static
     {
@@ -235,17 +240,7 @@ final class ConfirmIdentityAction extends Action
         }
 
         if ($this->operation !== null) {
-            $pending = AuthenticationSession::pendingOperation();
-
-            // A forged or stale attempt id must never fall through to the
-            // generic window: an unrelated confirmation elsewhere would then
-            // silently authorize this operation with zero proof for it. Only
-            // an exact, still-present grant may ask "has it been proven yet".
-            if ($pending === [] || $pending['id'] !== $attemptId) {
-                return true;
-            }
-
-            return ! $pending['proven'];
+            return ! AuthenticationSession::operationProven($attemptId);
         }
 
         $user = $this->confirmingUser();
@@ -454,6 +449,8 @@ final class ConfirmIdentityAction extends Action
 
     /**
      * Rendering this marks nothing confirmed; only completing the round trip does.
+     * The descriptor is recorded on the click, not here, so merely opening and
+     * abandoning the modal leaves nothing behind to re-open later.
      */
     private function providerConfirmationAction(): ?Action
     {
@@ -463,12 +460,16 @@ final class ConfirmIdentityAction extends Action
             return null;
         }
 
-        $this->rememberResumableAction();
+        $provider = $account->provider_name;
 
         return Action::make('confirmWithProvider')
-            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
-            ->icon(SocialiteProvider::tryFrom($account->provider_name)?->icon())
-            ->url(route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name]));
+            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($provider)]))
+            ->icon(SocialiteProvider::tryFrom($provider)?->icon())
+            ->action(function () use ($provider): RedirectResponse {
+                $this->rememberResumableAction();
+
+                return redirect()->to(route('auth.socialite.confirm.redirect', ['provider' => $provider]));
+            });
     }
 
     /**
@@ -509,15 +510,24 @@ final class ConfirmIdentityAction extends Action
         );
     }
 
+    /**
+     * Four call sites resolve this per modal render, and each one costs a
+     * passkey-exists plus a social-account query. The action lives one request.
+     */
     private function linkedProviderAccount(): ?UserSocialAccount
     {
-        $user = $this->confirmingUser();
-
-        if ($user->hasPassword() || $user->hasPasskey()) {
-            return null;
+        if ($this->providerAccountResolved) {
+            return $this->providerAccount;
         }
 
-        return $user->socialAccounts()->first();
+        $this->providerAccountResolved = true;
+        $user = $this->confirmingUser();
+
+        if (! $user->hasPassword() && ! $user->hasPasskey()) {
+            $this->providerAccount = $user->socialAccounts()->first();
+        }
+
+        return $this->providerAccount;
     }
 
     private function confirmingUser(): User

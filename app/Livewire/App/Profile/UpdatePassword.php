@@ -73,7 +73,6 @@ final class UpdatePassword extends BaseLivewireComponent
                 : __('profile.sections.set_password.title'))
             ->modalDescription(__('auth.confirm.description'))
             ->alwaysConfirm()
-            ->resumable(false)
             ->operation('set_password')
             ->beforeFormFilled(function (): void {
                 $this->form->validate();

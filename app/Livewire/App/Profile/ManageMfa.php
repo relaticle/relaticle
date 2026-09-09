@@ -76,6 +76,7 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.identity_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->resumable()
             ->operation('manage_mfa', 'enable')
             ->visible(fn (): bool => ! $this->enabled)
             ->modalSubmitActionLabel(__('profile.sections.mfa.continue'))
@@ -185,6 +186,7 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.disable_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->resumable()
             ->operation('manage_mfa', 'disable')
             ->visible(fn (): bool => $this->enabled)
             ->modalSubmitActionLabel(__('profile.sections.mfa.disable'))
@@ -213,6 +215,7 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.recovery_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->resumable()
             ->operation('manage_mfa', 'show_recovery_codes')
             ->visible(fn (): bool => $this->enabled)
             ->confirmedUsing(function (): void {
@@ -232,6 +235,7 @@ final class ManageMfa extends BaseLivewireComponent
             ->modalDescription(__('profile.sections.mfa.recovery_description'))
             ->modalWidth(Width::Medium)
             ->alwaysConfirm()
+            ->resumable()
             ->operation('manage_mfa', 'regenerate_recovery_codes')
             ->visible(fn (): bool => $this->enabled)
             ->confirmedUsing(function (): void {

@@ -308,15 +308,22 @@ final readonly class AuthenticationSession
         return ['action' => $resume['action'], 'arguments' => $arguments];
     }
 
-    private static function resumeProofSatisfied(?string $grantId): bool
+    /**
+     * Whether this exact grant is still the one in the slot and has been proven.
+     * A forged or superseded id must never fall through to the generic window.
+     */
+    public static function operationProven(string $grantId): bool
     {
-        if ($grantId === null) {
-            return IdentityConfirmation::confirmedRecently();
-        }
-
         $pending = self::pendingOperation();
 
         return $pending !== [] && $pending['id'] === $grantId && $pending['proven'];
+    }
+
+    private static function resumeProofSatisfied(?string $grantId): bool
+    {
+        return $grantId === null
+            ? IdentityConfirmation::confirmedRecently()
+            : self::operationProven($grantId);
     }
 
     /**

@@ -323,7 +323,9 @@ test('a provider-only user returns from confirmation with the log-out modal alre
     ]);
     $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
 
-    Livewire::test(LogoutOtherBrowserSessions::class)->mountAction('deleteBrowserSessions');
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->mountAction('deleteBrowserSessions')
+        ->mountAction('confirmWithProvider');
 
     $this->from($settingsUrl)
         ->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))
@@ -344,7 +346,7 @@ test('a provider-only user returns from confirmation with the log-out modal alre
         ->assertHasNoActionErrors();
 });
 
-test('an abandoned modal is not reopened by a later unrelated confirmation', function (): void {
+test('opening the modal without starting the round trip records nothing to reopen', function (): void {
     $user = User::factory()->withTeam()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
@@ -353,6 +355,24 @@ test('an abandoned modal is not reopened by a later unrelated confirmation', fun
     ]);
 
     Livewire::test(LogoutOtherBrowserSessions::class)->mountAction('deleteBrowserSessions');
+
+    IdentityConfirmation::markConfirmed();
+
+    Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
+});
+
+test('a round trip that returns without the proof is not reopened by a later unrelated confirmation', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->mountAction('deleteBrowserSessions')
+        ->mountAction('confirmWithProvider');
+
     Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
 
     IdentityConfirmation::markConfirmed();

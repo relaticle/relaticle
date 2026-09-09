@@ -303,7 +303,9 @@ test('a provider-only user returns from confirmation with the enrolment modal al
         'provider_name' => SocialiteProvider::GOOGLE->value,
     ]);
 
-    Livewire::test(ManageMfa::class)->mountAction('enableMfa');
+    Livewire::test(ManageMfa::class)
+        ->mountAction('enableMfa')
+        ->mountAction('confirmWithProvider');
 
     $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
     Socialite::fake('google', (new SocialiteUser)->map([
@@ -320,3 +322,41 @@ test('a provider-only user returns from confirmation with the enrolment modal al
         ->assertHasNoActionErrors()
         ->assertActionMounted('confirmMfa');
 });
+
+test('a provider-only user returns from confirmation with the mfa action already open', function (string $action): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->socialOnly()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Livewire::test(ManageMfa::class)
+        ->mountAction($action)
+        ->mountAction('confirmWithProvider');
+    $grantId = AuthenticationSession::pendingOperation()['id'];
+
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect(route('identity.confirm.mfa'));
+
+    $secret = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+    $this->post(route('identity.confirm.mfa.store'), [
+        'code' => resolve(Google2FA::class)->getCurrentOtp($secret),
+    ])->assertRedirect();
+
+    Livewire::test(ManageMfa::class)
+        ->assertActionMounted($action)
+        ->assertMountedActionModalDontSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']))
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect(AuthenticationSession::pendingOperation())->toBe([])
+        ->and($grantId)->not->toBeEmpty();
+})->with(['disableMfa', 'showRecoveryCodes', 'regenerateRecoveryCodes']);

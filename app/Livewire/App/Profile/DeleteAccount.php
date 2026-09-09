@@ -55,6 +55,7 @@ final class DeleteAccount extends BaseLivewireComponent
             ->label(__('profile.actions.delete_account'))
             ->color('danger')
             ->alwaysConfirm()
+            ->resumable()
             ->prependSchema([
                 TextInput::make('confirm_email')
                     ->label(__('profile.sections.delete_account.confirm_email_label'))
