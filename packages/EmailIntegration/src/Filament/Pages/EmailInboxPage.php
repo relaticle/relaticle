@@ -452,7 +452,7 @@ final class EmailInboxPage extends Page
         };
 
         // Only quote the original body when the viewer is entitled to read it.
-        $quotedBody = $user->can('viewBody', $email) ? $email->body?->body_html : null;
+        $quotedBody = $user->can('viewBody', $email) ? $email->quotedBodyHtml() : null;
 
         $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
         $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
