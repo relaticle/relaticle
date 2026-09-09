@@ -225,6 +225,8 @@ it('adds the host when Google omits the attendees list', function (): void {
 });
 
 it('resolves this mailbox event id from a shared iCalendar UID', function (): void {
+    $this->travelTo('2026-09-21 14:00:00');
+
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'email_address' => 'me@example.com',
         'refresh_token' => 'refresh',
@@ -233,6 +235,9 @@ it('resolves this mailbox event id from a shared iCalendar UID', function (): vo
 
     $match = new Event;
     $match->setId('evt-teammate-mailbox');
+    $matchStart = new EventDateTime;
+    $matchStart->setDateTime('2026-09-21T14:00:00Z');
+    $match->setStart($matchStart);
 
     $page = new EventsResource;
     $page->setItems([$match]);
@@ -240,19 +245,120 @@ it('resolves this mailbox event id from a shared iCalendar UID', function (): vo
     $events = Mockery::mock(Events::class);
     $events->shouldReceive('listEvents')
         ->once()
-        ->with('primary', [
-            'iCalUID' => 'ical-shared',
-            'maxResults' => 1,
-            'showDeleted' => false,
-        ])
+        ->with('primary', Mockery::on(function (array $params): bool {
+            return ($params['iCalUID'] ?? null) === 'ical-shared'
+                && ($params['singleEvents'] ?? null) === true
+                && ($params['showDeleted'] ?? null) === false
+                && ($params['timeMin'] ?? null) === '2026-09-21T14:00:00Z'
+                && ($params['timeMax'] ?? null) === '2026-09-22T14:00:00Z';
+        }))
         ->andReturn($page);
 
     $calendar = new Calendar(Mockery::mock(Client::class));
     $calendar->events = $events;
 
-    $eventId = (new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('ical-shared');
+    $eventId = (new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('ical-shared', now());
 
     expect($eventId)->toBe('evt-teammate-mailbox');
+});
+
+it('resolves the recurring Google occurrence that matches the iCalendar UID and start', function (): void {
+    $this->travelTo('2026-09-14 12:00:00');
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'email_address' => 'me@example.com',
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $thisWeek = new Event;
+    $thisWeek->setId('evt-this-week');
+    $thisWeekStart = new EventDateTime;
+    $thisWeekStart->setDateTime('2026-09-14T14:00:00Z');
+    $thisWeek->setStart($thisWeekStart);
+
+    $nextWeek = new Event;
+    $nextWeek->setId('evt-next-week');
+    $nextWeekStart = new EventDateTime;
+    $nextWeekStart->setDateTime('2026-09-21T14:00:00Z');
+    $nextWeek->setStart($nextWeekStart);
+
+    $page = new EventsResource;
+    $page->setItems([$thisWeek, $nextWeek]);
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->with('primary', Mockery::on(function (array $params): bool {
+            return ($params['iCalUID'] ?? null) === 'ical-shared'
+                && ($params['singleEvents'] ?? null) === true
+                && ($params['showDeleted'] ?? null) === false;
+        }))
+        ->andReturn($page);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $eventId = (new GoogleCalendarService($account, $calendar))
+        ->findEventIdByICalUid('ical-shared', now()->setTime(14, 0)->addWeek());
+
+    expect($eventId)->toBe('evt-next-week');
+});
+
+it('resolves an all-day Google occurrence by its calendar date', function (): void {
+    $this->travelTo('2026-09-21 00:00:00');
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'email_address' => 'me@example.com',
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $match = new Event;
+    $match->setId('evt-all-day');
+    $matchStart = new EventDateTime;
+    $matchStart->setDate('2026-09-21');
+    $match->setStart($matchStart);
+
+    $page = new EventsResource;
+    $page->setItems([$match]);
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')->once()->andReturn($page);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $eventId = (new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('ical-shared', now());
+
+    expect($eventId)->toBe('evt-all-day');
+});
+
+it('returns null when Google instances share an iCalendar UID but none match the occurrence start', function (): void {
+    $this->travelTo('2026-09-21 14:00:00');
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $otherOccurrence = new Event;
+    $otherOccurrence->setId('evt-this-week');
+    $otherStart = new EventDateTime;
+    $otherStart->setDateTime('2026-09-14T14:00:00Z');
+    $otherOccurrence->setStart($otherStart);
+
+    $page = new EventsResource;
+    $page->setItems([$otherOccurrence]);
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')->once()->andReturn($page);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    expect((new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('ical-shared', now()))
+        ->toBeNull();
 });
 
 it('returns null when Google has no event for the iCalendar UID', function (): void {
@@ -270,7 +376,7 @@ it('returns null when Google has no event for the iCalendar UID', function (): v
     $calendar = new Calendar(Mockery::mock(Client::class));
     $calendar->events = $events;
 
-    expect((new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('missing'))
+    expect((new GoogleCalendarService($account, $calendar))->findEventIdByICalUid('missing', now()))
         ->toBeNull();
 });
 

@@ -171,9 +171,12 @@ final readonly class MeetingRespondentResolver
             return null;
         }
 
+        // Google recurring occurrences share ical_uid. Match the viewed start
+        // so an RSVP does not land on a different instance in the series.
         $ownCopyEventId = Meeting::query()
             ->where('connected_account_id', $account->getKey())
             ->where('ical_uid', $meeting->ical_uid)
+            ->where('starts_at', $meeting->starts_at)
             ->value('provider_event_id');
 
         if (is_string($ownCopyEventId) && $ownCopyEventId !== '') {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Carbon\CarbonInterface;
 use Google\Service\Calendar;
 use Google\Service\Calendar\Channel;
 use Google\Service\Calendar\Event as GoogleEvent;
@@ -186,12 +187,17 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         }
     }
 
-    public function findEventIdByICalUid(string $iCalUid): ?string
+    public function findEventIdByICalUid(string $iCalUid, CarbonInterface $occurrenceStartsAt): ?string
     {
+        $occurrenceStart = $occurrenceStartsAt->utc();
+
         try {
             $page = $this->client->events->listEvents('primary', [
                 'iCalUID' => $iCalUid,
-                'maxResults' => 1,
+                'singleEvents' => true,
+                'timeMin' => $occurrenceStart->format('Y-m-d\TH:i:s\Z'),
+                'timeMax' => $occurrenceStartsAt->utc()->addDay()->format('Y-m-d\TH:i:s\Z'),
+                'maxResults' => 10,
                 'showDeleted' => false,
             ]);
         } catch (Throwable) {
@@ -204,9 +210,15 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             return null;
         }
 
-        $id = $items[0]->getId();
+        foreach ($items as $event) {
+            $id = $this->googleEventIdIfOccurrenceStartMatches($event, $occurrenceStart);
 
-        return is_string($id) && $id !== '' ? $id : null;
+            if (is_string($id)) {
+                return $id;
+            }
+        }
+
+        return null;
     }
 
     public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?Data\CalendarPushChannelData
@@ -251,6 +263,23 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
         } catch (Throwable) {
             // The channel may already be expired or stopped.
         }
+    }
+
+    private function googleEventIdIfOccurrenceStartMatches(GoogleEvent $event, CarbonInterface $occurrenceStart): ?string
+    {
+        $start = $event->getStart();
+        $startDate = (string) $start->getDate();
+        $parsedStart = $startDate !== ''
+            ? Date::parse($startDate, 'UTC')
+            : Date::parse((string) $start->getDateTime())->utc();
+
+        if (! $parsedStart->equalTo($occurrenceStart)) {
+            return null;
+        }
+
+        $id = $event->getId();
+
+        return $id !== '' ? $id : null;
     }
 
     private function selfAttendeeFrom(GoogleEvent $event): ?EventAttendee
