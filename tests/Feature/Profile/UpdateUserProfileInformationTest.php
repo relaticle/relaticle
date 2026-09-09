@@ -860,7 +860,7 @@ describe('locale', function () {
             ->locale->toBe('fr');
     });
 
-    test('locale is stored alongside an email change', function () {
+    test('locale survives a deferred email change', function () {
         Notification::fake();
 
         $user = User::factory()->withTeam()->create([
@@ -868,16 +868,20 @@ describe('locale', function () {
             'email_verified_at' => now(),
             'locale' => null,
         ]);
+        $this->actingAs($user);
 
-        $this->action->update($user, [
-            'name' => $user->name,
-            'email' => 'locale-email-changed@example.com',
-            'locale' => 'da',
-        ]);
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'locale-email-changed@example.com',
+                'locale' => 'da',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
 
         expect($user->fresh())
             ->locale->toBe('da')
-            ->email_verified_at->toBeNull();
+            ->email->toBe('locale-email@example.com');
     });
 
     test('chatLocale falls back to English for a language without translations', function () {
