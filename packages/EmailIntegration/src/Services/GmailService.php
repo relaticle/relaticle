@@ -34,10 +34,12 @@ final readonly class GmailService implements MailServiceInterface
     {
         /** @var array<int, string> $messageIds */
         $messageIds = [];
-        /** @var array<int, string> $readMessageIds */
-        $readMessageIds = [];
-        /** @var array<int, string> $unreadMessageIds */
-        $unreadMessageIds = [];
+        // id => isRead, last-write-wins. UNREAD can be added and removed on the
+        // same message across history records in one sync; keying by id keeps
+        // the LATEST state so a message never lands in both lists (which the
+        // sync job would then apply unread-last, overriding the final state).
+        /** @var array<string, bool> $readState */
+        $readState = [];
 
         $newCursor = $cursor;
         $pageToken = null;
@@ -76,20 +78,14 @@ final readonly class GmailService implements MailServiceInterface
                 // Track messages where the UNREAD label was removed (user read the email)
                 foreach ($item->getLabelsRemoved() ?? [] as $change) {
                     if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                        $id = $change->getMessage()->getId();
-                        if (! in_array($id, $readMessageIds, strict: true)) {
-                            $readMessageIds[] = $id;
-                        }
+                        $readState[$change->getMessage()->getId()] = true;
                     }
                 }
 
                 // Track messages where the UNREAD label was re-added (marked unread again)
                 foreach ($item->getLabelsAdded() ?? [] as $change) {
                     if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                        $id = $change->getMessage()->getId();
-                        if (! in_array($id, $unreadMessageIds, strict: true)) {
-                            $unreadMessageIds[] = $id;
-                        }
+                        $readState[$change->getMessage()->getId()] = false;
                     }
                 }
             }
@@ -100,6 +96,19 @@ final readonly class GmailService implements MailServiceInterface
 
             $pageToken = $history->getNextPageToken();
         } while ($pageToken !== null && $pageToken !== '');
+
+        /** @var array<int, string> $readMessageIds */
+        $readMessageIds = [];
+        /** @var array<int, string> $unreadMessageIds */
+        $unreadMessageIds = [];
+
+        foreach ($readState as $id => $isRead) {
+            if ($isRead) {
+                $readMessageIds[] = (string) $id;
+            } else {
+                $unreadMessageIds[] = (string) $id;
+            }
+        }
 
         return new MailDeltaResult(
             messageIds: collect($messageIds),
