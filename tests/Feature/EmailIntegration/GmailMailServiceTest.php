@@ -402,6 +402,76 @@ it('surfaces new, read, and unread message ids from gmail history', function ():
         ->and($delta->newCursor)->toBe('4000');
 });
 
+it('keeps only the last unread-label change when a message is marked unread then read in one sync', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $markedUnread = new History;
+    $markedUnread->setLabelsAdded([gmailHistoryLabelAdded('msg-flip', ['UNREAD'])]);
+
+    $markedRead = new History;
+    $markedRead->setLabelsRemoved([gmailHistoryLabelRemoved('msg-flip', ['UNREAD'])]);
+
+    $response = new ListHistoryResponse;
+    $response->setHistoryId('4000');
+    $response->setHistory([$markedUnread, $markedRead]);
+
+    $gmail = fakeGmailHistory(fn (): ListHistoryResponse => $response);
+
+    $delta = new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($delta->readMessageIds->all())->toBe(['msg-flip'])
+        ->and($delta->unreadMessageIds?->all())->toBe([]);
+});
+
+it('keeps only the last unread-label change when a message is marked read then unread in one sync', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $markedRead = new History;
+    $markedRead->setLabelsRemoved([gmailHistoryLabelRemoved('msg-flip', ['UNREAD'])]);
+
+    $markedUnread = new History;
+    $markedUnread->setLabelsAdded([gmailHistoryLabelAdded('msg-flip', ['UNREAD'])]);
+
+    $response = new ListHistoryResponse;
+    $response->setHistoryId('4000');
+    $response->setHistory([$markedRead, $markedUnread]);
+
+    $gmail = fakeGmailHistory(fn (): ListHistoryResponse => $response);
+
+    $delta = new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($delta->unreadMessageIds?->all())->toBe(['msg-flip'])
+        ->and($delta->readMessageIds->all())->toBe([]);
+});
+
+it('keeps only the last unread-label change when the flip spans history pages', function (): void {
+    $account = ConnectedAccount::factory()->make();
+
+    $firstHistory = new History;
+    $firstHistory->setLabelsAdded([gmailHistoryLabelAdded('msg-flip', ['UNREAD'])]);
+
+    $firstPage = new ListHistoryResponse;
+    $firstPage->setHistoryId('4100');
+    $firstPage->setNextPageToken('page-2');
+    $firstPage->setHistory([$firstHistory]);
+
+    $secondHistory = new History;
+    $secondHistory->setLabelsRemoved([gmailHistoryLabelRemoved('msg-flip', ['UNREAD'])]);
+
+    $secondPage = new ListHistoryResponse;
+    $secondPage->setHistoryId('4100');
+    $secondPage->setHistory([$secondHistory]);
+
+    $gmail = fakeGmailHistory(function (string $userId, array $params) use ($firstPage, $secondPage): ListHistoryResponse {
+        return isset($params['pageToken']) ? $secondPage : $firstPage;
+    });
+
+    $delta = new GmailService($account, $gmail)->fetchDelta('3891');
+
+    expect($delta->readMessageIds->all())->toBe(['msg-flip'])
+        ->and($delta->unreadMessageIds?->all())->toBe([]);
+});
+
 it('follows gmail history pages until the token is exhausted', function (): void {
     $account = ConnectedAccount::factory()->make();
     $captured = [];
