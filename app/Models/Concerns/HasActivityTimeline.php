@@ -41,8 +41,16 @@ trait HasActivityTimeline
                         'email_received',
                         when: fn (Email $email): bool => $email->direction === EmailDirection::INBOUND && $email->sent_at === null,
                     )
-                    ->with(['from', 'labels', 'participants'])
-                    ->title(fn (Email $email): string => $email->subject ?? 'Email')
+                    ->with(['from', 'labels', 'participants', 'shares'])
+                    ->title(function (Email $email) use ($viewer): string {
+                        // VisibleEmailScope admits metadata-only mail. Subjects are masked
+                        // here the same way the inbox does: viewSubject, not a raw column read.
+                        if (! $viewer instanceof User || ! $viewer->can('viewSubject', $email)) {
+                            return '(subject hidden)';
+                        }
+
+                        return $email->subject ?? 'Email';
+                    })
                     ->description(fn (Email $email): ?string => $email->from->first()?->email_address)
                     ->causer(fn (Email $email) => $email->from->first());
 
