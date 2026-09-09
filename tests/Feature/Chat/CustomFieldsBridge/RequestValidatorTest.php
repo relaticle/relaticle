@@ -12,14 +12,14 @@ beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 });
 
-it('returns the clean payload unchanged for simple string fields', function (): void {
+it('renders markdown into html for a rich editor field', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['description' => 'Hello']);
 
     expect($result->error)->toBeNull()
-        ->and($result->cleanFields)->toBe(['description' => 'Hello']);
+        ->and($result->cleanFields)->toBe(['description' => "<p>Hello</p>\n"]);
 });
 
 it('translates single-choice labels into option IDs', function (): void {

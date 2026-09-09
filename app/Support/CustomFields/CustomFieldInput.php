@@ -8,10 +8,11 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 final readonly class CustomFieldInput
 {
-    public function __construct(private CustomFieldOptionMap $optionMap) {}
+    public function __construct(private CustomFieldOptionMap $optionMap, private MarkdownRenderer $markdown) {}
 
     public function normalize(string $teamId, string $entityType, mixed $customFields): mixed
     {
@@ -58,6 +59,7 @@ final readonly class CustomFieldInput
             CustomFieldType::TOGGLE_BUTTONS => $this->singleOption($field, $value, $entry),
             CustomFieldType::MULTI_SELECT,
             CustomFieldType::CHECKBOX_LIST => $this->optionList($field, $value, $entry),
+            CustomFieldType::RICH_EDITOR => $this->richText($value),
             CustomFieldType::TEXT,
             CustomFieldType::NUMBER,
             CustomFieldType::EMAIL,
@@ -65,7 +67,6 @@ final readonly class CustomFieldInput
             CustomFieldType::LINK,
             CustomFieldType::TEXTAREA,
             CustomFieldType::CHECKBOX,
-            CustomFieldType::RICH_EDITOR,
             CustomFieldType::MARKDOWN_EDITOR,
             CustomFieldType::TAGS_INPUT,
             CustomFieldType::COLOR_PICKER,
@@ -145,6 +146,19 @@ final readonly class CustomFieldInput
         }
 
         return $id;
+    }
+
+    private function richText(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        if (str_starts_with(ltrim($value), '<')) {
+            return $value;
+        }
+
+        return $this->markdown->toHtml($value);
     }
 
     private function skipsOptionTranslation(CustomField $field): bool

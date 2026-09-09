@@ -38,6 +38,7 @@ use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\CustomFields\CustomFieldInput;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -58,6 +59,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
@@ -73,6 +75,7 @@ use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
+use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
@@ -86,6 +89,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
+use Spatie\LaravelMarkdown\MarkdownRenderer;
 use Spatie\Onboard\OnboardingSteps;
 
 final class AppServiceProvider extends ServiceProvider
@@ -152,6 +156,18 @@ final class AppServiceProvider extends ServiceProvider
                 config('markdown-response.driver_options.league.options', []),
             ),
         );
+
+        // The shared MarkdownRenderer always loads HeadingPermalinkExtension, which
+        // stamps a docs-site anchor onto every heading regardless of add_anchors_to_headings.
+        $this->app->when(CustomFieldInput::class)
+            ->needs(MarkdownRenderer::class)
+            ->give(fn (): MarkdownRenderer => new MarkdownRenderer(
+                commonmarkOptions: Arr::except((array) config('markdown.commonmark_options'), 'heading_permalink'),
+                highlightCode: false,
+                cacheStoreName: false,
+                renderAnchors: false,
+                extensions: [TableExtension::class],
+            ));
     }
 
     /**

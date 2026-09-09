@@ -40,3 +40,9 @@ it('updates a task select value by label', function (): void {
         ->assertOk()
         ->assertJsonPath('data.attributes.custom_fields.status.label', 'In progress');
 });
+
+it('stores markdown note bodies as html', function (): void {
+    $this->postJson('/api/v1/notes', ['title' => 'Md note', 'custom_fields' => ['body' => '**bold**']])
+        ->assertCreated()
+        ->assertJsonPath('data.attributes.custom_fields.body', fn (string $body): bool => str_contains($body, '<strong>bold</strong>'));
+});
