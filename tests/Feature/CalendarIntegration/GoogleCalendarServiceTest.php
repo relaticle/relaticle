@@ -348,3 +348,57 @@ it('requests deleted events during incremental sync and maps cancellations to to
         ->and($result->events[0]->providerEventId)->toBe('evt-deleted')
         ->and($result->events[0]->status)->toBe('cancelled');
 });
+
+it('keeps the original sync token on every incremental calendar page', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'refresh_token' => 'refresh',
+        'token_expires_at' => now()->addHour(),
+    ]));
+
+    $firstEvent = new Event;
+    $firstEvent->setId('evt-page-1');
+    $firstEvent->setStatus('cancelled');
+
+    $firstPage = new EventsResource;
+    $firstPage->setItems([$firstEvent]);
+    $firstPage->setNextPageToken('page-2');
+
+    $secondEvent = new Event;
+    $secondEvent->setId('evt-page-2');
+    $secondEvent->setStatus('cancelled');
+
+    $secondPage = new EventsResource;
+    $secondPage->setItems([$secondEvent]);
+    $secondPage->setNextSyncToken('next-token');
+
+    $events = Mockery::mock(Events::class);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->with('primary', [
+            'syncToken' => 'sync-token',
+            'singleEvents' => true,
+            'showDeleted' => true,
+            'maxResults' => 250,
+        ])
+        ->andReturn($firstPage);
+    $events->shouldReceive('listEvents')
+        ->once()
+        ->with('primary', [
+            'syncToken' => 'sync-token',
+            'singleEvents' => true,
+            'showDeleted' => true,
+            'maxResults' => 250,
+            'pageToken' => 'page-2',
+        ])
+        ->andReturn($secondPage);
+
+    $calendar = new Calendar(Mockery::mock(Client::class));
+    $calendar->events = $events;
+
+    $result = (new GoogleCalendarService($account, $calendar))->fetchDelta('sync-token');
+
+    expect($result->nextSyncToken)->toBe('next-token')
+        ->and($result->events)->toHaveCount(2)
+        ->and($result->events[0]->providerEventId)->toBe('evt-page-1')
+        ->and($result->events[1]->providerEventId)->toBe('evt-page-2');
+});

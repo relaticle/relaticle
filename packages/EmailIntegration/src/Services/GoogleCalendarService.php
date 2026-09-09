@@ -95,8 +95,8 @@ final readonly class GoogleCalendarService implements CalendarServiceInterface
             ];
 
             if ($pageToken !== null) {
+                // Google requires the original incremental query, including syncToken, on every page.
                 $params['pageToken'] = $pageToken;
-                unset($params['syncToken']);
             }
 
             try {
