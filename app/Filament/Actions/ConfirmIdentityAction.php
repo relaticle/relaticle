@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions;
 
+use App\Enums\SocialiteProvider;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
@@ -331,7 +332,7 @@ final class ConfirmIdentityAction extends Action
         $user = $this->confirmingUser();
 
         if (! $user->hasPassword()) {
-            return $this->providerOffer();
+            return [];
         }
 
         $hasPasskey = $user->hasPasskey();
@@ -439,22 +440,6 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
-     * @return array<int, Component>
-     */
-    private function providerOffer(): array
-    {
-        if (! $this->providerProofPending()) {
-            return [];
-        }
-
-        return [
-            Placeholder::make('providerOfferHint')
-                ->hiddenLabel()
-                ->content(__('auth.confirm.description')),
-        ];
-    }
-
-    /**
      * Rendering this marks nothing confirmed; only completing the round trip does.
      */
     private function providerConfirmationAction(): ?Action
@@ -467,6 +452,7 @@ final class ConfirmIdentityAction extends Action
 
         return Action::make('confirmWithProvider')
             ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
+            ->icon(SocialiteProvider::tryFrom($account->provider_name)?->icon())
             ->url(route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name]));
     }
 
