@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -274,6 +275,161 @@ it('includes file attachments in the /me/sendMail payload', function (): void {
             && $attachments[0]['contentType'] === 'application/pdf'
             && $attachments[0]['contentBytes'] === base64_encode('PDF-BYTES');
     });
+});
+
+it('sends a reply through createReply so Graph keeps the conversation', function (): void {
+    Http::fake(function (Request $request) {
+        $url = (string) $request->url();
+
+        if ($request->method() === 'GET' && str_contains(urldecode($url), 'internetMessageId eq')) {
+            return Http::response([
+                'value' => [[
+                    'id' => 'ORIG-ID',
+                    'conversationId' => 'CONV-1',
+                    'internetMessageId' => '<orig@example.com>',
+                ]],
+            ]);
+        }
+
+        if ($request->method() === 'POST' && str_ends_with($url, '/createReply')) {
+            return Http::response([
+                'id' => 'DRAFT-ID',
+                'conversationId' => 'CONV-1',
+            ], 201);
+        }
+
+        if ($request->method() === 'PATCH' && str_contains($url, '/me/messages/DRAFT-ID')) {
+            return Http::response([
+                'id' => 'DRAFT-ID',
+                'conversationId' => 'CONV-1',
+            ]);
+        }
+
+        if ($request->method() === 'POST' && str_contains($url, '/me/messages/DRAFT-ID/attachments')) {
+            return Http::response(['id' => 'ATT-1'], 201);
+        }
+
+        if ($request->method() === 'POST' && str_ends_with($url, '/send')) {
+            return Http::response('', 202);
+        }
+
+        return Http::response(['error' => 'unexpected '.$request->method().' '.$url], 500);
+    });
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $result = $service->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+        'cc' => [['email' => 'cc@example.com', 'name' => 'Cc']],
+        'in_reply_to' => '<orig@example.com>',
+        'thread_id' => 'CONV-1',
+        'rfc_message_id' => '<reply@example.com>',
+        'attachments' => [[
+            'filename' => 'notes.txt',
+            'mime_type' => 'text/plain',
+            'content' => 'NOTES',
+        ]],
+    ]);
+
+    expect($result['thread_id'])->toBe('CONV-1')
+        ->and($result['rfc_message_id'])->toBe('<reply@example.com>');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST' && str_ends_with((string) $r->url(), '/me/messages/ORIG-ID/createReply'));
+    Http::assertSent(function (Request $r): bool {
+        if ($r->method() !== 'PATCH' || ! str_contains((string) $r->url(), '/me/messages/DRAFT-ID')) {
+            return false;
+        }
+
+        $payload = $r->data();
+
+        return ($payload['subject'] ?? null) === 'Re: Hello'
+            && ($payload['body']['content'] ?? null) === '<p>Thanks</p>'
+            && ($payload['toRecipients'][0]['emailAddress']['address'] ?? null) === 'sender@example.com'
+            && ($payload['ccRecipients'][0]['emailAddress']['address'] ?? null) === 'cc@example.com'
+            && ($payload['singleValueExtendedProperties'][0]['value'] ?? null) === '<reply@example.com>'
+            && ! array_key_exists('attachments', $payload);
+    });
+    Http::assertSent(function (Request $r): bool {
+        if ($r->method() !== 'POST' || ! str_contains((string) $r->url(), '/me/messages/DRAFT-ID/attachments')) {
+            return false;
+        }
+
+        $payload = $r->data();
+
+        return ($payload['name'] ?? null) === 'notes.txt'
+            && ($payload['contentBytes'] ?? null) === base64_encode('NOTES');
+    });
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST' && str_ends_with((string) $r->url(), '/me/messages/DRAFT-ID/send'));
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+});
+
+it('falls back to sendMail when the original Graph message cannot be found', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response(['value' => []]),
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $service->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+        'in_reply_to' => '<missing@example.com>',
+        'thread_id' => 'CONV-MISSING',
+    ]);
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/createReply'));
+});
+
+it('deletes the Graph reply draft when updating it fails', function (): void {
+    Http::fake(function (Request $request) {
+        $url = (string) $request->url();
+
+        if ($request->method() === 'GET' && str_contains(urldecode($url), 'internetMessageId eq')) {
+            return Http::response([
+                'value' => [[
+                    'id' => 'ORIG-ID',
+                    'conversationId' => 'CONV-1',
+                    'internetMessageId' => '<orig@example.com>',
+                ]],
+            ]);
+        }
+
+        if ($request->method() === 'POST' && str_ends_with($url, '/createReply')) {
+            return Http::response([
+                'id' => 'DRAFT-ID',
+                'conversationId' => 'CONV-1',
+            ], 201);
+        }
+
+        if ($request->method() === 'PATCH' && str_contains($url, '/me/messages/DRAFT-ID')) {
+            return Http::response(['error' => ['message' => 'Invalid draft']], 400);
+        }
+
+        if ($request->method() === 'DELETE' && str_contains($url, '/me/messages/DRAFT-ID')) {
+            return Http::response('', 204);
+        }
+
+        return Http::response(['error' => 'unexpected '.$request->method().' '.$url], 500);
+    });
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    expect(fn () => $service->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'sender@example.com', 'name' => 'Sender']],
+        'in_reply_to' => '<orig@example.com>',
+        'thread_id' => 'CONV-1',
+    ]))->toThrow(RequestException::class);
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'DELETE'
+        && str_contains((string) $r->url(), '/me/messages/DRAFT-ID'));
+    Http::assertNotSent(fn (Request $r): bool => str_ends_with((string) $r->url(), '/send'));
 });
 
 it('expands and maps inbound attachment metadata into FetchedEmailData', function (): void {
