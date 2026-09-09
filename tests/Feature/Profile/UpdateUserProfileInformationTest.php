@@ -270,6 +270,8 @@ describe('email change verification', function () {
         $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
             ->assertRedirect();
 
+        Livewire::test(UpdateProfileInformationComponent::class)->assertActionNotMounted();
+
         Livewire::test(UpdateProfileInformationComponent::class)
             ->assertFormSet(['email' => 'new@example.com'])
             ->call('updateProfile')
