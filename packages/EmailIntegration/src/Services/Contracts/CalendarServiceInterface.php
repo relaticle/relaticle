@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services\Contracts;
 
+use Carbon\CarbonInterface;
 use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
@@ -28,8 +29,9 @@ interface CalendarServiceInterface
 
     /**
      * This mailbox's provider event id for a shared iCalendar UID, if the event exists.
+     * Recurring Google occurrences share an iCalUID, so the occurrence start is required.
      */
-    public function findEventIdByICalUid(string $iCalUid): ?string;
+    public function findEventIdByICalUid(string $iCalUid, CarbonInterface $occurrenceStartsAt): ?string;
 
     public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?CalendarPushChannelData;
 

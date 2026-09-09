@@ -66,8 +66,9 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         }
     }
 
-    public function findEventIdByICalUid(string $iCalUid): ?string
+    public function findEventIdByICalUid(string $iCalUid, CarbonInterface $occurrenceStartsAt): ?string
     {
+        // Microsoft assigns a distinct iCalUId per occurrence, unlike Google.
         $escaped = str_replace("'", "''", $iCalUid);
 
         try {
