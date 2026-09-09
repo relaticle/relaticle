@@ -19,7 +19,7 @@ mutates(StoreEmailJob::class);
  * Build a StoreEmailJob whose mailbox returns a message of the given direction,
  * then run it against the account's inbox/sent toggles.
  */
-function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction): void
+function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction, ?EmailFolder $folder = null): void
 {
     $fetched = new FetchedEmailData(
         providerMessageId: 'msg-'.$direction->value,
@@ -30,7 +30,7 @@ function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction):
         snippet: 'Hello',
         sentAt: Date::now(),
         direction: $direction,
-        folder: $direction === EmailDirection::OUTBOUND ? EmailFolder::Sent : EmailFolder::Inbox,
+        folder: $folder ?? ($direction === EmailDirection::OUTBOUND ? EmailFolder::Sent : EmailFolder::Inbox),
         hasAttachments: false,
         isRead: true,
         bodyText: 'Hello',
@@ -72,4 +72,12 @@ it('stores an email whose direction is enabled', function (): void {
     runStoreEmailJob($account, EmailDirection::INBOUND);
 
     expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(1);
+});
+
+it('skips storing a provider draft even when inbox sync is on', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['sync_inbox' => true, 'sync_sent' => true]));
+
+    runStoreEmailJob($account, EmailDirection::INBOUND, EmailFolder::Drafts);
+
+    expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(0);
 });

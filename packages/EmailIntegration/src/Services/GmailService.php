@@ -169,10 +169,14 @@ final readonly class GmailService implements MailServiceInterface
 
         $params = [
             'maxResults' => 500,
+            // Gmail's messages.list includes drafts unless we exclude them.
+            // Drafts have no SENT label, so the store job would treat them as
+            // inbound and share unsent mail with the workspace.
+            'q' => '-in:drafts',
         ];
 
         if ($daysBack !== null && $daysBack > 0) {
-            $params['q'] = 'after:'.now()->subDays($daysBack)->timestamp;
+            $params['q'] .= ' after:'.now()->subDays($daysBack)->timestamp;
         }
 
         if ($pageToken !== null && $pageToken !== '') {
