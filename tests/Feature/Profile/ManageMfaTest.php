@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use App\Actions\Auth\ConfirmMfaEnrollment;
+use App\Enums\SocialiteProvider;
 use App\Livewire\App\Profile\ManageMfa;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use Filament\Actions\Testing\TestAction;
 use Laravel\Fortify\Fortify;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -289,4 +293,30 @@ test('an invalid recovery code cannot disable MFA', function (): void {
 
     expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
         ->and($user->fresh()->recoveryCodes())->toBe($codes);
+});
+
+test('a provider-only user returns from confirmation with the enrolment modal already open', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Livewire::test(ManageMfa::class)->mountAction('enableMfa');
+
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))->assertRedirect();
+
+    Livewire::test(ManageMfa::class)
+        ->assertActionMounted('enableMfa')
+        ->assertMountedActionModalDontSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']))
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertActionMounted('confirmMfa');
 });

@@ -151,6 +151,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                 'email' => AuthenticationSession::pendingOperation()['target_id'] ?? '',
             ]))
             ->alwaysConfirm()
+            ->resumable(false)
             ->operation('change_email', fn (): string => EmailAddress::canonicalize((string) ($this->data['email'] ?? '')))
             ->beforeFormFilled(function (): void {
                 $this->form->validate();

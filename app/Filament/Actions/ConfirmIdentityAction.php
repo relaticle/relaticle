@@ -60,6 +60,8 @@ final class ConfirmIdentityAction extends Action
 
     private ?string $operation = null;
 
+    private bool $resumable = true;
+
     private Closure|string|null $target = null;
 
     /** @var array<int, Component> */
@@ -103,6 +105,17 @@ final class ConfirmIdentityAction extends Action
     {
         $this->operation = $operation;
         $this->target = $target;
+
+        return $this;
+    }
+
+    /**
+     * Opt out when the action reads form state that a full-page provider round
+     * trip destroys: a re-opened modal would validate or target an empty form.
+     */
+    public function resumable(bool $condition = true): static
+    {
+        $this->resumable = $condition;
 
         return $this;
     }
@@ -450,6 +463,8 @@ final class ConfirmIdentityAction extends Action
             return null;
         }
 
+        $this->rememberResumableAction();
+
         return Action::make('confirmWithProvider')
             ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
             ->icon(SocialiteProvider::tryFrom($account->provider_name)?->icon())
@@ -473,6 +488,23 @@ final class ConfirmIdentityAction extends Action
         }
 
         return ! IdentityConfirmation::confirmedRecently($this->alwaysConfirm ? null : $this->within);
+    }
+
+    private function rememberResumableAction(): void
+    {
+        $livewire = $this->getLivewire();
+
+        if (! $this->resumable || ! $livewire instanceof LivewireComponent) {
+            return;
+        }
+
+        AuthenticationSession::rememberResumableAction(
+            $this->confirmingUser(),
+            $livewire->getName(),
+            $this->getName(),
+            $this->getArguments(),
+            $this->operation === null ? null : (AuthenticationSession::pendingOperation()['id'] ?? null),
+        );
     }
 
     private function linkedProviderAccount(): ?UserSocialAccount

@@ -182,7 +182,7 @@ it('resumes first passkey registration after returning from the linked provider'
         ->assertRedirect();
 
     livewire(ManagePasskeys::class)
-        ->mountAction('registerPasskey')
+        ->assertActionMounted('registerPasskey')
         ->assertMountedActionModalSee(__('profile.sections.passkeys.register'))
         ->assertMountedActionModalDontSee(__('auth.confirm.continue_with_provider', ['provider' => 'Google']))
         ->callMountedAction()
@@ -190,6 +190,36 @@ it('resumes first passkey registration after returning from the linked provider'
         ->assertDispatched('passkey-register');
 
     expect(AuthenticationSession::pendingOperation()['id'])->toBe($grantId);
+});
+
+it('does not reopen the modal when the provider round trip was abandoned', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+
+    livewire(ManagePasskeys::class)->assertActionNotMounted();
+});
+
+it('does not reopen an action recorded for another user', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    IdentityConfirmation::markConfirmed();
+
+    $this->actingAs(User::factory()->withTeam()->create());
+
+    livewire(ManagePasskeys::class)->assertActionNotMounted();
 });
 
 it('does not reuse a provider confirmation for another operation', function (): void {

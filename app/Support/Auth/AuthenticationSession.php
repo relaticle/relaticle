@@ -29,6 +29,8 @@ final readonly class AuthenticationSession
 
     private const string LINK_SUGGESTION_KEY = 'auth.link_suggestion';
 
+    private const string RESUME_KEY = 'auth.confirm.resume';
+
     private const int LIFETIME_MINUTES = 10;
 
     private const int OPERATION_LIFETIME_MINUTES = 15;
@@ -114,6 +116,7 @@ final readonly class AuthenticationSession
             self::OPERATION_KEY,
             self::ATTEMPT_KEY,
             self::PROVIDER_CONFIRM_KEY,
+            self::RESUME_KEY,
             'auth.password_confirmed_at',
             'login.id',
             'login.remember',
@@ -243,6 +246,86 @@ final readonly class AuthenticationSession
         }
 
         session()->forget(self::OPERATION_KEY);
+    }
+
+    /**
+     * Remember which action to re-open once the user returns from a provider
+     * confirmation. The round trip is a full page load, so the Livewire
+     * component that opened the modal is gone by the time they come back; the
+     * descriptor is written entirely server-side, and re-opening a modal
+     * authorizes nothing by itself.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    public static function rememberResumableAction(User $user, string $component, string $action, array $arguments, ?string $grantId): void
+    {
+        session()->put(self::RESUME_KEY, [
+            'user_id' => (string) $user->getAuthIdentifier(),
+            'component' => $component,
+            'action' => $action,
+            'arguments' => $arguments,
+            'grant_id' => $grantId,
+            'expires_at' => now()->addMinutes(self::OPERATION_LIFETIME_MINUTES)->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * One-time read for the component named in the descriptor, and only once the
+     * proof it was waiting on actually landed. A descriptor left behind by an
+     * abandoned or failed round trip is never returned; it expires instead.
+     *
+     * @return array{action: string, arguments: array<string, mixed>}|null
+     */
+    public static function pullResumableAction(User $user, string $component): ?array
+    {
+        $resume = session()->get(self::RESUME_KEY);
+
+        if (
+            ! is_array($resume)
+            || ! isset($resume['user_id'], $resume['component'], $resume['action'], $resume['expires_at'])
+            || ! is_string($resume['user_id'])
+            || ! is_string($resume['component'])
+            || ! is_string($resume['action'])
+            || ! isset($resume['arguments'])
+            || ! is_array($resume['arguments'])
+            || ! is_int($resume['expires_at'])
+            || ! array_key_exists('grant_id', $resume)
+            || (! is_string($resume['grant_id']) && $resume['grant_id'] !== null)
+        ) {
+            return null;
+        }
+
+        if ($resume['expires_at'] <= now()->getTimestamp()) {
+            session()->forget(self::RESUME_KEY);
+
+            return null;
+        }
+
+        if ($resume['user_id'] !== (string) $user->getAuthIdentifier() || $resume['component'] !== $component) {
+            return null;
+        }
+
+        if (! self::resumeProofSatisfied($resume['grant_id'])) {
+            return null;
+        }
+
+        session()->forget(self::RESUME_KEY);
+
+        /** @var array<string, mixed> $arguments */
+        $arguments = $resume['arguments'];
+
+        return ['action' => $resume['action'], 'arguments' => $arguments];
+    }
+
+    private static function resumeProofSatisfied(?string $grantId): bool
+    {
+        if ($grantId === null) {
+            return IdentityConfirmation::confirmedRecently();
+        }
+
+        $pending = self::pendingOperation();
+
+        return $pending !== [] && $pending['id'] === $grantId && $pending['proven'];
     }
 
     /**
