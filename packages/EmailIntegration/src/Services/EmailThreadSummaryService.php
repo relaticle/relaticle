@@ -26,17 +26,20 @@ final readonly class EmailThreadSummaryService
      */
     public function getSummary(EmailThread $thread, User $viewer, bool $regenerate = false): AiSummary
     {
+        $prompt = $this->buildPrompt($thread, $viewer);
+        $inputHash = hash('sha256', $viewer->getKey()."\n".$prompt);
+
         if (! $regenerate) {
-            $cached = $thread->aiSummary;
+            $cached = $thread->aiSummary()->where('input_hash', $inputHash)->first();
             if ($cached !== null) {
                 return $cached;
             }
         }
 
-        return $this->generateAndCache($thread, $viewer);
+        return $this->generateAndCache($thread, $prompt, $inputHash);
     }
 
-    private function generateAndCache(EmailThread $thread, User $viewer): AiSummary
+    private function buildPrompt(EmailThread $thread, User $viewer): string
     {
         $emails = $thread->emails()
             ->with(['from', 'participants', 'body', 'labels', 'shares'])
@@ -90,11 +93,16 @@ final readonly class EmailThreadSummaryService
             $lines[] = '';
         }
 
+        return implode("\n", $lines);
+    }
+
+    private function generateAndCache(EmailThread $thread, string $prompt, string $inputHash): AiSummary
+    {
         $provider = (string) config('services.email_summary.provider');
         $model = (string) config('services.email_summary.model');
 
         $response = (new ThreadSummarizer)->prompt(
-            implode("\n", $lines),
+            $prompt,
             provider: $provider,
             model: $model,
         );
@@ -109,6 +117,7 @@ final readonly class EmailThreadSummaryService
             'summarizable_type' => $thread->getMorphClass(),
             'summarizable_id' => $thread->getKey(),
             'summary' => $response->text,
+            'input_hash' => $inputHash,
             'model_used' => $model,
             'prompt_tokens' => $response->usage->promptTokens,
             'completion_tokens' => $response->usage->completionTokens,
