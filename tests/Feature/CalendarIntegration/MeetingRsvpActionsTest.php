@@ -2,15 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
+use App\Models\People;
 use App\Models\User;
 use App\Policies\MeetingPolicy;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Actions\MeetingRsvpActions;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
-use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
@@ -60,7 +63,7 @@ function meetingRsvpInvitation(ConnectedAccount $account, array $overrides = [])
 it('renders the RSVP dropdown as Pending when the mailbox has not answered', function (): void {
     $meeting = meetingRsvpInvitation($this->account);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertSee(AttendeeResponseStatus::NEEDS_ACTION->getLabel());
 });
@@ -70,7 +73,7 @@ it('labels the RSVP dropdown with the current response after the mailbox answers
         'response_status' => AttendeeResponseStatus::ACCEPTED,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertSee(AttendeeResponseStatus::ACCEPTED->getLabel());
 });
@@ -78,7 +81,7 @@ it('labels the RSVP dropdown with the current response after the mailbox answers
 it('shows RSVP actions on the meeting card for invitations the mailbox owner can answer', function (): void {
     $meeting = meetingRsvpInvitation($this->account);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertActionVisible([
             TestAction::make('view')->table($meeting),
             TestAction::make('acceptMeeting'),
@@ -102,7 +105,7 @@ it('shows RSVP actions when the signed-in user is the host even without a self a
         'organizer_email' => $this->account->email_address,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertActionVisible([
             TestAction::make('view')->table($meeting),
             TestAction::make('acceptMeeting'),
@@ -120,7 +123,7 @@ it('shows RSVP actions when the signed-in user is the host even without a self a
 it('shows RSVP actions when the signed-in user is the host', function (): void {
     $meeting = meetingRsvpInvitation($this->account, ['is_organizer' => true]);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertActionVisible([
             TestAction::make('view')->table($meeting),
             TestAction::make('acceptMeeting'),
@@ -151,7 +154,7 @@ it('hides RSVP actions for a teammate who is not listed on the guest list', func
     $this->actingAs($teammate);
     Filament::setTenant($this->team);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertCanSeeTableRecords([$meeting])
         ->assertActionHidden([
             TestAction::make('view')->table($meeting),
@@ -191,7 +194,7 @@ it('hides RSVP actions when only the workspace email is invited but no matching 
     $this->actingAs($teammate);
     Filament::setTenant($this->team);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertCanSeeTableRecords([$meeting])
         ->assertActionHidden([
             TestAction::make('view')->table($meeting),
@@ -224,7 +227,7 @@ it('shows RSVP actions when the workspace email is invited and the matching cale
     $this->actingAs($teammate);
     Filament::setTenant($this->team);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertCanSeeTableRecords([$meeting])
         ->assertActionVisible([
             TestAction::make('view')->table($meeting),
@@ -263,7 +266,7 @@ it('shows RSVP actions when only the connected mailbox email is on the guest lis
     $this->actingAs($teammate);
     Filament::setTenant($this->team);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->assertCanSeeTableRecords([$meeting])
         ->assertActionVisible([
             TestAction::make('view')->table($meeting),
@@ -284,7 +287,7 @@ it('accepts an invitation from the meeting card and updates the calendar', funct
 
     app()->instance(CalendarServiceFactoryInterface::class, $factory);
 
-    livewire(ListMeetings::class)
+    meetingRsvpOnRecord($meeting)
         ->callAction([
             TestAction::make('view')->table($meeting),
             TestAction::make('acceptMeeting'),
@@ -293,3 +296,11 @@ it('accepts an invitation from the meeting card and updates the calendar', funct
 
     expect($meeting->fresh()?->response_status)->toBe(AttendeeResponseStatus::ACCEPTED);
 });
+
+function meetingRsvpOnRecord(Meeting $meeting): Testable
+{
+    $person = People::factory()->create(['team_id' => $meeting->team_id]);
+    $meeting->people()->attach($person, ['link_source' => 'manual']);
+
+    return livewire(MeetingsRelationManager::class, ['ownerRecord' => $person, 'pageClass' => ViewPeople::class]);
+}
