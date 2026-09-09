@@ -1,123 +1,103 @@
-{{-- Pricing cards (managed Cloud + open-source self-hosting) --}}
-<div class="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
-    {{-- Managed Cloud Pro --}}
-    <div
-        x-data="{ yearly: true }"
-        class="relative flex flex-col overflow-hidden rounded-2xl border border-primary/20 bg-white shadow-[0_4px_32px_-8px_rgba(124,58,237,0.08)] dark:border-primary/15 dark:bg-white/[0.02] dark:shadow-[0_4px_32px_-8px_rgba(124,58,237,0.15)]"
-    >
-        <div class="h-1 bg-gradient-to-r from-primary via-purple-500 to-pink-500"></div>
-        <div class="flex flex-1 flex-col p-8">
-            <div class="absolute right-5 top-6">
-                <span class="inline-flex items-center gap-1 rounded-full bg-primary/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-700 dark:bg-primary/[0.15] dark:text-primary-300">
-                    <x-ri-star-fill class="h-3 w-3" />
-                    Recommended
-                </span>
-            </div>
+<div x-data="{ yearly: true }" class="mx-auto max-w-4xl">
+    <div class="mb-8 flex justify-center">
+        <x-billing.interval-toggle />
+    </div>
 
-            <div class="relative mb-6">
-                <div class="flex items-center gap-2.5">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/[0.08] dark:bg-primary/[0.15]">
-                        <x-ri-cloud-line class="h-4.5 w-4.5 text-primary dark:text-primary-400" />
+    <div id="pricing-plans" class="grid gap-5 md:grid-cols-2">
+        <section class="relative flex flex-col rounded-2xl border border-primary-300 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_6px_20px_-10px_rgba(124,58,237,0.25)] dark:border-primary-400/40 dark:bg-white/[0.03] dark:shadow-none">
+            <div class="p-6 sm:p-8">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15]">
+                            <x-icons.plan-cloud-pro class="size-5 text-primary dark:text-primary-400" />
+                        </div>
+                        <h2 class="font-display text-xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('billing.plans.cloud_pro') }}</h2>
                     </div>
-                    <h2 class="font-display text-xl font-semibold text-gray-900 dark:text-white">Cloud Pro</h2>
+                    <span class="shrink-0 rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">{{ __('Recommended') }}</span>
                 </div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Managed by us. Ready in minutes.</p>
+                <p class="mt-4 min-h-10 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('A ready-to-use CRM for your whole team. Hosting included.') }}</p>
+
+                <div class="mt-8">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Per workspace') }}</p>
+                    <p class="mt-2 flex items-baseline gap-1.5" aria-live="polite">
+                        <span class="font-display text-5xl font-bold tracking-[-0.03em] text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ month') }}</span>
+                    </p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">{{ __('billing.pro_plan.billed_yearly') }}</p>
+                </div>
+
+                <x-marketing.button :href="route('login')" iconTrailing="ri-arrow-right-line" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                    {{ __('Start for free') }}
+                </x-marketing.button>
+                <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('14-day trial. No card required.') }}</p>
             </div>
 
-            <div class="relative mb-6">
-                <div class="flex items-baseline gap-1">
-                    <span class="text-5xl font-bold tracking-tight text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
-                    <span class="text-sm text-gray-400 dark:text-gray-500">/mo</span>
-                </div>
-                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">Per workspace. Never per seat.</p>
-
-                <div class="mt-4 inline-flex items-center gap-2 rounded-full border border-gray-200/80 p-1 text-xs dark:border-white/[0.08]">
-                    <button type="button" @click="yearly = true" :aria-pressed="yearly" :class="yearly ? 'bg-primary text-white' : 'text-gray-500 dark:text-gray-400'" class="rounded-full px-3 py-1 font-medium transition">
-                        Yearly
-                        <span class="ml-1 text-[10px]" :class="yearly ? 'text-white/80' : 'text-primary-600 dark:text-primary-300'">Save 21%</span>
-                    </button>
-                    <button type="button" @click="yearly = false" :aria-pressed="!yearly" :class="!yearly ? 'bg-primary text-white' : 'text-gray-500 dark:text-gray-400'" class="rounded-full px-3 py-1 font-medium transition">Monthly</button>
-                </div>
-            </div>
-
-            <div class="relative mb-8 flex-1">
+            <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
+                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Your workspace includes') }}</p>
                 <ul class="space-y-3">
-                    @foreach([
-                        'Unlimited users and records',
-                        '2,000 AI credits / month',
-                        'Premium AI models included',
-                        'REST API and 37-tool MCP server',
-                        'Email support',
-                    ] as $feature)
-                        <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
-                            <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
+                    @foreach(__('billing.pro_plan.features') as $feature)
+                        <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
+                            <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-primary dark:text-primary-400" />
                             {{ $feature }}
                         </li>
                     @endforeach
                 </ul>
+                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('Need more AI credits? Prepaid top-ups are available.') }}</p>
             </div>
+        </section>
 
-            <x-marketing.button href="{{ route('login') }}">
-                Start your 14-day trial, no card
-            </x-marketing.button>
-            <p class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500" x-text="yearly ? '$228 billed yearly · save $60' : 'Billed monthly · cancel anytime'">
-                $228 billed yearly · save $60
-            </p>
-        </div>
-    </div>
-
-    {{-- Open-source self-hosting --}}
-    <div class="relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_2px_16px_-6px_rgba(0,0,0,0.05)] dark:border-white/[0.06] dark:bg-white/[0.02] dark:shadow-none">
-        <div class="h-1 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-white/10 dark:via-white/20 dark:to-white/10"></div>
-        <div class="flex flex-1 flex-col p-8">
-            <div class="mb-6">
-                <div class="flex items-center gap-2.5">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 dark:bg-white/[0.06]">
-                        <x-ri-server-line class="h-4.5 w-4.5 text-gray-600 dark:text-gray-400" />
+        <section id="enterprise-plan" class="flex flex-col rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.08] dark:bg-white/[0.02]">
+            <div class="p-6 sm:p-8">
+                <div class="flex items-center gap-3">
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 dark:bg-white/[0.06]">
+                        <x-icons.plan-enterprise class="size-5 text-gray-700 dark:text-gray-300" />
                     </div>
-                    <h2 class="font-display text-xl font-semibold text-gray-900 dark:text-white">Self-Hosted</h2>
+                    <h2 class="font-display text-xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</h2>
                 </div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Your server, your data, your rules.</p>
+                <p class="mt-4 min-h-10 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.tagline') }}</p>
+
+                <div class="mt-8" aria-label="{{ __('billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
+                    <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Starting at') }}</p>
+                    <p class="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+                        <span class="font-display text-5xl font-bold tracking-[-0.03em] text-gray-950 dark:text-white">${{ $enterprisePrice }}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ year') }}</span>
+                    </p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.billing') }}</p>
+                </div>
+
+                <x-marketing.button variant="secondary" :href="route('contact', ['plan' => 'enterprise'])" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                    {{ __('billing.enterprise.contact') }}
+                </x-marketing.button>
+                <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('No commitment until scope is agreed.') }}</p>
             </div>
 
-            <div class="mb-8">
-                <div class="flex items-baseline gap-1">
-                    <span class="text-5xl font-bold tracking-tight text-gray-950 dark:text-white">Free</span>
-                    <span class="text-sm text-gray-400 dark:text-gray-500">forever</span>
-                </div>
-                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">AGPL-3.0 open source</p>
-            </div>
-
-            <div class="mb-8 flex-1">
+            <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
+                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.includes') }}</p>
                 <ul class="space-y-3">
-                    @foreach([
-                        'Unlimited users and records',
-                        'Full source code access',
-                        'Docker Compose deployment',
-                        'Data never leaves your server',
-                        'Community support on Discord',
-                    ] as $feature)
-                        <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
-                            <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+                    @foreach(__('billing.enterprise.features') as $feature)
+                        <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
+                            <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" />
                             {{ $feature }}
                         </li>
                     @endforeach
                 </ul>
+                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.terms') }}</p>
             </div>
-
-            <x-marketing.button variant="secondary" href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
-                View on GitHub
-            </x-marketing.button>
-        </div>
+        </section>
     </div>
-</div>
 
-<div class="mx-auto mt-8 max-w-4xl space-y-3 text-center">
-    <p class="text-sm text-gray-500 dark:text-gray-400">
-        Need higher AI allowances or custom invoicing?
-        <a href="{{ route('contact') }}" class="font-medium text-primary-600 hover:underline dark:text-primary-400">Talk to us</a>.
-    </p>
-    <p class="text-xs text-gray-400 dark:text-gray-500">
-        Credit cost varies by model and tool calls. A simple reply is 1 credit; a premium one costs more. Allowances may evolve with notice.
-    </p>
+    <div id="self-hosting" class="mt-5 flex flex-col gap-4 rounded-2xl border border-gray-200/80 bg-gray-50 p-5 dark:border-white/[0.06] dark:bg-white/[0.02] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div class="flex items-start gap-4">
+            <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-gray-200/80 dark:bg-white/[0.06] dark:shadow-none dark:ring-white/[0.08]">
+                <x-ri-github-fill class="size-5 text-gray-700 dark:text-gray-300" />
+            </div>
+            <div>
+                <p class="font-display text-base font-semibold text-gray-950 dark:text-white">{{ __('Prefer to self-host? It’s free.') }}</p>
+                <p class="mt-1 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('AGPL-3.0 open source. Unlimited users and records on your own server, forever.') }}</p>
+            </div>
+        </div>
+        <x-marketing.button variant="secondary" size="sm" :href="route('selfHosted')" iconTrailing="ri-arrow-right-line" class="shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+            {{ __('Explore self-hosting') }}
+        </x-marketing.button>
+    </div>
 </div>

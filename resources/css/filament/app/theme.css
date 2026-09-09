@@ -27,18 +27,42 @@
    Pure Tailwind CSS Classes Only
    =================================== */
 
-/* App Panel Custom Layout */
+/* App Panel Custom Layout
+
+   Profile (and any tall page) was scrolling the document. Overflow past
+   <body> paints on <html>. html.fi is only min-h-dvh; Filament also sets
+   .fi-main-ctn to min-h-[calc(100dvh-4rem)]. The app shell used h-screen
+   (100vh), which can be taller than 100dvh. Lock html/body and keep the
+   only scroller on .fi-layout. */
+html.fi:has(body.fi-panel-app) {
+    height: 100dvh;
+    overflow: hidden;
+}
+
+.fi-body.fi-panel-app {
+    height: 100dvh;
+    overflow: hidden;
+}
+
 .fi-app-layout {
-    @apply flex h-screen;
+    @apply flex h-full overflow-hidden;
 }
 
 .fi-app-main-wrapper {
-    @apply flex-1 flex flex-col min-w-0;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col;
 
-    /* Only the content area scrolls, not the topbar */
     > .fi-layout {
-        @apply flex-1 overflow-y-auto;
+        @apply min-h-0 flex-1 overflow-y-auto;
+        height: auto;
     }
+}
+
+.fi-body.fi-panel-app .fi-app-layout .fi-main-ctn {
+    min-height: 0;
+}
+
+.fi-app-layout .fi-main {
+    height: auto;
 }
 
 .fi-header-heading {
@@ -98,6 +122,13 @@
        above the prefix icon instead of centred on it. */
     .fi-input {
         @apply h-full py-0 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400;
+
+        /* Global search renders `type="search"`, so WebKit paints its own blue
+           cancel glyph next to the key cap. Escape already clears the field. */
+        &::-webkit-search-cancel-button,
+        &::-webkit-search-decoration {
+            @apply appearance-none;
+        }
     }
 
     /* Keyboard hint reads as a key cap rather than trailing text */
@@ -259,8 +290,15 @@
 
     .fi-sidebar-item-btn,
     .fi-sidebar-group-btn,
-    .fi-sidebar-search,
     .fi-tenant-menu-trigger-text {
+        @apply overflow-hidden;
+    }
+
+    /* The search field clips only while the rail is collapsed, so its label
+       slides out behind the narrowing edge like every other one. An open
+       sidebar must not clip it: the results panel is absolutely positioned and
+       wider than the column, so a clip here hides every result on desktop. */
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-search {
         @apply overflow-hidden;
     }
 
@@ -427,8 +465,19 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply border-r border-gray-100 dark:border-gray-800;
 }
 
+/* Rounded corners only. overflow-hidden made this box Floating UI's flip
+   clipping ancestor. Row action menus teleport out so they stay visible, then
+   flip to the top of a short relation-manager table and cover + New / Attach. */
 .fi-ta-content {
-    @apply rounded-xl overflow-hidden;
+    @apply rounded-xl;
+}
+
+/* asmit/resized-column sets overflow-x: auto on the same node Filament marks
+   as the fixed positioning context. CSS then computes overflow-y to auto as
+   well, which is the same clipping ancestor as above. Keep horizontal scroll
+   on .fi-ta-table-wrapper only. */
+.fi-ta-content-ctn.fi-fixed-positioning-context {
+    overflow: visible;
 }
 
 .fi-ta-table thead {
@@ -493,22 +542,42 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 }
 
 /* Dropdowns */
-.fi-dropdown-panel {
-    @apply rounded-xl;
-}
 
 /* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
    z-index 21 so its own dropdowns clear the sticky table head at 19. That also
    puts it above a page-header action dropdown, whose panel is Filament's
    default z-index 20, so the panel renders *behind* the search field and
-   filter/column triggers. Lift those panels over the toolbar; 22 keeps them
-   under Filament chrome (topbar/sidebar, z-index 30). */
-.fi-header-actions-ctn .fi-dropdown-panel {
-    @apply z-[22];
+   filter/column triggers. Row ⋮ menus teleport to body at the same default,
+   so they paint under + New / Attach and the column-reorder grip sits on
+   Detach. 22 clears the toolbar and stays under Filament chrome (30). */
+.fi-dropdown-panel {
+    @apply z-[22] rounded-xl p-1;
+}
+
+.fi-dropdown-list {
+    @apply flex flex-col gap-0.5 p-0;
+}
+
+.fi-dropdown-list + .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
 .fi-dropdown-list-item {
-    @apply rounded-lg;
+    @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm;
+}
+
+.fi-dropdown-list-item .fi-icon {
+    @apply size-5 shrink-0;
+}
+
+.fi-dropdown-list-item-label {
+    @apply min-w-0 flex-1 text-start;
+}
+
+/* Livewire shows this on click. Idle, it must not occupy layout or it reads
+   as a grip on Detach. */
+.fi-dropdown-panel .fi-loading-indicator {
+    display: none;
 }
 
 /* Panels */
@@ -537,7 +606,7 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
 /* Actions */
 .fi-ac-action:hover,
-.fi-ta-actions button:hover {
+.fi-ta-actions button:hover:not(.fi-dropdown-list-item) {
     @apply transition-opacity duration-200 opacity-80;
 }
 

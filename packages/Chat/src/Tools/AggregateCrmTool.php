@@ -197,7 +197,7 @@ final class AggregateCrmTool implements Tool
         return (string) json_encode([
             'group_by' => $groupBy,
             'rows' => $mappedRows,
-            'total_count' => (int) $rows->sum('count'),
+            'total_count' => (int) $rows->sum(fn (Task $row): int => (int) $row->getAttribute('count')),
             'truncated' => false,
         ], JSON_UNESCAPED_SLASHES);
     }

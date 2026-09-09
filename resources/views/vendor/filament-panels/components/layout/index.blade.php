@@ -85,7 +85,6 @@
                             x-bind:style="'display: flex; opacity:1;'" {{-- Mimics `x-cloak`, as using `x-cloak` causes visual issues with chart widgets --}}
                         @endif
                         class="fi-main-ctn"
-                        style="min-height: 100%;"
                     >
                         {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::CONTENT_BEFORE, scopes: $renderHookScopes) }}
 

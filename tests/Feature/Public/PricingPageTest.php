@@ -5,9 +5,12 @@ declare(strict_types=1);
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
+use App\Support\CompetitorFacts;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\ModelRegistry;
 use Symfony\Component\DomCrawler\Crawler;
+
+mutates(Plan::class, ModelRegistry::class, CompetitorFacts::class);
 
 it('shows the legacy two-card page when billing is off', function (): void {
     Feature::define(BillingFeature::class, false);
@@ -23,28 +26,77 @@ it('shows the pro tier when billing is on', function (): void {
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('No per-seat pricing. Ever.')
+        ->assertSee('One price for your whole team.')
         ->assertSee('$19')
         ->assertSee('$24')
         ->assertSee('$228 billed yearly')
         ->assertSee('Save 21%')
         ->assertSee('2,000 AI credits')
         ->assertSee('Cloud Pro')
-        ->assertSee('Self-Hosted')
-        ->assertSee('Start your 14-day trial')
+        ->assertSee('Prefer to self-host? It’s free.')
+        ->assertSee('Start for free')
+        ->assertSee('14-day trial. No card required.')
         ->assertDontSee('One workspace price as your team grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');
 });
 
-it('advertises all MCP tools in the feature metrics', function (): void {
+it('keeps self-hosting separate from the two paid plan choices', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $response = $this->get('/pricing');
+    $crawler = new Crawler((string) $response->getContent());
+
+    expect($crawler->filter('#pricing-plans h2')->each(fn (Crawler $heading): string => trim($heading->text())))
+        ->toBe(['Cloud Pro', 'Enterprise'])
+        ->and($crawler->filter('#self-hosting a')->attr('href'))->toBe(route('selfHosted'));
+});
+
+it('closes with a trial start and a sales contact when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
     $response = $this->get('/pricing')->assertOk();
     $crawler = new Crawler((string) $response->getContent());
-    $toolCount = $crawler
-        ->filterXPath('//*[normalize-space(text())="MCP Tools"]/preceding-sibling::div[1]')
-        ->text();
+    $cta = $crawler->filter('#pricing-cta');
 
-    expect($toolCount)->toBe('37');
+    expect($cta->filter('h2')->text())->toBe(__('Start with a 14-day trial'))
+        ->and($cta->filter('a[href="'.route('login').'"]')->text())->toContain(__('Start for free'))
+        ->and($cta->filter('a[href="'.route('contact').'"]')->text())->toContain(__('Talk to us'))
+        ->and($crawler->filter('#pricing-plans #self-hosting'))->toHaveCount(0)
+        ->and($crawler->filter('#self-hosting a[href="'.route('selfHosted').'"]'))->toHaveCount(1);
+});
+
+it('closes with a free start and a self-hosting link when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $response = $this->get('/pricing')->assertOk();
+    $cta = (new Crawler((string) $response->getContent()))->filter('#pricing-cta');
+
+    expect($cta->filter('a[href="'.route('login').'"]')->text())->toContain(__('Start for free'))
+        ->and($cta->filter('a[href="'.route('selfHosted').'"]')->text())->toContain(__('Explore self-hosting'))
+        ->and(trim($cta->filter('a[href="'.route('contact').'"]')->text()))->toBe(__('Questions? Talk to us.'));
+});
+
+it('answers the trial question right after the hosted plan question when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $response = $this->get('/pricing')->assertOk();
+    $questions = (new Crawler((string) $response->getContent()))
+        ->filter('#pricing-faq button')
+        ->each(fn (Crawler $button): string => trim($button->text()));
+
+    $hostedIndex = array_search(__("What's included in the hosted plan?"), $questions, true);
+
+    expect($hostedIndex)->not->toBeFalse()
+        ->and($questions[$hostedIndex + 1])->toBe(__('What happens after my trial ends?'));
+});
+
+it('links to the complete MCP tool offering', function (): void {
+    $response = $this->get('/pricing')->assertOk();
+    $crawler = new Crawler((string) $response->getContent());
+    $toolLink = $crawler->filter('main a[href="'.route('ai').'"]')->text();
+
+    expect($toolLink)->toContain('37 MCP tools');
 });
 
 it('emits product json-ld on the pricing page', function (): void {
@@ -100,14 +152,14 @@ it('scopes the hosted-plan faq to the free tier when billing is off', function (
         ->assertDontSee('2,000-credit');
 });
 
-it('shows the comparison list with the pro-tier hosted price and updates when billing is on', function (): void {
+it('compares hosted product access with scoped Enterprise services when billing is on', function (): void {
     Feature::define(BillingFeature::class, true);
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee(__('Self-hosted or hosted: how to choose'))
+        ->assertSee(__('Choose how you get started'))
         ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
-        ->assertSee(__('Managed by Relaticle. No self-hosted maintenance required'))
+        ->assertSee(__('Scoped implementation project'))
         ->assertDontSee(__('$0/mo per workspace'))
         ->assertDontSee(__('Zero-downtime updates and automatic daily backups, handled for you'));
 });
@@ -131,6 +183,22 @@ it('emits accurate product json-ld offers when billing is on', function (): void
         ->assertSee('"name":"Self-hosted","price":"0"', false)
         ->assertSee('"name":"Cloud Pro","price":"19"', false)
         ->assertDontSee('"name":"Cloud","price":"0"', false);
+});
+
+it('keeps the Enterprise starting price consistent with its annual structured offer', function (): void {
+    Feature::define(BillingFeature::class, true);
+    config(['relaticle.enterprise.starting_price_yearly' => 25_000]);
+
+    $response = $this->get('/pricing')->assertSee('From $25,000 / year');
+    $crawler = new Crawler((string) $response->getContent());
+    $graph = json_decode($crawler->filter('script[type="application/ld+json"]')->text(), true, 512, JSON_THROW_ON_ERROR);
+    $product = collect($graph['@graph'])->firstWhere('@type', 'Product');
+    $offer = collect($product['offers'])->firstWhere('name', 'Enterprise');
+
+    expect($offer)->not->toBeNull()
+        ->and($offer['priceSpecification']['minPrice'])->toBe(25_000)
+        ->and($offer['priceSpecification']['unitText'])->toBe('year')
+        ->and($offer['url'])->toBe(route('contact', ['plan' => 'enterprise']));
 });
 
 it('emits accurate product json-ld offers when billing is off', function (): void {
@@ -256,14 +324,18 @@ it('names the models a plan includes even when this install holds no provider ke
         ->assertDontSee('Gemini');
 });
 
-it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is on', function (): void {
-    // No Enterprise plan card or checkout path exists in the codebase, so the page must
-    // not name it as a contactable/sellable tier anywhere in its visible copy.
+it('offers Enterprise through a scoped sales inquiry with an annual starting price', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $this->get('/pricing')
-        ->assertOk()
-        ->assertDontSee('Enterprise');
+    $response = $this->get('/pricing')
+        ->assertSee('From $20,000 / year')
+        ->assertSee('Scope, usage, support, and delivery milestones agreed before signing.')
+        ->assertSee('What does Enterprise include?');
+
+    $card = (new Crawler((string) $response->getContent()))->filter('#enterprise-plan');
+
+    expect($card->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'enterprise']))
+        ->and($card->text())->toContain('Implementation scoped to your workflow');
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is off', function (): void {

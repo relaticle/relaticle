@@ -185,6 +185,21 @@ it('preserves a sysadmin-granted plan when an unrelated subscription ends', func
         ->and($balance->credits_remaining)->toBe(Plan::Enterprise->credits());
 });
 
+it('preserves an Enterprise grant when an older Pro subscription sends an update', function (string $status): void {
+    $team = stripeBillingTeam();
+    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
+    $team->refresh()->forceFill(['plan' => Plan::Enterprise])->save();
+    app(CreditService::class)->resetPeriod($team);
+
+    sendStripeWebhook(stripeSubscriptionEvent($team, 'updated', ['status' => $status]))->assertSuccessful();
+
+    expect($team->refresh()->plan)->toBe(Plan::Enterprise);
+
+    app(CreditService::class)->resetPeriod($team);
+
+    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->sole()->credits_remaining)->toBe(10_000);
+})->with(['active', 'past_due']);
+
 it('leaves the plan untouched for a price that maps to no plan', function (): void {
     $team = stripeBillingTeam();
 
@@ -436,6 +451,18 @@ it('notifies the workspace owner when a renewal charge fails', function (): void
 
     expect($notification->data['title'])->toContain($team->name)
         ->and($notification->data['body'])->toBe(__('billing.payment_failed.notification_body'));
+});
+
+it('keeps Enterprise access clear in an older subscription payment notification', function (): void {
+    $team = stripeBillingTeam();
+    $team->forceFill(['plan' => Plan::Enterprise])->save();
+
+    sendStripeWebhook(invoicePaymentFailedEvent($team))->assertOk();
+
+    $notification = $team->owner->notifications()->sole();
+
+    expect($notification->data['body'])->toContain('Your Enterprise access is unchanged.')
+        ->not->toContain('to keep Pro');
 });
 
 it('notifies once per invoice, not once per Stripe retry attempt', function (): void {
