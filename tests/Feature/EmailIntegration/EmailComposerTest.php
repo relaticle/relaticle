@@ -1092,6 +1092,66 @@ it('downloads a provider-stored attachment when forwarding', function (): void {
     expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
 });
 
+it('does not queue a forward when a provider attachment cannot be downloaded', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $attachment = EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andThrow(new RuntimeException('provider unavailable'));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertSet('isOpen', true)
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 18,
+        ]])
+        ->assertNotified(__('filament/emails/composer.notifications.send_attachment_unavailable.title'));
+
+    expect(Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->exists())->toBeFalse();
+});
+
 it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
