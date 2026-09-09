@@ -8,6 +8,7 @@ use App\Features\SocialAuth;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\App\Profile\ManageMfa;
 use App\Livewire\App\Profile\ManagePasskeys;
+use App\Livewire\Concerns\ResumesIdentityConfirmation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
@@ -22,6 +23,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use PragmaRX\Google2FA\Google2FA;
 
 mutates(DeletePasskey::class, ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class, AuthenticationSession::class);
+mutates(ResumesIdentityConfirmation::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
@@ -266,6 +268,43 @@ it('does not reopen the action on a component it was not recorded for', function
 
     livewire(ManageMfa::class)->assertActionNotMounted();
     livewire(ManagePasskeys::class)->assertActionMounted('registerPasskey');
+});
+
+it('resumes the modal after the mfa follow-up that a provider confirmation triggers', function (): void {
+    $user = User::factory()->withTeam()->withConfirmedMfa()->socialOnly()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    livewire(ManagePasskeys::class)->mountAction('registerPasskey');
+    $grantId = AuthenticationSession::pendingOperation()['id'];
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect(route('identity.confirm.mfa'));
+
+    $this->get(route('identity.confirm.mfa'))->assertOk();
+
+    $secret = Fortify::currentEncrypter()->decrypt((string) $user->two_factor_secret);
+    $this->post(route('identity.confirm.mfa.store'), [
+        'code' => resolve(Google2FA::class)->getCurrentOtp($secret),
+    ])->assertRedirect();
+
+    livewire(ManagePasskeys::class)
+        ->assertActionMounted('registerPasskey')
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register');
+
+    expect(AuthenticationSession::pendingOperation()['id'])->toBe($grantId);
 });
 
 it('does not reuse a provider confirmation for another operation', function (): void {

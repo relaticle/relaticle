@@ -6,10 +6,12 @@ use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Security;
+use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +25,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 
 mutates(LogoutOtherBrowserSessions::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
+mutates(AuthenticationSession::class, IdentityConfirmationRedirectController::class);
 mutates(EnsureAuthenticationComplete::class);
 
 test('social user can log out other sessions without confirmation', function (): void {
