@@ -13,3 +13,12 @@ toggle, and Gmail backfill lists with `-in:drafts`. Importing a draft would stor
 as `SYNCED` with the account's sharing default, so teammates could read unsent mail
 through linked CRM records. Composer drafts (`EmailStatus::DRAFT`) are a different
 path and stay local.
+
+## Per-viewer shares override the email default in search
+
+`PrivacyService::effectiveTier()` applies a viewer's share before the email's
+`privacy_tier`. Search must do the same. Do not `OR` `privacy_tier` FULL or
+SUBJECT with a share: a metadata-only share on a FULL email would still match
+subject and snippet. Use the share when one exists (direct first, then another
+copy of the same `rfc_message_id`). Fall back to `privacy_tier` only when the
+viewer has no share.
