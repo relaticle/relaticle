@@ -56,7 +56,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
     {
         $user = $this->authUser();
 
-        if (! IdentityConfirmation::satisfied($user)) {
+        if (! IdentityConfirmation::satisfied()) {
             $this->notifyIdentityConfirmationFailed();
 
             return;

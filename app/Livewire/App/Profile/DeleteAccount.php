@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\Profile;
 
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Features\AccountDeletion;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\IdentityConfirmation;
@@ -19,9 +20,15 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Laravel\Pennant\Feature;
 
 final class DeleteAccount extends BaseLivewireComponent
 {
+    public function boot(): void
+    {
+        abort_unless(Feature::active(AccountDeletion::class), 403);
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -66,11 +73,11 @@ final class DeleteAccount extends BaseLivewireComponent
             ->confirmedUsing(fn (): Redirector|RedirectResponse|null => $this->deleteAccount());
     }
 
-    public function deleteAccount(): Redirector|RedirectResponse|null
+    private function deleteAccount(): Redirector|RedirectResponse|null
     {
         $user = $this->authUser();
 
-        if (! IdentityConfirmation::satisfied($user)) {
+        if (! IdentityConfirmation::satisfied()) {
             $this->notifyIdentityConfirmationFailed();
 
             return null;

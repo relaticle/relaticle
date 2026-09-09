@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
+use App\Http\Middleware\RequireIdentityConfirmation;
+use App\Http\Middleware\RequireOperationGrant;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
@@ -80,7 +83,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // api/mcp root banners are exactly the crawlable secondary-host URLs.
         $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
 
-        $middleware->web(append: RedirectToPrimaryHost::class);
+        $middleware->web(append: [
+            RedirectToPrimaryHost::class,
+            EnsureAuthenticationComplete::class,
+        ]);
 
         // Only enforced on multi-host deployments (any *_DOMAIN configured);
         // the framework already skips TrustHosts in local and test runs.
@@ -135,6 +141,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'signed' => ValidateSignature::class,
             'no-referrer' => NoReferrer::class,
+            // Fortify and Passkeys both reference this alias by name in their own
+            // route definitions; overriding it here (rather than swapping every
+            // route's middleware array) is the only way to reach both packages'
+            // routes with the same scoped confirmation policy as the UI.
+            'password.confirm' => RequireIdentityConfirmation::class,
+            'require-operation' => RequireOperationGrant::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [

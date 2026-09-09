@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Profile;
 
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
-use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
@@ -14,18 +14,13 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Fortify\Contracts\UpdatesUserPasswords;
 
 final class UpdatePassword extends BaseLivewireComponent
 {
     /** @var array<string, mixed>|null */
     public ?array $data = [];
-
-    public function mount(): void
-    {
-        // Initialize empty form
-    }
 
     public function form(Schema $schema): Schema
     {
@@ -37,14 +32,6 @@ final class UpdatePassword extends BaseLivewireComponent
                     ->aside()
                     ->description($hasPassword ? __('profile.sections.update_password.description') : __('profile.sections.set_password.description'))
                     ->schema([
-                        TextInput::make('currentPassword')
-                            ->label(__('profile.form.current_password.label'))
-                            ->password()
-                            ->revealable(filament()->arePasswordsRevealable())
-                            ->required($hasPassword)
-                            ->autocomplete('current-password')
-                            ->currentPassword($hasPassword)
-                            ->visible($hasPassword),
                         TextInput::make('password')
                             ->label(__('profile.form.new_password.label'))
                             ->password()
@@ -64,9 +51,7 @@ final class UpdatePassword extends BaseLivewireComponent
                                 fn (Get $get): bool => filled($get('password'))
                             ),
                         Actions::make([
-                            Action::make('save')
-                                ->label(__('profile.actions.save'))
-                                ->submit('updatePassword'),
+                            $this->saveAction(),
                         ]),
                     ]),
             ])
@@ -75,6 +60,27 @@ final class UpdatePassword extends BaseLivewireComponent
     }
 
     public function updatePassword(): void
+    {
+        $this->mountAction('save');
+    }
+
+    public function saveAction(): ConfirmIdentityAction
+    {
+        return ConfirmIdentityAction::make('save')
+            ->label(__('profile.actions.save'))
+            ->modalHeading(__('auth.confirm.heading'))
+            ->modalDescription(__('auth.confirm.description'))
+            ->alwaysConfirm()
+            ->operation('set_password')
+            ->beforeFormFilled(function (): void {
+                $this->form->validate();
+            })
+            ->confirmedUsing(function (): void {
+                $this->savePassword();
+            });
+    }
+
+    private function savePassword(): void
     {
         try {
             $this->rateLimit(5);
@@ -88,10 +94,7 @@ final class UpdatePassword extends BaseLivewireComponent
 
         $data = $this->form->getState();
 
-        // Update the password directly without Fortify validation
-        $this->authUser()->forceFill([
-            'password' => Hash::make($data['password'] ?? ''),
-        ])->save();
+        resolve(UpdatesUserPasswords::class)->update($this->authUser(), $data);
 
         if (request()->hasSession() && filled($data['password'])) {
             request()->session()->put(['password_hash_'.Filament::getAuthGuard() => $this->authUser()->getAuthPassword()]);

@@ -3,22 +3,30 @@
 declare(strict_types=1);
 
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Actions\Profile\RequestEmailChange;
+use App\Enums\SocialiteProvider;
 use App\Livewire\App\Profile\UpdateProfileInformation as UpdateProfileInformationComponent;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use App\Notifications\Auth\NoticeOfEmailChangeRequest;
-use App\Notifications\Auth\VerifyEmail;
 use App\Notifications\Auth\VerifyEmailChange;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\SameOriginUrl;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Laravel\Passkeys\Passkey;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(UpdateUserProfileInformation::class, UpdateProfileInformationComponent::class);
+mutates(UpdateUserProfileInformation::class, UpdateProfileInformationComponent::class, RequestEmailChange::class);
 
 beforeEach(function () {
     $this->action = new UpdateUserProfileInformation;
@@ -80,6 +88,17 @@ describe('email change verification', function () {
         $this->actingAs($this->verifiedUser);
     });
 
+    test('a direct profile submission cannot issue an email change without fresh identity proof', function (): void {
+        session()->put('auth.password_confirmed_at', time() - 60);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile');
+
+        Notification::assertNothingSent();
+        expect($this->verifiedUser->fresh()->email)->toBe('original@example.com');
+    });
+
     test('email change does not update email immediately', function () {
         Livewire::test(UpdateProfileInformationComponent::class)
             ->fillForm([
@@ -87,6 +106,8 @@ describe('email change verification', function () {
                 'email' => 'new@example.com',
             ])
             ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
             ->assertHasNoFormErrors()
             ->assertNotified();
 
@@ -102,6 +123,8 @@ describe('email change verification', function () {
                 'email' => 'new@example.com',
             ])
             ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
             ->assertHasNoFormErrors();
 
         Notification::assertSentOnDemand(VerifyEmailChange::class);
@@ -114,6 +137,8 @@ describe('email change verification', function () {
                 'email' => 'new@example.com',
             ])
             ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
             ->assertHasNoFormErrors();
 
         Notification::assertSentTo($this->verifiedUser, NoticeOfEmailChangeRequest::class);
@@ -139,6 +164,8 @@ describe('email change verification', function () {
                 'email' => 'new@example.com',
             ])
             ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
             ->assertFormSet([
                 'email' => 'original@example.com',
             ]);
@@ -151,12 +178,139 @@ describe('email change verification', function () {
                 'email' => 'new@example.com',
             ])
             ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
             ->assertHasNoFormErrors()
             ->assertNotified();
 
         expect($this->verifiedUser->fresh())
             ->name->toBe('Updated Name')
             ->email->toBe('original@example.com');
+    });
+
+    test('email confirmation keeps the normalized target when the form changes afterward', function (): void {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => '  New@Example.com  '])
+            ->call('updateProfile')
+            ->assertActionMounted('confirmEmailChange')
+            ->assertMountedActionModalSee('new@example.com')
+            ->set('data.email', 'different@example.com')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        Notification::assertSentOnDemand(VerifyEmailChange::class,
+            fn (VerifyEmailChange $notification, array $channels, AnonymousNotifiable $notifiable): bool => $notifiable->routes['mail'] === 'new@example.com');
+        expect(AuthenticationSession::pendingOperation())->toBe([]);
+    });
+
+    test('an enrolled user must prove MFA before requesting an email change', function (): void {
+        $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+        $this->actingAs($user);
+        AuthenticationSession::markComplete($user);
+        $component = Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction()
+            ->assertHasActionErrors(['code']);
+
+        Notification::assertNothingSent();
+
+        $component->setActionData([
+            'password' => 'password',
+            'use_recovery_code' => true,
+            'recovery_code' => 'recovery-code-one',
+        ])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        Notification::assertSentOnDemand(VerifyEmailChange::class);
+        expect($user->fresh()->recoveryCodes())->not->toContain('recovery-code-one');
+    });
+
+    test('a passkey user requests the email change after completing the confirmation ceremony', function (): void {
+        $user = User::factory()->withTeam()->create(['password' => null]);
+        $this->actingAs($user);
+        Passkey::create([
+            'user_id' => $user->id,
+            'name' => 'MacBook Pro',
+            'credential_id' => 'email-change-passkey',
+            'credential' => [],
+        ]);
+        $component = Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile')
+            ->callMountedAction()
+            ->assertDispatched('confirm-identity-ceremony');
+
+        Notification::assertNothingSent();
+        AuthenticationSession::proveOperation($user, 'change_email', 'new@example.com');
+
+        $component->callMountedAction()->assertHasNoActionErrors();
+
+        Notification::assertSentOnDemand(VerifyEmailChange::class);
+    });
+
+    test('a provider-only user resumes the email change after returning from confirmation', function (): void {
+        $user = User::factory()->withTeam()->socialOnly()->create();
+        $this->actingAs($user);
+        $account = UserSocialAccount::factory()->create([
+            'user_id' => $user->id,
+            'provider_name' => SocialiteProvider::GOOGLE->value,
+        ]);
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile');
+        $this->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))->assertRedirect();
+        Socialite::fake('google', (new SocialiteUser)->map([
+            'id' => $account->provider_id,
+            'email' => $user->email,
+        ]));
+        $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+            ->assertRedirect();
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['email' => 'new@example.com'])
+            ->call('updateProfile')
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        Notification::assertSentOnDemand(VerifyEmailChange::class);
+        expect(AuthenticationSession::pendingOperation())->toBe([]);
+    });
+
+    test('the verified email link applies the confirmed change only once', function (): void {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction();
+        /** @var VerifyEmailChange $verification */
+        $verification = Notification::sent(new AnonymousNotifiable, VerifyEmailChange::class)->sole();
+
+        $this->get($verification->url)->assertRedirect();
+
+        expect($this->verifiedUser->fresh()->email)->toBe('new@example.com')
+            ->and($this->verifiedUser->fresh()->email_verified_at)->not->toBeNull();
+        $this->get($verification->url)->assertForbidden();
+    });
+
+    test('the old address can block a confirmed email change', function (): void {
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['email' => 'new@example.com'])
+            ->call('updateProfile')
+            ->setActionData(['password' => 'password'])
+            ->callMountedAction();
+        /** @var NoticeOfEmailChangeRequest $notice */
+        $notice = Notification::sent($this->verifiedUser, NoticeOfEmailChangeRequest::class)->sole();
+        /** @var VerifyEmailChange $verification */
+        $verification = Notification::sent(new AnonymousNotifiable, VerifyEmailChange::class)->sole();
+
+        $this->get($notice->blockVerificationUrl)->assertRedirect();
+        $this->get($verification->url)->assertForbidden();
+
+        expect($this->verifiedUser->fresh()->email)->toBe('original@example.com');
     });
 });
 
@@ -191,26 +345,41 @@ describe('photo upload', function () {
             ->and(Storage::disk('public')->exists($user->profile_photo_path))->toBeTrue();
     })->with(['jpg', 'jpeg', 'png']);
 
-    test('handles photo with email change', function () {
+    test('refuses a photo update that also swaps the email', function () {
         Notification::fake();
         $photo = UploadedFile::fake()->image('avatar.png', 400, 400);
 
-        // Store the file first (simulating what Filament does)
+        $photoPath = $photo->storePublicly('profile-photos', ['disk' => 'public']);
+
+        expect(fn () => $this->action->update($this->user, [
+            'name' => 'Photo User',
+            'email' => 'photouser@example.com',
+            'profile_photo_path' => $photoPath,
+        ]))->toThrow(HttpException::class);
+
+        expect($this->user->fresh())
+            ->email->toBe('john@example.com')
+            ->email_verified_at->not->toBeNull();
+
+        Notification::assertNothingSent();
+    });
+
+    test('handles a photo update that keeps the email', function () {
+        Notification::fake();
+        $photo = UploadedFile::fake()->image('avatar.png', 400, 400);
+
         $photoPath = $photo->storePublicly('profile-photos', ['disk' => 'public']);
 
         $this->action->update($this->user, [
             'name' => 'Photo User',
-            'email' => 'photouser@example.com',
+            'email' => $this->user->email,
             'profile_photo_path' => $photoPath,
         ]);
 
         expect($this->user->fresh())
             ->name->toBe('Photo User')
-            ->email->toBe('photouser@example.com')
-            ->email_verified_at->toBeNull()
+            ->email->toBe('john@example.com')
             ->profile_photo_path->toBe($photoPath);
-
-        Notification::assertSentTo($this->user, VerifyEmail::class);
     });
 
     test('null profile_photo_path does not delete existing photo', function () {
@@ -543,5 +712,43 @@ describe('timezone', function () {
         expect($user->fresh())
             ->name->toBe('Renamed Without Timezone Key')
             ->timezone->toBe('Asia/Tokyo');
+    });
+});
+
+describe('the raw profile-information route', function () {
+    test('a direct request cannot change the account email without an identity proof', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'owner@example.com',
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('user-profile-information.update'), [
+                'name' => $user->name,
+                'email' => 'attacker@example.com',
+            ])
+            ->assertStatus(423);
+
+        expect($user->fresh())
+            ->email->toBe('owner@example.com')
+            ->email_verified_at->not->toBeNull();
+    });
+
+    test('a direct request may still update non-credential fields', function () {
+        $user = User::factory()->withTeam()->create([
+            'name' => 'Original Name',
+            'email' => 'owner@example.com',
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('user-profile-information.update'), [
+                'name' => 'Renamed Over Http',
+                'email' => 'owner@example.com',
+            ])
+            ->assertSuccessful();
+
+        expect($user->fresh())
+            ->name->toBe('Renamed Over Http')
+            ->email->toBe('owner@example.com');
     });
 });

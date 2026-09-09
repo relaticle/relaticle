@@ -5,20 +5,24 @@ declare(strict_types=1);
 namespace App\Filament\Actions;
 
 use App\Models\User;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\OneTimeCodeInput;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
 use LogicException;
 
@@ -26,16 +30,22 @@ use LogicException;
  * Re-entrant identity confirmation as a reusable Filament action.
  *
  * First invocation: if the gate is not satisfied and the user has a passkey, it
- * dispatches the browser confirm ceremony and halts (modal stays open). The global
- * JS handler runs the WebAuthn assertion, which refreshes auth.password_confirmed_at
- * server-side, then re-invokes callMountedAction. On re-entry the gate is satisfied
- * and confirmedUsing() runs. The password path validates and marks confirmed inline,
- * with no ceremony.
+ * dispatches the browser confirm ceremony and halts (modal stays open). The
+ * ceremony runs through PasskeyConfirmationController, which proves identity,
+ * applies enrolled MFA, and marks the session confirmed itself; the JS handler
+ * then re-invokes callMountedAction. On re-entry the gate is satisfied and
+ * confirmedUsing() runs. The password path validates and marks confirmed
+ * inline, with no ceremony. A user with neither a password nor a passkey has
+ * no inline proof to give; if a linked provider offers one, identityFields()
+ * renders it as a link the user must actually complete, never as a bypass.
  *
- * Irreversible actions opt into alwaysConfirm(): the freshness window is ignored and a
- * fresh proof is demanded on every attempt. Re-entry is scoped to the attempt's own
- * start time (a hidden timestamp) rather than the global window, so the passkey ceremony
- * (which refreshes auth.password_confirmed_at) still terminates the loop on re-entry.
+ * Irreversible actions opt into alwaysConfirm(): the freshness window is
+ * ignored and a fresh proof is demanded on every attempt. Re-entry is scoped to
+ * a server-minted attempt id (a hidden field the client cannot forge a value
+ * for) rather than the global window, so the passkey ceremony still terminates
+ * the loop on re-entry. operation() additionally binds that attempt to one of
+ * AuthenticationSession's allowlisted operations, so a matching write action
+ * can later require and consume the same grant.
  */
 final class ConfirmIdentityAction extends Action
 {
@@ -44,6 +54,10 @@ final class ConfirmIdentityAction extends Action
     private bool $alwaysConfirm = false;
 
     private ?int $within = null;
+
+    private ?string $operation = null;
+
+    private Closure|string|null $target = null;
 
     /** @var array<int, Component> */
     private array $prependedSchema = [];
@@ -78,6 +92,19 @@ final class ConfirmIdentityAction extends Action
     }
 
     /**
+     * Bind this attempt to one of AuthenticationSession's allowlisted operations,
+     * so a later write action can require and consume the same grant. Only
+     * meaningful alongside alwaysConfirm().
+     */
+    public function operation(string $operation, Closure|string|null $target = null): static
+    {
+        $this->operation = $operation;
+        $this->target = $target;
+
+        return $this;
+    }
+
+    /**
      * @param  array<int, Component>  $components
      */
     public function prependSchema(array $components): static
@@ -107,10 +134,11 @@ final class ConfirmIdentityAction extends Action
             return $action;
         });
 
-        $this->action(function (array $data, Action $action): mixed {
+        $this->action(function (array $data, Action $action, ?Schema $schema): mixed {
             $user = $this->confirmingUser();
+            $operation = $this->pendingOperationFor($data);
 
-            if ($this->confirmationRequired($user, $data)) {
+            if ($this->confirmationRequired($data)) {
                 if ($user->hasPasskey() && blank($data['password'] ?? null)) {
                     $livewire = $this->getLivewire();
 
@@ -124,41 +152,120 @@ final class ConfirmIdentityAction extends Action
                     $action->halt();
                 }
 
-                IdentityConfirmation::markConfirmed();
+                if (! $user->hasPassword()) {
+                    // Nothing left to prove inline: no password field existed to
+                    // validate, and a linked-provider offer (if any) is completed
+                    // out of band, never by resubmitting this form.
+                    $action->halt();
+                }
+
+                $recovery = (bool) ($data['use_recovery_code'] ?? false);
+
+                try {
+                    IdentityConfirmation::requireMfaProof(
+                        $user,
+                        $recovery ? null : ($data['code'] ?? null),
+                        $recovery ? ($data['recovery_code'] ?? null) : null,
+                    );
+                } catch (ValidationException $exception) {
+                    $field = $recovery ? 'recovery_code' : 'code';
+
+                    // A password field only exists inside a mounted schema, so
+                    // reaching here without one is impossible.
+                    assert($schema instanceof Schema);
+
+                    throw ValidationException::withMessages([
+                        $schema->getStatePath().'.'.$field => $exception->errors()[$field],
+                    ]);
+                }
+
+                IdentityConfirmation::confirmOperation($user, $operation);
             }
 
             throw_if(! $this->confirmedUsing instanceof Closure, LogicException::class, 'ConfirmIdentityAction: confirmedUsing callback is not set.');
 
-            return $this->evaluate($this->confirmedUsing, ['action' => $action]);
+            // The target comes from the grant that was actually proven, never
+            // from a separately re-read Livewire argument: those are mutable
+            // client-visible state and must not be trusted to still name the
+            // same record the user proved fresh identity for.
+            return $this->evaluate($this->confirmedUsing, [
+                'action' => $action,
+                'operationTarget' => $operation['target_id'] ?? null,
+            ]);
         });
     }
 
     /**
      * @param  array<string, mixed>  $data
      */
-    private function confirmationRequired(User $user, array $data): bool
+    private function confirmationRequired(array $data): bool
     {
-        if (! $user->hasPassword() && ! $user->hasPasskey()) {
-            return false;
-        }
-
         if (! $this->alwaysConfirm) {
             return ! IdentityConfirmation::confirmedRecently($this->within);
         }
 
-        // alwaysConfirm ignores the freshness window (and any within() override): proof is
-        // scoped to this attempt's own start time so the passkey ceremony re-entry terminates.
-        // The attempt marker travels through client-writable form state, so it can only ever
-        // tighten the gate: a proof that does not exist at all still fails the freshness check.
-        $attemptStartedAt = (int) ($data['confirm_started_at'] ?? 0);
+        $attemptId = is_string($data['identity_attempt_id'] ?? null) ? $data['identity_attempt_id'] : null;
+
+        if ($attemptId === null) {
+            return true;
+        }
+
+        if ($this->operation !== null) {
+            $pending = AuthenticationSession::pendingOperation();
+
+            // A forged or stale attempt id must never fall through to the
+            // generic window: an unrelated confirmation elsewhere would then
+            // silently authorize this operation with zero proof for it. Only
+            // an exact, still-present grant may ask "has it been proven yet".
+            if ($pending === [] || $pending['id'] !== $attemptId) {
+                return true;
+            }
+
+            return ! $pending['proven'];
+        }
+
+        $user = $this->confirmingUser();
+
+        // A user with neither a password nor a passkey has only the linked
+        // provider offer as proof, and that is a full-page round trip: it
+        // necessarily finishes before this fresh attempt's own mount, every
+        // time. Comparing against attemptStartedAt() would then reject every
+        // provider-proven confirmation this population can ever produce.
+        if (! $user->hasPassword() && ! $user->hasPasskey()) {
+            return ! IdentityConfirmation::confirmedRecently();
+        }
+
         $confirmedAt = (int) session('auth.password_confirmed_at', 0);
 
-        return ! IdentityConfirmation::confirmedRecently() || $confirmedAt < $attemptStartedAt;
+        return ! IdentityConfirmation::confirmedRecently() || $confirmedAt < AuthenticationSession::attemptStartedAt($attemptId);
     }
 
     /**
-     * Pins the moment this attempt began so re-confirmation is scoped to the attempt,
-     * not the global freshness window. Persists across the halt/re-entry cycle.
+     * @param  array<string, mixed>  $data
+     * @return array{operation: string, target_id: string|null}|null
+     */
+    private function pendingOperationFor(array $data): ?array
+    {
+        if ($this->operation === null) {
+            return null;
+        }
+
+        $attemptId = is_string($data['identity_attempt_id'] ?? null) ? $data['identity_attempt_id'] : null;
+        $pending = AuthenticationSession::pendingOperation();
+
+        if ($attemptId === null || $pending === [] || $pending['id'] !== $attemptId) {
+            return null;
+        }
+
+        return ['operation' => $pending['operation'], 'target_id' => $pending['target_id']];
+    }
+
+    /**
+     * Pins a server-bound attempt id so re-confirmation is scoped to this
+     * attempt, not the global freshness window. Persists across the
+     * halt/re-entry cycle because Filament only evaluates default() once, at
+     * mount, and the id then travels as ordinary (client-visible, not
+     * client-writable) form state.
      *
      * @return array<int, Component>
      */
@@ -169,8 +276,41 @@ final class ConfirmIdentityAction extends Action
         }
 
         return [
-            Hidden::make('confirm_started_at')->default(fn (): string => (string) time()),
+            Hidden::make('identity_attempt_id')->default(fn (): string => $this->createAttempt()),
         ];
+    }
+
+    private function createAttempt(): string
+    {
+        if ($this->operation === null) {
+            return AuthenticationSession::beginAttempt();
+        }
+
+        $user = $this->confirmingUser();
+        $target = $this->resolveTarget();
+        $pending = AuthenticationSession::pendingOperation();
+
+        // A provider-only account proves itself out of band, so a fresh attempt
+        // here would discard the grant the OAuth round trip just proved.
+        if ($pending !== [] && ! $user->hasPassword() && ! $user->hasPasskey()) {
+            try {
+                AuthenticationSession::requireOperation($user, $this->operation, $target);
+
+                return $pending['id'];
+            } catch (ValidationException) {
+            }
+        }
+
+        return AuthenticationSession::startOperation($user, $this->operation, $target);
+    }
+
+    private function resolveTarget(): ?string
+    {
+        if ($this->target instanceof Closure) {
+            return $this->evaluate($this->target);
+        }
+
+        return $this->target;
     }
 
     /**
@@ -181,7 +321,7 @@ final class ConfirmIdentityAction extends Action
         $user = $this->confirmingUser();
 
         if (! $user->hasPassword()) {
-            return [];
+            return $this->providerOffer($user);
         }
 
         $hasPasskey = $user->hasPasskey();
@@ -239,7 +379,85 @@ final class ConfirmIdentityAction extends Action
                 ->visible($usesPasswordField)
                 ->required($usesPasswordField)
                 ->rule($passwordRule),
+            ...$this->mfaFields($user, $usesPasswordField),
         ]));
+    }
+
+    /**
+     * @return array<int, Component>
+     */
+    private function mfaFields(User $user, Closure $usesPasswordField): array
+    {
+        if (! $user->hasEnabledTwoFactorAuthentication()) {
+            return [];
+        }
+
+        $usesCode = fn (Get $get): bool => $usesPasswordField($get) && ! (bool) $get('use_recovery_code');
+        $usesRecoveryCode = fn (Get $get): bool => $usesPasswordField($get) && (bool) $get('use_recovery_code');
+
+        return [
+            Hidden::make('use_recovery_code')->default(false),
+            OneTimeCodeInput::make('code')
+                ->label(__('auth.mfa.code'))
+                ->visible($usesCode)
+                ->required($usesCode),
+            TextInput::make('recovery_code')
+                ->label(__('auth.mfa.recovery_code'))
+                ->placeholder(__('auth.mfa.recovery_placeholder'))
+                ->autocomplete('off')
+                ->visible($usesRecoveryCode)
+                ->required($usesRecoveryCode),
+            Actions::make([
+                Action::make('useRecoveryCode')
+                    ->label(__('auth.mfa.use_recovery_code'))
+                    ->link()
+                    ->visible(fn (Get $get): bool => ! (bool) $get('use_recovery_code'))
+                    ->action(function (Set $set): void {
+                        $set('code', null);
+                        $set('use_recovery_code', true);
+                    }),
+                Action::make('useAuthenticatorCode')
+                    ->label(__('auth.mfa.use_code'))
+                    ->link()
+                    ->visible(fn (Get $get): bool => (bool) $get('use_recovery_code'))
+                    ->action(function (Set $set): void {
+                        $set('recovery_code', null);
+                        $set('use_recovery_code', false);
+                    }),
+            ])->visible($usesPasswordField),
+        ];
+    }
+
+    /**
+     * A user with no password and no passkey (a provider-only account) has
+     * nothing to prove inline. If a provider is linked, offer it as a real
+     * navigation to a fresh OAuth round trip; merely rendering this link marks
+     * nothing confirmed, only completing it does.
+     *
+     * @return array<int, Component>
+     */
+    private function providerOffer(User $user): array
+    {
+        if ($user->hasPasskey()) {
+            return [];
+        }
+
+        $account = $user->socialAccounts()->first();
+
+        if (! $account) {
+            return [];
+        }
+
+        return [
+            Placeholder::make('providerOfferHint')
+                ->hiddenLabel()
+                ->content(__('auth.confirm.description')),
+            Actions::make([
+                Action::make('confirmWithProvider')
+                    ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
+                    ->url(fn (): string => route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name])),
+            ]),
+        ];
     }
 
     private function confirmingUser(): User

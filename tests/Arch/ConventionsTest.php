@@ -111,6 +111,11 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
             continue;
         }
 
+        // An action replacing a vendor class must keep that class's shape.
+        if (str_starts_with((string) ($reflection->getParentClass() ?: null)?->getName(), 'Laravel\\')) {
+            continue;
+        }
+
         $publicMethods = array_values(array_map(
             fn (ReflectionMethod $method): string => $method->getName(),
             array_filter(
