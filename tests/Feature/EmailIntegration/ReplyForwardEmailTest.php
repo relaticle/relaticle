@@ -8,6 +8,8 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -20,11 +22,12 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
-mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
+mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, Email::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -270,7 +273,8 @@ it('inline composer prefills reply-all and forward from their modes', function (
         ->assertSet('subject', 'Fwd: Original Subject')
         // A forward has no recipient yet, and does not thread against the original.
         ->assertSet('to', [])
-        ->assertSet('inReplyToEmailId', null);
+        ->assertSet('inReplyToEmailId', null)
+        ->assertSet('quotedBodyHtml', '<p>Original body</p>');
 });
 
 it('a reply saved as a draft still threads when it is sent later', function (): void {
@@ -299,6 +303,150 @@ it('a reply saved as a draft still threads when it is sent later', function (): 
         ->and($reply->thread_id)->toBe($this->inboundEmail->thread_id);
 });
 
+it('includes the original plain-text body when quoting a reply or forward', function (string $mode, string $marker): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => "Please review the invoice by Friday.\nThanks, Acme Billing",
+    ]);
+
+    $composer = livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, $mode)
+        ->set('bodyHtml', '<p>FYI</p>');
+
+    if ($mode === 'forward') {
+        $composer->set('to', ['forward-to@example.com']);
+    }
+
+    $composer->call('send')->assertHasNoErrors();
+
+    $outbound = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->firstOrFail();
+
+    expect($outbound->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('Thanks, Acme Billing')
+        ->toContain($marker);
+})->with([
+    'reply' => ['reply', 'blockquote'],
+    'forward' => ['forward', '---------- Forwarded message ----------'],
+]);
+
+it('escapes html in a plain-text original when quoting a forward', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => '<script>alert(1)</script>Please pay',
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>FYI</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $html = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail()
+        ->body
+        ->body_html;
+
+    expect($html)
+        ->toContain('Please pay')
+        ->toContain('alert(1)')
+        ->not->toContain('<script>alert(1)</script>');
+});
+
+it('restores the plain-text original when a saved forward is reopened', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>FYI</p>')
+        ->call('close');
+
+    $draftId = Email::query()->where('status', EmailStatus::DRAFT)->sole()->getKey();
+
+    $composer = livewire(EmailComposer::class)
+        ->call('open', [], $draftId);
+
+    expect($composer->get('quotedBodyHtml'))
+        ->toContain('Please review the invoice by Friday.');
+
+    $composer->assertSee('Please review the invoice by Friday.');
+});
+
+it('includes the original plain-text body when forwarding from the relation manager', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['forward-to@example.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Fwd: Original Subject',
+                'body_html' => '<p>FYI</p>',
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'forward'],
+        );
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail();
+
+    expect($forward->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('---------- Forwarded message ----------');
+});
+
+it('includes the original plain-text body when forwarding from the inbox', function (): void {
+    $this->inboundEmail->body->update([
+        'body_html' => null,
+        'body_text' => 'Please review the invoice by Friday.',
+    ]);
+
+    livewire(EmailInboxPage::class)
+        ->callAction(
+            'replyForwardEmail',
+            data: [
+                'connected_account_id' => $this->account->id,
+                'to' => ['forward-to@example.com'],
+                'cc' => [],
+                'bcc' => [],
+                'subject' => 'Fwd: Original Subject',
+                'body_html' => '<p>FYI</p>',
+            ],
+            arguments: ['emailId' => $this->inboundEmail->id, 'mode' => 'forward'],
+        );
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->firstOrFail();
+
+    expect($forward->body->body_html)
+        ->toContain('FYI')
+        ->toContain('Please review the invoice by Friday.')
+        ->toContain('---------- Forwarded message ----------');
+});
+
 it('a forward saved as a draft keeps its source without threading against it', function (): void {
     livewire(EmailComposer::class, ['dock' => 'inline'])
         ->call('openReply', $this->inboundEmail->id, 'forward')
@@ -314,6 +462,185 @@ it('a forward saved as a draft keeps its source without threading against it', f
         ->assertSet('sourceEmailId', $this->inboundEmail->id)
         // ...but a forward is a new message, so it must not thread against it.
         ->assertSet('inReplyToEmailId', null);
+});
+
+it('lists and sends the original attachments when forwarding', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $attachment = inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 15,
+        ]])
+        ->assertSee('contract.pdf')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached contract</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentAttachment = $forward->attachments->sole();
+
+    expect($sentAttachment->filename)->toBe('contract.pdf')
+        ->and($sentAttachment->storage_path)->not->toBe($attachment->storage_path);
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $attachment->storage_path);
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $sentAttachment->storage_path);
+    expect(Storage::disk(EmailAttachment::DISK)->get((string) $sentAttachment->storage_path))->toBe('signed-contract');
+});
+
+it('does not attach the original files when replying', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'reply')
+        ->assertSet('savedAttachments', [])
+        ->assertDontSee('contract.pdf')
+        ->set('bodyHtml', '<p>Thanks</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $reply = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::REPLY)
+        ->sole();
+
+    expect($reply->attachments)->toHaveCount(0);
+});
+
+it('omits a forwarded attachment the user removes before sending', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $keep = inboundStoredAttachment($this->inboundEmail, 'keep.pdf', 'keep-bytes');
+    $drop = inboundStoredAttachment($this->inboundEmail, 'drop.pdf', 'drop-bytes');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertSee('keep.pdf')
+        ->assertSee('drop.pdf')
+        ->call('removeSavedAttachment', (string) $drop->getKey())
+        ->assertSee('keep.pdf')
+        ->assertDontSee('drop.pdf')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Only keep.pdf</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+
+    expect($forward->attachments->pluck('filename')->all())->toBe(['keep.pdf']);
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $drop->storage_path);
+    expect($this->inboundEmail->refresh()->attachments)->toHaveCount(2)
+        ->and($keep->refresh()->storage_path)->not->toBeNull();
+});
+
+it('saves forwarded attachments onto a draft and sends those copies', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $attachment = inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    $draftAttachment = $draft->attachments->sole();
+
+    expect($draftAttachment->filename)->toBe('contract.pdf')
+        ->and($draftAttachment->storage_path)->not->toBe($attachment->storage_path);
+
+    livewire(EmailComposer::class)
+        ->call('open', [], (string) $draft->getKey())
+        ->assertSee('contract.pdf')
+        ->set('to', ['forward-to@example.com'])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $attachment->storage_path);
+    Storage::disk(EmailAttachment::DISK)->assertMissing((string) $draftAttachment->storage_path);
+});
+
+it('does not list original attachments when the viewer cannot read the body', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+    $this->team->users()->attach($viewer, ['role' => 'editor']);
+
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $viewer->id,
+        'status' => 'active',
+    ]));
+
+    $this->inboundEmail->update(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+
+    $this->actingAs($viewer);
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertSet('savedAttachments', [])
+        ->assertDontSee('contract.pdf');
+});
+
+it('does not list inline images as forwarded attachments', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    inboundStoredAttachment($this->inboundEmail, 'logo.png', 'png-bytes', inline: true);
+    $file = inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $file->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 15,
+        ]])
+        ->assertSee('contract.pdf')
+        ->assertDontSee('logo.png');
+});
+
+it('includes a newly uploaded file alongside the original attachments on a forward', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Contract plus note</p>')
+        ->set('attachments', [UploadedFile::fake()->create('cover-note.pdf', 12)])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+
+    expect($forward->attachments->pluck('filename')->all())->toEqualCanonicalizing(['contract.pdf', 'cover-note.pdf']);
 });
 
 it('the docked composer closes when the reader moves to another email', function (): void {
@@ -520,3 +847,19 @@ it('redirects to oauth when grant permission is confirmed for a mailbox that nee
         ->callAction('grantSendPermission')
         ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
 });
+
+function inboundStoredAttachment(Email $email, string $filename, string $contents, bool $inline = false): EmailAttachment
+{
+    $path = 'email-attachments/'.$filename;
+
+    Storage::disk(EmailAttachment::DISK)->put($path, $contents);
+
+    return EmailAttachment::factory()->create([
+        'email_id' => $email->getKey(),
+        'filename' => $filename,
+        'storage_path' => $path,
+        'size' => strlen($contents),
+        'is_inline' => $inline,
+        'mime_type' => $inline ? 'image/png' : 'application/pdf',
+    ]);
+}

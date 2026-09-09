@@ -36,7 +36,7 @@ final readonly class RespondToMeetingAction
         $iCalUid = $meeting->ical_uid;
 
         if ($providerEventId === null && is_string($iCalUid) && $iCalUid !== '') {
-            $providerEventId = $calendar->findEventIdByICalUid($iCalUid);
+            $providerEventId = $calendar->findEventIdByICalUid($iCalUid, $meeting->starts_at);
         }
 
         if ($providerEventId === null || $providerEventId === '') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Team;
 use App\Models\User;
 use App\Policies\MeetingPolicy;
+use Carbon\CarbonInterface;
 use Relaticle\EmailIntegration\Actions\RespondToMeetingAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
@@ -60,7 +61,11 @@ function teammateMailboxCopy(ConnectedAccount $account, Meeting $source, string 
         'team_id' => $account->team_id,
         'connected_account_id' => $account->getKey(),
         'provider_event_id' => $providerEventId,
+        'provider_recurring_event_id' => $source->provider_recurring_event_id,
         'ical_uid' => $source->ical_uid,
+        'starts_at' => $source->starts_at,
+        'ends_at' => $source->ends_at,
+        'all_day' => $source->all_day,
         'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
         'status' => CalendarEventStatus::CONFIRMED,
         'organizer_email' => $source->organizer_email,
@@ -416,6 +421,84 @@ it('uses the connected calendar account that matches the listed mailbox identity
     );
 });
 
+it('writes the teammate RSVP to the matching recurring occurrence, not an earlier copy with the same iCal UID', function (): void {
+    $this->travelTo('2026-09-14 12:00:00');
+
+    $owner = User::factory()->withTeam()->create();
+    $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
+    $icalUid = 'weekly-standup@google.com';
+    $thisWeekStart = now()->setTime(14, 0);
+    $nextWeekStart = $thisWeekStart->addWeek();
+
+    $thisWeekMeeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'provider_event_id' => 'owner-this-week',
+        'provider_recurring_event_id' => 'google-series',
+        'ical_uid' => $icalUid,
+        'starts_at' => $thisWeekStart,
+        'ends_at' => $thisWeekStart->addMinutes(30),
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+        'status' => CalendarEventStatus::CONFIRMED,
+        'organizer_email' => 'host@example.com',
+    ]);
+
+    $nextWeekMeeting = Meeting::factory()->create([
+        'team_id' => $account->team_id,
+        'connected_account_id' => $account->getKey(),
+        'provider_event_id' => 'owner-next-week',
+        'provider_recurring_event_id' => 'google-series',
+        'ical_uid' => $icalUid,
+        'starts_at' => $nextWeekStart,
+        'ends_at' => $nextWeekStart->addMinutes(30),
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+        'status' => CalendarEventStatus::CONFIRMED,
+        'organizer_email' => 'host@example.com',
+    ]);
+
+    $teammate = User::factory()->create(['email' => 'mail2asmitnepali@gmail.com']);
+    $owner->currentTeam->users()->attach($teammate, ['role' => 'admin']);
+    $teammate->switchTeam($owner->currentTeam);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $owner->currentTeam->getKey(),
+        'user_id' => $teammate->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]));
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $nextWeekMeeting->getKey(),
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    teammateMailboxCopy($teammateAccount, $thisWeekMeeting, 'aaa-teammate-this-week');
+    teammateMailboxCopy($teammateAccount, $nextWeekMeeting, 'zzz-teammate-next-week');
+
+    $service = Mockery::mock(CalendarServiceInterface::class);
+    $service->shouldNotReceive('findEventIdByICalUid');
+    $service->shouldReceive('respondToEvent')
+        ->once()
+        ->with('zzz-teammate-next-week', AttendeeResponseStatus::ACCEPTED);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldReceive('make')
+        ->once()
+        ->with(Mockery::on(fn (ConnectedAccount $passed): bool => $passed->is($teammateAccount)))
+        ->andReturn($service);
+
+    app()->instance(CalendarServiceFactoryInterface::class, $factory);
+
+    app(RespondToMeetingAction::class)->execute(
+        $teammate,
+        $nextWeekMeeting->fresh(['attendees', 'connectedAccount']),
+        AttendeeResponseStatus::ACCEPTED,
+    );
+});
+
 it('writes the teammate RSVP to their own mailbox event, not the source mailbox id', function (): void {
     $owner = User::factory()->withTeam()->create();
     $account = respondToMeetingCalendarAccount($owner, $owner->currentTeam);
@@ -490,7 +573,7 @@ it('looks up the teammate mailbox event by iCal UID when their local copy has no
     $service = Mockery::mock(CalendarServiceInterface::class);
     $service->shouldReceive('findEventIdByICalUid')
         ->once()
-        ->with($meeting->ical_uid)
+        ->with($meeting->ical_uid, Mockery::type(CarbonInterface::class))
         ->andReturn('evt-teammate-mailbox');
     $service->shouldReceive('respondToEvent')
         ->once()

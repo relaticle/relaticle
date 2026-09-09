@@ -67,6 +67,10 @@ return [
             'title' => 'Some files were too large',
             'body' => 'Not attached: :files. Each file must be under :max, and all attachments together under :total.',
         ],
+        'attachment_unavailable' => [
+            'title' => 'Some attachments could not be included',
+            'body' => 'Not attached: :files. Download them from the original email and add them here if you still need them.',
+        ],
         'draft_account_disconnected' => [
             'title' => 'Original account no longer connected',
             'body' => 'The account this draft was written from isn\'t connected anymore, so it\'s been switched to your default account. Double-check the sender before sending.',

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -9,17 +11,17 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Route;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
-use Relaticle\EmailIntegration\Filament\Resources\MeetingResource;
-use Relaticle\EmailIntegration\Filament\Resources\MeetingResource\Pages\ListMeetings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 
-mutates(MeetingResource::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class);
+mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -36,8 +38,8 @@ beforeEach(function (): void {
     );
 });
 
-it('renders the meeting list page', function (): void {
-    livewire(ListMeetings::class)->assertOk();
+it('removes the standalone meetings route', function (): void {
+    expect(Route::has('filament.app.resources.meetings.index'))->toBeFalse();
 });
 
 it('lists meetings for the current team', function (): void {
@@ -46,7 +48,7 @@ it('lists meetings for the current team', function (): void {
         'connected_account_id' => $this->account->id,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$mine])
         ->assertCanSeeTableRecords([$mine]);
 });
 
@@ -64,7 +66,7 @@ it('filters upcoming meetings', function (): void {
         'ends_at' => Date::now()->subDays(2)->addHour(),
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$future, $past])
         ->filterTable('upcoming')
         ->assertCanSeeTableRecords([$future])
         ->assertCanNotSeeTableRecords([$past]);
@@ -85,7 +87,7 @@ it('shows title, time range, duration, and rsvp in the view modal', function ():
         'description' => '<p>Agenda</p>',
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('New Meeting')
         ->assertMountedActionModalSee('Sep 30')
@@ -111,7 +113,7 @@ it('shows all-day meetings without a clock range', function (): void {
         'response_status' => AttendeeResponseStatus::TENTATIVE,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Offsite')
         ->assertMountedActionModalSee(__('filament/resources/meeting.time.all_day'))
@@ -130,7 +132,7 @@ it('hides the rsvp pill when response status is null', function (): void {
         'response_status' => null,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('No RSVP Meeting')
         ->assertMountedActionModalDontSee('Accepted');
@@ -145,7 +147,7 @@ it('hides link, location, and description when they are empty', function (): voi
         'description' => null,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalDontSee('https://meet.example.test/abc')
         ->assertMountedActionModalDontSee('Rooftop Terrace 7B')
@@ -174,7 +176,7 @@ it('lists attendees with host and rsvp in the view modal', function (): void {
         'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
         ->assertMountedActionModalSee('Asmit Magan')
@@ -196,7 +198,7 @@ it('shows an empty participants line when there are no attendees', function (): 
         'all_day' => false,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
         ->assertMountedActionModalSee('0')
@@ -218,7 +220,7 @@ it('shows the current user attendee row when is_self is true', function (): void
         'response_status' => AttendeeResponseStatus::ACCEPTED,
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Current User')
         ->assertMountedActionModalSee('self@example.test')
@@ -234,7 +236,7 @@ it('shows link, location, and description when they are filled', function (): vo
         'description' => '<p>Kickoff notes</p>',
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('https://meet.example.test/abc')
         ->assertMountedActionModalSee('Rooftop Terrace 7B')
@@ -255,7 +257,7 @@ it('lists linked people, companies, and opportunities in the view modal', functi
     $meeting->companies()->attach($company, ['link_source' => 'manual']);
     $meeting->opportunities()->attach($opportunity, ['link_source' => 'manual']);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.linked_records.heading'))
         ->assertMountedActionModalSee('Linked Person')
@@ -263,15 +265,17 @@ it('lists linked people, companies, and opportunities in the view modal', functi
         ->assertMountedActionModalSee('Linked Deal');
 });
 
-it('shows link records when nothing is linked', function (): void {
+it('offers linking additional records from the meeting drawer', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
     ]);
 
-    livewire(ListMeetings::class)
-        ->mountAction(TestAction::make('view')->table($meeting))
-        ->assertMountedActionModalSee(__('filament/resources/meeting.actions.link_records.label'));
+    meetingDetailsOnRecord([$meeting])
+        ->assertActionVisible([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('linkRecords'),
+        ]);
 });
 
 it('links a record from the meeting view modal', function (): void {
@@ -281,10 +285,10 @@ it('links a record from the meeting view modal', function (): void {
     ]);
     $person = People::factory()->for($this->team)->create();
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$meeting])
         ->callAction([
             TestAction::make('view')->table($meeting),
-            TestAction::make('linkRecordsEmpty'),
+            TestAction::make('linkRecords'),
         ], [
             'target_type' => 'People',
             'target_id' => $person->getKey(),
@@ -308,8 +312,19 @@ it('filters past meetings', function (): void {
         'ends_at' => Date::now()->subDays(2)->addHour(),
     ]);
 
-    livewire(ListMeetings::class)
+    meetingDetailsOnRecord([$future, $past])
         ->filterTable('past')
         ->assertCanSeeTableRecords([$past])
         ->assertCanNotSeeTableRecords([$future]);
 });
+
+/** @param array<int, Meeting> $meetings */
+function meetingDetailsOnRecord(array $meetings): Testable
+{
+    $company = Company::factory()->create(['team_id' => filament()->getTenant()->getKey()]);
+    foreach ($meetings as $meeting) {
+        $meeting->companies()->attach($company, ['link_source' => 'manual']);
+    }
+
+    return livewire(MeetingsRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class]);
+}
