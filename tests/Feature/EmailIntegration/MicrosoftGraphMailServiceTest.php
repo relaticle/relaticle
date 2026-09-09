@@ -276,6 +276,37 @@ it('includes file attachments in the /me/sendMail payload', function (): void {
     });
 });
 
+it('marks cid images as inline file attachments on sendMail', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $service->sendMessage([
+        'subject' => 'Hi',
+        'body_html' => '<p><img src="cid:logo@example.test"></p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'attachments' => [[
+            'filename' => 'logo.png',
+            'mime_type' => 'image/png',
+            'content' => 'PNG-BYTES',
+            'is_inline' => true,
+            'content_id' => 'logo@example.test',
+        ]],
+    ]);
+
+    Http::assertSent(function (Request $r): bool {
+        $attachments = $r->data()['message']['attachments'] ?? [];
+
+        return $attachments !== []
+            && $attachments[0]['isInline'] === true
+            && $attachments[0]['contentId'] === 'logo@example.test'
+            && $attachments[0]['name'] === 'logo.png'
+            && $attachments[0]['contentBytes'] === base64_encode('PNG-BYTES');
+    });
+});
+
 it('expands and maps inbound attachment metadata into FetchedEmailData', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([

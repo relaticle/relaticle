@@ -10,6 +10,8 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -27,7 +29,7 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
-mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, Email::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class);
+mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, Email::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class, SendEmailAction::class, SaveEmailDraftAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -608,7 +610,7 @@ it('does not list original attachments when the viewer cannot read the body', fu
 it('does not list inline images as forwarded attachments', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
-    inboundStoredAttachment($this->inboundEmail, 'logo.png', 'png-bytes', inline: true);
+    inboundStoredAttachment($this->inboundEmail, 'logo.png', 'png-bytes', inline: true, contentId: 'logo@example.test');
     $file = inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
 
     livewire(EmailComposer::class, ['dock' => 'inline'])
@@ -620,6 +622,85 @@ it('does not list inline images as forwarded attachments', function (): void {
         ]])
         ->assertSee('contract.pdf')
         ->assertDontSee('logo.png');
+});
+
+it('sends quoted inline images with the forwarded message', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->inboundEmail->body->update([
+        'body_html' => '<p>See logo</p><img src="cid:logo@example.test">',
+    ]);
+
+    $inline = inboundStoredAttachment($this->inboundEmail, 'logo.png', 'png-bytes', inline: true, contentId: 'logo@example.test');
+    inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->assertDontSee('logo.png')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentInline = $forward->attachments->firstWhere('is_inline', true);
+    $sentFile = $forward->attachments->firstWhere('is_inline', false);
+
+    expect($forward->body->body_html)->toContain('cid:logo@example.test')
+        ->and($forward->has_attachments)->toBeTrue()
+        ->and($sentInline)->not->toBeNull()
+        ->and($sentInline->filename)->toBe('logo.png')
+        ->and($sentInline->content_id)->toBe('logo@example.test')
+        ->and($sentInline->storage_path)->not->toBe($inline->storage_path)
+        ->and($sentFile?->filename)->toBe('contract.pdf');
+
+    expect(Storage::disk(EmailAttachment::DISK)->get((string) $sentInline->storage_path))->toBe('png-bytes');
+});
+
+it('saves quoted inline images onto a forward draft and sends those copies', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->inboundEmail->body->update([
+        'body_html' => '<p>See logo</p><img src="cid:logo@example.test">',
+    ]);
+
+    $inline = inboundStoredAttachment($this->inboundEmail, 'logo.png', 'png-bytes', inline: true, contentId: 'logo@example.test');
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    $draftInline = $draft->attachments->sole();
+
+    expect($draftInline->is_inline)->toBeTrue()
+        ->and($draftInline->content_id)->toBe('logo@example.test')
+        ->and($draftInline->storage_path)->not->toBe($inline->storage_path)
+        ->and($draft->has_attachments)->toBeFalse();
+
+    livewire(EmailComposer::class)
+        ->call('open', [], (string) $draft->getKey())
+        ->assertDontSee('logo.png')
+        ->set('to', ['forward-to@example.com'])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentInline = $forward->attachments->sole();
+
+    expect($sentInline->is_inline)->toBeTrue()
+        ->and($sentInline->content_id)->toBe('logo@example.test')
+        ->and($forward->body->body_html)->toContain('cid:logo@example.test');
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $inline->storage_path);
+    Storage::disk(EmailAttachment::DISK)->assertMissing((string) $draftInline->storage_path);
 });
 
 it('includes a newly uploaded file alongside the original attachments on a forward', function (): void {
@@ -848,7 +929,7 @@ it('redirects to oauth when grant permission is confirmed for a mailbox that nee
         ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
 });
 
-function inboundStoredAttachment(Email $email, string $filename, string $contents, bool $inline = false): EmailAttachment
+function inboundStoredAttachment(Email $email, string $filename, string $contents, bool $inline = false, ?string $contentId = null): EmailAttachment
 {
     $path = 'email-attachments/'.$filename;
 
@@ -860,6 +941,7 @@ function inboundStoredAttachment(Email $email, string $filename, string $content
         'storage_path' => $path,
         'size' => strlen($contents),
         'is_inline' => $inline,
+        'content_id' => $inline ? ($contentId ?? 'cid-'.$filename) : null,
         'mime_type' => $inline ? 'image/png' : 'application/pdf',
     ]);
 }
