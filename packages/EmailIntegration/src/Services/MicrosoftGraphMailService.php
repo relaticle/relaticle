@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
@@ -15,6 +16,8 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use RuntimeException;
+use stdClass;
+use Throwable;
 
 final class MicrosoftGraphMailService implements MailServiceInterface
 {
@@ -192,7 +195,33 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         return self::MESSAGES_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
     }
 
+    /**
+     * Send a new email, or a reply when `in_reply_to` is present.
+     *
+     * Graph rejects standard headers such as In-Reply-To on /me/sendMail, so a
+     * reply must go through createReply. That stamps conversationId and the RFC
+     * reply headers Outlook uses to thread the message.
+     */
     public function sendMessage(array $data): array
+    {
+        $message = $this->buildMessagePayload($data);
+
+        if (isset($data['in_reply_to'])) {
+            $original = $this->findMessageByInternetMessageId($data['in_reply_to']);
+
+            if ($original !== null) {
+                return $this->submitReply($original, $message, $data);
+            }
+        }
+
+        return $this->submitNewMessage($message, $data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function buildMessagePayload(array $data): array
     {
         $message = [
             'subject' => $data['subject'],
@@ -221,11 +250,87 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ]];
         }
 
+        return $message;
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     * @param  array<string, mixed>  $data
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
+     */
+    private function submitNewMessage(array $message, array $data): array
+    {
         $this->clientFactory->make($this->account)
             ->post('/me/sendMail', ['message' => $message, 'saveToSentItems' => true])
             ->throw();
 
-        // Graph /me/sendMail returns 202 with no body. Synthesize ids; the next
+        return $this->pendingSendResult($data);
+    }
+
+    /**
+     * @param  array{provider_message_id: string, thread_id: string, rfc_message_id: string}  $original
+     * @param  array<string, mixed>  $message
+     * @param  array<string, mixed>  $data
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
+     */
+    private function submitReply(array $original, array $message, array $data): array
+    {
+        $http = $this->clientFactory->make($this->account);
+        $originalId = $original['provider_message_id'];
+
+        $draft = $http->post("/me/messages/{$originalId}/createReply", new stdClass)
+            ->throw()
+            ->json();
+
+        $draftId = is_array($draft) ? (string) ($draft['id'] ?? '') : '';
+
+        throw_if($draftId === '', RuntimeException::class, 'Microsoft Graph createReply did not return a draft id.');
+
+        try {
+            $attachments = $message['attachments'] ?? [];
+            unset($message['attachments']);
+
+            $http->patch("/me/messages/{$draftId}", $message)->throw();
+
+            if (is_array($attachments)) {
+                foreach ($attachments as $attachment) {
+                    if (! is_array($attachment)) {
+                        continue;
+                    }
+
+                    $http->post("/me/messages/{$draftId}/attachments", $attachment)->throw();
+                }
+            }
+
+            $http->post("/me/messages/{$draftId}/send", new stdClass)->throw();
+        } catch (Throwable $exception) {
+            $this->discardDraft($http, $draftId);
+
+            throw $exception;
+        }
+
+        $conversationId = is_array($draft) ? (string) ($draft['conversationId'] ?? '') : '';
+
+        if ($conversationId === '') {
+            $conversationId = $original['thread_id'];
+        }
+
+        $result = $this->pendingSendResult($data);
+
+        if ($conversationId !== '') {
+            $result['thread_id'] = $conversationId;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
+     */
+    private function pendingSendResult(array $data): array
+    {
+        // Graph send endpoints return 202 with no body. Synthesize ids; the next
         // delta sync will pick up the canonical Graph id + internetMessageId.
         $synthetic = (string) Str::ulid();
 
@@ -236,13 +341,42 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         ];
     }
 
+    private function discardDraft(PendingRequest $http, string $draftId): void
+    {
+        try {
+            $http->delete("/me/messages/{$draftId}");
+        } catch (Throwable) {
+        }
+    }
+
     public function findSentMessage(string $rfcMessageId): ?array
     {
         $escaped = str_replace("'", "''", $rfcMessageId);
 
+        return $this->findMessage(
+            "singleValueExtendedProperties/Any(ep: ep/id eq '".self::RECONCILIATION_PROPERTY_ID."' and ep/value eq '{$escaped}')",
+            $rfcMessageId,
+        );
+    }
+
+    /**
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}|null
+     */
+    private function findMessageByInternetMessageId(string $rfcMessageId): ?array
+    {
+        $escaped = str_replace("'", "''", $rfcMessageId);
+
+        return $this->findMessage("internetMessageId eq '{$escaped}'", $rfcMessageId);
+    }
+
+    /**
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}|null
+     */
+    private function findMessage(string $filter, string $rfcMessageId): ?array
+    {
         $message = $this->clientFactory->make($this->account)
             ->get('/me/messages', [
-                '$filter' => "singleValueExtendedProperties/Any(ep: ep/id eq '".self::RECONCILIATION_PROPERTY_ID."' and ep/value eq '{$escaped}')",
+                '$filter' => $filter,
                 '$select' => 'id,conversationId,internetMessageId',
                 '$top' => 1,
             ])
