@@ -33,11 +33,12 @@ final class MeetingDetailInfolist
     public static function viewAction(): ViewAction
     {
         return ViewAction::make()
+            ->slideOver()
             ->modalHeading(__('filament/resources/meeting.view.heading'))
             ->modalWidth(Width::Large)
             ->schema(fn (Schema $schema): Schema => self::configure($schema))
             ->registerModalActions([
-                self::linkRecordsAction('linkRecordsEmpty'),
+                self::linkRecordsAction('linkRecords'),
                 ...MeetingRsvpActions::make(),
             ]);
     }
@@ -108,15 +109,11 @@ final class MeetingDetailInfolist
                             ->badge()
                             ->state(fn (Meeting $record): int => self::linkedCount($record)),
                     ])
-                    ->headerActions([
-                        self::linkRecordsAction('linkRecords')->iconButton(),
-                    ])
                     ->schema([
                         MeetingLinkedRecordsEntry::make('linked_records')
                             ->hiddenLabel()
                             ->visible(fn (Meeting $record): bool => self::linkedCount($record) > 0),
-                        self::linkRecordsAction('linkRecordsEmpty')
-                            ->visible(fn (Meeting $record): bool => self::linkedCount($record) === 0),
+                        self::linkRecordsAction('linkRecords'),
                     ]),
                 Section::make(__('filament/resources/meeting.sections.description.heading'))
                     ->schema([

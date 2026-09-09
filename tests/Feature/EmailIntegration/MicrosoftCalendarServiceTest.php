@@ -267,7 +267,7 @@ it('resolves this mailbox event id from a shared iCalendar UID', function (): vo
     ]);
 
     $eventId = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
-        ->findEventIdByICalUid("uid-with'-quote");
+        ->findEventIdByICalUid("uid-with'-quote", now());
 
     expect($eventId)->toBe('evt-teammate-mailbox');
 
@@ -291,7 +291,7 @@ it('returns null when Graph has no event for the iCalendar UID', function (): vo
     ]);
 
     expect((new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
-        ->findEventIdByICalUid('missing'))
+        ->findEventIdByICalUid('missing', now()))
         ->toBeNull();
 });
 

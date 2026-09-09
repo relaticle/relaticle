@@ -146,7 +146,7 @@ trait HasEmailComposeActions
         };
 
         // Only quote the original body when the viewer is entitled to read it.
-        $quotedBody = $user->can('viewBody', $email) ? ($email->body->body_html ?? '') : '';
+        $quotedBody = $user->can('viewBody', $email) ? ($email->quotedBodyHtml() ?? '') : '';
 
         $subjectPrefix = $mode === 'forward' ? 'Fwd: ' : 'Re: ';
         $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
