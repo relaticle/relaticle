@@ -147,6 +147,52 @@ it('sends a plain multipart/alternative message when there are no attachments', 
         ->and($raw)->not->toContain('multipart/mixed');
 });
 
+it('threads a same-mailbox reply with the provider thread id', function (): void {
+    $account = ConnectedAccount::factory()->make([
+        'email_address' => 'sender@example.com',
+        'display_name' => 'Sender',
+    ]);
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService($account, $gmail)->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'in_reply_to' => '<original@example.com>',
+        'thread_id' => 'gmail-thread-abc',
+    ]);
+
+    expect($captured->getThreadId())->toBe('gmail-thread-abc');
+});
+
+it('sends a reply without a provider thread id when the thread belongs to another mailbox', function (): void {
+    $account = ConnectedAccount::factory()->make([
+        'email_address' => 'sender@example.com',
+        'display_name' => 'Sender',
+    ]);
+
+    $captured = null;
+    $gmail = fakeGmail(function (Message $message) use (&$captured): void {
+        $captured = $message;
+    });
+
+    new GmailService($account, $gmail)->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply from another mailbox</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'in_reply_to' => '<original@example.com>',
+    ]);
+
+    $raw = decodeRaw($captured);
+
+    expect($captured->getThreadId())->toBeNull()
+        ->and($raw)->toContain('In-Reply-To: <original@example.com>');
+});
+
 it('strips quotes and newlines from attachment filenames to prevent header injection', function (): void {
     $account = ConnectedAccount::factory()->make([
         'email_address' => 'sender@example.com',
