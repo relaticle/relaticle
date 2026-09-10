@@ -59,7 +59,7 @@ final readonly class ListMeetingsForDay
 
         return $query
             ->whereIn('meetings.id', $copies)
-            ->with(['team', 'attendees.contact', 'connectedAccount'])
+            ->with(['team', 'attendees.contact', 'connectedAccount.user'])
             ->orderBy('starts_at')
             ->orderBy('id')
             ->get();

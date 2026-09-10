@@ -20,3 +20,10 @@ Mailbox search (inbox and record email pages) must go through
 `EmailSearchService`. Never `ilike` on `subject` or `snippet` alone.
 Metadata-only teammate rows stay in the list, but those columns are hidden.
 A guessed subject must not match. Participants remain searchable.
+
+## Meeting attendee "self"
+
+`MeetingAttendee.is_self` is the mailbox that owns that meeting copy, not the
+current viewer. Name that row from `meeting.connectedAccount.user` (or the
+account display name). Never substitute `auth()->user()`. Alice viewing
+Bob's copy must still show Bob.
