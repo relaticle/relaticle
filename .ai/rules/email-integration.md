@@ -37,6 +37,12 @@ current viewer. Name that row from `meeting.connectedAccount.user` (or the
 account display name). Never substitute `auth()->user()`. Alice viewing
 Bob's copy must still show Bob.
 
+## Meeting attendee mailbox names
+
+`MailboxDisplayNameDirectory` must resolve names through `VisibleEmailScope`
+for the current viewer. A team-wide participant search leaks names from
+private and mailbox-blocked mail onto another user's meeting.
+
 ## Personal calendar vs workspace meetings
 
 Home (`ListMeetingsForDay`, `MeetingsHomeWidget`) is a personal calendar.

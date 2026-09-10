@@ -64,7 +64,7 @@ final readonly class ListMeetingsForDay
             ->orderBy('id')
             ->get();
 
-        resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($meetings);
+        resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($user, $meetings);
 
         return $meetings;
     }

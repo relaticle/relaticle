@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
@@ -478,6 +479,158 @@ it('names a card guest from mailbox history without a person record', function (
         ->assertDontSee('mail2asmitnepali@gmail.com')
         ->assertSee('attendee-avatar-initials', escape: false)
         ->assertDontSee('attendee-avatar-guest', escape: false);
+});
+
+it('names a card guest from the viewer own private email', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'own.private@example.test',
+        'name' => 'Own Private Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'own.private@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Own Private Guest')
+        ->assertDontSee('own.private@example.test');
+});
+
+it('does not name a card guest from a teammate private email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'secret.guest@example.test',
+        'name' => 'Secret Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'secret.guest@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Secret Guest')
+        ->assertSee('secret.guest@example.test');
+});
+
+it('does not name a card guest from a mailbox-blocked email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'spam@badactor.test',
+        'name' => 'Blocked Sender',
+    ]);
+    EmailBlocklist::factory()->email('spam@badactor.test')->create([
+        'user_id' => $teammate->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'spam@badactor.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Blocked Sender')
+        ->assertSee('spam@badactor.test');
+});
+
+it('names a card guest from a teammate workspace-visible email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'shared.guest@acme.test',
+        'name' => 'Shared Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'shared.guest@acme.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Shared Guest')
+        ->assertDontSee('shared.guest@acme.test');
 });
 
 it('colours the card dot by the viewer RSVP', function (string $status, string $expectedClass, string $expectedLabel): void {
