@@ -254,3 +254,15 @@ For any deliverable screenshot, invoke `Skill('screenshot-with-callout')` per sh
   a file and open that: `php artisan tinker --execute '\Laravel\Pennant\Feature::define(\App\Features\Billing::class, false); file_put_contents(".context/off.html", view("pricing")->render());'`
   then `agent-browser open "file://$(pwd)/.context/off.html"`. Vite assets resolve to the
   absolute `APP_URL`, so the page styles correctly from `file://`.
+
+## 10. Turnstile on the signup step (verified: 2026-09-10)
+
+- The widget lives in a **closed shadow root**, so `document.querySelector("iframe[src*=challenges]")`
+  is always null. Read the enclosing `.fi-grid-col` instead: `fi-hidden` = silent pass, 70px tall =
+  checkbox shown. The schema's grid child is `.fi-grid-col`, not `.fi-fo-field`; an empty in-flow
+  column still costs one 24px grid gap, so measure password-field-bottom to button-top (24 = clean). Cloudflare's dummy sitekeys drive each state: `1x…AA` passes silently,
+  `3x…FF` forces the checkbox, `2x…AB` always fails; secret `1x…AA` accepts the dummy token.
+- To click the checkbox use coordinates: `agent-browser mouse move X Y && mouse down && mouse up`
+  at `rect.x+20, rect.y+32`. Under zsh `mouse move $XY` fails with "Missing arguments": an
+  unquoted variable is not word-split, so `read -r X Y <<< "$XY"` first.
+- `agent-browser set media dark` exists; toggling `document.documentElement.classList` also works.
