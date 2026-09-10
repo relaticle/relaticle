@@ -502,7 +502,48 @@ it('drops the sync prompt once a mailbox is connected', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
-it('names a linked contact on the card', function (): void {
+it('colours the row dot by the viewer RSVP without showing the label', function (string $status, string $expectedClass, string $unexpectedLabel): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+        'response_status' => $status,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee($expectedClass, escape: false)
+        ->assertDontSee($unexpectedLabel);
+})->with([
+    'accepted is green' => ['accepted', 'bg-success-500', 'Accepted'],
+    'declined is red' => ['declined', 'bg-danger-500', 'Declined'],
+    'maybe is orange' => ['tentative', 'bg-warning-500', 'Maybe'],
+    'pending is grey' => ['needsAction', 'bg-gray-400', 'Pending'],
+]);
+
+it('does not list attendees on the home meeting row', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Staff call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Maya Chen',
+        'email_address' => 'maya@example.test',
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Staff call')
+        ->assertDontSee('Maya Chen')
+        ->assertDontSee('data-testid="meeting-card-participants"', escape: false);
+});
+
+it('names a linked contact in the home meeting slideover', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -521,13 +562,16 @@ it('names a linked contact on the card', function (): void {
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('Maya Chen')
-        ->assertDontSee('maya@example.test')
-        ->assertSee('attendee-avatar-initials', escape: false)
-        ->assertDontSee('attendee-avatar-guest', escape: false);
+        ->assertDontSee('Maya Chen')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Maya Chen')
+        ->assertMountedActionModalSee('maya@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
 });
 
-it('names a card guest from mailbox history without a person record', function (): void {
+it('names a slideover guest from mailbox history without a person record', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -554,13 +598,16 @@ it('names a card guest from mailbox history without a person record', function (
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('Asmit Nepali')
-        ->assertDontSee('mail2asmitnepali@gmail.com')
-        ->assertSee('attendee-avatar-initials', escape: false)
-        ->assertDontSee('attendee-avatar-guest', escape: false);
+        ->assertDontSee('Asmit Nepali')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
 });
 
-it('names a card guest from the viewer own private email', function (): void {
+it('names a slideover guest from the viewer own private email', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -587,11 +634,14 @@ it('names a card guest from the viewer own private email', function (): void {
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('Own Private Guest')
-        ->assertDontSee('own.private@example.test');
+        ->assertDontSee('Own Private Guest')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Own Private Guest')
+        ->assertMountedActionModalSee('own.private@example.test');
 });
 
-it('does not name a card guest from a teammate private email', function (): void {
+it('does not name a slideover guest from a teammate private email', function (): void {
     $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
     $teammateAccount = ConnectedAccount::withoutEvents(
         fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -626,10 +676,13 @@ it('does not name a card guest from a teammate private email', function (): void
 
     livewire(MeetingsHomeWidget::class)
         ->assertDontSee('Secret Guest')
-        ->assertSee('secret.guest@example.test');
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalDontSee('Secret Guest')
+        ->assertMountedActionModalSee('secret.guest@example.test');
 });
 
-it('does not name a card guest from a mailbox-blocked email', function (): void {
+it('does not name a slideover guest from a mailbox-blocked email', function (): void {
     $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
     $teammateAccount = ConnectedAccount::withoutEvents(
         fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -670,10 +723,13 @@ it('does not name a card guest from a mailbox-blocked email', function (): void 
 
     livewire(MeetingsHomeWidget::class)
         ->assertDontSee('Blocked Sender')
-        ->assertSee('spam@badactor.test');
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalDontSee('Blocked Sender')
+        ->assertMountedActionModalSee('spam@badactor.test');
 });
 
-it('names a card guest from a teammate workspace-visible email', function (): void {
+it('names a slideover guest from a teammate workspace-visible email', function (): void {
     $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
     $teammateAccount = ConnectedAccount::withoutEvents(
         fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -708,84 +764,14 @@ it('names a card guest from a teammate workspace-visible email', function (): vo
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('Shared Guest')
-        ->assertDontSee('shared.guest@acme.test');
+        ->assertDontSee('Shared Guest')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Shared Guest')
+        ->assertMountedActionModalSee('shared.guest@acme.test');
 });
 
-it('colours the card dot by the viewer RSVP', function (string $status, string $expectedClass, string $expectedLabel): void {
-    Meeting::factory()->create([
-        'team_id' => $this->team->id,
-        'connected_account_id' => $this->account->id,
-        'title' => 'Call',
-        'starts_at' => Date::parse('2026-09-09 16:00:00'),
-        'ends_at' => Date::parse('2026-09-09 17:00:00'),
-        'response_status' => $status,
-    ]);
-
-    livewire(MeetingsHomeWidget::class)
-        ->assertSee($expectedClass, escape: false)
-        ->assertSee($expectedLabel);
-})->with([
-    'accepted is green' => ['accepted', 'bg-success-500', 'Accepted'],
-    'declined is red' => ['declined', 'bg-danger-500', 'Declined'],
-    'maybe is orange' => ['tentative', 'bg-warning-500', 'Maybe'],
-    'pending is grey' => ['needsAction', 'bg-gray-400', 'Pending'],
-]);
-
-it('shows three guests on the card and an overflow for the rest', function (): void {
-    $meeting = Meeting::factory()->create([
-        'team_id' => $this->team->id,
-        'connected_account_id' => $this->account->id,
-        'title' => 'Staff',
-        'starts_at' => Date::parse('2026-09-09 16:00:00'),
-        'ends_at' => Date::parse('2026-09-09 17:00:00'),
-    ]);
-
-    foreach (['Alice One', 'Bob Two', 'Cara Three', 'Drew Four'] as $name) {
-        MeetingAttendee::factory()->create([
-            'meeting_id' => $meeting->id,
-            'name' => $name,
-            'email_address' => strtolower(str_replace(' ', '.', $name)).'@example.test',
-            'is_organizer' => $name === 'Alice One',
-        ]);
-    }
-
-    livewire(MeetingsHomeWidget::class)
-        ->assertSee('Alice One')
-        ->assertSee('Bob Two')
-        ->assertSee('Cara Three')
-        ->assertSee('Drew Four')
-        ->assertSee(__('filament/pages/dashboard.meetings.more_participants', ['count' => 1]))
-        ->assertSee('data-testid="meeting-card-participants"', escape: false)
-        ->assertDontSee(__('filament/resources/meeting.attendees.show_more'));
-});
-
-it('collapses duplicate guest emails on the card', function (): void {
-    $meeting = Meeting::factory()->create([
-        'team_id' => $this->team->id,
-        'connected_account_id' => $this->account->id,
-        'title' => 'Call',
-        'starts_at' => Date::parse('2026-09-09 16:00:00'),
-        'ends_at' => Date::parse('2026-09-09 17:00:00'),
-    ]);
-
-    MeetingAttendee::factory()->create([
-        'meeting_id' => $meeting->id,
-        'name' => 'Maya Chen',
-        'email_address' => 'maya@example.test',
-    ]);
-    MeetingAttendee::factory()->create([
-        'meeting_id' => $meeting->id,
-        'name' => 'maya@example.test',
-        'email_address' => 'maya@example.test',
-    ]);
-
-    livewire(MeetingsHomeWidget::class)
-        ->assertSee('Maya Chen')
-        ->assertDontSee('maya@example.test');
-});
-
-it('does not name a card guest from the workspace user for a different connected mailbox', function (): void {
+it('does not name a slideover guest from the workspace user for a different connected mailbox', function (): void {
     $this->user->forceFill([
         'name' => 'Oliver Workspace',
         'email' => 'oliver@relaticle.test',
@@ -812,11 +798,14 @@ it('does not name a card guest from the workspace user for a different connected
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('Whiteshark Devs')
-        ->assertDontSee('Oliver Workspace');
+        ->assertDontSee('Whiteshark Devs')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Whiteshark Devs')
+        ->assertMountedActionModalDontSee('Oliver Workspace');
 });
 
-it('shows a person icon when the attendee has no name', function (): void {
+it('shows a person icon in the slideover when the attendee has no name', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -833,9 +822,40 @@ it('shows a person icon when the attendee has no name', function (): void {
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('only@example.test')
-        ->assertSee('attendee-avatar-guest', escape: false)
-        ->assertDontSee('attendee-avatar-initials', escape: false);
+        ->assertDontSee('only@example.test')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('only@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-guest', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-initials', escape: false);
+});
+
+it('collapses duplicate guest emails in the home meeting slideover', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Maya Chen',
+        'email_address' => 'maya@example.test',
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'maya@example.test',
+        'email_address' => 'maya@example.test',
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Maya Chen')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Maya Chen')
+        ->assertMountedActionModalSee('maya@example.test');
 });
 
 it('marks an in-progress meeting as happening now', function (): void {
@@ -854,6 +874,34 @@ it('marks an in-progress meeting as happening now', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.happening_now'));
 });
 
+it('strikes through the title when a meeting is in the past', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Morning sync',
+        'starts_at' => Date::parse('2026-09-09 10:00:00'),
+        'ends_at' => Date::parse('2026-09-09 10:30:00'),
+        'all_day' => false,
+    ]);
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Afternoon review',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+        'all_day' => false,
+    ]);
+
+    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
+
+    expect($html)
+        ->toContain('Morning sync')
+        ->toContain('Afternoon review')
+        ->toMatch('/Morning sync.*line-through/s')
+        ->not->toMatch('/Afternoon review.*line-through/s');
+});
+
 it('does not mark a later meeting as happening now', function (): void {
     Meeting::factory()->create([
         'team_id' => $this->team->id,
@@ -869,7 +917,7 @@ it('does not mark a later meeting as happening now', function (): void {
         ->assertDontSee(__('filament/pages/dashboard.meetings.happening_now'));
 });
 
-it('opens the meeting slideover from the title', function (): void {
+it('opens the meeting slideover from the title expand control', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -885,7 +933,7 @@ it('opens the meeting slideover from the title', function (): void {
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
 });
 
-it('keeps participants collapsed and opens only from the title', function (): void {
+it('opens the meeting modal from the row and title expand control', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -893,38 +941,22 @@ it('keeps participants collapsed and opens only from the title', function (): vo
         'starts_at' => Date::parse('2026-09-09 16:00:00'),
         'ends_at' => Date::parse('2026-09-09 17:00:00'),
     ]);
-    MeetingAttendee::factory()->create([
-        'meeting_id' => $meeting->id,
-        'name' => 'Maya Chen',
-        'email_address' => 'maya@example.test',
-    ]);
 
     $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
 
     expect($html)
         ->toContain('data-testid="meeting-card-title"')
+        ->toContain('data-testid="meeting-card-open"')
+        ->toContain('data-testid="meeting-card-row"')
+        ->toContain('type="button"')
         ->toContain("openMeeting('{$meeting->id}')")
-        ->toContain('data-testid="meeting-card-toggle"')
-        ->toContain('data-testid="meeting-card-participants"')
-        ->toContain('aria-expanded="false"')
-        ->toContain('x-cloak')
-        ->not->toMatch('/<button[^>]*data-testid="meeting-card"/');
-});
-
-it('hides the participant toggle when a meeting has no guests', function (): void {
-    Meeting::factory()->create([
-        'team_id' => $this->team->id,
-        'connected_account_id' => $this->account->id,
-        'title' => 'Focus block',
-        'starts_at' => Date::parse('2026-09-09 16:00:00'),
-        'ends_at' => Date::parse('2026-09-09 17:00:00'),
-    ]);
-
-    livewire(MeetingsHomeWidget::class)
-        ->assertSee('Focus block')
-        ->assertSee('data-testid="meeting-card-title"', escape: false)
-        ->assertDontSee('data-testid="meeting-card-toggle"', escape: false)
-        ->assertDontSee('data-testid="meeting-card-participants"', escape: false);
+        ->toContain('group-hover/row:opacity-100')
+        ->toContain('wire:loading.remove')
+        ->toContain('wire:loading.class="pointer-events-none opacity-60"')
+        ->toContain('fi-loading-indicator')
+        ->not->toContain('data-testid="meeting-card-participants"')
+        ->not->toContain('cursor-wait')
+        ->not->toContain('aria-expanded=');
 });
 
 it('shows four meetings and load more when the day has more', function (): void {
