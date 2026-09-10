@@ -10,6 +10,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -17,6 +18,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -728,4 +730,92 @@ it('resets the visible list when the selected day changes', function (): void {
         ->assertSee('Meeting 4')
         ->assertDontSee('Meeting 5')
         ->assertSee(__('filament/pages/dashboard.meetings.load_more'));
+});
+
+it('does not list a teammate meeting on home when the viewer is not invited', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $teammateAccount->id,
+        'title' => 'Meeting with client',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Client',
+        'email_address' => 'client@example.test',
+        'is_self' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Meeting with client');
+
+    expect(Meeting::query()
+        ->withGlobalScope('visible', VisibleMeetingScope::personal($this->user))
+        ->find($meeting->getKey()))
+        ->toBeNull();
+});
+
+it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
+    $this->user->forceFill(['name' => 'Alice Viewer'])->save();
+
+    $bob = User::factory()->create(['name' => 'Bob Owner']);
+    $bob->teams()->attach($this->team, ['role' => 'admin']);
+    $bob->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $bobAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $bob->id,
+            'email_address' => 'bob@example.com',
+        ])
+    );
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $bobAccount->id,
+        'title' => 'Shared standup',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Calendar Bob',
+        'email_address' => 'bob@example.com',
+        'is_self' => true,
+        'is_organizer' => true,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Alice Viewer',
+        'email_address' => strtolower((string) $this->user->email),
+        'is_self' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Guest',
+        'email_address' => 'guest@acme.test',
+        'is_self' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Shared standup')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Bob Owner')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'));
 });

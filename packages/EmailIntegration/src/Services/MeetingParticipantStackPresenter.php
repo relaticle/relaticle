@@ -75,6 +75,7 @@ final readonly class MeetingParticipantStackPresenter
         $states = [];
 
         foreach ($meeting->attendees as $attendee) {
+            $attendee->setRelation('meeting', $meeting);
             $state = $this->attendeePresenter->present($attendee);
             $key = $state['email'] !== '' ? $state['email'] : $state['name'];
 

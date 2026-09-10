@@ -464,8 +464,8 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         }
 
         $meeting = Meeting::query()
-            ->withGlobalScope('visible', new VisibleMeetingScope($user))
-            ->with(['team', 'attendees.contact', 'connectedAccount', 'people', 'companies', 'opportunities'])
+            ->withGlobalScope('visible', VisibleMeetingScope::personal($user))
+            ->with(['team', 'attendees.contact', 'connectedAccount.user', 'people', 'companies', 'opportunities'])
             ->find($meetingId);
 
         if ($meeting instanceof Meeting) {
