@@ -6,9 +6,11 @@ use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -17,7 +19,7 @@ use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
-mutates(MeetingsHomeWidget::class, ListMeetingsForDay::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, Dashboard::class);
+mutates(MeetingsHomeWidget::class, ListMeetingsForDay::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, Dashboard::class, HasConnectMailboxActions::class);
 
 beforeEach(function (): void {
     $this->travelTo(Date::parse('2026-09-09 15:00:00'));
@@ -49,16 +51,78 @@ it('renders the empty day copy on home', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.heading'))
         ->assertSee(__('filament/pages/dashboard.meetings.empty.title'))
         ->assertSee(__('filament/pages/dashboard.meetings.empty.description'))
-        ->assertSee(__('filament/pages/dashboard.meetings.date.today', ['date' => 'Sep 9']));
+        ->assertSee(__('filament/pages/dashboard.meetings.date.today'));
 });
 
 it('moves to tomorrow and yesterday from the date controls', function (): void {
-    livewire(MeetingsHomeWidget::class)
+    $component = livewire(MeetingsHomeWidget::class)
         ->call('nextDay')
-        ->assertSee(__('filament/pages/dashboard.meetings.date.tomorrow', ['date' => 'Sep 10']))
+        ->assertSee(__('filament/pages/dashboard.meetings.date.tomorrow'));
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-10');
+
+    $component
         ->call('previousDay')
         ->call('previousDay')
-        ->assertSee(__('filament/pages/dashboard.meetings.date.yesterday', ['date' => 'Sep 8']));
+        ->assertSee(__('filament/pages/dashboard.meetings.date.yesterday'));
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-08');
+});
+
+it('returns to today from the overflow menu', function (): void {
+    $component = livewire(MeetingsHomeWidget::class)
+        ->call('previousDay')
+        ->call('previousDay')
+        ->call('goToToday');
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-09');
+});
+
+it('loads the day chosen in the calendar', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Board review',
+        'starts_at' => Date::parse('2026-09-21 16:00:00'),
+        'ends_at' => Date::parse('2026-09-21 17:00:00'),
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Board review')
+        ->set('selectedDate', '2026-09-21')
+        ->assertSee('Board review')
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('jumps to the next day that has a meeting', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Renewal call',
+        'starts_at' => Date::parse('2026-09-12 16:00:00'),
+        'ends_at' => Date::parse('2026-09-12 17:00:00'),
+    ]);
+
+    $component = livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.next_with_meetings'))
+        ->call('goToNextDayWithMeetings')
+        ->assertSee('Renewal call');
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-12');
+});
+
+it('hides the jump button when no later meeting exists', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Past sync',
+        'starts_at' => Date::parse('2026-09-01 16:00:00'),
+        'ends_at' => Date::parse('2026-09-01 17:00:00'),
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.title'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.next_with_meetings'));
 });
 
 it('shows the meetings panel on the dashboard above tasks', function (): void {
@@ -140,7 +204,54 @@ it('shows one copy when two calendars share an ical uid', function (): void {
     expect($component->instance()->meetings()->count())->toBe(1);
 });
 
-it('shows the linked person name and hides the email on the card', function (): void {
+it('asks the user to sync a calendar when no mailbox is connected', function (): void {
+    $this->account->delete();
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.disconnected.title'))
+        ->assertSee(__('filament/pages/dashboard.meetings.disconnected.description'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'))
+        ->assertActionVisible('connectGmail')
+        ->assertActionHidden('connectAzure')
+        ->assertActionHasUrl(
+            TestAction::make('connectGmail'),
+            route('email-accounts.redirect', ['provider' => 'gmail']),
+        );
+});
+
+it('still asks to sync when the only mailbox is disconnected', function (): void {
+    $this->account->delete();
+
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->disconnected()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.disconnected.title'))
+        ->assertActionVisible('connectGmail');
+});
+
+it('does not treat a teammate mailbox as this user calendar', function (): void {
+    $this->account->delete();
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+    ]));
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.disconnected.title'));
+});
+
+it('drops the sync prompt once a mailbox is connected', function (): void {
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee(__('filament/pages/dashboard.meetings.disconnected.title'))
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('identifies a participant by email on the card, keeping the row to one line', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -158,11 +269,35 @@ it('shows the linked person name and hides the email on the card', function (): 
         'is_organizer' => true,
     ]);
 
-    livewire(MeetingsHomeWidget::class)
-        ->assertSee('Maya Chen')
+    $html = livewire(MeetingsHomeWidget::class)
+        ->assertSee('maya@example.test')
         ->assertSee(__('filament/resources/meeting.attendees.host'))
-        ->assertDontSee('maya@example.test');
+        ->html();
+
+    // The name still rides along as the avatar's alt text. It must not also be
+    // rendered as row text, or the row grows to the two lines this avoids.
+    expect(substr_count($html, 'Maya Chen'))->toBe(substr_count($html, 'alt="Maya Chen"'));
 });
+
+it('colours the card dot by the viewer RSVP', function (string $status, string $expectedClass, string $expectedLabel): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+        'response_status' => $status,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee($expectedClass, escape: false)
+        ->assertSee($expectedLabel);
+})->with([
+    'accepted is green' => ['accepted', 'bg-success-500', 'Accepted'],
+    'declined is red' => ['declined', 'bg-danger-500', 'Declined'],
+    'maybe is orange' => ['tentative', 'bg-warning-500', 'Maybe'],
+    'pending is grey' => ['needsAction', 'bg-gray-400', 'Pending'],
+]);
 
 it('collapses guests after three and reveals the rest on show more', function (): void {
     $meeting = Meeting::factory()->create([

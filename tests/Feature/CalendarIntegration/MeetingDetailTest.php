@@ -222,9 +222,11 @@ it('shows the current user attendee row when is_self is true', function (): void
         'response_status' => AttendeeResponseStatus::ACCEPTED,
     ]);
 
+    // A self attendee is named from the signed-in account, not the calendar
+    // copy of the name, so the row reads as the viewer sees themselves.
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
-        ->assertMountedActionModalSee('Current User')
+        ->assertMountedActionModalSee($this->user->name)
         ->assertMountedActionModalDontSee('self@example.test')
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
 });
@@ -251,7 +253,7 @@ it('prefers the linked person name over the calendar email', function (): void {
         ->assertMountedActionModalDontSee('maya@example.test');
 });
 
-it('shows a name from the email when the calendar name is the email and there is no person', function (): void {
+it('shows the address itself rather than inventing a name from the email', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -267,8 +269,7 @@ it('shows a name from the email when the calendar name is the email and there is
 
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
-        ->assertMountedActionModalSee('Only')
-        ->assertMountedActionModalDontSee('only@example.test')
+        ->assertMountedActionModalSee('only@example.test')
         ->assertMountedActionModalDontSee(__('filament/resources/meeting.attendees.guest'));
 });
 

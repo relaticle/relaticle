@@ -28,7 +28,6 @@ use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
-use Relaticle\EmailIntegration\Livewire\MailboxConnectPrompt;
 use Relaticle\EmailIntegration\Livewire\MailboxImportStatus;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
@@ -97,7 +96,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.mailbox-import-status', MailboxImportStatus::class);
-        Livewire::component('email-integration.mailbox-connect-prompt', MailboxConnectPrompt::class);
         Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
 
         // The feature flag is already checked above (config-based, stable for the
