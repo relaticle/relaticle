@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignUlid('team_id')->constrained()->cascadeOnDelete();
             $table->string('type', 20);
             $table->string('value');
+            $table->string('enforcement_level', 20)->default('blocked');
             $table->foreignUlid('created_by')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
 
