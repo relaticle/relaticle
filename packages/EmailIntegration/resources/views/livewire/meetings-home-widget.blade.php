@@ -130,13 +130,40 @@
                 @endphp
                 <div
                     wire:key="meeting-home-{{ $meetingKey }}"
-                    x-data="{ expanded: false, expandLabel: @js($expandLabel), collapseLabel: @js($collapseLabel) }"
+                    x-data="{
+                        expanded: false,
+                        showCard: false,
+                        expandLabel: @js($expandLabel),
+                        collapseLabel: @js($collapseLabel),
+                        toggle() {
+                            if (this.expanded) {
+                                this.expanded = false;
+                                window.setTimeout(() => {
+                                    if (! this.expanded) {
+                                        this.showCard = false;
+                                    }
+                                }, 320);
+
+                                return;
+                            }
+
+                            this.showCard = true;
+                            this.expanded = true;
+                        },
+                        onPanelTransitionEnd(event) {
+                            if (event.propertyName !== 'grid-template-rows' || this.expanded) {
+                                return;
+                            }
+
+                            this.showCard = false;
+                        },
+                    }"
                     data-testid="meeting-card"
                     class="py-0.5"
                 >
                     <div
-                        class="px-2.5 py-2 transition-[border-color,background-color,box-shadow] duration-300 ease-out motion-reduce:transition-none"
-                        x-bind:class="expanded
+                        class="px-2.5 py-2 transition-[border-color,background-color,box-shadow] duration-300 ease-in-out motion-reduce:transition-none"
+                        x-bind:class="showCard
                             ? 'rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] shadow-sm'
                             : 'border border-transparent'"
                     >
@@ -144,7 +171,7 @@
                         data-testid="meeting-card-row"
                         class="flex min-h-9 cursor-pointer items-center gap-2.5"
                         @if ($hasParticipants)
-                            x-on:click="expanded = ! expanded"
+                            x-on:click="toggle()"
                             x-bind:aria-expanded="expanded.toString()"
                             aria-expanded="false"
                             aria-controls="{{ $participantsId }}"
@@ -224,7 +251,7 @@
                                 aria-hidden="true"
                             >
                                 <span
-                                    class="inline-flex transition-transform duration-300 ease-out motion-reduce:transition-none"
+                                    class="inline-flex transition-transform duration-300 ease-in-out motion-reduce:transition-none"
                                     x-bind:class="expanded && 'rotate-180'"
                                 >
                                     <x-filament::icon
@@ -241,18 +268,21 @@
                             id="{{ $participantsId }}"
                             data-testid="meeting-card-participants"
                             role="region"
-                            x-cloak
-                            x-show="expanded"
-                            x-collapse.duration.300ms
-                            class="mt-2 overflow-hidden rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]"
+                            class="grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none"
+                            x-bind:class="expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+                            x-on:transitionend="onPanelTransitionEnd($event)"
                         >
-                            @foreach ($participants['attendees'] as $state)
-                                @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
-                                    'state' => $state,
-                                    'showEmail' => false,
-                                    'compact' => true,
-                                ])
-                            @endforeach
+                            <div class="min-h-0 overflow-hidden">
+                                <div class="mt-2 rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]">
+                                    @foreach ($participants['attendees'] as $state)
+                                        @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
+                                            'state' => $state,
+                                            'showEmail' => false,
+                                            'compact' => true,
+                                        ])
+                                    @endforeach
+                                </div>
+                            </div>
                         </div>
                     @endif
                     </div>

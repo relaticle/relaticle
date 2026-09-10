@@ -563,8 +563,10 @@ it('renders a compact row with a hover expand control on the title', function ()
         ->toContain('M3.75 3.75v4.5m0-4.5h4.5')
         ->toContain('group-hover/title:opacity-100')
         ->toContain('aria-expanded="false"')
-        ->toContain('x-cloak')
-        ->toContain('x-collapse.duration.300ms')
+        ->toContain('grid-template-rows')
+        ->toContain('grid-rows-[1fr]')
+        ->toContain('grid-rows-[0fr]')
+        ->toContain('onPanelTransitionEnd')
         ->not->toContain('data-testid="meeting-card-participants-preview"');
 });
 
