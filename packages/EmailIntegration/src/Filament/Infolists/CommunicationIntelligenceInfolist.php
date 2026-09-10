@@ -8,7 +8,6 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Carbon\CarbonInterface;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
@@ -26,7 +25,7 @@ final class CommunicationIntelligenceInfolist
         return Section::make(__("{$translationKey}.heading"))
             ->icon(Heroicon::ChartBar)
             ->schema([
-                Section::make(__("{$translationKey}.groups.connection"))
+                Fieldset::make(__("{$translationKey}.groups.connection"))
                     ->schema([
                         TextEntry::make('visible_first_interaction_at')
                             ->label(__("{$translationKey}.fields.first_interaction.label"))
@@ -50,9 +49,7 @@ final class CommunicationIntelligenceInfolist
                             ->placeholder(__("{$translationKey}.fields.strongest_connection.placeholder")),
                     ])
                     ->columns(2)
-                    ->columnSpanFull()
-                    ->collapsible()
-                    ->collapsed(),
+                    ->columnSpanFull(),
 
                 Fieldset::make(__("{$translationKey}.groups.email"))
                     ->schema([
@@ -97,7 +94,7 @@ final class CommunicationIntelligenceInfolist
             ->columns(1)
             ->columnSpanFull()
             ->collapsible()
-            ->collapsed(fn (People|Company|Opportunity $record): bool => ! self::metrics($record)->lastInteractionAt() instanceof CarbonInterface);
+            ->collapsed();
     }
 
     /**

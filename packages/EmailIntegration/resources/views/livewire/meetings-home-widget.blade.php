@@ -14,11 +14,12 @@
         <div class="flex shrink-0 items-center gap-1">
             {{-- The prefix is server-rendered and the date comes from the picker's
                  own state, so a click anywhere on "Today, Sep 10" opens the calendar. --}}
-            <div
-                class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
-                x-on:click="$event.target.closest('.fi-meetings-date-trigger') || $el.querySelector('.fi-meetings-date-trigger')?.click()"
-            >
-                <span aria-hidden="true">{{ $this->datePrefix() }}</span>
+            <div class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                <span
+                    aria-hidden="true"
+                    class="cursor-pointer"
+                    x-on:click="$el.parentElement.querySelector('.fi-meetings-date-trigger')?.click()"
+                >{{ $this->datePrefix() }}</span>
                 {{ $this->getSchema('datePickerSchema') }}
             </div>
 
