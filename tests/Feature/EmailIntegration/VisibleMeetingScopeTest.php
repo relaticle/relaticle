@@ -49,10 +49,10 @@ beforeEach(function (): void {
     };
 });
 
-function visibleMeetingsTo(User $viewer): Collection
+function visibleMeetingsTo(User $viewer, bool $personalCalendarOnly = false): Collection
 {
     return Meeting::query()
-        ->withGlobalScope('visible', new VisibleMeetingScope($viewer))
+        ->withGlobalScope('visible', new VisibleMeetingScope($viewer, personalCalendarOnly: $personalCalendarOnly))
         ->get();
 }
 
@@ -89,6 +89,58 @@ it('hides a coworker meeting when all attendees are protected', function (): voi
 
     expect($visibleIds)->toContain($normal->id)
         ->not->toContain($protected->id);
+});
+
+it('hides a coworker meeting on a personal calendar when the viewer is not invited', function (): void {
+    $external = ($this->makeCoworkerMeeting)(['client@contact.com']);
+
+    expect(visibleMeetingsTo($this->viewer, personalCalendarOnly: true)->modelKeys())
+        ->not->toContain($external->id);
+});
+
+it('shows a coworker meeting on workspace scope but hides it on a personal calendar', function (): void {
+    $external = ($this->makeCoworkerMeeting)(['client@contact.com']);
+
+    expect(visibleMeetingsTo($this->viewer)->modelKeys())->toContain($external->id)
+        ->and(visibleMeetingsTo($this->viewer, personalCalendarOnly: true)->modelKeys())
+        ->not->toContain($external->id);
+});
+
+it('shows a personal-calendar meeting from any of the viewers connected mailboxes', function (): void {
+    $secondaryAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->viewer->id,
+        'email_address' => 'secondary@example.test',
+    ]));
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $secondaryAccount->getKey(),
+    ]);
+
+    expect(visibleMeetingsTo($this->viewer, personalCalendarOnly: true)->modelKeys())
+        ->toContain($meeting->id);
+});
+
+it('shows a coworker meeting on a personal calendar when the viewer is on the guest list', function (): void {
+    $viewerEmail = strtolower((string) $this->viewer->email);
+    $invited = ($this->makeCoworkerMeeting)([$viewerEmail, 'client@contact.com']);
+
+    expect(visibleMeetingsTo($this->viewer, personalCalendarOnly: true)->modelKeys())
+        ->toContain($invited->id);
+});
+
+it('shows a coworker meeting on a personal calendar when only a connected mailbox is on the guest list', function (): void {
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->viewer->id,
+        'email_address' => 'viewer-mailbox@example.test',
+    ]));
+
+    $invited = ($this->makeCoworkerMeeting)(['viewer-mailbox@example.test', 'client@contact.com']);
+
+    expect(visibleMeetingsTo($this->viewer, personalCalendarOnly: true)->modelKeys())
+        ->toContain($invited->id);
 });
 
 it('shows a coworker meeting when only some attendees are protected', function (): void {
