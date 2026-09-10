@@ -29,3 +29,21 @@ SUBJECT with a share: a metadata-only share on a FULL email would still match
 subject and snippet. Use the share when one exists (direct first, then another
 copy of the same `rfc_message_id`). Fall back to `privacy_tier` only when the
 viewer has no share.
+
+## Meeting attendee "self"
+
+`MeetingAttendee.is_self` is the mailbox that owns that meeting copy, not the
+current viewer. Name that row from `meeting.connectedAccount.user` (or the
+account display name). Never substitute `auth()->user()`. Alice viewing
+Bob's copy must still show Bob.
+
+## Personal calendar vs workspace meetings
+
+Home (`ListMeetingsForDay`, `MeetingsHomeWidget`) is a personal calendar.
+Use `VisibleMeetingScope::personal($viewer)`. Show only meetings synced from
+one of the viewer's connected mailboxes or where the viewer is on the guest
+list (user email plus every connected-account address).
+
+Record Meetings tabs, communication-intelligence aggregates, and other
+workspace surfaces keep the default `VisibleMeetingScope` (teammate meetings
+with an external guest stay visible there).
