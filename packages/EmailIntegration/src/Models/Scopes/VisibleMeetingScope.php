@@ -34,6 +34,9 @@ final readonly class VisibleMeetingScope implements Scope
         private bool $personalCalendarOnly = false,
     ) {}
 
+    /**
+     * @return self<Model>
+     */
     public static function personal(User $viewer): self
     {
         return new self($viewer, personalCalendarOnly: true);
