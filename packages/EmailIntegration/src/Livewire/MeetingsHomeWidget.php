@@ -411,10 +411,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         return $now->gte($meeting->ends_at->timezone($this->viewerTimezone()));
     }
 
-    /**
-     * The viewer's own RSVP. Colour is paired with the status label so the
-     * card never relies on the rail or dot alone.
-     */
+    /** The viewer's own RSVP status, used for the home-list status dot color. */
     private function viewerResponseStatus(Meeting $meeting): AttendeeResponseStatus
     {
         $user = auth()->user();

@@ -1,19 +1,14 @@
 @php
     /** @var array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: \Relaticle\EmailIntegration\Enums\AttendeeResponseStatus|null} $state */
     $showEmail ??= $state['email'] !== '' && mb_strtolower($state['name']) !== $state['email'];
-    $compact ??= false;
 @endphp
 
-<div @class([
-    'flex items-center',
-    'gap-2 py-1' => $compact,
-    'gap-3 py-1.5' => ! $compact,
-])>
+<div class="flex items-center gap-3 py-1.5">
     @include('email-integration::filament.infolists.partials.meeting-attendee-avatar', [
         'src' => $state['avatar'],
         'alt' => $state['name'],
         'hasName' => $state['has_name'],
-        'size' => $compact ? 'sm' : 'md',
+        'size' => 'md',
     ])
 
     <div class="min-w-0 flex-1">
