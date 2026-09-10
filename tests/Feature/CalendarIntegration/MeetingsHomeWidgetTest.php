@@ -553,7 +553,10 @@ it('opens the meeting modal from the row and title expand control', function ():
         ->toContain("openMeeting('{$meeting->id}')")
         ->toContain('M3.75 3.75v4.5m0-4.5h4.5')
         ->toContain('group-hover/title:opacity-100')
+        ->toContain('wire:loading.flex')
+        ->toContain('fi-loading-indicator')
         ->not->toContain('data-testid="meeting-card-participants"')
+        ->not->toContain('cursor-wait')
         ->not->toContain('aria-expanded=');
 });
 
