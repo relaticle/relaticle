@@ -161,6 +161,51 @@ return [
         'cta' => 'Confirm new email',
     ],
 
+    'email_code' => [
+        'expires' => 'This code expires in :count minutes.',
+        'browser_hint' => 'Enter this code in the browser tab where you started.',
+        'latest_only' => 'Only the latest code you requested works.',
+        'unsolicited' => 'Did not request this? You can ignore this email.',
+        'purposes' => [
+            'signup' => [
+                'subject' => 'Your Relaticle signup code',
+                'preheader' => 'Use this code to finish creating your account',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to finish creating your Relaticle account.',
+            ],
+            'verify_email' => [
+                'subject' => 'Your Relaticle verification code',
+                'preheader' => 'Use this code to verify your email',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to verify your Relaticle account email.',
+            ],
+            'sign_in' => [
+                'subject' => 'Your Relaticle sign-in code',
+                'preheader' => 'Use this code to sign in',
+                'heading' => "Confirm it's you",
+                'body' => 'Enter this code to sign in to your Relaticle account.',
+            ],
+            'confirm_identity' => [
+                'subject' => 'Your Relaticle confirmation code',
+                'preheader' => 'Use this code to continue',
+                'heading' => 'Confirm your identity',
+                'body' => 'Enter this code to continue with your Relaticle account.',
+            ],
+            'change_email' => [
+                'subject' => 'Your Relaticle email change code',
+                'preheader' => 'Use this code to confirm your new email',
+                'heading' => 'Confirm your new email',
+                'body' => 'Enter this code to finish changing your Relaticle account email.',
+            ],
+            'enable_email_sign_in' => [
+                'subject' => 'Your Relaticle email sign-in code',
+                'preheader' => 'Use this code to turn on email sign-in',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to turn on email sign-in for your Relaticle account.',
+            ],
+        ],
+    ],
+
     'email_change_notice' => [
         'subject' => 'Email change requested',
         'preheader' => 'Was this you? Block it if not',

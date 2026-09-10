@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use Illuminate\Bus\Batch;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
@@ -26,7 +23,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Queueable;
 
     public int $tries = 3;
 

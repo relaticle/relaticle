@@ -21,7 +21,7 @@ final class ProtectedRecipientFactory extends Factory
         return [
             'team_id' => Team::factory(),
             'type' => 'email',
-            'value' => $this->faker->unique()->safeEmail(),
+            'value' => fake()->unique()->safeEmail(),
             'created_by' => User::factory(),
         ];
     }

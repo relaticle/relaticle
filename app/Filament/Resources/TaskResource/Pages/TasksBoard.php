@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -20,7 +21,6 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
@@ -174,7 +174,7 @@ final class TasksBoard extends BoardResourcePage
                     }),
             ])
             ->filters([
-                SelectFilter::make('assignees')
+                RecordSelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
                     ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
                     ->searchable()

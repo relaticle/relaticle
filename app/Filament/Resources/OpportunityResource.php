@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
@@ -45,7 +46,7 @@ final class OpportunityResource extends Resource
 
     protected static ?string $modelLabel = null;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static ?int $navigationSort = 3;
 
@@ -141,6 +142,11 @@ final class OpportunityResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/opportunity.navigation_label');
+    }
+
+    public static function getNavigationIcon(): string
+    {
+        return CrmEntity::Opportunity->icon();
     }
 
     public static function getEloquentQuery(): Builder

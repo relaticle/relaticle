@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelUserDeletion;
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Features\AccountDeletion;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\UserDeletionCancelledNotification;
 use App\Notifications\UserDeletionScheduledNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 
 mutates(ScheduleUserDeletion::class, CancelUserDeletion::class);
+
+beforeEach(function (): void {
+    Feature::define(AccountDeletion::class, true);
+});
 
 test('user can schedule account deletion', function () {
     Notification::fake();
@@ -84,6 +90,7 @@ test('the deletion blocker names an action the app supports', function (): void 
 
 test('user can cancel scheduled deletion', function () {
     Notification::fake();
+    Feature::define(AccountDeletion::class, false);
 
     $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
     $personalTeam = $user->personalTeam();

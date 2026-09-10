@@ -19,8 +19,8 @@ final class EmailBodyFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
-            'body_text' => $this->faker->paragraph(),
-            'body_html' => '<p>'.$this->faker->paragraph().'</p>',
+            'body_text' => fake()->paragraph(),
+            'body_html' => '<p>'.fake()->paragraph().'</p>',
         ];
     }
 }

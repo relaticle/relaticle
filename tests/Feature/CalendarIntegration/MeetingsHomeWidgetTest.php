@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
@@ -342,6 +343,85 @@ it('does not show a meeting that starts on another day', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
+/**
+ * All-day events are stored as a UTC date at midnight. Converting that timestamp
+ * into the viewer's zone moves the day for anyone west of UTC. Los Angeles is
+ * UTC-7 in September, so 2026-09-10 00:00 UTC would otherwise land on the 9th.
+ */
+it('shows an all-day event on its calendar date for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->set('selectedDate', '2026-09-10')
+        ->assertSee('Company offsite')
+        ->assertSee(__('filament/pages/dashboard.meetings.all_day'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('does not show an all-day event on the previous local day for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Company offsite')
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('jumps to the calendar date of a later all-day event for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    $component = livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.next_with_meetings'))
+        ->call('goToNextDayWithMeetings')
+        ->assertSee('Company offsite');
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-10');
+});
+
+it('lists a late-evening timed meeting on the local day for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'West coast standup',
+        'starts_at' => Date::parse('2026-09-10 04:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 05:00:00', 'UTC'),
+        'all_day' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('West coast standup')
+        ->set('selectedDate', '2026-09-10')
+        ->assertDontSee('West coast standup');
+});
+
 it('shows one copy when two calendars share an ical uid', function (): void {
     $teammate = User::factory()->create();
     $otherAccount = ConnectedAccount::withoutEvents(
@@ -480,6 +560,158 @@ it('names a card guest from mailbox history without a person record', function (
         ->assertDontSee('attendee-avatar-guest', escape: false);
 });
 
+it('names a card guest from the viewer own private email', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'own.private@example.test',
+        'name' => 'Own Private Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'own.private@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Own Private Guest')
+        ->assertDontSee('own.private@example.test');
+});
+
+it('does not name a card guest from a teammate private email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'secret.guest@example.test',
+        'name' => 'Secret Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'secret.guest@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Secret Guest')
+        ->assertSee('secret.guest@example.test');
+});
+
+it('does not name a card guest from a mailbox-blocked email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'spam@badactor.test',
+        'name' => 'Blocked Sender',
+    ]);
+    EmailBlocklist::factory()->email('spam@badactor.test')->create([
+        'user_id' => $teammate->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'spam@badactor.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Blocked Sender')
+        ->assertSee('spam@badactor.test');
+});
+
+it('names a card guest from a teammate workspace-visible email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'shared.guest@acme.test',
+        'name' => 'Shared Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'shared.guest@acme.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Shared Guest')
+        ->assertDontSee('shared.guest@acme.test');
+});
+
 it('colours the card dot by the viewer RSVP', function (string $status, string $expectedClass, string $expectedLabel): void {
     Meeting::factory()->create([
         'team_id' => $this->team->id,
@@ -551,6 +783,37 @@ it('collapses duplicate guest emails on the card', function (): void {
     livewire(MeetingsHomeWidget::class)
         ->assertSee('Maya Chen')
         ->assertDontSee('maya@example.test');
+});
+
+it('does not name a card guest from the workspace user for a different connected mailbox', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill([
+        'email_address' => 'whiteshark.devs@example.test',
+        'display_name' => 'Whiteshark',
+    ])->save();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Whiteshark Devs',
+        'email_address' => 'whiteshark.devs@example.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Whiteshark Devs')
+        ->assertDontSee('Oliver Workspace');
 });
 
 it('shows a person icon when the attendee has no name', function (): void {
@@ -770,7 +1033,10 @@ it('does not list a teammate meeting on home when the viewer is not invited', fu
 it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
     $this->user->forceFill(['name' => 'Alice Viewer'])->save();
 
-    $bob = User::factory()->create(['name' => 'Bob Owner']);
+    $bob = User::factory()->create([
+        'name' => 'Bob Owner',
+        'email' => 'bob@example.com',
+    ]);
     $bob->teams()->attach($this->team, ['role' => 'admin']);
     $bob->forceFill(['current_team_id' => $this->team->id])->save();
 
