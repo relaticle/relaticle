@@ -130,31 +130,39 @@
                 >
                     <div
                         data-testid="meeting-card-row"
-                        class="relative flex min-h-9 cursor-pointer items-center gap-2.5"
+                        class="flex min-h-9 cursor-pointer items-center gap-2.5"
                         wire:click="{{ $openTarget }}"
                         wire:loading.attr="disabled"
                         wire:target="{{ $openTarget }}"
                         aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                     >
-                        <span
-                            wire:loading.flex
-                            wire:target="{{ $openTarget }}"
-                            class="pointer-events-none absolute inset-0 z-10 items-center justify-center rounded-md bg-[var(--surface-block-bg)]/80 dark:bg-gray-950/80"
-                            role="status"
-                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
-                        >
-                            <x-filament::loading-indicator class="size-4 text-primary-500" />
+                        <span class="inline-flex size-3.5 shrink-0 items-center justify-center">
+                            <span
+                                wire:loading.remove
+                                wire:target="{{ $openTarget }}"
+                                @class([
+                                    'size-1.5 rounded-full',
+                                    'bg-success-500' => $dotColor === 'success',
+                                    'bg-danger-500' => $dotColor === 'danger',
+                                    'bg-warning-500' => $dotColor === 'warning',
+                                    'bg-gray-400' => $dotColor === 'gray',
+                                ])
+                                aria-hidden="true"
+                            ></span>
+                            <x-filament::loading-indicator
+                                wire:loading
+                                wire:target="{{ $openTarget }}"
+                                @class([
+                                    'size-3.5',
+                                    'text-success-500' => $dotColor === 'success',
+                                    'text-danger-500' => $dotColor === 'danger',
+                                    'text-warning-500' => $dotColor === 'warning',
+                                    'text-gray-400' => $dotColor === 'gray',
+                                ])
+                                role="status"
+                                aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                            />
                         </span>
-                        <span
-                            @class([
-                                'size-1.5 shrink-0 rounded-full',
-                                'bg-success-500' => $dotColor === 'success',
-                                'bg-danger-500' => $dotColor === 'danger',
-                                'bg-warning-500' => $dotColor === 'warning',
-                                'bg-gray-400' => $dotColor === 'gray',
-                            ])
-                            aria-hidden="true"
-                        ></span>
 
                         <div
                             class="group/title relative flex min-w-0 flex-1 items-center gap-1.5"
