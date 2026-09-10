@@ -120,7 +120,11 @@ final readonly class CustomFieldsSchemaDescriber
         return match ($dataType) {
             FieldDataType::DATE => 'YYYY-MM-DD',
             FieldDataType::DATE_TIME => 'ISO 8601, e.g. "2026-05-20T14:00:00Z"',
-            FieldDataType::TEXT => 'plain text is fine, will be wrapped as HTML on save',
+            FieldDataType::TEXT => match ($rawType) {
+                'rich-editor' => 'markdown, or HTML when the value starts with <; stored as HTML',
+                'markdown-editor' => 'markdown',
+                default => null,
+            },
             FieldDataType::MULTI_CHOICE => 'array of label strings',
             default => match ($rawType) {
                 'email' => 'array of email strings',
