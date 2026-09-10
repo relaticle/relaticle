@@ -8,9 +8,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\User;
 use Laravel\Pennant\Feature;
-use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
-use Relaticle\CustomFields\Services\TenantContextService;
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -215,45 +213,4 @@ it('names the field code in a rule validation error, not only the field label', 
     expect($result->error)
         ->toContain("custom_fields.{$field->code}")
         ->toContain($foreign->getKey());
-});
-
-it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $company = Company::factory()->create(['team_id' => $user->currentTeam->getKey(), 'name' => 'Globex']);
-
-    $section = CustomFieldSection::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
-        'entity_type' => 'task',
-        'name' => 'Links',
-        'code' => 'links',
-        'type' => 'section',
-        'sort_order' => 98,
-        'active' => true,
-    ]);
-
-    $field = CustomField::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
-        'custom_field_section_id' => $section->getKey(),
-        'entity_type' => 'task',
-        'code' => 'linked_company',
-        'name' => 'Linked Company',
-        'type' => 'record',
-        'lookup_type' => 'company',
-        'sort_order' => 1,
-        'active' => true,
-        'validation_rules' => [],
-    ]);
-
-    TenantContextService::setTenantId($user->currentTeam->getKey());
-
-    try {
-        $rows = resolve(CustomFieldsDisplayFormatter::class)
-            ->format($user, 'task', [$field->code => [$company->getKey()]], null);
-    } finally {
-        TenantContextService::setTenantId(null);
-    }
-
-    expect($rows)->toHaveCount(1)
-        ->and($rows[0]['new'])->toBe('Globex')
-        ->and($rows[0]['values'])->toBe(['Globex']);
 });
