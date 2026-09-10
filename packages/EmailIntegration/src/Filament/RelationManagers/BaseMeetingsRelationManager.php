@@ -9,10 +9,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -109,20 +107,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
                     ->icon(Heroicon::Link)
                     ->color('gray')
-                    ->schema([
-                        Select::make('target_type')
-                            ->options([
-                                'People' => 'Person',
-                                'Company' => 'Company',
-                                'Opportunity' => 'Opportunity',
-                            ])
-                            ->required()
-                            ->live(),
-                        Select::make('target_id')
-                            ->options(fn (Get $get): array => $this->searchOptions((string) $get('target_type')))
-                            ->searchable()
-                            ->required(),
-                    ])
+                    ->schema(MeetingDetailInfolist::linkRecordFields())
                     ->action(function (array $data, Meeting $record): void {
                         resolve(LinkMeetingToRecordAction::class)
                             ->execute($record, $this->resolveRecord((string) $data['target_type'], (string) $data['target_id']));
@@ -148,22 +133,6 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                             ->send();
                     }),
             ]);
-    }
-
-    /** @return array<string, string> */
-    private function searchOptions(string $type): array
-    {
-        // CRM models carry no global tenant scope, so every query here must be
-        // constrained to the current tenant. Otherwise the option list (and the
-        // resolveRecord lookup below) would expose and link records from other teams.
-        $teamId = filament()->getTenant()?->getKey();
-
-        return match ($type) {
-            'People' => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-            'Company' => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-            default => [],
-        };
     }
 
     private function resolveRecord(string $type, string $id): Model

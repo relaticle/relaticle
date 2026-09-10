@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Route;
 use Livewire\Features\SupportTesting\Testable;
@@ -297,6 +298,36 @@ it('links a record from the meeting view modal', function (): void {
 
     expect($meeting->fresh()?->people()->count())->toBe(1);
 });
+
+it('labels the link record picker with the selected type', function (string $type, string $labelKey): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('linkRecords'),
+        ])
+        ->assertFormFieldExists(
+            'target_type',
+            fn (Select $field): bool => $field->getLabel() === __('filament/resources/meeting.fields.record_type.label'),
+        )
+        ->assertFormFieldExists(
+            'target_id',
+            fn (Select $field): bool => $field->getLabel() === __('filament/resources/meeting.fields.record.label'),
+        )
+        ->fillForm(['target_type' => $type])
+        ->assertFormFieldExists(
+            'target_id',
+            fn (Select $field): bool => $field->getLabel() === __($labelKey),
+        );
+})->with([
+    'person' => ['People', 'filament/resources/meeting.linked_record_types.people'],
+    'company' => ['Company', 'filament/resources/meeting.linked_record_types.companies'],
+    'opportunity' => ['Opportunity', 'filament/resources/meeting.linked_record_types.opportunities'],
+]);
 
 it('filters past meetings', function (): void {
     $future = Meeting::factory()->create([
