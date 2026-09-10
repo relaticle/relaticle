@@ -53,20 +53,10 @@ final readonly class EmailSearchService
      */
     private function whereViewerCanSeeSubject(Builder $query, string $viewerId): Builder
     {
-        return $query->where(function (Builder $access) use ($viewerId): void {
-            $access
-                ->where('user_id', $viewerId)
-                ->orWhereIn('privacy_tier', [EmailPrivacyTier::SUBJECT->value, EmailPrivacyTier::FULL->value])
-                ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
-                    ->where('shared_with', $viewerId)
-                    ->whereIn('tier', [EmailPrivacyTier::SUBJECT->value, EmailPrivacyTier::FULL->value]))
-                ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
-                ->orWhereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
-                    $shareQuery,
-                    $viewerId,
-                    [EmailPrivacyTier::SUBJECT->value, EmailPrivacyTier::FULL->value],
-                ));
-        });
+        return $this->whereViewerHasAccessAtTiers($query, $viewerId, [
+            EmailPrivacyTier::SUBJECT->value,
+            EmailPrivacyTier::FULL->value,
+        ]);
     }
 
     /**
@@ -75,19 +65,47 @@ final readonly class EmailSearchService
      */
     private function whereViewerCanSeeBody(Builder $query, string $viewerId): Builder
     {
-        return $query->where(function (Builder $access) use ($viewerId): void {
+        return $this->whereViewerHasAccessAtTiers($query, $viewerId, [
+            EmailPrivacyTier::FULL->value,
+        ]);
+    }
+
+    /**
+     * Match PrivacyService: a per-viewer share overrides the email default.
+     *
+     * @param  Builder<Email>  $query
+     * @param  list<string>  $tiers
+     * @return Builder<Email>
+     */
+    private function whereViewerHasAccessAtTiers(Builder $query, string $viewerId, array $tiers): Builder
+    {
+        return $query->where(function (Builder $access) use ($viewerId, $tiers): void {
             $access
                 ->where('user_id', $viewerId)
-                ->orWhere('privacy_tier', EmailPrivacyTier::FULL->value)
+                ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
                 ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
                     ->where('shared_with', $viewerId)
-                    ->where('tier', EmailPrivacyTier::FULL->value))
-                ->orWhereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
-                ->orWhereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
-                    $shareQuery,
-                    $viewerId,
-                    [EmailPrivacyTier::FULL->value],
-                ));
+                    ->whereIn('tier', $tiers))
+                ->orWhere(function (Builder $crossShare) use ($viewerId, $tiers): void {
+                    $crossShare
+                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                            ->where('shared_with', $viewerId))
+                        ->whereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                            $shareQuery,
+                            $viewerId,
+                            $tiers,
+                        ));
+                })
+                ->orWhere(function (Builder $byDefault) use ($viewerId, $tiers): void {
+                    $byDefault
+                        ->whereIn('privacy_tier', $tiers)
+                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                            ->where('shared_with', $viewerId))
+                        ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                            $shareQuery,
+                            $viewerId,
+                        ));
+                });
         });
     }
 
@@ -101,16 +119,22 @@ final readonly class EmailSearchService
     }
 
     /**
-     * @param  list<string>  $tiers
+     * @param  list<string>|null  $tiers
      */
-    private function crossMessageShareExists(BaseBuilder $query, string $viewerId, array $tiers): BaseBuilder
+    private function crossMessageShareExists(BaseBuilder $query, string $viewerId, ?array $tiers = null): BaseBuilder
     {
-        return $query->from('email_shares')
+        $query
+            ->from('email_shares')
             ->join('emails as share_source_emails', 'share_source_emails.id', '=', 'email_shares.email_id')
             ->where('email_shares.shared_with', $viewerId)
-            ->whereIn('email_shares.tier', $tiers)
             ->whereColumn('share_source_emails.team_id', 'emails.team_id')
             ->whereColumn('share_source_emails.rfc_message_id', 'emails.rfc_message_id')
             ->whereNotNull('emails.rfc_message_id');
+
+        if ($tiers !== null) {
+            $query->whereIn('email_shares.tier', $tiers);
+        }
+
+        return $query;
     }
 }
