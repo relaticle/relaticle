@@ -113,6 +113,8 @@
             @foreach (array_slice($this->meetingCards, 0, $this->visibleCount) as $card)
                 @php
                     $participants = $card['participants'];
+                    $responseStatus = $card['response_status'];
+                    $dotColor = $responseStatus->getColor();
                     $time = $card['time'];
                     $happeningNow = $card['happening_now'];
                     $meetingKey = $card['id'];
@@ -131,17 +133,63 @@
                     data-testid="meeting-card"
                     x-bind:class="expanded && '-mx-1 my-1 rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-4 py-3 shadow-sm'"
                 >
-                    <div class="flex min-h-11 items-center gap-3 py-3" x-bind:class="expanded && 'py-0'">
+                    <div
+                        data-testid="meeting-card-row"
+                        class="flex min-h-11 cursor-pointer items-center gap-3 py-3"
+                        x-bind:class="expanded && 'py-0'"
+                        @if ($hasParticipants)
+                            x-on:click="expanded = ! expanded"
+                            x-bind:aria-expanded="expanded.toString()"
+                            aria-expanded="false"
+                            aria-controls="{{ $participantsId }}"
+                            x-bind:aria-label="expanded ? collapseLabel : expandLabel"
+                        @else
+                            wire:click="{{ $openTarget }}"
+                            wire:loading.attr="disabled"
+                            wire:target="{{ $openTarget }}"
+                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                        @endif
+                    >
                         <span
-                            class="size-1.5 shrink-0 rounded-full bg-primary-500"
+                            @class([
+                                'size-1.5 shrink-0 rounded-full',
+                                'bg-success-500' => $dotColor === 'success',
+                                'bg-danger-500' => $dotColor === 'danger',
+                                'bg-warning-500' => $dotColor === 'warning',
+                                'bg-gray-400' => $dotColor === 'gray',
+                            ])
                             aria-hidden="true"
                         ></span>
 
                         <div
-                            class="min-w-0 flex-1 truncate text-sm font-medium text-gray-950 dark:text-white"
+                            class="group/title relative flex min-w-0 flex-1 items-center gap-1.5"
                             data-testid="meeting-card-title"
                         >
-                            {{ $card['title'] }}
+                            <span class="min-w-0 truncate text-sm font-medium text-gray-950 dark:text-white">
+                                {{ $card['title'] }}
+                            </span>
+
+                            <button
+                                type="button"
+                                data-testid="meeting-card-open"
+                                wire:click.stop="{{ $openTarget }}"
+                                wire:loading.attr="disabled"
+                                wire:target="{{ $openTarget }}"
+                                x-on:click.stop
+                                @class([
+                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/title:opacity-100 disabled:cursor-wait disabled:opacity-60',
+                                    'text-success-600 hover:bg-success-50 dark:text-success-400 dark:hover:bg-success-500/10' => $dotColor === 'success',
+                                    'text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10' => $dotColor === 'danger',
+                                    'text-warning-600 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-500/10' => $dotColor === 'warning',
+                                    'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10' => $dotColor === 'gray',
+                                ])
+                                aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                            >
+                                <x-filament::icon
+                                    :icon="\Filament\Support\Icons\Heroicon::OutlinedArrowsPointingOut"
+                                    class="size-3.5 shrink-0"
+                                />
+                            </button>
                         </div>
 
                         <time
@@ -160,35 +208,14 @@
                             @endif
                         </time>
 
-                        <button
-                            type="button"
-                            data-testid="meeting-card-open"
-                            wire:click="{{ $openTarget }}"
-                            wire:loading.attr="disabled"
-                            wire:target="{{ $openTarget }}"
-                            class="inline-flex shrink-0 items-center justify-center rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-white/10 dark:hover:text-gray-300"
-                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
-                        >
-                            <x-filament::icon
-                                :icon="\Filament\Support\Icons\Heroicon::OutlinedMagnifyingGlass"
-                                class="size-4 shrink-0"
-                            />
-                        </button>
-
                         @if ($hasParticipants)
-                            <button
-                                type="button"
-                                data-testid="meeting-card-toggle"
-                                class="inline-flex shrink-0 items-center gap-1.5 rounded-md p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:hover:bg-white/10 dark:hover:text-gray-300"
-                                x-on:click="expanded = ! expanded"
-                                x-bind:aria-expanded="expanded.toString()"
-                                aria-expanded="false"
-                                aria-controls="{{ $participantsId }}"
-                                aria-label="{{ $expandLabel }}"
-                                x-bind:aria-label="expanded ? collapseLabel : expandLabel"
+                            <span
+                                data-testid="meeting-card-participants-preview"
+                                class="inline-flex shrink-0 items-center gap-1.5 text-gray-400"
+                                aria-hidden="true"
                             >
                                 @if ($participants['avatars'] !== [])
-                                    <span class="flex -space-x-1.5" aria-hidden="true">
+                                    <span class="flex -space-x-1.5">
                                         @foreach ($participants['avatars'] as $avatar)
                                             @include('email-integration::filament.infolists.partials.meeting-attendee-avatar', [
                                                 'src' => $avatar['src'],
@@ -216,7 +243,7 @@
                                         class="size-4 shrink-0"
                                     />
                                 </span>
-                            </button>
+                            </span>
                         @endif
                     </div>
 
