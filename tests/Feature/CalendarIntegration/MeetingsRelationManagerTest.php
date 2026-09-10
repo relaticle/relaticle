@@ -22,8 +22,9 @@ use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\MeetingParticipantStackPresenter;
 
-mutates(MeetingsRelationManager::class, BaseMeetingsRelationManager::class, EmailVisibilityService::class, MeetingDetailInfolist::class);
+mutates(MeetingsRelationManager::class, BaseMeetingsRelationManager::class, EmailVisibilityService::class, MeetingDetailInfolist::class, MeetingParticipantStackPresenter::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -200,6 +201,31 @@ it('hides meetings on a protected person', function (): void {
     ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertCanNotSeeTableRecords([$meeting]);
+});
+
+it('shows attendee avatars and overflow in the attendees column', function (): void {
+    $person = People::factory()->for($this->team)->create();
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Stacked Attendees Meeting',
+    ]);
+    $meeting->people()->attach($person, ['link_source' => 'manual']);
+
+    foreach (['Alice Alpha', 'Bob Beta', 'Carol Gamma', 'Dave Delta'] as $name) {
+        MeetingAttendee::factory()->create([
+            'meeting_id' => $meeting->id,
+            'name' => $name,
+            'email_address' => mb_strtolower(str_replace(' ', '.', $name)).'@example.test',
+        ]);
+    }
+
+    livewire(MeetingsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertSee('attendee-avatar-initials', escape: false)
+        ->assertSee(__('filament/pages/dashboard.meetings.more_participants', ['count' => 1]));
 });
 
 it('shows the shared meeting detail in the relation manager view modal', function (): void {
