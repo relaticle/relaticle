@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
+use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -13,6 +14,9 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
@@ -537,6 +541,321 @@ it('does not list attendees on the home meeting row', function (): void {
         ->assertSee('Staff call')
         ->assertDontSee('Maya Chen')
         ->assertDontSee('data-testid="meeting-card-participants"', escape: false);
+});
+
+it('names a linked contact in the home meeting slideover', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $person = People::factory()->for($this->team)->create(['name' => 'Maya Chen']);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'maya@example.test',
+        'email_address' => 'maya@example.test',
+        'contact_id' => $person->id,
+        'is_organizer' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Maya Chen')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Maya Chen')
+        ->assertMountedActionModalSee('maya@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+});
+
+it('names a slideover guest from mailbox history without a person record', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'name' => 'Asmit Nepali',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Asmit Nepali')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+});
+
+it('names a slideover guest from the viewer own private email', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'own.private@example.test',
+        'name' => 'Own Private Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'own.private@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Own Private Guest')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Own Private Guest')
+        ->assertMountedActionModalSee('own.private@example.test');
+});
+
+it('does not name a slideover guest from a teammate private email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->private()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'secret.guest@example.test',
+        'name' => 'Secret Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'secret.guest@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Secret Guest')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalDontSee('Secret Guest')
+        ->assertMountedActionModalSee('secret.guest@example.test');
+});
+
+it('does not name a slideover guest from a mailbox-blocked email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->full()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'spam@badactor.test',
+        'name' => 'Blocked Sender',
+    ]);
+    EmailBlocklist::factory()->email('spam@badactor.test')->create([
+        'user_id' => $teammate->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $teammateAccount->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'spam@badactor.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Blocked Sender')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalDontSee('Blocked Sender')
+        ->assertMountedActionModalSee('spam@badactor.test');
+});
+
+it('names a slideover guest from a teammate workspace-visible email', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'is_internal' => false,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'shared.guest@acme.test',
+        'name' => 'Shared Guest',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'shared.guest@acme.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Shared Guest')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Shared Guest')
+        ->assertMountedActionModalSee('shared.guest@acme.test');
+});
+
+it('does not name a slideover guest from the workspace user for a different connected mailbox', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill([
+        'email_address' => 'whiteshark.devs@example.test',
+        'display_name' => 'Whiteshark',
+    ])->save();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Whiteshark Devs',
+        'email_address' => 'whiteshark.devs@example.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Whiteshark Devs')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Whiteshark Devs')
+        ->assertMountedActionModalDontSee('Oliver Workspace');
+});
+
+it('shows a person icon in the slideover when the attendee has no name', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'only@example.test',
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('only@example.test')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('only@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-guest', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-initials', escape: false);
+});
+
+it('collapses duplicate guest emails in the home meeting slideover', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Maya Chen',
+        'email_address' => 'maya@example.test',
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'maya@example.test',
+        'email_address' => 'maya@example.test',
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Maya Chen')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Maya Chen')
+        ->assertMountedActionModalSee('maya@example.test');
 });
 
 it('marks an in-progress meeting as happening now', function (): void {
