@@ -33,10 +33,7 @@ abstract class BaseWriteDeleteTool implements Tool
 
     abstract public function description(): string;
 
-    protected function nameAttribute(): string
-    {
-        return 'name';
-    }
+    abstract protected function nameAttribute(): string;
 
     public function schema(JsonSchema $schema): array
     {

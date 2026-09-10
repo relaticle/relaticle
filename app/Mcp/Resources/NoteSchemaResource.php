@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
 use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
@@ -21,6 +22,11 @@ use Laravel\Mcp\Server\Resource;
 final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
+
+    protected function entity(): CrmEntity
+    {
+        return CrmEntity::Note;
+    }
 
     public function shouldRegister(): bool
     {
@@ -47,13 +53,13 @@ final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
     public function toSchema(User $user): array
     {
         return [
-            'entity' => 'note',
+            'entity' => $this->entity()->value,
             'description' => 'Free-form notes attached to CRM records.',
             'fields' => [
                 'title' => ['type' => 'string', 'required' => true],
             ],
-            'custom_fields' => $this->resolveCustomFields($user, 'note'),
-            'filterable_fields' => $this->resolveFilterableFields($user, 'note'),
+            'custom_fields' => $this->resolveCustomFields($user),
+            'filterable_fields' => $this->resolveFilterableFields($user),
             'relationships' => ['creator', 'companies', 'people', 'opportunities'],
             'writable_relationships' => [
                 'company_ids' => [

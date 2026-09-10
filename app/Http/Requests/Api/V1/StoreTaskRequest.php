@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -15,9 +16,9 @@ final class StoreTaskRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'task';
+        return CrmEntity::Task;
     }
 
     /**
@@ -41,6 +42,6 @@ final class StoreTaskRequest extends FormRequest
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
             'assignee_ids' => ['nullable', 'array'],
             'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
-        ], new ValidCustomFields($teamId, 'task')->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value)->toRules($this->input('custom_fields')));
     }
 }

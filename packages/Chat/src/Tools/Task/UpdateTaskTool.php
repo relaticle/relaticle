@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Task;
 
 use App\Actions\Task\UpdateTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -20,35 +22,21 @@ use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 final class UpdateTaskTool extends BaseWriteUpdateTool
 {
     use NormalizesToolInput;
+    use OperatesOnCrmEntity;
 
     public function description(): string
     {
         return 'Propose updating an existing task. Returns a proposal for user approval.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Task::class;
+        return CrmEntity::Task;
     }
 
     protected function actionClass(): string
     {
         return UpdateTask::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'task';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Task';
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 
     protected function ownedForeignKeyLists(): array

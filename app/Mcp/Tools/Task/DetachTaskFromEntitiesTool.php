@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\DetachTaskRelationships;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseDetachTool;
-use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -19,14 +20,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Detach a task from companies, people, opportunities, or unassign users. Removes specified links.')]
 final class DetachTaskFromEntitiesTool extends BaseDetachTool
 {
-    protected function modelClass(): string
-    {
-        return Task::class;
-    }
+    use OperatesOnCrmEntity;
 
-    protected function entityLabel(): string
+    protected function entity(): CrmEntity
     {
-        return 'Task';
+        return CrmEntity::Task;
     }
 
     protected function resourceClass(): string

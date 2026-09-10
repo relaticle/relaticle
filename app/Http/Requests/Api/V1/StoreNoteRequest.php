@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -14,9 +15,9 @@ final class StoreNoteRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'note';
+        return CrmEntity::Note;
     }
 
     /**
@@ -36,6 +37,6 @@ final class StoreNoteRequest extends FormRequest
             'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
             'opportunity_ids' => ['nullable', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
-        ], new ValidCustomFields($teamId, 'note')->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value)->toRules($this->input('custom_fields')));
     }
 }

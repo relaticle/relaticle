@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\AttachTaskRelationships;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseAttachTool;
-use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -20,19 +21,16 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Attach a task to companies, people, opportunities, or assign to users. Adds links without removing existing ones.')]
 final class AttachTaskToEntitiesTool extends BaseAttachTool
 {
+    use OperatesOnCrmEntity;
+
     protected function openWorldHint(): bool
     {
         return true;
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Task::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Task';
+        return CrmEntity::Task;
     }
 
     protected function resourceClass(): string

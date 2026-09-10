@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources\Concerns;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Schema\McpSchemaCache;
@@ -16,9 +17,12 @@ use Relaticle\CustomFields\Services\ValidationService;
 
 trait ResolvesEntitySchema
 {
-    protected function resolveCustomFields(User $user, string $entityType): object
+    abstract protected function entity(): CrmEntity;
+
+    protected function resolveCustomFields(User $user): object
     {
         $teamId = $user->currentTeam->getKey();
+        $entityType = $this->entity()->value;
         $cacheKey = McpSchemaCache::entitySchemaKey($teamId, $entityType);
 
         return (object) Cache::remember($cacheKey, McpSchemaCache::TTL, function () use ($teamId, $entityType): array {
@@ -35,9 +39,9 @@ trait ResolvesEntitySchema
         });
     }
 
-    protected function resolveFilterableFields(User $user, string $entityType): object
+    protected function resolveFilterableFields(User $user): object
     {
-        return (object) (new CustomFieldFilterSchema)->build($user, $entityType);
+        return (object) (new CustomFieldFilterSchema)->build($user, $this->entity()->value);
     }
 
     private const CHOICE_TYPES = ['select', 'radio', 'multi-select', 'checkbox-list', 'tags-input', 'toggle-buttons'];

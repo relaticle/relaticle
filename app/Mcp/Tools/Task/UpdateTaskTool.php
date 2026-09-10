@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\UpdateTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
@@ -20,14 +21,16 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Update an existing task in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class UpdateTaskTool extends BaseUpdateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function openWorldHint(): bool
     {
         return true;
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Task::class;
+        return CrmEntity::Task;
     }
 
     protected function actionClass(): string
@@ -38,16 +41,6 @@ final class UpdateTaskTool extends BaseUpdateTool
     protected function resourceClass(): string
     {
         return TaskResource::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'task';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'task';
     }
 
     protected function entitySchema(JsonSchema $schema): array

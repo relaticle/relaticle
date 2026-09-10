@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\People;
 
 use App\Actions\People\CreatePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,6 +14,8 @@ use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class CreatePersonTool extends BaseWriteCreateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose creating a new person/contact. Returns a proposal for user approval.';
@@ -22,9 +26,9 @@ final class CreatePersonTool extends BaseWriteCreateTool
         return CreatePeople::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'people';
+        return CrmEntity::People;
     }
 
     protected function ownedForeignKeys(): array

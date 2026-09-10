@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\Company;
 use App\Models\User;
@@ -14,9 +15,9 @@ final class UpdateCompanyRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'company';
+        return CrmEntity::Company;
     }
 
     /**
@@ -30,6 +31,6 @@ final class UpdateCompanyRequest extends FormRequest
 
         return array_merge([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-        ], new ValidCustomFields($teamId, 'company', isUpdate: true, ignoreEntityId: ($record = $this->route('company')) instanceof Company ? $record->getKey() : null)->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value, isUpdate: true, ignoreEntityId: ($record = $this->route('company')) instanceof Company ? $record->getKey() : null)->toRules($this->input('custom_fields')));
     }
 }

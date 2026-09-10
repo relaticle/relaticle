@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Task;
 
 use App\Actions\Task\CreateTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -17,6 +19,7 @@ use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 final class CreateTaskTool extends BaseWriteCreateTool
 {
     use NormalizesToolInput;
+    use OperatesOnCrmEntity;
 
     public function description(): string
     {
@@ -28,9 +31,9 @@ final class CreateTaskTool extends BaseWriteCreateTool
         return CreateTask::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'task';
+        return CrmEntity::Task;
     }
 
     protected function ownedForeignKeyLists(): array
@@ -40,11 +43,6 @@ final class CreateTaskTool extends BaseWriteCreateTool
             'people_ids' => People::class,
             'opportunity_ids' => Opportunity::class,
         ];
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 
     protected function entitySchema(JsonSchema $schema): array

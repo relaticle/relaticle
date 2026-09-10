@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\AttachNoteRelationships;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseAttachTool;
-use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -18,14 +19,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Attach a note to companies, people, or opportunities. Adds links without removing existing ones.')]
 final class AttachNoteToEntitiesTool extends BaseAttachTool
 {
-    protected function modelClass(): string
-    {
-        return Note::class;
-    }
+    use OperatesOnCrmEntity;
 
-    protected function entityLabel(): string
+    protected function entity(): CrmEntity
     {
-        return 'Note';
+        return CrmEntity::Note;
     }
 
     protected function resourceClass(): string

@@ -27,10 +27,7 @@ abstract class BaseDeleteTool extends Tool
 
     abstract protected function entityLabel(): string;
 
-    protected function nameAttribute(): string
-    {
-        return 'name';
-    }
+    abstract protected function nameAttribute(): string;
 
     public function schema(JsonSchema $schema): array
     {

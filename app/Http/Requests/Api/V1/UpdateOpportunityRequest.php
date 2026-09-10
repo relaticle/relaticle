@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\Opportunity;
 use App\Models\User;
@@ -15,9 +16,9 @@ final class UpdateOpportunityRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'opportunity';
+        return CrmEntity::Opportunity;
     }
 
     /**
@@ -33,6 +34,6 @@ final class UpdateOpportunityRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'company_id' => ['nullable', 'string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
             'contact_id' => ['nullable', 'string', Rule::exists('people', 'id')->where('team_id', $teamId)],
-        ], new ValidCustomFields($teamId, 'opportunity', isUpdate: true, ignoreEntityId: ($record = $this->route('opportunity')) instanceof Opportunity ? $record->getKey() : null)->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value, isUpdate: true, ignoreEntityId: ($record = $this->route('opportunity')) instanceof Opportunity ? $record->getKey() : null)->toRules($this->input('custom_fields')));
     }
 }

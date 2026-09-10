@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\CreateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
@@ -17,6 +19,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Create a new note in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class CreateNoteTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreateNote::class;
@@ -27,9 +31,9 @@ final class CreateNoteTool extends BaseCreateTool
         return NoteResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'note';
+        return CrmEntity::Note;
     }
 
     protected function entitySchema(JsonSchema $schema): array

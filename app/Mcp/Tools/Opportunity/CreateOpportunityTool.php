@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Opportunity;
 
 use App\Actions\Opportunity\CreateOpportunity;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\OpportunityResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
@@ -17,6 +19,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Create a new opportunity (deal) in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class CreateOpportunityTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreateOpportunity::class;
@@ -27,9 +31,9 @@ final class CreateOpportunityTool extends BaseCreateTool
         return OpportunityResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'opportunity';
+        return CrmEntity::Opportunity;
     }
 
     protected function entitySchema(JsonSchema $schema): array

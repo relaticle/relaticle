@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\DeleteNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\BaseDeleteTool;
-use App\Models\Note;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
@@ -14,23 +15,15 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Delete a note from the CRM (soft delete).')]
 final class DeleteNoteTool extends BaseDeleteTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Note::class;
+        return CrmEntity::Note;
     }
 
     protected function actionClass(): string
     {
         return DeleteNote::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Note';
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 }

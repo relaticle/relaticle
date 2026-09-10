@@ -58,6 +58,18 @@ enum CrmEntity: string
         };
     }
 
+    /** The singular English noun that tool errors and proposal cards use for the record. */
+    public function singularName(): string
+    {
+        return match ($this) {
+            self::Company => 'Company',
+            self::People => 'Person',
+            self::Opportunity => 'Opportunity',
+            self::Task => 'Task',
+            self::Note => 'Note',
+        };
+    }
+
     public function urlType(): string
     {
         return match ($this) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
 use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
@@ -21,6 +22,11 @@ use Laravel\Mcp\Server\Resource;
 final class CompanySchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
+
+    protected function entity(): CrmEntity
+    {
+        return CrmEntity::Company;
+    }
 
     public function shouldRegister(): bool
     {
@@ -47,14 +53,14 @@ final class CompanySchemaResource extends Resource implements ProvidesEntitySche
     public function toSchema(User $user): array
     {
         return [
-            'entity' => 'company',
+            'entity' => $this->entity()->value,
             'description' => 'Organizations and businesses tracked in the CRM.',
             'fields' => [
                 'name' => ['type' => 'string', 'required' => true],
                 'account_owner_id' => ['type' => 'string', 'required' => false, 'description' => 'Team member ID from whoami.'],
             ],
-            'custom_fields' => $this->resolveCustomFields($user, 'company'),
-            'filterable_fields' => $this->resolveFilterableFields($user, 'company'),
+            'custom_fields' => $this->resolveCustomFields($user),
+            'filterable_fields' => $this->resolveFilterableFields($user),
             'relationships' => ['creator', 'accountOwner', 'people', 'opportunities', 'tasks', 'notes'],
             'aggregate_includes' => [
                 'peopleCount' => 'Count of related people',

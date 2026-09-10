@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
@@ -13,9 +14,9 @@ final class StoreCompanyRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'company';
+        return CrmEntity::Company;
     }
 
     /**
@@ -29,6 +30,6 @@ final class StoreCompanyRequest extends FormRequest
 
         return array_merge([
             'name' => ['required', 'string', 'max:255'],
-        ], new ValidCustomFields($teamId, 'company')->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value)->toRules($this->input('custom_fields')));
     }
 }

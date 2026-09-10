@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Company;
 
 use App\Actions\Company\UpdateCompany;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
@@ -18,9 +19,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Update an existing company in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class UpdateCompanyTool extends BaseUpdateTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Company::class;
+        return CrmEntity::Company;
     }
 
     protected function actionClass(): string
@@ -31,16 +34,6 @@ final class UpdateCompanyTool extends BaseUpdateTool
     protected function resourceClass(): string
     {
         return CompanyResource::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'company';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'company';
     }
 
     protected function entitySchema(JsonSchema $schema): array

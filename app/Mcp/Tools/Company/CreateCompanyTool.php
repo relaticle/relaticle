@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Company;
 
 use App\Actions\Company\CreateCompany;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
@@ -17,6 +19,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Create a new company in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class CreateCompanyTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreateCompany::class;
@@ -27,9 +31,9 @@ final class CreateCompanyTool extends BaseCreateTool
         return CompanyResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'company';
+        return CrmEntity::Company;
     }
 
     protected function entitySchema(JsonSchema $schema): array

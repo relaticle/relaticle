@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\Note;
 use App\Models\User;
@@ -15,9 +16,9 @@ final class UpdateNoteRequest extends FormRequest
 {
     use NormalizesCustomFields;
 
-    protected function customFieldEntityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'note';
+        return CrmEntity::Note;
     }
 
     /**
@@ -37,6 +38,6 @@ final class UpdateNoteRequest extends FormRequest
             'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
             'opportunity_ids' => ['nullable', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
-        ], new ValidCustomFields($teamId, 'note', isUpdate: true, ignoreEntityId: ($record = $this->route('note')) instanceof Note ? $record->getKey() : null)->toRules($this->input('custom_fields')));
+        ], new ValidCustomFields($teamId, $this->entity()->value, isUpdate: true, ignoreEntityId: ($record = $this->route('note')) instanceof Note ? $record->getKey() : null)->toRules($this->input('custom_fields')));
     }
 }
