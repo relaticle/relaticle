@@ -405,7 +405,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         $now = Date::now($this->viewerTimezone());
 
         if ($meeting->all_day) {
-            return $now->gte($meeting->starts_at->timezone($this->viewerTimezone())->endOfDay());
+            return $now->toDateString() > $meeting->ends_at->utc()->toDateString();
         }
 
         return $now->gte($meeting->ends_at->timezone($this->viewerTimezone()));

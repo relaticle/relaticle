@@ -367,6 +367,47 @@ it('shows an all-day event on its calendar date for a viewer west of UTC', funct
         ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
+it('shows a multi-day all-day event on every day in its range', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-12 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->set('selectedDate', '2026-09-10')
+        ->assertSee('Company offsite')
+        ->set('selectedDate', '2026-09-11')
+        ->assertSee('Company offsite')
+        ->set('selectedDate', '2026-09-12')
+        ->assertSee('Company offsite')
+        ->set('selectedDate', '2026-09-13')
+        ->assertDontSee('Company offsite');
+});
+
+it('does not mark todays all-day event as past for a viewer west of UTC', function (): void {
+    $this->travelTo(Date::parse('2026-09-10 17:00:00', 'UTC'));
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
+
+    expect($html)
+        ->toContain('Company offsite')
+        ->not->toMatch('/Company offsite.*line-through/s');
+});
+
 it('does not show an all-day event on the previous local day for a viewer west of UTC', function (): void {
     $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
 
