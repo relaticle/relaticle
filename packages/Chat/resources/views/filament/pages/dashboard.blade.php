@@ -64,7 +64,7 @@
                 @livewire('email-integration.mailbox-import-status', ['placement' => 'home'])
             @endisland
 
-            @livewire('email-integration.mailbox-connect-prompt')
+            @livewire('email-integration.meetings-home-widget')
         @endif
 
         @include('chat::filament.pages.partials.my-tasks')
