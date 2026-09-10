@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Components\Forms;
 
+use App\Filament\Concerns\HasRecordChips;
 use App\Models\Team;
 use App\Models\User;
 use Closure;
@@ -26,6 +27,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class TeamMemberSelect extends Select
 {
+    use HasRecordChips;
+
     /**
      * Namespaced defensively so it cannot collide with a real `users` column
      * (RelationshipJoiner selects `users.*`, and our alias is added alongside it).
@@ -156,10 +159,14 @@ final class TeamMemberSelect extends Select
 
         $this->searchable();
         $this->preload();
+        $this->allowHtml();
         $this->getOptionLabelFromRecordUsing(
-            fn (User $record): string => $record->getKey() === auth()->id()
-                ? __('filament/panel.selects.member_self', ['name' => $record->name])
-                : (string) $record->name,
+            fn (User $record): string => $this->recordChipLabel(
+                $record,
+                $record->getKey() === auth()->id()
+                    ? __('filament/panel.selects.member_self', ['name' => $record->name])
+                    : (string) $record->name,
+            ),
         );
     }
 }

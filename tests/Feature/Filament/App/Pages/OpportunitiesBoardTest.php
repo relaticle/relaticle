@@ -6,10 +6,12 @@ use App\Enums\CustomFields\OpportunityField;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
 use Relaticle\Flowforge\Board;
 
@@ -56,6 +58,51 @@ it('displays opportunities in the correct board columns', function (): void {
         ->toContain($prospectingOpportunity->id)
         ->and($board->getBoardRecords((string) $closedWon->getKey())->pluck('id'))
         ->toContain($closedWonOpportunity->id);
+});
+
+it('renders the company logo on a board card', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+
+    Opportunity::factory()
+        ->recycle([$this->user, $this->team])
+        ->create([
+            'name' => 'Acme renewal',
+            'company_id' => $company->getKey(),
+            'custom_fields' => [$this->stageField->code => $prospecting->getKey()],
+        ]);
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSee('Acme Corp')
+        ->assertSee($company->logo, escape: false);
+});
+
+it('orders the company filter alphabetically and chips each option', function (): void {
+    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zeta Industries']);
+    $acme = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+
+    $field = null;
+
+    foreach (livewire(OpportunitiesBoard::class)->instance()->getTableFiltersForm()->getComponents(withHidden: true) as $component) {
+        foreach ($component->getChildComponentContainers() as $container) {
+            foreach ($container->getComponents(withHidden: true) as $child) {
+                if ($child instanceof Select && $child->hasRelationship() && $child->getRelationshipName() === 'company') {
+                    $field = $child;
+                }
+            }
+        }
+    }
+
+    expect($field)->not->toBeNull()
+        ->and($field->isHtmlAllowed())->toBeTrue()
+        ->and($field->getOptionLabelFromRecord($acme))->toContain($acme->logo);
+
+    $labels = array_values(array_map(
+        fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
+        $field->getOptionsFromRelationship(),
+    ));
+
+    expect($labels)->toBe(['Acme Corp', 'Zeta Industries']);
 });
 
 it('does not show opportunities from other teams', function (): void {

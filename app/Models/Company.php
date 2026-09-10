@@ -13,6 +13,7 @@ use App\Observers\CompanyObserver;
 use App\Services\AvatarService;
 use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
+use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -43,7 +44,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'name',
     'creation_source',
 ])]
-final class Company extends Model implements HasCustomFields, HasMedia, HasTimeline
+final class Company extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasCreator;
@@ -86,6 +87,11 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
         $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
 
         return $logo === '' || $logo === '0' ? resolve(AvatarService::class)->generateAuto(name: $this->name) : $logo;
+    }
+
+    public function getFilamentAvatarUrl(): string
+    {
+        return $this->logo;
     }
 
     /**

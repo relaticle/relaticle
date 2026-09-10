@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -65,10 +66,10 @@ final class NoteResource extends Resource
             ->columns([
                 TextColumn::make('title')
                     ->searchable(),
-                TextColumn::make('companies.name')
+                RecordChipColumn::make('companies.name')
                     ->label(__('filament/resources/note.fields.companies.label'))
                     ->toggleable(),
-                TextColumn::make('people.name')
+                RecordChipColumn::make('people.name')
                     ->label(__('filament/resources/note.fields.people.label'))
                     ->toggleable(),
                 TextColumn::make('creator.name')
@@ -132,7 +133,7 @@ final class NoteResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['customFieldValues.customField.options'])
+            ->with(['companies.media', 'people', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

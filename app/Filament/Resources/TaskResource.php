@@ -7,6 +7,8 @@ namespace App\Filament\Resources;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Tables\Filters\RecordSelectFilter;
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
@@ -80,10 +82,8 @@ final class TaskResource extends Resource
                     ->searchable()
                     ->limit(50)
                     ->weight('medium'),
-                TextColumn::make('assignees.name')
+                RecordChipColumn::make('assignees.name')
                     ->label(__('filament/resources/task.fields.assignees.label'))
-                    ->badge()
-                    ->color('primary')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('creator.name')
@@ -116,7 +116,7 @@ final class TaskResource extends Resource
                         $query->where('users.id', auth()->id());
                     }))
                     ->toggle(),
-                SelectFilter::make('assignees')
+                RecordSelectFilter::make('assignees')
                     ->multiple()
                     ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
                     ->searchable()
@@ -208,7 +208,7 @@ final class TaskResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['customFieldValues.customField.options'])
+            ->with(['assignees', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
