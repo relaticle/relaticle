@@ -36,7 +36,7 @@ final readonly class MeetingAttendeePresenter
         $selfName = $mailboxPerson !== null ? $this->usableName($mailboxPerson['name'], $email) : null;
         $memberName = $member !== null ? $this->usableName($member['name'], $email) : null;
         $calendarName = $this->usableName($attendee->name, $email);
-        $mailboxName = $email !== '' ? $this->mailboxName($attendee, $email) : null;
+        $mailboxName = $email !== '' ? $this->mailboxName($email) : null;
         $named = $contactName
             ?? $selfName
             ?? $memberName
@@ -114,15 +114,15 @@ final readonly class MeetingAttendeePresenter
         return $this->teamMembers->find($teamId, $email);
     }
 
-    private function mailboxName(MeetingAttendee $attendee, string $email): ?string
+    private function mailboxName(string $email): ?string
     {
-        $teamId = $this->teamId($attendee);
+        $viewer = auth()->user();
 
-        if ($teamId === null) {
+        if (! $viewer instanceof User) {
             return null;
         }
 
-        return $this->mailboxNames->find($teamId, $email);
+        return $this->mailboxNames->find($viewer, $email);
     }
 
     private function usableName(mixed $name, string $email): ?string

@@ -4,33 +4,42 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
 final class MailboxDisplayNameDirectory
 {
     /** @var array<string, array<string, string|null>> */
-    private array $namesByTeam = [];
+    private array $namesByViewer = [];
 
     /**
+     * Resolve display names from mail the viewer is allowed to see.
+     *
+     * Restricted to mail VisibleEmailScope would list. Without that gate,
+     * names from private, mailbox-blocked, protected, and internal messages
+     * leak onto another user's meeting.
+     *
      * @param  list<string>  $emails
      */
-    public function prime(string $teamId, array $emails): void
+    public function prime(User $viewer, array $emails): void
     {
+        $cacheKey = $this->cacheKey($viewer);
         $missing = [];
 
-        $this->namesByTeam[$teamId] ??= [];
+        $this->namesByViewer[$cacheKey] ??= [];
 
         foreach ($emails as $email) {
             $normalized = Str::lower(trim($email));
 
-            if ($normalized === '' || array_key_exists($normalized, $this->namesByTeam[$teamId])) {
+            if ($normalized === '' || array_key_exists($normalized, $this->namesByViewer[$cacheKey])) {
                 continue;
             }
 
-            $this->namesByTeam[$teamId][$normalized] = null;
+            $this->namesByViewer[$cacheKey][$normalized] = null;
             $missing[] = $normalized;
         }
 
@@ -47,7 +56,8 @@ final class MailboxDisplayNameDirectory
             ->whereRaw('lower(btrim(email_participants.name)) <> email_participants.email_address')
             ->whereHas(
                 'email',
-                fn (Builder $query): Builder => $query->where('team_id', $teamId),
+                fn (Builder $query): Builder => $query
+                    ->withGlobalScope('visible', new VisibleEmailScope($viewer)),
             )
             ->groupBy('email_participants.email_address', 'email_participants.name')
             ->orderByDesc('mentions')
@@ -57,38 +67,31 @@ final class MailboxDisplayNameDirectory
             $email = Str::lower(trim((string) $row->email_address));
             $name = trim((string) $row->name);
 
-            if ($email === '' || $name === '' || $this->namesByTeam[$teamId][$email] !== null) {
+            if ($email === '' || $name === '' || $this->namesByViewer[$cacheKey][$email] !== null) {
                 continue;
             }
 
-            $this->namesByTeam[$teamId][$email] = $name;
+            $this->namesByViewer[$cacheKey][$email] = $name;
         }
     }
 
     /**
      * @param  iterable<int, Meeting>  $meetings
      */
-    public function primeFromMeetings(iterable $meetings): void
+    public function primeFromMeetings(User $viewer, iterable $meetings): void
     {
         $emails = [];
-        $teamId = null;
 
         foreach ($meetings as $meeting) {
-            $teamId ??= (string) $meeting->team_id;
-
             foreach ($meeting->attendees as $attendee) {
                 $emails[] = (string) $attendee->email_address;
             }
         }
 
-        if ($teamId === null) {
-            return;
-        }
-
-        $this->prime($teamId, $emails);
+        $this->prime($viewer, $emails);
     }
 
-    public function find(string $teamId, string $email): ?string
+    public function find(User $viewer, string $email): ?string
     {
         $normalized = Str::lower(trim($email));
 
@@ -96,10 +99,17 @@ final class MailboxDisplayNameDirectory
             return null;
         }
 
-        if (! isset($this->namesByTeam[$teamId]) || ! array_key_exists($normalized, $this->namesByTeam[$teamId])) {
-            $this->prime($teamId, [$normalized]);
+        $cacheKey = $this->cacheKey($viewer);
+
+        if (! isset($this->namesByViewer[$cacheKey]) || ! array_key_exists($normalized, $this->namesByViewer[$cacheKey])) {
+            $this->prime($viewer, [$normalized]);
         }
 
-        return $this->namesByTeam[$teamId][$normalized] ?? null;
+        return $this->namesByViewer[$cacheKey][$normalized] ?? null;
+    }
+
+    private function cacheKey(User $viewer): string
+    {
+        return $viewer->getKey().':'.$viewer->current_team_id;
     }
 }
