@@ -58,6 +58,8 @@ final readonly class TurnstileChallenge implements ValidationRule
             return;
         }
 
+        Log::info('Cloudflare turnstile rejected a signup token.', ['error_codes' => $verdict->errorCodes]);
+
         $fail(__('auth.turnstile.failed'));
     }
 }

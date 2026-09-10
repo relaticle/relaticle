@@ -96,6 +96,22 @@ it('rejects a token cloudflare refuses', function (mixed $body): void {
     'not json' => ['<html>down</html>'],
 ]);
 
+it('logs the error codes cloudflare returned for a rejected token', function (): void {
+    enableSignupChallenge();
+    fakeSiteverify(false, ['invalid-input-response', 'timeout-or-duplicate']);
+    Log::spy();
+
+    startSignup('jane-logged-'.uniqid().'@gmail.com')
+        ->fillForm(['password' => 'Password123!', 'cf_turnstile_response' => 'a-bad-token'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['cf_turnstile_response']);
+
+    Log::shouldHaveReceived('info')
+        ->once()
+        ->withArgs(fn (string $message, array $context): bool => str_contains($message, 'rejected')
+            && $context['error_codes'] === ['invalid-input-response', 'timeout-or-duplicate']);
+});
+
 it('fails closed when siteverify is unreachable', function (callable $stub): void {
     enableSignupChallenge();
     Http::fake(['challenges.cloudflare.com/*' => $stub]);

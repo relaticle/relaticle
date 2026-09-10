@@ -60,3 +60,29 @@ it('completes a signup through the turnstile challenge without showing a widget'
 
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
+
+it('holds a submit made before the turnstile token exists and replays it', function (): void {
+    config([
+        'honeypot.enabled' => true,
+        'relaticle.features.signup_challenge' => true,
+        'services.turnstile.key' => '1x00000000000000000000AA',
+        'services.turnstile.secret' => '1x0000000000000000000000000000000AA',
+    ]);
+    Feature::flushCache();
+    Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true])]);
+
+    $email = 'jane-turnstile-race-'.uniqid().'@gmail.com';
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $email);
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->type('[id="form.password"]', 'Password123!')
+        ->click('button[type="submit"]')
+        ->assertPathIs('/app/email-verification/prompt');
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});

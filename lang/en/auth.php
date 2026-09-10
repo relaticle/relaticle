@@ -97,5 +97,7 @@ return [
         'required' => 'Please complete the verification challenge.',
         'failed' => 'Verification failed. Please try again.',
         'unavailable' => 'Verification is temporarily unavailable. Please try again in a moment.',
+        'checking' => 'Checking your browser…',
+        'blocked' => 'We couldn\'t verify your browser. Turn off content blockers for this site and try again.',
     ],
 ];
