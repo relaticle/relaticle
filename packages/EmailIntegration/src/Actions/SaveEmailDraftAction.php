@@ -24,8 +24,8 @@ final readonly class SaveEmailDraftAction
      * Create or update a DRAFT email row. Drafts are never queued and never
      * team-visible (privacy_tier PRIVATE).
      *
-     * A draft made from another message keeps the link to it. Dropping it — as this
-     * did originally — meant a reply saved as a draft came back as a plain new
+     * A draft made from another message keeps the link to it. Dropping it, as this
+     * did originally, meant a reply saved as a draft came back as a plain new
      * message: reopening it could not show what was being answered, and sending it
      * threaded nowhere in the recipient's client. `source_email_id` carries that
      * link for replies AND forwards, resolved here to the original's RFC message id
@@ -36,6 +36,10 @@ final readonly class SaveEmailDraftAction
      * `attachments` holds storage paths already written to {@see EmailAttachment::DISK}
      * by the caller; each becomes an EmailAttachment row on the draft. Rows already
      * attached to the draft are left alone, so re-saving never duplicates them.
+     *
+     * `unresolved_attachments` are forwarded files that could not be copied yet
+     * (provider download failed). They are stored without bytes so the composer
+     * can list them and retry on send.
      *
      * @param  array{
      *     connected_account_id: string,
@@ -48,6 +52,8 @@ final readonly class SaveEmailDraftAction
      *     creation_source?: ?EmailCreationSource,
      *     attachments?: list<string>,
      *     attachment_file_names?: array<string, string>,
+     *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
+     *     unresolved_attachments?: list<array{filename: string, mime_type: string, size: int, is_inline?: bool, content_id?: ?string, provider_attachment_id?: ?string}>,
      * }  $data
      */
     public function execute(User $user, array $data, ?string $draftId = null): Email
@@ -89,7 +95,7 @@ final readonly class SaveEmailDraftAction
                 'folder' => EmailFolder::Drafts,
                 'status' => EmailStatus::DRAFT,
                 'privacy_tier' => EmailPrivacyTier::PRIVATE,
-                // Set below, once the new attachment rows exist — an update must not
+                // Set below, once the new attachment rows exist. An update must not
                 // clear the flag for files a previous save already attached.
                 'has_attachments' => $existing instanceof Email && $existing->has_attachments,
                 'is_internal' => false,
@@ -112,7 +118,8 @@ final readonly class SaveEmailDraftAction
                 'body_text' => strip_tags((string) $data['body_html']),
             ]);
 
-            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? []);
+            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? [], $data['attachment_attributes'] ?? []);
+            $this->attachUnresolved($draft, $data['unresolved_attachments'] ?? []);
 
             $draft->participants()->delete();
 
@@ -150,7 +157,7 @@ final readonly class SaveEmailDraftAction
     }
 
     /**
-     * @param  array{subject: ?string, body_html: ?string, to: list<string>, cc: list<string>, bcc: list<string>, attachments?: list<string>}  $data
+     * @param  array{subject: ?string, body_html: ?string, to: list<string>, cc: list<string>, bcc: list<string>, attachments?: list<string>, unresolved_attachments?: list<array<string, mixed>>}  $data
      */
     private function isEmpty(array $data): bool
     {
@@ -160,7 +167,8 @@ final readonly class SaveEmailDraftAction
             && $data['cc'] === []
             && $data['bcc'] === []
             // A message that is nothing but an attached file is still worth keeping.
-            && ($data['attachments'] ?? []) === [];
+            && ($data['attachments'] ?? []) === []
+            && ($data['unresolved_attachments'] ?? []) === [];
     }
 
     /**
@@ -169,8 +177,9 @@ final readonly class SaveEmailDraftAction
      *
      * @param  list<string>  $paths
      * @param  array<string, string>  $originalNames  storage path => original client filename
+     * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attributes
      */
-    private function attachFiles(Email $draft, array $paths, array $originalNames): void
+    private function attachFiles(Email $draft, array $paths, array $originalNames, array $attributes): void
     {
         $disk = Storage::disk(EmailAttachment::DISK);
 
@@ -190,9 +199,58 @@ final readonly class SaveEmailDraftAction
                 'mime_type' => $disk->mimeType($path) ?: 'application/octet-stream',
                 'size' => $disk->size($path),
                 'storage_path' => $path,
+                'is_inline' => $attributes[$path]['is_inline'] ?? false,
+                'content_id' => $attributes[$path]['content_id'] ?? null,
             ]);
         }
+    }
 
-        $draft->update(['has_attachments' => $draft->attachments()->exists()]);
+    /**
+     * @param  list<array{filename: string, mime_type: string, size: int, is_inline?: bool, content_id?: ?string, provider_attachment_id?: ?string}>  $unresolved
+     */
+    private function attachUnresolved(Email $draft, array $unresolved): void
+    {
+        $existingKeys = $draft->attachments()
+            ->whereNull('storage_path')
+            ->get()
+            ->map(fn (EmailAttachment $attachment): string => $this->unresolvedKey(
+                (string) $attachment->filename,
+                $attachment->provider_attachment_id,
+                $attachment->is_inline,
+            ))
+            ->all();
+
+        foreach ($unresolved as $attachment) {
+            $isInline = $attachment['is_inline'] ?? false;
+            $key = $this->unresolvedKey(
+                $attachment['filename'],
+                $attachment['provider_attachment_id'] ?? null,
+                $isInline,
+            );
+
+            if (in_array($key, $existingKeys, true)) {
+                continue;
+            }
+
+            EmailAttachment::query()->create([
+                'email_id' => $draft->getKey(),
+                'filename' => $attachment['filename'],
+                'mime_type' => $attachment['mime_type'],
+                'size' => $attachment['size'],
+                'storage_path' => null,
+                'is_inline' => $isInline,
+                'content_id' => $attachment['content_id'] ?? null,
+                'provider_attachment_id' => $attachment['provider_attachment_id'] ?? null,
+            ]);
+
+            $existingKeys[] = $key;
+        }
+
+        $draft->update(['has_attachments' => $draft->attachments()->where('is_inline', false)->exists()]);
+    }
+
+    private function unresolvedKey(string $filename, ?string $providerAttachmentId, bool $isInline): string
+    {
+        return $filename."\0".($providerAttachmentId ?? '')."\0".($isInline ? '1' : '0');
     }
 }

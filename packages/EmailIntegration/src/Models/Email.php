@@ -9,6 +9,7 @@ use App\Models\Concerns\HasTeam;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Factories\EmailFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -23,7 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -46,7 +48,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property string|null $in_reply_to
  * @property string $subject
  * @property string|null $snippet
- * @property Carbon|null $sent_at
+ * @property CarbonInterface|null $sent_at
  * @property EmailDirection $direction
  * @property EmailFolder|null $folder
  * @property EmailStatus $status
@@ -55,10 +57,10 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property bool $is_internal
  * @property EmailCreationSource $creation_source
  * @property string|null $batch_id
- * @property Carbon|null $scheduled_for
+ * @property CarbonInterface|null $scheduled_for
  * @property string|null $last_error
  * @property int $attempts
- * @property Carbon|null $linked_at
+ * @property CarbonInterface|null $linked_at
  * @property EmailPriority $priority
  */
 #[ObservedBy(EmailObserver::class)]
@@ -107,21 +109,6 @@ final class Email extends Model
         'has_attachments' => false,
         'is_internal' => false,
         'creation_source' => EmailCreationSource::SYNC,
-    ];
-
-    protected $casts = [
-        'sent_at' => 'datetime',
-        'direction' => EmailDirection::class,
-        'folder' => EmailFolder::class,
-        'status' => EmailStatus::class,
-        'privacy_tier' => EmailPrivacyTier::class,
-        'creation_source' => EmailCreationSource::class,
-        'has_attachments' => 'boolean',
-        'is_internal' => 'boolean',
-        'scheduled_for' => 'datetime',
-        'attempts' => 'integer',
-        'linked_at' => 'datetime',
-        'priority' => EmailPriority::class,
     ];
 
     /**
@@ -247,10 +234,58 @@ final class Email extends Model
         return $this->participants->where('role', EmailParticipantRole::CC);
     }
 
-    public function aiLabel(): ?EmailLabel
+    /**
+     * The rule-based category stamped at sync. StoreEmailAction writes
+     * `source = system`. The unmatched Other fallback is stored, not shown.
+     */
+    public function categoryLabel(): ?EmailLabel
     {
-        return $this->labels->firstWhere('source', 'ai');
+        $label = $this->labels->firstWhere('source', 'system');
+
+        if (! $label instanceof EmailLabel) {
+            return null;
+        }
+
+        $category = EmailCategory::tryFrom($label->label);
+
+        if (! $category instanceof EmailCategory || ! $category->isVisible()) {
+            return null;
+        }
+
+        return $label;
     }
+
+    /**
+     * Name of the mailbox that imported this email, for list-row "via …" copy.
+     * Prefer the provider display name on the connected account, then the
+     * teammate who linked that mailbox, then the address itself.
+     */
+    public function mailboxViaName(): ?string
+    {
+        $account = $this->connectedAccount;
+
+        if ($account !== null) {
+            if (filled($account->display_name)) {
+                return $account->display_name;
+            }
+
+            if (filled($account->user?->name)) {
+                return $account->user->name;
+            }
+
+            return $account->email_address ?: null;
+        }
+
+        return $this->user?->name;
+    }
+
+    /**
+     * Connected mailboxes that hold a visible copy of this message. Email is
+     * the mailbox address, never the Relaticle login.
+     *
+     * @var list<array{name: string, mailbox_email: string}>
+     */
+    public array $accessMailboxes = [];
 
     /**
      * @return EloquentCollection<int, EmailAttachment>
@@ -271,6 +306,27 @@ final class Email extends Model
     public function sanitizedBodyHtml(): ?string
     {
         return EmailHtmlSanitizer::sanitize($this->body?->body_html, $this->inlineAttachments());
+    }
+
+    /**
+     * HTML to append when this message is replied to or forwarded. Prefers the
+     * stored HTML. A plain-text-only body is escaped so the original is not dropped.
+     */
+    public function quotedBodyHtml(): ?string
+    {
+        $html = $this->body?->body_html;
+
+        if (filled($html)) {
+            return $html;
+        }
+
+        $text = $this->body?->body_text;
+
+        if (blank($text)) {
+            return null;
+        }
+
+        return nl2br(e($text), false);
     }
 
     /**
@@ -306,6 +362,22 @@ final class Email extends Model
     public function shares(): HasMany
     {
         return $this->hasMany(EmailShare::class);
+    }
+
+    /**
+     * @return HasMany<EmailAccessRequest, $this>
+     */
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(EmailAccessRequest::class);
+    }
+
+    public function hasPendingAccessRequestFrom(User $viewer): bool
+    {
+        return $this->accessRequests()
+            ->where('requester_id', $viewer->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->exists();
     }
 
     /**
@@ -354,5 +426,26 @@ final class Email extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(EmailBatch::class, 'batch_id');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'sent_at' => 'datetime',
+            'direction' => EmailDirection::class,
+            'folder' => EmailFolder::class,
+            'status' => EmailStatus::class,
+            'privacy_tier' => EmailPrivacyTier::class,
+            'creation_source' => EmailCreationSource::class,
+            'has_attachments' => 'boolean',
+            'is_internal' => 'boolean',
+            'scheduled_for' => 'datetime',
+            'attempts' => 'integer',
+            'linked_at' => 'datetime',
+            'priority' => EmailPriority::class,
+        ];
     }
 }

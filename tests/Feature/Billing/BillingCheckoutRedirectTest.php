@@ -17,7 +17,7 @@ mutates(Billing::class);
 /**
  * Stripe's SDK talks HTTP directly, so the only way to exercise the real
  * checkout path offline is to hand it a client that answers with a canned
- * session. Everything above it — Cashier, the action, the Livewire method —
+ * session. Everything above it (Cashier, the action, the Livewire method)
  * runs for real.
  */
 function fakeStripeCheckoutSession(string $url): void

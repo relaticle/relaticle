@@ -9,15 +9,23 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
+use Filament\Support\View\ComponentAttributeBag;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Actions\StopCalendarPushChannelAction;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+
+use function Filament\Support\generate_icon_html;
 
 /**
  * The per-account action menu shared by the accounts list and a single account's
@@ -37,28 +45,35 @@ trait HasConnectedAccountActions
         $this->afterAccountChanged();
     }
 
+    public function syncingIcon(): Htmlable
+    {
+        return generate_icon_html(
+            'heroicon-m-arrow-path',
+            attributes: new ComponentAttributeBag(['class' => 'motion-safe:animate-spin']),
+            size: IconSize::Small,
+        ) ?? new HtmlString('');
+    }
+
     /**
      * Native Filament dropdown grouping the per-account actions. Arguments are baked onto
      * each child action so the group can be rendered once per account in the blade.
      *
-     * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect
+     * @param  array<int, Action>  $extraActions  page-specific entries, appended before Disconnect Mailbox
+     * @param  bool  $includeSettings  whether to show Manage (hidden on the settings page itself)
      */
-    public function accountActions(string $accountId, EmailAccountStatus $status, array $extraActions = []): ActionGroup
+    public function accountActions(string $accountId, array $extraActions = [], bool $includeSettings = true): ActionGroup
     {
         $arguments = ['account_id' => $accountId];
+
+        $settingsAction = $includeSettings
+            ? [($this->accountSettingsAction())($arguments)]
+            : [];
 
         // Invoke each action with the arguments (not ->arguments()) so account_id is encoded
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
-            ($this->setDefaultAction())($arguments),
-            ($this->reAuthAction())($arguments)
-                ->visible(in_array($status, [
-                    EmailAccountStatus::REAUTH_REQUIRED,
-                    EmailAccountStatus::ERROR,
-                ], true)),
-            ($this->syncCalendarNowAction())($arguments),
-            ($this->reimportHistoryAction())($arguments),
-            ($this->syncCalendarAction())($arguments),
+            ...$settingsAction,
+            ($this->reconnectAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
             ($this->disconnectAction())($arguments),
         ])
@@ -69,13 +84,26 @@ trait HasConnectedAccountActions
             ->iconButton();
     }
 
-    public function reAuthAction(): Action
+    public function accountSettingsAction(): Action
     {
-        return Action::make('reAuth')
-            ->label(__('filament/pages/email-accounts.actions.re_auth'))
-            ->icon('heroicon-o-arrow-path')
-            ->color('warning')
+        return Action::make('accountSettings')
+            ->label(__('filament/pages/email-accounts.actions.manage'))
+            ->icon('heroicon-o-cog-6-tooth')
+            ->color('gray')
             ->size(Size::Small)
+            ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
+                'account' => (string) $arguments['account_id'],
+            ]));
+    }
+
+    public function reconnectAction(): Action
+    {
+        return Action::make('reconnect')
+            ->label(__('filament/pages/email-accounts.actions.reconnect'))
+            ->icon('heroicon-o-arrow-path')
+            ->color('gray')
+            ->size(Size::Small)
+            ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
             ->url(fn (array $arguments): string => route('email-accounts.redirect', [
                 'provider' => $this->findAccount($arguments)?->provider->value,
             ]), true);
@@ -104,6 +132,7 @@ trait HasConnectedAccountActions
                 $account = $this->findOwnedAccountOrFail($arguments);
 
                 if ($account->hasCalendar()) {
+                    resolve(StopCalendarPushChannelAction::class)->execute($account);
                     $account->disableCalendar();
                     $this->afterAccountChanged();
 
@@ -111,7 +140,7 @@ trait HasConnectedAccountActions
                 }
 
                 // Always re-run OAuth when enabling so the provider grants the calendar scope on the token.
-                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]).'?capability=calendar');
+                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]));
             });
     }
 
@@ -126,7 +155,8 @@ trait HasConnectedAccountActions
             ->action(function (array $arguments): void {
                 $account = $this->findOwnedAccountOrFail($arguments);
 
-                dispatch(new IncrementalCalendarSyncJob($account));
+                MailboxSyncTracker::markCalendarStarted($account);
+                dispatch(new IncrementalCalendarSyncJob($account, reconcileAfter: true));
 
                 Notification::make()
                     ->success()

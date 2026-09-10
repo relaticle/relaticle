@@ -119,6 +119,7 @@ return [
     'limiters' => [
         'login' => 'login',
         'two-factor' => 'two-factor',
+        'passkeys' => 'passkeys',
     ],
 
     /*
@@ -146,7 +147,6 @@ return [
     */
 
     'features' => [
-        Features::resetPasswords(),
         Features::emailVerification(),
         Features::updateProfileInformation(),
         Features::updatePasswords(),
@@ -155,6 +155,42 @@ return [
             'confirmPassword' => true,
             // 'window' => 0,
         ]),
+        Features::passkeys(),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    |
+    | Settings that drive Fortify's passkey (WebAuthn) support. The relying
+    | party id is the host browsers will scope credentials to; keep it set
+    | to the panel's host so credentials registered in the admin do not
+    | bleed across subdomains.
+    |
+    */
+
+    'passkeys' => [
+        'relying_party_id' => config('app.app_panel_domain')
+            ?: parse_url((string) config('app.url'), PHP_URL_HOST),
+        'allowed_origins' => [
+            (function (): string {
+                $appUrl = (string) config('app.url');
+                $panelDomain = config('app.app_panel_domain');
+
+                if (! $panelDomain) {
+                    return $appUrl;
+                }
+
+                $parsed = parse_url($appUrl);
+                $scheme = $parsed['scheme'] ?? 'https';
+                $port = isset($parsed['port']) ? ":{$parsed['port']}" : '';
+
+                return "{$scheme}://{$panelDomain}{$port}";
+            })(),
+        ],
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
+        'timeout' => 60000,
     ],
 
 ];

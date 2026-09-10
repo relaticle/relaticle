@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
+use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\RecordChip;
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
-use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
@@ -28,7 +31,6 @@ use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -39,7 +41,9 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -54,7 +58,7 @@ final class PeopleResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static ?int $navigationSort = 1;
 
@@ -69,7 +73,7 @@ final class PeopleResource extends Resource
                             ->required()
                             ->maxLength(255)
                             ->columnSpan(7),
-                        Select::make('company_id')
+                        RecordSelect::make('company_id')
                             ->relationship('company', 'name')
                             ->suffixAction(
                                 Action::make('Create Company')
@@ -105,12 +109,11 @@ final class PeopleResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')
+                RecordChipColumn::make('name')
                     ->label(__('filament/resources/person.fields.name.label'))
                     ->searchable()
-                    ->sortable()
-                    ->view('filament.tables.columns.avatar-name-column'),
-                TextColumn::make('company.name')
+                    ->sortable(),
+                RecordChipColumn::make('company.name')
                     ->label(__('filament/resources/person.fields.company.label'))
                     ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
                     ->searchable()
@@ -173,7 +176,6 @@ final class PeopleResource extends Resource
             ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
-            EmailsRelationManager::class,
             MeetingsRelationManager::class,
         ];
     }
@@ -202,10 +204,20 @@ final class PeopleResource extends Resource
         return __('filament/resources/person.navigation_label');
     }
 
+    public static function getNavigationIcon(): string
+    {
+        return CrmEntity::People->icon();
+    }
+
+    public static function getGlobalSearchResultTitle(Model $record): Htmlable
+    {
+        return RecordChip::forRecord($record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['customFieldValues.customField.options'])
+            ->with(['company.media', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

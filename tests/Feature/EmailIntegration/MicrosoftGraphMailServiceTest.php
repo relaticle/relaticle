@@ -128,6 +128,35 @@ it('paginates delta with @odata.nextLink and surfaces new + read ids + new curso
         ->and($delta->newCursor)->toContain('$deltatoken=FRESH');
 });
 
+it('maps a Graph drafts-folder message as an inbound draft', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
+            'value' => [['id' => 'drafts-folder-id', 'displayName' => 'Drafts']],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response([
+            'id' => 'DRAFT1',
+            'internetMessageId' => '<draft@example.com>',
+            'conversationId' => 'thread-draft',
+            'subject' => 'Unsent',
+            'bodyPreview' => 'Still writing',
+            'receivedDateTime' => '2026-01-15T10:00:00Z',
+            'isRead' => true,
+            'hasAttachments' => false,
+            'parentFolderId' => 'drafts-folder-id',
+            'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
+            'toRecipients' => [['emailAddress' => ['address' => 'prospect@example.com', 'name' => 'Prospect']]],
+            'ccRecipients' => [],
+            'bccRecipients' => [],
+            'body' => ['contentType' => 'html', 'content' => '<p>Still writing</p>'],
+        ]),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('DRAFT1');
+
+    expect($email->direction)->toBe(EmailDirection::INBOUND)
+        ->and($email->folder)->toBe(EmailFolder::Drafts);
+});
+
 it('maps a Graph message payload to FetchedEmailData', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
@@ -177,11 +206,45 @@ it('POSTs to /me/sendMail and returns provider ids', function (): void {
         'body_html' => '<p>Hi</p>',
         'body_text' => 'Hi',
         'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'rfc_message_id' => '<local-id@example.com>',
     ]);
 
     expect($result['provider_message_id'])->not->toBeEmpty();
 
-    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+    Http::assertSent(function (Request $r): bool {
+        $message = $r->data()['message'];
+
+        return str_contains((string) $r->url(), '/me/sendMail')
+            && ! array_key_exists('internetMessageId', $message)
+            && $message['singleValueExtendedProperties'] === [[
+                'id' => 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId',
+                'value' => '<local-id@example.com>',
+            ]];
+    });
+});
+
+it('finds a sent message by its reconciliation property', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response([
+            'value' => [[
+                'id' => 'AAA1',
+                'conversationId' => 'thread-1',
+                'internetMessageId' => '<provider-id@example.com>',
+            ]],
+        ]),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)
+        ->make(makeAzureAccount())
+        ->findSentMessage('<local-id@example.com>');
+
+    expect($result)->toBe([
+        'provider_message_id' => 'AAA1',
+        'thread_id' => 'thread-1',
+        'rfc_message_id' => '<provider-id@example.com>',
+    ]);
+
+    Http::assertSent(fn (Request $r): bool => str_contains(urldecode((string) $r->url()), "singleValueExtendedProperties/Any(ep: ep/id eq 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId' and ep/value eq '<local-id@example.com>')"));
 });
 
 it('includes file attachments in the /me/sendMail payload', function (): void {
@@ -210,6 +273,37 @@ it('includes file attachments in the /me/sendMail payload', function (): void {
             && $attachments[0]['name'] === 'report.pdf'
             && $attachments[0]['contentType'] === 'application/pdf'
             && $attachments[0]['contentBytes'] === base64_encode('PDF-BYTES');
+    });
+});
+
+it('marks cid images as inline file attachments on sendMail', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $service = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount());
+
+    $service->sendMessage([
+        'subject' => 'Hi',
+        'body_html' => '<p><img src="cid:logo@example.test"></p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'attachments' => [[
+            'filename' => 'logo.png',
+            'mime_type' => 'image/png',
+            'content' => 'PNG-BYTES',
+            'is_inline' => true,
+            'content_id' => 'logo@example.test',
+        ]],
+    ]);
+
+    Http::assertSent(function (Request $r): bool {
+        $attachments = $r->data()['message']['attachments'] ?? [];
+
+        return $attachments !== []
+            && $attachments[0]['isInline'] === true
+            && $attachments[0]['contentId'] === 'logo@example.test'
+            && $attachments[0]['name'] === 'logo.png'
+            && $attachments[0]['contentBytes'] === base64_encode('PNG-BYTES');
     });
 });
 

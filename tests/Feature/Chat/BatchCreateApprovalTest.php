@@ -73,7 +73,7 @@ function makeSingleProposal(string $convId, User $user, string $title): PendingA
     ]);
 }
 
-it('refuses a whole-batch approval — a batch resolves only per item', function (): void {
+it('refuses a whole-batch approval: a batch resolves only per item', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [
         ['title' => 'Batch A'], ['title' => 'Batch B'], ['title' => 'Batch C'],
     ]);
@@ -134,7 +134,7 @@ it('marks the batch rejected when every item is skipped', function (): void {
         ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
 });
 
-it('is idempotent — re-approving the same item does not double-create', function (): void {
+it('is idempotent: re-approving the same item does not double-create', function (): void {
     $action = makeBatchProposal($this->convId, $this->user, [['title' => 'Once'], ['title' => 'Two']]);
     $service = resolve(PendingActionService::class);
 

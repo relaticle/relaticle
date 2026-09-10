@@ -21,7 +21,8 @@
 @source '../../../../packages/ImportWizardNew/resources';
 
 /* EmailIntegration */
-@source '../../../../packages/EmailIntegration/*';
+@source '../../../../packages/EmailIntegration/resources';
+@source '../../../../packages/EmailIntegration/src';
 
 /* Custom Fields */
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';
@@ -35,18 +36,42 @@
    Pure Tailwind CSS Classes Only
    =================================== */
 
-/* App Panel Custom Layout */
+/* App Panel Custom Layout
+
+   Profile (and any tall page) was scrolling the document. Overflow past
+   <body> paints on <html>. html.fi is only min-h-dvh; Filament also sets
+   .fi-main-ctn to min-h-[calc(100dvh-4rem)]. The app shell used h-screen
+   (100vh), which can be taller than 100dvh. Lock html/body and keep the
+   only scroller on .fi-layout. */
+html.fi:has(body.fi-panel-app) {
+    height: 100dvh;
+    overflow: hidden;
+}
+
+.fi-body.fi-panel-app {
+    height: 100dvh;
+    overflow: hidden;
+}
+
 .fi-app-layout {
-    @apply flex h-screen;
+    @apply flex h-full overflow-hidden;
 }
 
 .fi-app-main-wrapper {
-    @apply flex-1 flex flex-col min-w-0;
+    @apply flex min-h-0 min-w-0 flex-1 flex-col;
 
-    /* Only the content area scrolls, not the topbar */
     > .fi-layout {
-        @apply flex-1 overflow-y-auto;
+        @apply min-h-0 flex-1 overflow-y-auto;
+        height: auto;
     }
+}
+
+.fi-body.fi-panel-app .fi-app-layout .fi-main-ctn {
+    min-height: 0;
+}
+
+.fi-app-layout .fi-main {
+    height: auto;
 }
 
 .fi-header-heading {
@@ -69,7 +94,7 @@
 }
 
 /* Search row (AppSidebar): the search field and the notifications trigger,
-   inset to exactly the gutter the navigation items sit in — the nav's `px-6`
+   inset to exactly the gutter the navigation items sit in: the nav's `px-6`
    less the groups' `-mx-2`. Padding rather than margin, so the rule separating
    it from the workspace switcher runs the full width of the sidebar. */
 .fi-sidebar-search-ctn {
@@ -106,6 +131,13 @@
        above the prefix icon instead of centred on it. */
     .fi-input {
         @apply h-full py-0 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400;
+
+        /* Global search renders `type="search"`, so WebKit paints its own blue
+           cancel glyph next to the key cap. Escape already clears the field. */
+        &::-webkit-search-cancel-button,
+        &::-webkit-search-decoration {
+            @apply appearance-none;
+        }
     }
 
     /* Keyboard hint reads as a key cap rather than trailing text */
@@ -214,29 +246,174 @@
     display: none;
 }
 
-body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
-    display: none;
-}
-
 @media (width < 64rem) {
     body:has([data-page-heading]) .fi-topbar-start {
         @apply flex min-w-0 flex-1;
     }
 }
 
+/* ===================================
+   Sidebar collapse: motion and the toggle
+   =================================== */
+
+:root {
+    --sidebar-motion-duration: 220ms;
+    --sidebar-motion-easing: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* The panel ships `lg:transition-none` on the sidebar while the content beside
+   it transitions, so a desktop collapse snapped in one place and slid in the
+   other. One curve and one duration for the width, the toggle and the labels. */
 @media (width >= 64rem) {
-    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-inline-end: calc(var(--spacing) * 11);
+    .fi-sidebar {
+        transition-property: width;
+        transition-duration: var(--sidebar-motion-duration);
+        transition-timing-function: var(--sidebar-motion-easing);
     }
 
-    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
-        margin-top: calc(var(--spacing) * 4);
-        margin-inline-start: calc(var(--spacing) * 1);
-        margin-inline-end: calc(var(--spacing) * 9);
+    /* Filament sizes the collapsed rail from its content, and `auto` cannot be
+       animated from a fixed width. `--collapsed-sidebar-width` comes from the
+       panel's `collapsedSidebarWidth()`, so both ends are explicit. */
+    .fi-sidebar:not(.fi-sidebar-open) {
+        width: var(--collapsed-sidebar-width);
+    }
 
-        .fi-tenant-menu-trigger {
-            padding: calc(var(--spacing) * 1);
-        }
+    /* Keeping the icons start-aligned means they hold their column while the
+       width animates, rather than drifting in from the centre of a 20rem panel. */
+    .fi-sidebar-item-btn,
+    .fi-sidebar-group-dropdown-trigger-btn,
+    .fi-tenant-menu-trigger {
+        @apply justify-start;
+    }
+
+    /* Text slides out behind the narrowing edge instead of rewrapping into it.
+       Left to reflow, the workspace name went from one line to three and back
+       during a single collapse. */
+    .fi-sidebar-item-label,
+    .fi-sidebar-group-label,
+    .fi-tenant-menu-trigger-text,
+    .fi-tenant-menu-trigger-tenant-name,
+    .fi-tenant-menu-trigger-current-tenant-label {
+        @apply whitespace-nowrap;
+    }
+
+    .fi-sidebar-item-btn,
+    .fi-sidebar-group-btn,
+    .fi-tenant-menu-trigger-text {
+        @apply overflow-hidden;
+    }
+
+    /* The search field clips only while the rail is collapsed, so its label
+       slides out behind the narrowing edge like every other one. An open
+       sidebar must not clip it: the results panel is absolutely positioned and
+       wider than the column, so a clip here hides every result on desktop. */
+    .fi-sidebar:not(.fi-sidebar-open) .fi-sidebar-search {
+        @apply overflow-hidden;
+    }
+
+    /* The lane the toggle sits in, beside the switcher when open. It has to
+       clear everything the button occupies, which is its 4.5 inset plus its own
+       8 of width: anything narrower and the trigger's box runs under the button
+       even though the workspace name still looks clear of it. It is not
+       transitioned: animating it let the trigger's edge overtake the button,
+       and the fading workspace name ran out from under it. Snapping it at the
+       start of the collapse is invisible, since the name is already clipped by
+       the panel edge well before it reaches the button. */
+    #fi-main-sidebar.fi-sidebar-open:has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-inline-end: calc(var(--spacing) * 14);
+    }
+
+    /* On the rail the toggle drops below the switcher rather than beside it,
+       so the rail can be narrow enough to centre both on the navigation's icon
+       column. The avatar is pinned so the narrow box cannot squeeze it. */
+    #fi-main-sidebar:not(.fi-sidebar-open):has(> [data-sidebar-workspace-toggle]) > .fi-tenant-menu {
+        margin-top: calc(var(--spacing) * 3);
+        margin-inline: calc(var(--spacing) * 3.5);
+        padding-bottom: calc(var(--spacing) * 11);
+    }
+
+    .fi-tenant-menu-trigger .fi-avatar {
+        @apply shrink-0;
+    }
+}
+
+/* The panel's own collapse button is inline in the topbar view, with no config
+   to turn it off. Hiding it leaves one toggle, in the sidebar it controls. */
+body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
+    display: none;
+}
+
+.fi-sidebar-toggle-btn {
+    @apply absolute top-4 z-20 hidden h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 lg:flex dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-200;
+
+    /* 4.5 spacing from the trailing edge is also the centre of the collapsed
+       rail, so this one value serves both states and the button never moves
+       horizontally relative to the panel. It rides the edge as the panel
+       animates, which is the only path across the sidebar that crosses no
+       labels: everything beside it is clipped by that same edge. */
+    inset-inline-end: calc(var(--spacing) * 4.5);
+
+    /* Expanding: the button leaves the rail immediately, so it is back on the
+       header line before the panel is wide enough to show one. */
+    transition-property: color, background-color, top;
+    transition-duration: var(--sidebar-motion-duration),
+        var(--sidebar-motion-duration), calc(var(--sidebar-motion-duration) / 2);
+    transition-timing-function: var(--sidebar-motion-easing);
+
+    .fi-sidebar-toggle-icon {
+        @apply h-5 w-5;
+    }
+}
+
+/* On the rail the button drops to the row below the workspace avatar, which is
+   the only thing that changes between the two states.
+
+   Collapsing, that drop is the last thing to happen: running it against the
+   width made the button descend past a sidebar still at full width. A CSS
+   transition is read off the state being entered, so the delay belongs here and
+   not on the rule above. */
+#fi-main-sidebar:not(.fi-sidebar-open) .fi-sidebar-toggle-btn {
+    top: calc(var(--spacing) * 14);
+    transition-delay: 0s, 0s, calc(var(--sidebar-motion-duration) / 2);
+}
+
+/* One glyph per direction, swapped by the sidebar's own state class so the icon
+   never lags a frame behind the panel it describes. */
+.fi-sidebar-toggle-icon-expand,
+#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-collapse {
+    @apply block;
+}
+
+.fi-sidebar-toggle-icon-collapse,
+#fi-main-sidebar.fi-sidebar-open .fi-sidebar-toggle-icon-expand {
+    @apply hidden;
+}
+
+/* Labels fade out before the panel narrows past them, and back in behind the
+   widening edge. Without a leave transition the panel emptied on frame one. */
+.fi-sidebar-item-label,
+.fi-sidebar-item-badge-ctn,
+.fi-sidebar-group-btn,
+.fi-sidebar-search,
+.fi-tenant-menu-trigger-text,
+.fi-tenant-menu-trigger .fi-icon {
+    &.fi-transition-enter {
+        transition-delay: calc(var(--sidebar-motion-duration) / 2.5);
+        transition-duration: calc(var(--sidebar-motion-duration) / 2);
+    }
+
+    &.fi-transition-leave {
+        @apply lg:transition;
+
+        transition-duration: calc(var(--sidebar-motion-duration) / 3);
+    }
+
+    &.fi-transition-leave-start {
+        @apply opacity-100;
+    }
+
+    &.fi-transition-leave-end {
+        @apply opacity-0;
     }
 }
 
@@ -297,8 +474,19 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply border-r border-gray-100 dark:border-gray-800;
 }
 
+/* Rounded corners only. overflow-hidden made this box Floating UI's flip
+   clipping ancestor. Row action menus teleport out so they stay visible, then
+   flip to the top of a short relation-manager table and cover + New / Attach. */
 .fi-ta-content {
-    @apply rounded-xl overflow-hidden;
+    @apply rounded-xl;
+}
+
+/* asmit/resized-column sets overflow-x: auto on the same node Filament marks
+   as the fixed positioning context. CSS then computes overflow-y to auto as
+   well, which is the same clipping ancestor as above. Keep horizontal scroll
+   on .fi-ta-table-wrapper only. */
+.fi-ta-content-ctn.fi-fixed-positioning-context {
+    overflow: visible;
 }
 
 .fi-ta-table thead {
@@ -363,22 +551,42 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 }
 
 /* Dropdowns */
-.fi-dropdown-panel {
-    @apply rounded-xl;
-}
 
 /* asmit/resized-column lifts the table toolbar (`.fi-ta-header-ctn`) to
    z-index 21 so its own dropdowns clear the sticky table head at 19. That also
    puts it above a page-header action dropdown, whose panel is Filament's
-   default z-index 20 — the panel then renders *behind* the search field and
-   filter/column triggers. Lift those panels over the toolbar; 22 keeps them
-   under Filament chrome (topbar/sidebar, z-index 30). */
-.fi-header-actions-ctn .fi-dropdown-panel {
-    @apply z-[22];
+   default z-index 20, so the panel renders *behind* the search field and
+   filter/column triggers. Row ⋮ menus teleport to body at the same default,
+   so they paint under + New / Attach and the column-reorder grip sits on
+   Detach. 22 clears the toolbar and stays under Filament chrome (30). */
+.fi-dropdown-panel {
+    @apply z-[22] rounded-xl p-1;
+}
+
+.fi-dropdown-list {
+    @apply flex flex-col gap-0.5 p-0;
+}
+
+.fi-dropdown-list + .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
 .fi-dropdown-list-item {
-    @apply rounded-lg;
+    @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm;
+}
+
+.fi-dropdown-list-item .fi-icon {
+    @apply size-5 shrink-0;
+}
+
+.fi-dropdown-list-item-label {
+    @apply min-w-0 flex-1 text-start;
+}
+
+/* Livewire shows this on click. Idle, it must not occupy layout or it reads
+   as a grip on Detach. */
+.fi-dropdown-panel .fi-loading-indicator {
+    display: none;
 }
 
 /* Panels */
@@ -407,7 +615,7 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
 /* Actions */
 .fi-ac-action:hover,
-.fi-ta-actions button:hover {
+.fi-ta-actions button:hover:not(.fi-dropdown-list-item) {
     @apply transition-opacity duration-200 opacity-80;
 }
 
@@ -472,9 +680,22 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply rounded-md w-6 h-6 shrink-0;
 }
 
-/* Ensure tenant menu dropdown is visible above content when sidebar is collapsed */
+/* The workspace dropdown overhangs the topbar, but it lives inside the sidebar,
+   and on desktop Filament gives the sidebar z-index 20 against the topbar's 30.
+   No z-index on the panel itself can win that: it is confined to its ancestor's
+   stacking context, so the topbar painted over the top of the list. Lifting the
+   sidebar is the fix; 31 clears the topbar and stays under modals at 40. */
+@media (width >= 64rem) {
+    .fi-sidebar {
+        @apply z-[31];
+    }
+}
+
+/* Inside the sidebar's own stacking context the panel and the collapse toggle
+   both sat at 20, so the later toggle won and floated over the first menu item
+   on the collapsed rail. */
 .fi-tenant-menu .fi-dropdown-panel {
-    @apply z-50;
+    @apply z-30;
 }
 
 /* Checkbox and Radio */
@@ -714,98 +935,4 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     .dark [data-chat-loading-label] {
         color: #9ca3af;
     }
-}
-
-/* ── Email reader overlay ──────────────────────────────────────────────────
-   Mount animations only. The overlay is gated by a Livewire `@if`, so it is
-   removed from the DOM outright on close; an Alpine leave transition would need
-   visibility state that does not survive Livewire morphing the element. */
-@keyframes fi-email-reader-backdrop-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-@keyframes fi-email-reader-panel-in {
-    from { opacity: 0; transform: translateY(0.5rem) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.fi-email-reader-backdrop {
-    animation: fi-email-reader-backdrop-in 200ms ease-out;
-}
-
-.fi-email-reader-panel {
-    animation: fi-email-reader-panel-in 200ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .fi-email-reader-backdrop,
-    .fi-email-reader-panel {
-        animation: none;
-    }
-}
-
-/* ── Action modals sit above the mail surfaces ─────────────────────────────
-   Filament paints a modal at z-40 (z-50 for one stacked on another). The reader
-   overlay and the composer window are z-40, and z-50 once the composer is
-   expanded — so an action opened from either (sharing, signatures, templates)
-   renders *underneath* an opaque panel: no error, no visible modal, and the
-   click reads as dead. A modal is always the topmost surface, so it is lifted
-   past both here, keeping Filament's own base/stacked ordering intact. */
-.fi-modal > .fi-modal-close-overlay,
-.fi-modal > .fi-modal-window-ctn {
-    z-index: 60;
-}
-
-.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-close-overlay,
-.fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-window-ctn {
-    z-index: 70;
-}
-
-/* ── Docked draft: the writing area runs to the footer ─────────────────────
-   The dock has no height of its own (it grows with the draft), so the editor
-   cannot flex into it — giving the container a min-height would just open a gap
-   below the editor's own box. The floor belongs on the editable area itself. */
-[data-composer-dock='inline'] .fi-fo-rich-editor-content {
-    min-height: 11rem;
-}
-
-/* ── Email reader: secondary icon actions ──────────────────────────────────
-   Sharing/Summarize/Request access are Filament actions, the reply icons are
-   plain buttons; left alone the two render at different sizes and weights and
-   the row stops reading as one group. This pins the Filament ones to the same
-   28px box, 16px glyph and gray-400 resting weight as their neighbours. */
-.fi-email-reader-action.fi-icon-btn {
-    block-size: calc(var(--spacing) * 7);
-    inline-size: calc(var(--spacing) * 7);
-    /* Filament offsets its own padding with a -6px margin. The padding is gone
-       here, so the margin has to go too — left in, it eats the row's gap and the
-       buttons overlap. */
-    margin: 0;
-    padding: 0;
-    color: theme('colors.gray.400');
-}
-
-.fi-email-reader-action.fi-icon-btn .fi-icon {
-    block-size: calc(var(--spacing) * 4);
-    inline-size: calc(var(--spacing) * 4);
-}
-
-.fi-email-reader-action.fi-icon-btn:hover {
-    background-color: theme('colors.gray.100');
-    color: theme('colors.gray.600');
-}
-
-.dark .fi-email-reader-action.fi-icon-btn:hover {
-    background-color: theme('colors.gray.800');
-    color: theme('colors.gray.300');
-}
-
-/* ── Email list: direction badge ───────────────────────────────────────────
-   Filament's xs badge ships 2px of horizontal padding, which leaves the label
-   touching the pill edge at this size. A little room either side makes it read
-   as a tag rather than tinted text. */
-.fi-email-direction-badge.fi-badge {
-    padding-block: 1px;
-    padding-inline: calc(var(--spacing) * 1.5);
 }

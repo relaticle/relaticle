@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
+use App\Filament\Components\Forms\RecordSelect;
+use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
@@ -15,21 +18,19 @@ use App\Models\Team;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
@@ -71,7 +72,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                             ->where('cfv.custom_field_id', '=', $stageField->getKey());
                     })
                     ->select('opportunities.*', 'cfv.'.$valueColumn)
-                    ->with(['company', 'contact'])
+                    ->with(['company.media', 'contact'])
             )
             ->recordTitleAttribute('name')
             ->columnIdentifier($valueColumn)
@@ -99,10 +100,10 @@ final class OpportunitiesBoard extends BoardResourcePage
                 return $schema
                     ->components([
                         CardFlex::make([
-                            TextEntry::make('company.name')
+                            RecordChipEntry::make('company.name')
+                                ->chipSize('sm')
                                 ->hiddenLabel()
                                 ->visible(fn (?string $state): bool => filled($state))
-                                ->icon(Heroicon::OutlinedBuildingOffice)
                                 ->color('gray')
                                 ->size(TextSize::ExtraSmall)
                                 ->grow(),
@@ -115,6 +116,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             })
             ->columnActions([
                 CreateAction::make()
+                    ->authorize(fn (): bool => Gate::allows('create', Opportunity::class))
                     ->label(__('filament/pages/boards.opportunities.actions.add'))
                     ->icon('heroicon-o-plus')
                     ->iconButton()
@@ -127,11 +129,11 @@ final class OpportunitiesBoard extends BoardResourcePage
                                 ->required()
                                 ->placeholder(__('filament/pages/boards.opportunities.form.name_placeholder'))
                                 ->columnSpanFull(),
-                            Select::make('company_id')
+                            RecordSelect::make('company_id')
                                 ->relationship('company', 'name')
                                 ->searchable()
                                 ->preload(),
-                            Select::make('contact_id')
+                            RecordSelect::make('contact_id')
                                 ->relationship('contact', 'name')
                                 ->searchable()
                                 ->preload(),
@@ -163,6 +165,7 @@ final class OpportunitiesBoard extends BoardResourcePage
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('update', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ExtraLarge)
@@ -177,6 +180,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                         $record->update($data);
                     }),
                 Action::make('delete')
+                    ->authorize(fn (?Opportunity $record): bool => $record instanceof Opportunity && Gate::allows('delete', $record))
                     ->label(__('filament/pages/boards.opportunities.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -186,13 +190,13 @@ final class OpportunitiesBoard extends BoardResourcePage
                     }),
             ])
             ->filters([
-                SelectFilter::make('companies')
+                RecordSelectFilter::make('companies')
                     ->label(__('filament/pages/boards.opportunities.filters.company'))
                     ->relationship('company', 'name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
-                SelectFilter::make('contacts')
+                RecordSelectFilter::make('contacts')
                     ->label(__('filament/pages/boards.opportunities.filters.contact'))
                     ->relationship('contact', 'name')
                     ->searchable()
@@ -224,6 +228,8 @@ final class OpportunitiesBoard extends BoardResourcePage
 
         $card = (clone $query)->find($cardId);
         throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
+
+        abort_unless(Gate::allows('update', $card), 403);
 
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
@@ -262,11 +268,11 @@ final class OpportunitiesBoard extends BoardResourcePage
 
     /**
      * "Today" and "tomorrow" are questions about the viewer's calendar, so the boundary
-     * moves into their zone — but the close date itself must not. Unlike the tasks
+     * moves into their zone, but the close date itself must not. Unlike the tasks
      * board's due date, this is a plain calendar date the package stores at midnight
      * UTC: converting it into a negative-offset zone walks it back past midnight and
      * the card reads a day early. Move only the "today" it is measured against, and
-     * compare the two as dates rather than instants — midnight UTC and midnight in
+     * compare the two as dates rather than instants. Midnight UTC and midnight in
      * Los Angeles are the same calendar day but seven hours apart, so an instant
      * comparison would call a date closing today overdue.
      */

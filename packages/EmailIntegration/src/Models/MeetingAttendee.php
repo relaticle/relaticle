@@ -23,6 +23,9 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
  * @property bool $is_self
  * @property string|null $contact_id
  * @property string|null $company_id
+ * @property People|null $contact
+ * @property Company|null $company
+ * @property Meeting $meeting
  */
 final class MeetingAttendee extends Model
 {

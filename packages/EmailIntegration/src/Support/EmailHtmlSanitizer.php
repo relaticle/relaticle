@@ -41,7 +41,7 @@ final readonly class EmailHtmlSanitizer
         // opaque-origin sandboxed iframe, so CSS cannot read cookies or run JS.
         $config = (new HtmlSanitizerConfig)
             // Raise Symfony's 20 KB default (which clips real newsletters) to a
-            // bounded ceiling rather than removing it — see MAX_INPUT_BYTES.
+            // bounded ceiling rather than removing it. See MAX_INPUT_BYTES.
             ->withMaxInputLength(self::MAX_INPUT_BYTES)
             ->allowSafeElements()
             ->allowElement('style')

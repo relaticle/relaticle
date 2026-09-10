@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
+use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -21,7 +22,9 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RescheduleQueuedEmailAction;
@@ -50,13 +53,15 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
         return $table
             ->query($this->buildQuery())
             ->filters($this->lockedStatus instanceof EmailStatus ? [] : [$this->statusFilter()])
-            ->when(
-                $this->lockedStatus === EmailStatus::FAILED,
-                fn (Table $table): Table => $table
-                    ->emptyStateHeading(__('filament/pages/email-inbox.failed.empty.heading'))
-                    ->emptyStateDescription(__('filament/pages/email-inbox.failed.empty.description'))
-                    ->emptyStateIcon(Heroicon::ExclamationCircle),
-            )
+            ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
+                ? __('filament/pages/email-inbox.failed.empty.heading')
+                : __('filament/pages/email-inbox.outbox.empty.heading'))
+            ->emptyStateDescription(fn (): string => $this->lockedStatus === EmailStatus::FAILED
+                ? __('filament/pages/email-inbox.failed.empty.description')
+                : __('filament/pages/email-inbox.outbox.empty.description'))
+            ->emptyStateIcon(fn (): Heroicon => $this->lockedStatus === EmailStatus::FAILED
+                ? Heroicon::OutlinedExclamationCircle
+                : Heroicon::OutlinedClock)
             ->columns([
                 TextColumn::make('subject')->limit(50)->searchable(),
                 TextColumn::make('participants_to')
@@ -87,6 +92,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                     ->schema([
                         DateTimePicker::make('scheduled_for')
                             ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
+                            ->native(false)
                             ->seconds(false)
                             ->minDate(now())
                             ->required(),
@@ -143,6 +149,13 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ]);
     }
 
+    /**
+     * Re-render when a send is queued or cancelled, so the list matches the
+     * outbox badge without a page reload.
+     */
+    #[On('outbox:changed')]
+    public function refresh(): void {}
+
     public function render(): View
     {
         return view('email-integration::livewire.table');
@@ -193,14 +206,26 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
      */
     private function applyStatusTab(Builder $query, OutboxTab $tab): Builder
     {
+        $dueCutoff = $this->queuedDueCutoff();
+
         return match ($tab) {
             OutboxTab::SCHEDULED => $query->where('status', EmailStatus::QUEUED)
-                ->whereNotNull('scheduled_for')->where('scheduled_for', '>', now()),
+                ->whereNotNull('scheduled_for')->where('scheduled_for', '>', $dueCutoff),
             OutboxTab::QUEUED => $query->where('status', EmailStatus::QUEUED)
-                ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now())),
+                ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', $dueCutoff)),
             OutboxTab::SENDING => $query->where('status', EmailStatus::SENDING),
             OutboxTab::FAILED => $query->where('status', EmailStatus::FAILED),
             OutboxTab::SENT => $query->where('status', EmailStatus::SENT)->where('sent_at', '>=', now()->subDay()),
         };
+    }
+
+    /**
+     * Interactive sends stamp scheduled_for a few seconds ahead so the user can
+     * undo. That delay is not a scheduled send; the queued tab should show it
+     * immediately, matching the outbox badge.
+     */
+    private function queuedDueCutoff(): CarbonInterface
+    {
+        return now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));
     }
 }

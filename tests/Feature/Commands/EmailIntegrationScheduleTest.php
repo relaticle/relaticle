@@ -10,12 +10,14 @@ use Illuminate\Support\Facades\Bus;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
+use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(IncrementalEmailSyncCommand::class);
 mutates(IncrementalCalendarSyncCommand::class);
+mutates(RenewCalendarPushChannelsCommand::class);
 
 it('registers outbox and sync schedules when email integration is active', function (): void {
     Feature::activate(EmailIntegration::class);
@@ -25,6 +27,7 @@ it('registers outbox and sync schedules when email integration is active', funct
         ->expectsOutputToContain('email:dispatch-outbox')
         ->expectsOutputToContain('email:incremental-sync')
         ->expectsOutputToContain('calendar:incremental-sync')
+        ->expectsOutputToContain('calendar:renew-push-channels')
         ->assertSuccessful();
 });
 
@@ -40,10 +43,11 @@ it('runs email sync and outbox schedules on a single server without overlapping'
 
             return str_contains($haystack, 'email:incremental-sync')
                 || str_contains($haystack, 'calendar:incremental-sync')
+                || str_contains($haystack, 'calendar:renew-push-channels')
                 || str_contains($haystack, 'email:dispatch-outbox');
         });
 
-    expect($events)->toHaveCount(3)
+    expect($events)->toHaveCount(4)
         ->and($events->every(fn (Event $event): bool => $event->onOneServer && $event->withoutOverlapping))->toBeTrue();
 });
 
@@ -57,6 +61,7 @@ it('does not register outbox or sync schedules when email integration is inactiv
         ->doesntExpectOutputToContain('email:dispatch-outbox')
         ->doesntExpectOutputToContain('email:incremental-sync')
         ->doesntExpectOutputToContain('calendar:incremental-sync')
+        ->doesntExpectOutputToContain('calendar:renew-push-channels')
         ->assertSuccessful();
 });
 

@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PublicDomainList;
@@ -26,6 +29,8 @@ final readonly class LinkEmailAction
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
         private AutomatedSenderMatcher $automatedSender,
+        private EmailVisibilityService $visibility,
+        private RecordCommunicationMetrics $metrics,
         private PublicDomainList $publicDomainList,
     ) {}
 
@@ -74,7 +79,9 @@ final readonly class LinkEmailAction
                 return;
             }
 
-            $this->link($email);
+            $applyMetricsForPrelinkedRecords = $locked->linked_at === null;
+
+            $this->link($email, $applyMetricsForPrelinkedRecords);
 
             if ($locked->linked_at === null) {
                 $locked->updateQuietly(['linked_at' => now()]);
@@ -82,7 +89,7 @@ final readonly class LinkEmailAction
         });
     }
 
-    private function link(Email $email): void
+    private function link(Email $email, bool $applyMetricsForPrelinkedRecords): void
     {
         $participants = $email->participants()->with('contact', 'company')->get();
         $teamId = $email->team_id;
@@ -101,33 +108,16 @@ final readonly class LinkEmailAction
 
         foreach ($participants as $participant) {
             // Machine-sent senders (no-reply@, notice@, bounce@) still link to existing
-            // records but must never spawn a new Company/Person — there's no real
+            // records but must never spawn a new Company/Person: there's no real
             // contact behind them.
             $isAutomatedSender = $this->automatedSender->matches($participant->email_address);
+            $suppressCreate = $this->visibility->suppressesRecordCreation(
+                $participant->email_address,
+                $teamId,
+                $email->connected_account_id,
+            );
 
-            // 1. Try to match Company by email domain first, so the person can be born already linked.
-            $company = null;
-            $domain = $this->extractDomain($participant->email_address);
-
-            if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = $this->domainMatcher->firstMatching($domain, $teamId);
-
-                // 2. Auto-create Company when no existing record found.
-                if (! $company && ! $isAutomatedSender && $team?->auto_create_companies) {
-                    $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
-                }
-
-                if ($company instanceof Company) {
-                    $participant->update(['company_id' => $company->getKey()]);
-
-                    if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
-                        $countedCompanies[$company->getKey()] = true;
-                        $this->incrementEmailMetrics($company, $email);
-                    }
-                }
-            }
-
-            // 3. Try to match existing People record by email address.
+            // 1. Resolve the person before deciding whether to create a company.
             // Email values are stored as JSON arrays in json_value (e.g. ["user@example.com"])
             $person = People::query()->where('team_id', $teamId)
                 ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
@@ -136,8 +126,39 @@ final readonly class LinkEmailAction
                 )
                 ->first();
 
+            $wouldCreatePerson = ! $person
+                && ! $email->is_internal
+                && ! $isAutomatedSender
+                && ! $suppressCreate
+                && $connectedAccount
+                && $team
+                && $this->shouldCreatePerson($team, $participant->email_address, $email);
+
+            // 2. Match or create Company by email host so a new person can be born already linked.
+            $company = null;
+            $rawDomain = $this->extractDomain($participant->email_address);
+            $host = $rawDomain !== null ? $this->domainMatcher->host($rawDomain) : null;
+
+            if ($host && $skippedDomains->doesntContain($host)) {
+                $company = $this->domainMatcher->firstMatching($host, $teamId);
+
+                // 3. Auto-create Company only when a new person would also be created.
+                if (! $company && $wouldCreatePerson && $this->shouldCreateCompany($team, $participant->email_address, $email)) {
+                    $company = $this->autoCreateCompany->execute($host, $teamId, $team);
+                }
+
+                if ($company instanceof Company) {
+                    $participant->update(['company_id' => $company->getKey()]);
+
+                    if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
+                        $countedCompanies[$company->getKey()] = true;
+                        $this->metrics->incrementEmailMetrics($company, $email);
+                    }
+                }
+            }
+
             // 4. Auto-create Person when no existing record found, passing resolved company_id.
-            if (! $person && ! $isAutomatedSender && $connectedAccount && $team && $this->shouldCreatePerson($team, $participant->email_address, $email)) {
+            if ($wouldCreatePerson) {
                 $person = $this->autoCreatePerson->execute(
                     $participant->name ?? '',
                     $participant->email_address,
@@ -152,7 +173,7 @@ final readonly class LinkEmailAction
 
                 if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
-                    $this->incrementEmailMetrics($person, $email);
+                    $this->metrics->incrementEmailMetrics($person, $email);
                 }
 
                 if ($person->company_id) {
@@ -166,10 +187,19 @@ final readonly class LinkEmailAction
                 foreach ($opportunities as $opportunity) {
                     if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
-                        $this->incrementEmailMetrics($opportunity, $email);
+                        $this->metrics->incrementEmailMetrics($opportunity, $email);
                     }
                 }
             }
+        }
+
+        if ($applyMetricsForPrelinkedRecords) {
+            $this->metrics->incrementEmailMetricsForPrelinkedRecords(
+                $email,
+                $countedCompanies,
+                $countedPeople,
+                $countedOpportunities,
+            );
         }
     }
 
@@ -185,8 +215,6 @@ final readonly class LinkEmailAction
     {
         return match ($team->contact_creation_mode) {
             ContactCreationMode::All => true,
-            // The outbound message being linked is itself history: do not depend on a
-            // second query that ActiveAccountScope can hide during mailbox re-import.
             ContactCreationMode::Selective => $email->direction === EmailDirection::OUTBOUND
                 || $this->hasTeamOutboundHistory($team, $emailAddress),
             ContactCreationMode::None => false,
@@ -194,13 +222,26 @@ final readonly class LinkEmailAction
     }
 
     /**
+     * A company is created only when a person would be created for this address
+     * and the workspace company toggle is on. None never creates companies.
+     * Selective creates them only for addresses the workspace has emailed (or
+     * the outbound message being linked). All creates them for every eligible
+     * address.
+     */
+    private function shouldCreateCompany(Team $team, string $emailAddress, Email $email): bool
+    {
+        return $team->auto_create_companies && $this->shouldCreatePerson($team, $emailAddress, $email);
+    }
+
+    /**
      * True when any connected mailbox on this team has an outbound email involving
-     * the address. The email currently being linked already exists in the table,
-     * so the first send is enough — a reply is not required.
+     * the address. Includes mail stored under disconnected accounts so a reply
+     * on an active mailbox still creates the person after account churn.
      */
     private function hasTeamOutboundHistory(Team $team, string $emailAddress): bool
     {
         return Email::query()
+            ->withoutGlobalScope(ActiveAccountScope::class)
             ->where('team_id', $team->getKey())
             ->where('direction', EmailDirection::OUTBOUND)
             ->whereHas(
@@ -235,48 +276,5 @@ final readonly class LinkEmailAction
         $relation->attach($relatedId, ['link_source' => 'auto']);
 
         return true;
-    }
-
-    /**
-     * Increment the shared email-interaction counters on a linked CRM record
-     * (People, Company, or Opportunity — all expose the same metric columns).
-     *
-     * Counters use atomic SQL increments so concurrent StoreEmailJob workers
-     * don't lose updates. The timestamps use GREATEST so an older email linked
-     * after a newer one (out-of-order parallel backfill) never moves
-     * last_email_at backwards.
-     */
-    private function incrementEmailMetrics(Model $record, Email $email): void
-    {
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
-
-        // Raw, parameterised UPDATE: counters increment atomically (no lost updates
-        // under concurrent StoreEmailJob workers) and the timestamps use GREATEST so
-        // an older email linked after a newer one (out-of-order parallel backfill)
-        // never moves last_email_at backwards. Bindings keep the date out of the SQL
-        // string; the table/key come from model metadata, never user input.
-        $sets = [
-            'email_count = email_count + 1',
-            'inbound_email_count = inbound_email_count + ?',
-            'outbound_email_count = outbound_email_count + ?',
-            'updated_at = ?',
-        ];
-
-        /** @var list<mixed> $bindings */
-        $bindings = [$isInbound ? 1 : 0, $isInbound ? 0 : 1, now()];
-
-        if ($email->sent_at !== null) {
-            $sets[] = 'last_email_at = GREATEST(last_email_at, ?)';
-            $sets[] = 'last_interaction_at = GREATEST(last_interaction_at, ?)';
-            $bindings[] = $email->sent_at;
-            $bindings[] = $email->sent_at;
-        }
-
-        $bindings[] = $record->getKey();
-
-        DB::update(
-            'update '.$record->getTable().' set '.implode(', ', $sets).' where '.$record->getKeyName().' = ?',
-            $bindings,
-        );
     }
 }

@@ -32,7 +32,7 @@ trait ChecksTokenAbility
         /** @var PersonalAccessToken|PassportAccessToken|object|null $token */
         $token = $user?->currentAccessToken();
 
-        // OAuth clients can only ever ask for `mcp:use` — it is the single entry in
+        // OAuth clients can only ever ask for `mcp:use`. It is the single entry in
         // the authorization-server metadata laravel/mcp publishes, so per-ability
         // grants are not expressible over OAuth. Holding it authorizes the toolset;
         // which team's data those tools reach is bound separately on the token.

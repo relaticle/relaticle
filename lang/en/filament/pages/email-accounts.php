@@ -10,10 +10,9 @@ return [
         'connect_gmail' => 'Connect Google Account',
         'connect_azure' => 'Connect Microsoft Account',
         'manage' => 'Manage',
-        're_auth' => 'Re-authenticate',
-        'edit_settings' => 'Settings',
+        'reconnect' => 'Reconnect',
         'set_default' => 'Set as default',
-        'disconnect' => 'Disconnect',
+        'disconnect' => 'Disconnect Mailbox',
         'sync_calendar' => [
             'enable_label' => 'Sync calendar',
             'disable_label' => 'Disable calendar sync',
@@ -54,8 +53,8 @@ return [
     ],
     'notifications' => [
         'calendar_sync_queued' => [
-            'title' => 'Calendar sync queued.',
-            'body' => 'New events should appear within a minute.',
+            'title' => 'Calendar sync started.',
+            'body' => 'Your meetings will update on this page as the sync finishes.',
         ],
         'disconnected' => [
             'title' => 'Account disconnected.',
@@ -79,9 +78,20 @@ return [
     ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
-    'importing' => 'Importing',
-    'importing_count' => ':count emails',
-    'importing_progress' => ':imported of :estimated emails',
+    'send_missing_tooltip' => 'Send access was not granted. Grant it to send mail from Relaticle.',
+    'importing' => 'Syncing',
+    'importing_calendar' => 'Syncing calendar',
+    'importing_email' => 'Syncing email',
+    'importing_email_and_calendar' => 'Syncing email and calendar',
+    'importing_percent' => ':percent%',
+    'sync_status' => [
+        'title_syncing' => 'Syncing',
+        'title_complete' => 'Import complete',
+        'meetings_processed' => '{1}:count meeting processed|[2,*]:count meetings processed',
+        'emails_processed' => '{1}:count email processed|[2,*]:count emails processed',
+        'close' => 'Dismiss',
+        'open_settings' => 'Open account settings',
+    ],
     'capabilities' => [
         'email' => 'Email',
         'calendar' => 'Calendar',
@@ -98,7 +108,7 @@ return [
         ],
         'meetings' => [
             'heading' => 'See your meetings in Relaticle',
-            'description' => 'Connect your mailbox and enable calendar sync to track meetings alongside your CRM records.',
+            'description' => 'Connect your mailbox to track meetings alongside your CRM records.',
         ],
     ],
 ];

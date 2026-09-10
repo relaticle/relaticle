@@ -30,7 +30,7 @@ use Symfony\Component\HttpFoundation\Response;
  * WARNING: Not Octane-safe. This middleware uses addGlobalScope() on static
  * model state and clearBootedModels() in terminate(). Under Octane, if
  * terminate() fails to run, scopes from the previous request leak into the
- * next request — potentially exposing cross-tenant data. The auth guard state
+ * next request, potentially exposing cross-tenant data. The auth guard state
  * (setUser/forgetUser) has the same leakage risk. Safe under FPM only.
  */
 final readonly class SetApiTeamContext
@@ -67,7 +67,7 @@ final readonly class SetApiTeamContext
             return response()->json(['message' => 'You do not belong to this team.'], 403);
         }
 
-        // Set team in memory only — do NOT call switchTeam() which persists
+        // Set team in memory only. Do NOT call switchTeam(), which persists
         // current_team_id to the database, corrupting the web panel's team state
         // when API calls target a different team than the active web session.
         $user->forceFill(['current_team_id' => $team->getKey()]);
@@ -100,7 +100,7 @@ final readonly class SetApiTeamContext
         $token = $user->currentAccessToken();
 
         // Passport OAuth tokens are issued by our consent flow and ALWAYS carry a
-        // team_id. The token's team_id is authoritative — X-Team-Id and currentTeam
+        // team_id. The token's team_id is authoritative; X-Team-Id and currentTeam
         // are ignored. A Passport token without team_id is malformed (created outside
         // the MCP consent flow) and the request is rejected by returning null here.
         // @phpstan-ignore-next-line instanceof.alwaysFalse (User::currentAccessToken() is typed as Sanctum token but Passport replaces it at runtime via the api guard)
@@ -114,7 +114,7 @@ final readonly class SetApiTeamContext
 
         // Sanctum personal access tokens (created from the Access Tokens UI in the
         // user's profile) can optionally pin a team at creation time. If unpinned,
-        // X-Team-Id header or currentTeam applies — unchanged behavior.
+        // X-Team-Id header or currentTeam applies, which is unchanged behavior.
         if ($token instanceof PersonalAccessToken && is_string($token->team_id)) {
             return Team::query()->find($token->team_id);
         }

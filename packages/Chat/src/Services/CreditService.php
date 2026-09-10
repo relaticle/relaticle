@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Actions\Chat\SeedTeamCreditBalance;
+use App\Enums\Plan;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -127,7 +128,7 @@ final readonly class CreditService
     /**
      * Grant prepaid credits from a completed pack checkout. Idempotent on
      * $idempotencyKey (the Stripe checkout session id) via the ledger's
-     * (team_id, idempotency_key) unique index — webhook replays are a no-op.
+     * (team_id, idempotency_key) unique index, so webhook replays are a no-op.
      *
      * @param  array<string, mixed>  $metadata
      */
@@ -177,7 +178,7 @@ final readonly class CreditService
      * Spending drains the monthly allowance first, so the prepaid bucket only
      * shrinks once the allowance is gone. A refund has to reverse that: when
      * every remaining credit was prepaid, the credit came out of the prepaid
-     * bucket and must go back there — otherwise it silently becomes an
+     * bucket and must go back there. Otherwise it silently becomes an
      * allowance credit that the next period reset wipes.
      */
     private function purchasedAfter(AiCreditBalance $balance, int $newRemaining): int
@@ -418,11 +419,22 @@ final readonly class CreditService
         });
     }
 
+    public function allowanceFor(Team $team): int
+    {
+        $team->loadMissing('subscriptions');
+
+        if ($team->plan !== Plan::Enterprise && $team->subscription()?->pastDue() === true) {
+            return Plan::Free->credits();
+        }
+
+        return $team->plan->credits();
+    }
+
     public function resetPeriod(Team $team, ?string $sysadminId = null): void
     {
         DB::transaction(function () use ($team, $sysadminId): void {
             $plan = $team->plan;
-            $allowance = $plan->credits();
+            $allowance = $this->allowanceFor($team);
 
             $previous = AiCreditBalance::query()
                 ->where('team_id', $team->getKey())

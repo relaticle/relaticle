@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\TeamRole;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Notifications\Auth\ResetPassword;
+use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Exception;
+use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Models\Contracts\HasDefaultTenant;
@@ -31,8 +37,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Jetstream\Jetstream;
@@ -48,12 +55,14 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $password
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
- * @property Carbon|null $email_verified_at
- * @property Carbon|null $last_login_at
+ * @property CarbonImmutable|null $email_verified_at
+ * @property CarbonImmutable|null $email_sign_in_enabled_at
+ * @property CarbonImmutable|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
- * @property string|null $subscriber_recency_bucket
+ * @property string|null $subscriber_profile_hash
+ * @property string|null $rejected_subscriber_profile_hash
  * @property string|null $remember_token
- * @property Carbon|null $scheduled_deletion_at
+ * @property CarbonImmutable|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property EmailPrivacyTier|null $default_email_sharing_tier
@@ -79,10 +88,11 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
     'two_factor_recovery_codes',
     'two_factor_secret',
     'mailcoach_subscriber_uuid',
-    'subscriber_recency_bucket',
+    'subscriber_profile_hash',
+    'rejected_subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -93,6 +103,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use HasTeams;
     use HasUlids;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
     /**
@@ -103,7 +114,9 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
+            'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'default_email_sharing_tier' => EmailPrivacyTier::class,
@@ -123,8 +136,24 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->notificationPreferences()->wants($type, $channel);
     }
 
+    public function sendEmailVerificationNotification(): void
+    {
+        $notification = resolve(VerifyEmail::class);
+        $notification->url = Filament::getVerifyEmailUrl($this);
+
+        $this->notify($notification);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $notification = resolve(ResetPassword::class, ['token' => $token]);
+        $notification->url = Filament::getResetPasswordUrl($token, $this);
+
+        $this->notify($notification);
+    }
+
     /**
-     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * The zone this user's calendar is expressed in. `timezone` is nullable: a user
      * who never chose one and whose browser was never detected falls back to the app
      * default, so every caller that turns a stored UTC value into a wall clock reads
      * it from here rather than repeating the fallback.
@@ -147,6 +176,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->password !== null;
     }
 
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
+    }
+
     public function isScheduledForDeletion(): bool
     {
         return $this->scheduled_deletion_at !== null;
@@ -164,7 +198,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Members of a workspace: the `team_user` pivot plus the owner, who has no
-     * pivot row — the same two sources App\Support\TenantFkValidator checks.
+     * pivot row: the same two sources App\Support\TenantFkValidator checks.
      *
      * Deliberately not `current_team_id`: that column is only a user's *active*
      * workspace, so a member who is currently working in another one would drop
@@ -225,7 +259,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
-     * verified — every framework, Filament, and policy check that reads
+     * verified, so every framework, Filament, and policy check that reads
      * hasVerifiedEmail() honors the flag uniformly through this single override.
      */
     public function hasVerifiedEmail(): bool
@@ -292,7 +326,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * The ids of every team the user can reach, owned or joined.
      *
      * Authorization runs once per table row, so resolving a record's `team`
-     * relation inside a policy costs a query per row — and throws once a query
+     * relation inside a policy costs a query per row, and throws once a query
      * hydrates more than one row, because that is when Eloquent arms its strict
      * lazy-loading guard. Matching the record's foreign key against this set
      * keeps authorization off the record's relations entirely.
@@ -346,5 +380,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         }
 
         return Jetstream::findRole($membershipRole)?->key === $role;
+    }
+
+    // Ownership outranks the pivot role, so an owner row carrying a stale
+    // viewer value cannot lock them out of their own workspace.
+    public function isViewerOnTeamId(?string $teamId): bool
+    {
+        if ($teamId === null) {
+            return false;
+        }
+
+        $this->loadMissing('ownedTeams');
+
+        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
+            return false;
+        }
+
+        return $this->hasTeamRoleForTeamId($teamId, TeamRole::Viewer->value);
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
 use App\Models\User;
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +39,7 @@ function makeFailedTurnJob(User $user, string $conversationId): ProcessChatMessa
     );
 }
 
-function seedFailedTurnMessage(string $conversationId, User $user, string $role, string $content, Carbon $createdAt): void
+function seedFailedTurnMessage(string $conversationId, User $user, string $role, string $content, CarbonImmutable $createdAt): void
 {
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),

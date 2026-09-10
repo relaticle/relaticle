@@ -4,35 +4,26 @@ declare(strict_types=1);
 
 namespace App\Listeners\Email;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Team;
 use App\Models\User;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 
 final class TeamMemberAddedListener
 {
+    /**
+     * The owner gains has-team-members; the new member may gain has-crm-data
+     * through the team they just joined. Both profiles are re-synced.
+     */
     public function handle(TeamMemberAdded $event): void
     {
-        if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
-            return;
-        }
-
         /** @var Team $team */
         $team = $event->team;
 
-        /** @var User $owner */
-        $owner = $team->owner;
+        /** @var User $member */
+        $member = $event->user;
 
-        if (! $owner->mailcoach_subscriber_uuid) {
-            return;
-        }
-
-        dispatch(new ModifySubscriberTagsJob(
-            (string) $owner->id,
-            [SubscriberTagEnum::HasTeamMembers->value],
-            TagAction::Add,
-        ))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $team->user_id);
+        SyncSubscriberJob::dispatchFor((string) $member->id);
     }
 }

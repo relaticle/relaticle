@@ -36,7 +36,7 @@ it('keeps migrations forward-only (no down methods)', function (): void {
 
     expect($offenders)->toBe(
         [],
-        'Migrations are forward-only (.ai/guidelines/relaticle/core.md) — remove down() from: '.implode(', ', $offenders),
+        'Migrations are forward-only (.ai/guidelines/relaticle/core.md). Remove down() from: '.implode(', ', $offenders),
     );
 });
 
@@ -56,7 +56,7 @@ it('keeps migrations off the database clock (no useCurrent, CURRENT_TIMESTAMP, o
 
     expect($offenders)->toBe(
         [],
-        'Migrations must not write datetimes from the database clock — it resolves against the session timezone, not UTC (.ai/guidelines/relaticle/core.md). Use a PHP-side now() in: '.implode(', ', $offenders),
+        'Migrations must not write datetimes from the database clock; it resolves against the session timezone, not UTC (.ai/guidelines/relaticle/core.md). Use a PHP-side now() in: '.implode(', ', $offenders),
     );
 });
 
@@ -74,7 +74,7 @@ it('keeps compiled agent guidelines in sync with their .ai sources', function ()
             $relativeSource = str_replace($root.'/', '', $source);
 
             expect(str_contains($compiledContent, trim((string) file_get_contents($source))))->toBeTrue(
-                "{$compiled} is stale — it no longer contains the current content of {$relativeSource}. ".
+                "{$compiled} is stale. It no longer contains the current content of {$relativeSource}. ".
                 'Run `php artisan boost:update`, then copy AGENTS.md to GEMINI.md (boost does not write it).',
             );
         }
@@ -111,6 +111,11 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
             continue;
         }
 
+        // An action replacing a vendor class must keep that class's shape.
+        if (str_starts_with((string) ($reflection->getParentClass() ?: null)?->getName(), 'Laravel\\')) {
+            continue;
+        }
+
         $publicMethods = array_values(array_map(
             fn (ReflectionMethod $method): string => $method->getName(),
             array_filter(
@@ -128,7 +133,7 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
 
     expect($violations)->toBe(
         [],
-        'Actions expose exactly one public method, execute() (.ai/guidelines/relaticle/architecture.md) — fix: '.json_encode($violations),
+        'Actions expose exactly one public method, execute() (.ai/guidelines/relaticle/architecture.md). Fix: '.json_encode($violations),
     );
 });
 
@@ -159,5 +164,113 @@ it('forces a conscious arch-coverage decision when a package is added', function
         ],
         'Package list changed. Wire the new namespace into tests/Arch/ArchTest.php (boundary + structure rules), '.
         'the package table in .ai/guidelines/relaticle/architecture.md, and then update this list.',
+    );
+});
+
+it('keeps the mutable Carbon class out of the codebase', function (): void {
+    $root = dirname(__DIR__, 2);
+    $self = __FILE__;
+
+    $directories = [
+        $root.'/app',
+        $root.'/bootstrap',
+        $root.'/config',
+        $root.'/database',
+        $root.'/packages',
+        $root.'/routes',
+        $root.'/tests',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            if ($file->getPathname() === $self) {
+                continue;
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                $trimmed = mb_ltrim($line);
+
+                $isComment = str_starts_with($trimmed, '*')
+                    || str_starts_with($trimmed, '//')
+                    || str_starts_with($trimmed, '/*');
+
+                $declaresType = preg_match('/@(property|param|return|var)\b/', $trimmed) === 1;
+
+                if ($isComment && ! $declaresType) {
+                    continue;
+                }
+
+                if (preg_match('/\\bCarbon\\b(?!\\\\)/', $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = str_replace($root.'/', '', $file->getPathname()).':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Dates are immutable application-wide (.ai/guidelines/relaticle/core.md). The mutable Carbon '.
+        'class no longer matches what the date factory builds, so a type hint becomes a TypeError and an '.
+        'instanceof check silently turns false. Use CarbonImmutable, or CarbonInterface where a vendor '.
+        'may still hand you a mutable date. '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('keeps published copy and source free of em-dashes', function (): void {
+    $root = dirname(__DIR__, 2);
+    $emDash = "\u{2014}";
+    $dataGlyph = "'".$emDash."'";
+
+    $directories = [
+        $root.'/app',
+        $root.'/bootstrap',
+        $root.'/config',
+        $root.'/database',
+        $root.'/lang',
+        $root.'/packages',
+        $root.'/resources',
+        $root.'/routes',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.(php|md|js|css)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                if (! str_contains(str_replace($dataGlyph, '', $line), $emDash)) {
+                    continue;
+                }
+
+                $offenders[] = str_replace($root.'/', '', $file->getPathname()).':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Em-dashes are banned in copy, docs, and comments (.ai/guidelines/relaticle/writing.md). '.
+        "Rewrite the sentence rather than swapping the character; the standalone {$dataGlyph} data glyph is allowed. ".
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

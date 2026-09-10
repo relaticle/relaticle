@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use Illuminate\Bus\Batchable;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
@@ -21,7 +20,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Queueable, ReleasesOnProviderRateLimit;
 
     public int $tries = 5;
 
@@ -59,7 +58,31 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
+        $accountId = (string) $this->connectedAccount->getKey();
+
+        if ($this->releaseIfProviderCoolingDown($accountId)) {
+            return;
+        }
+
+        try {
+            $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
+        } catch (Throwable $exception) {
+            if ($this->releaseIfProviderRateLimited($accountId, $exception)) {
+                return;
+            }
+
+            throw $exception;
+        }
+
+        // Provider drafts are unsent. Gmail drafts carry DRAFT and not SENT, so
+        // fetchMessage() classifies them as inbound. Skip them here rather than
+        // in a provider service so it covers Gmail and Microsoft, and both the
+        // initial backfill and incremental syncs. Otherwise they store as SYNCED
+        // with the account's sharing default, and teammates can read them
+        // through linked CRM records.
+        if ($fetched->folder === EmailFolder::Drafts) {
+            return;
+        }
 
         // Honour the account's inbox/sent toggles. Gated here rather than in a
         // provider service so it covers Gmail and Microsoft, and both the initial

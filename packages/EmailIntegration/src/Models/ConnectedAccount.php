@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Models;
 use App\Models\Concerns\HasTeam;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Factories\ConnectedAccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,10 +18,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 /**
  * @property string $id
@@ -35,15 +36,22 @@ use Relaticle\EmailIntegration\Enums\EmailProvider;
  * @property bool $sync_sent
  * @property string $access_token
  * @property string|null $refresh_token
- * @property Carbon|null $token_expires_at
+ * @property array{email?: bool, send?: bool, calendar?: bool}|null $capabilities
+ * @property CarbonInterface|null $token_expires_at
  * @property int|null $hourly_send_limit
  * @property int|null $daily_send_limit
  * @property string|null $sync_cursor
- * @property Carbon|null $last_synced_at
+ * @property CarbonInterface|null $last_synced_at
  * @property int $initial_sync_imported
  * @property int|null $initial_sync_estimated
+ * @property int $initial_calendar_sync_imported
  * @property string|null $calendar_sync_cursor
- * @property Carbon|null $last_calendar_synced_at
+ * @property CarbonInterface|null $last_calendar_synced_at
+ * @property string|null $calendar_push_channel_id
+ * @property string|null $calendar_push_resource_id
+ * @property string|null $calendar_push_verification_token
+ * @property CarbonInterface|null $calendar_push_expires_at
+ * @property EmailAccountStatus $status
  */
 final class ConnectedAccount extends Model
 {
@@ -73,32 +81,19 @@ final class ConnectedAccount extends Model
         'last_synced_at',
         'initial_sync_imported',
         'initial_sync_estimated',
+        'initial_calendar_sync_imported',
         'calendar_sync_cursor',
         'last_calendar_synced_at',
+        'calendar_push_channel_id',
+        'calendar_push_resource_id',
+        'calendar_push_verification_token',
+        'calendar_push_expires_at',
         'status',
         'last_error',
         'sync_inbox',
         'sync_sent',
         'daily_send_limit',
         'hourly_send_limit',
-    ];
-
-    protected $casts = [
-        'provider' => EmailProvider::class,
-        'status' => EmailAccountStatus::class,
-        'token_expires_at' => 'datetime',
-        'last_synced_at' => 'datetime',
-        'last_calendar_synced_at' => 'datetime',
-        'initial_sync_imported' => 'integer',
-        'initial_sync_estimated' => 'integer',
-        'is_default' => 'boolean',
-        'sync_inbox' => 'boolean',
-        'sync_sent' => 'boolean',
-        'capabilities' => 'array',
-        'access_token' => 'encrypted',
-        'refresh_token' => 'encrypted',
-        'daily_send_limit' => 'integer',
-        'hourly_send_limit' => 'integer',
     ];
 
     // Scopes
@@ -127,6 +122,19 @@ final class ConnectedAccount extends Model
     protected function active(Builder $query): Builder
     {
         return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
+    /**
+     * Scope to accounts that are still connected. Sync-error and reauth-required
+     * mailboxes count: the user already added them. Disconnected ones do not.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function connected(Builder $query): Builder
+    {
+        return $query->whereNot('status', EmailAccountStatus::DISCONNECTED);
     }
 
     /**
@@ -193,12 +201,31 @@ final class ConnectedAccount extends Model
         return $this->hasMany(EmailSignature::class);
     }
 
+    /**
+     * @return HasMany<EmailBlocklist, $this>
+     */
+    public function blocklist(): HasMany
+    {
+        return $this->hasMany(EmailBlocklist::class);
+    }
+
     // Helpers
 
     /**
-     * Whether the user has at least one connected, authorised account in the given team.
-     * Single source of truth for the "is email set up?" gate that drives compose actions
-     * and the not-connected empty states.
+     * Whether the user has added a mailbox in this team. Sync-error and
+     * reauth-required accounts count. Disconnected accounts do not.
+     */
+    public static function hasConnectedFor(User $user, ?Team $team): bool
+    {
+        if (! $team instanceof Team) {
+            return false;
+        }
+
+        return self::query()->ownedBy($user, $team)->connected()->exists();
+    }
+
+    /**
+     * Whether the user has at least one account that is safe to sync or send through.
      */
     public static function hasActiveFor(User $user, ?Team $team): bool
     {
@@ -207,6 +234,23 @@ final class ConnectedAccount extends Model
         }
 
         return self::query()->ownedBy($user, $team)->active()->exists();
+    }
+
+    /**
+     * Whether the user has at least one active mailbox that can send from Relaticle.
+     * Accounts connected before send was tracked are treated as sendable.
+     */
+    public static function hasSendableFor(User $user, ?Team $team): bool
+    {
+        if (! $team instanceof Team) {
+            return false;
+        }
+
+        return self::query()
+            ->ownedBy($user, $team)
+            ->active()
+            ->get()
+            ->contains(fn (ConnectedAccount $account): bool => $account->isSendable());
     }
 
     public function isTokenExpired(): bool
@@ -235,9 +279,116 @@ final class ConnectedAccount extends Model
         return $this->hasCalendar() && $this->calendar_sync_cursor === null;
     }
 
+    public function isImportingCalendarHistory(): bool
+    {
+        return $this->isActive()
+            && $this->hasCalendar()
+            && $this->calendar_sync_cursor === null;
+    }
+
+    public function isCalendarSyncing(): bool
+    {
+        return MailboxSyncTracker::isCalendarSyncing($this);
+    }
+
+    public function showsCalendarSyncProgress(): bool
+    {
+        return $this->isImportingCalendarHistory()
+            || ($this->hasCalendar() && $this->isCalendarSyncing());
+    }
+
+    public function isEmailSyncing(): bool
+    {
+        return MailboxSyncTracker::isEmailSyncing($this);
+    }
+
+    public function showsSyncProgress(): bool
+    {
+        return $this->isImportingHistory() || $this->isCalendarSyncing() || $this->isEmailSyncing();
+    }
+
+    public function isIncrementalSyncing(): bool
+    {
+        return ! $this->isImportingHistory() && ($this->isCalendarSyncing() || $this->isEmailSyncing());
+    }
+
+    public function incrementalSyncStatusLabel(): ?string
+    {
+        if ($this->isImportingHistory()) {
+            return null;
+        }
+
+        $emailSyncing = $this->isEmailSyncing();
+        $calendarSyncing = $this->isCalendarSyncing();
+
+        if ($emailSyncing && $calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_email_and_calendar');
+        }
+
+        if ($calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_calendar');
+        }
+
+        if ($emailSyncing) {
+            return __('filament/pages/email-accounts.importing_email');
+        }
+
+        return null;
+    }
+
+    /**
+     * Percent of the first mailbox import. Starts at 0 until the provider
+     * gives a size estimate and imported rows start landing.
+     */
+    public function initialSyncProgressPercent(): int
+    {
+        $estimated = $this->initial_sync_estimated;
+
+        if ($estimated === null || $estimated <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(($this->initial_sync_imported / $estimated) * 100));
+    }
+
+    public function syncEmailsProcessedCount(): int
+    {
+        if ($this->isEmailSyncing()) {
+            return MailboxSyncTracker::emailProcessedCount($this);
+        }
+
+        if ($this->isImportingHistory() && $this->hasEmail() && $this->sync_cursor === null) {
+            return $this->initial_sync_imported;
+        }
+
+        return $this->initial_sync_imported;
+    }
+
+    public function syncMeetingsProcessedCount(): int
+    {
+        if ($this->isCalendarSyncing()) {
+            return MailboxSyncTracker::calendarProcessedCount($this);
+        }
+
+        if ($this->isImportingCalendarHistory()) {
+            return $this->initial_calendar_sync_imported;
+        }
+
+        return $this->initial_calendar_sync_imported;
+    }
+
+    public function syncDisplayPercent(): int
+    {
+        if ($this->isImportingHistory()) {
+            return $this->initialSyncProgressPercent();
+        }
+
+        return MailboxSyncTracker::runProgressPercent($this);
+    }
+
     /**
      * Whether emails of the given direction should be synced, per the user's
-     * inbox/sent toggles. The single source of truth for direction gating —
+     * inbox/sent toggles. The single source of truth for direction gating,
      * consulted on the store path so it covers both providers and both the
      * initial backfill and incremental syncs.
      */
@@ -271,6 +422,43 @@ final class ConnectedAccount extends Model
         return (bool) ($this->capabilities['email'] ?? true);
     }
 
+    /**
+     * Whether this token can send mail. Missing `send` means the account was
+     * connected before Relaticle recorded the grant, so treat it as allowed.
+     */
+    public function hasSend(): bool
+    {
+        return (bool) ($this->capabilities['send'] ?? true);
+    }
+
+    /**
+     * Whether this mailbox is safe to send through Relaticle. Requires a working
+     * token and a send grant. Sync-error and reauth-required accounts are not.
+     */
+    public function isSendable(): bool
+    {
+        return $this->isActive() && $this->hasSend();
+    }
+
+    public function capabilitiesLabel(): string
+    {
+        $labels = [];
+
+        if ($this->hasEmail()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.email');
+        }
+
+        if ($this->hasCalendar()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
+        }
+
+        if ($labels === []) {
+            return $this->provider->getLabel();
+        }
+
+        return implode(', ', $labels);
+    }
+
     public function enableCalendar(): void
     {
         $capabilities = $this->capabilities ?? [];
@@ -291,5 +479,32 @@ final class ConnectedAccount extends Model
     public function meetings(): HasMany
     {
         return $this->hasMany(Meeting::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'provider' => EmailProvider::class,
+            'status' => EmailAccountStatus::class,
+            'token_expires_at' => 'datetime',
+            'last_synced_at' => 'datetime',
+            'last_calendar_synced_at' => 'datetime',
+            'calendar_push_expires_at' => 'datetime',
+            'initial_sync_imported' => 'integer',
+            'initial_sync_estimated' => 'integer',
+            'initial_calendar_sync_imported' => 'integer',
+            'is_default' => 'boolean',
+            'sync_inbox' => 'boolean',
+            'sync_sent' => 'boolean',
+            'capabilities' => 'array',
+            'access_token' => 'encrypted',
+            'refresh_token' => 'encrypted',
+            'calendar_push_verification_token' => 'encrypted',
+            'daily_send_limit' => 'integer',
+            'hourly_send_limit' => 'integer',
+        ];
     }
 }

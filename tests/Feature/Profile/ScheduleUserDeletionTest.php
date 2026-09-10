@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelUserDeletion;
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Features\AccountDeletion;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\UserDeletionCancelledNotification;
 use App\Notifications\UserDeletionScheduledNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 
 mutates(ScheduleUserDeletion::class, CancelUserDeletion::class);
+
+beforeEach(function (): void {
+    Feature::define(AccountDeletion::class, true);
+});
 
 test('user can schedule account deletion', function () {
     Notification::fake();
@@ -64,8 +70,27 @@ test('user cannot schedule deletion when owning team with other members', functi
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
+test('the deletion blocker names an action the app supports', function (): void {
+    Notification::fake();
+
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $team->users()->attach(User::factory()->create(), ['role' => 'editor']);
+
+    try {
+        resolve(ScheduleUserDeletion::class)->schedule($owner);
+        $this->fail('Expected a validation exception.');
+    } catch (ValidationException $exception) {
+        $message = $exception->validator->errors()->first('team');
+
+        expect($message)->not->toContain('Transfer ownership')
+            ->and($message)->toContain($team->name);
+    }
+});
+
 test('user can cancel scheduled deletion', function () {
     Notification::fake();
+    Feature::define(AccountDeletion::class, false);
 
     $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
     $personalTeam = $user->personalTeam();

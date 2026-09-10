@@ -21,7 +21,7 @@ final class ConnectedAccountSyncFactory extends Factory
             'connected_account_id' => ConnectedAccount::factory(),
             'started_at' => now()->subMinutes(5),
             'completed_at' => now(),
-            'emails_synced' => $this->faker->numberBetween(0, 50),
+            'emails_synced' => fake()->numberBetween(0, 50),
             'errors_encountered' => 0,
             'status' => 'completed',
         ];

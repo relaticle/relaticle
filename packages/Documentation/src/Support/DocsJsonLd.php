@@ -12,7 +12,7 @@ use Spatie\SchemaOrg\Schema;
 
 /**
  * `/help` bypasses `<x-documentation::layout>` (see HelpController), which is
- * the only place `/docs` gets its BreadcrumbList from — so without this,
+ * the only place `/docs` gets its BreadcrumbList from, so without this,
  * `/help` pages carry zero structured data. Views call this directly, inline,
  * the same way the marketing pages build their own Graph
  * (resources/views/home/index.blade.php).
@@ -39,11 +39,18 @@ final readonly class DocsJsonLd
 
     private function articleNode(DocPage $page, string $url): Article
     {
+        $publisher = Schema::organization()
+            ->name((string) config('app.name'))
+            ->url(url('/'))
+            ->logo(asset('web-app-manifest-512x512.png'));
+
         $article = Schema::article()
             ->headline($page->title)
             ->description($page->description)
             ->mainEntityOfPage($url)
-            ->url($url);
+            ->url($url)
+            ->author($publisher)
+            ->publisher($publisher);
 
         return $page->updated instanceof CarbonImmutable
             ? $article->dateModified($page->updated)

@@ -21,7 +21,7 @@ final readonly class EmailObserver
         $owner = User::query()->find($email->user_id);
 
         if ($owner && ! $email->isDirty('privacy_tier')) {
-            $email->privacy_tier = $this->privacyService->defaultTierForUser($owner);
+            $email->privacy_tier = $this->privacyService->defaultTierForUser($owner, $email->team);
         }
     }
 

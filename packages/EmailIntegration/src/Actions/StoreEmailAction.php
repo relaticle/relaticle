@@ -16,6 +16,8 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
 final readonly class StoreEmailAction
@@ -31,7 +33,7 @@ final readonly class StoreEmailAction
         $storedInlinePaths = [];
 
         try {
-            return DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
+            $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
                 $email = Email::query()->create([
                     'team_id' => $connectedAccount->team_id,
                     'user_id' => $connectedAccount->user_id,
@@ -75,7 +77,7 @@ final readonly class StoreEmailAction
                 foreach ($data->attachments as $attachment) {
                     EmailAttachment::query()->create([
                         'email_id' => $email->getKey(),
-                        'filename' => $attachment['filename'],
+                        'filename' => $this->persistableAttachmentFilename($attachment),
                         'mime_type' => $attachment['mime_type'],
                         'size' => $attachment['size'],
                         'content_id' => $attachment['content_id'],
@@ -86,7 +88,7 @@ final readonly class StoreEmailAction
                 }
 
                 // "Internal" means every participant is a member of this workspace.
-                // Membership lives in the team_user pivot (plus the owner) — NOT in
+                // Membership lives in the team_user pivot (plus the owner), NOT in
                 // users.current_team_id, which only reflects a user's *active* team and
                 // would misclassify members whose active team is elsewhere.
                 $team = Team::query()->find($connectedAccount->team_id);
@@ -105,7 +107,7 @@ final readonly class StoreEmailAction
 
                 $email->updateQuietly(['is_internal' => $isInternal]);
 
-                // Deterministic, rule-based categorisation — cheap string heuristics,
+                // Deterministic, rule-based categorisation using cheap string heuristics,
                 // no LLM call. Runs inline now that participants/attachments/internal
                 // state are all known.
                 EmailLabel::query()->create([
@@ -121,6 +123,10 @@ final readonly class StoreEmailAction
 
                 return $email;
             });
+
+            $this->bumpInitialImportProgress($connectedAccount);
+
+            return $email;
         } catch (Throwable $exception) {
             Storage::disk(EmailAttachment::DISK)->delete($storedInlinePaths);
 
@@ -129,15 +135,42 @@ final readonly class StoreEmailAction
     }
 
     /**
+     * Providers often omit a filename on CID inline images. The column is not
+     * nullable, so invent a stable name from the part's mime type.
+     *
+     * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     */
+    private function persistableAttachmentFilename(array $attachment): string
+    {
+        if (filled($attachment['filename'])) {
+            return (string) $attachment['filename'];
+        }
+
+        $stem = ($attachment['is_inline'] ?? false) ? 'inline' : 'attachment';
+
+        return "{$stem}.{$this->extensionFromMimeType($attachment['mime_type'])}";
+    }
+
+    private function extensionFromMimeType(?string $mimeType): string
+    {
+        if (blank($mimeType)) {
+            return 'bin';
+        }
+
+        $extensions = MimeTypes::getDefault()->getExtensions($mimeType);
+
+        return $extensions[0] ?? 'bin';
+    }
+
+    /**
+     * Persist Gmail-inlined bytes. Small parts (<25 KB) arrive as body data with
+     * no attachment ID, including ordinary files, so downloads 404 unless we store them.
+     *
      * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
      * @param  list<string>  $storedInlinePaths
      */
     private function storeInlineData(Email $email, array $attachment, array &$storedInlinePaths): ?string
     {
-        if (($attachment['is_inline'] ?? false) === false) {
-            return null;
-        }
-
         if (blank($attachment['inline_data'])) {
             return null;
         }
@@ -154,5 +187,19 @@ final readonly class StoreEmailAction
         $storedInlinePaths[] = $path;
 
         return $path;
+    }
+
+    private function bumpInitialImportProgress(ConnectedAccount $connectedAccount): void
+    {
+        if ($connectedAccount->sync_cursor === null) {
+            ConnectedAccount::query()
+                ->whereKey($connectedAccount->getKey())
+                ->whereNull('sync_cursor')
+                ->increment('initial_sync_imported');
+        }
+
+        if (MailboxSyncTracker::isEmailSyncing($connectedAccount)) {
+            MailboxSyncTracker::bumpEmailProcessed($connectedAccount);
+        }
     }
 }

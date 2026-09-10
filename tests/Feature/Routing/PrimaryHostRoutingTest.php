@@ -56,10 +56,10 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('leaves signed routes untouched so host-bound signatures fail loudly instead of silently breaking', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withPersonalTeam()->unverified()->create();
 
         $this->actingAs($user)
-            ->get('http://app.relaticle.test/team-invitations/01hxxxxxxxxxxxxxxxxxxxxxxx?signature=invalid')
+            ->get('http://app.relaticle.test/email/verify/'.$user->getKey().'/invalid-hash?signature=invalid')
             ->assertForbidden();
     });
 
@@ -71,14 +71,17 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('keeps the socialite redirect on the requesting host so the oauth redirect_uri does not change', function (): void {
-        config(['services.github.client_id' => 'test-client-id']);
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => '/auth/callback/google',
+        ]);
 
-        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/github')
+        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/google')
             ->assertStatus(302)
             ->headers->get('Location');
 
-        expect($location)->toStartWith('https://github.com/login/oauth/authorize');
-        expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/github');
+        expect($location)->toStartWith('https://accounts.google.com/o/oauth2/auth');
+        expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/google');
     });
 
     it('leaves filament export downloads untouched', function (): void {

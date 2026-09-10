@@ -6,17 +6,8 @@
         data-inline-composer
     @endif
     {{-- Inline: the draft is appended to the reading pane's scroll region, so it is
-         simply as tall as its message — the region does the scrolling. --}}
+         simply as tall as its message; the region does the scrolling. --}}
     @class(['shrink-0' => $dock === 'inline'])
-    x-data="{
-        insertVariable(id) {
-            const editor = this.$root.querySelector('.email-composer-body [x-data^=\'richEditorFormComponent\']')
-
-            if (editor) {
-                Alpine.$data(editor).insertMergeTag(id)
-            }
-        },
-    }"
     @if ($dock === 'floating')
         x-on:keydown.window="(() => {
             if ($event.key === 'c'
@@ -29,7 +20,7 @@
 >
     @php
         // Composing and editing a saved draft both open fitted to the screen, so a
-        // draft looks the same wherever it came from — and the same as the reader it
+        // draft looks the same wherever it came from, and the same as the reader it
         // sits alongside. Shrinking drops back to the corner window.
         $isModal = $dock === 'floating' && $isExpanded && ! $isMinimized;
         $isFloating = $dock === 'floating';
@@ -60,7 +51,7 @@
             ])
         >
             {{-- Title bar. The inline dock sits inside the message it answers, so it
-                 needs no window chrome — just the Draft bar, whose × discards. --}}
+                 needs no window chrome, just the Draft bar, whose × discards. --}}
             @if ($dock === 'inline')
                 <x-emails.composer-draft-bar class="sticky top-0 z-10 h-10 border-t-2 border-dashed border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6" />
             @else
@@ -120,8 +111,13 @@
             @endif
 
             @unless ($isMinimized)
+                @if (! $this->canSendFromSelectedAccount())
+                    <x-emails.composer-send-missing :email="$this->fromAccount?->email_address">
+                        {{ $this->grantSendPermissionAction }}
+                    </x-emails.composer-send-missing>
+                @else
                 {{-- The message being answered or forwarded, above the draft and split
-                     off by the same dashed rule the inline dock uses — so a reply looks
+                     off by the same dashed rule the inline dock uses, so a reply looks
                      the same whether it is being written under the original or reopened
                      later from Drafts. The dock never shows this: there, the real
                      message is already on screen right above it. --}}
@@ -158,7 +154,7 @@
 
                     <x-emails.composer-field :label="__('filament/emails/composer.fields.to')">
                         <div class="min-w-0 flex-1">
-                            <x-emails.recipient-chips wire:model="to" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" />
+                            <x-emails.recipient-chips wire:model="to" :autofocus="true" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" />
                         </div>
                         <span class="shrink-0 space-x-2 text-xs font-medium text-gray-400">
                             <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
@@ -240,17 +236,6 @@
                             create-click="mountAction('createTemplate')"
                         />
 
-                        {{-- Inserts a merge tag into the RichEditor via its own Alpine
-                             component (`insertMergeTag`), which is what the editor's
-                             native `{{` autocomplete calls too. --}}
-                        <x-emails.composer-picker-menu
-                            icon="heroicon-o-variable"
-                            handler="alpine"
-                            :label="__('filament/emails/composer.actions.variable')"
-                            :options="\Relaticle\EmailIntegration\Services\EmailTemplateRenderService::MERGE_TAGS"
-                            :click="fn (?string $id): string => 'insertVariable(\''.$id.'\')'"
-                        />
-
                         <span wire:loading wire:target="attachments" class="pl-1 text-xs text-gray-400">{{ __('filament/emails/composer.actions.uploading') }}</span>
                     </div>
 
@@ -263,6 +248,7 @@
                         {{ __('filament/emails/composer.actions.send') }}
                     </x-filament::button>
                 </div>
+                @endif
             @endunless
         </div>
     @endif

@@ -21,7 +21,7 @@ use stdClass;
  *
  * This lives in the chat layer on purpose. The payloads come from `App\Http\Resources\V1`,
  * which the public REST API and the MCP server also serve, and ISO-8601 UTC is the right
- * contract for those — converting inside the resource would be a breaking API change.
+ * contract for those, and converting inside the resource would be a breaking API change.
  */
 trait LocalisesDatetimes
 {
@@ -32,7 +32,7 @@ trait LocalisesDatetimes
      * Three shapes have to be handled. The list tools round-trip through json_encode
      * first, so their datetimes arrive as ISO-8601 strings. The show tool passes the
      * resolved resource straight through, where they are still Carbon instances nested
-     * inside the stdClass that JsonApiResource wraps `attributes` in — so the walk has
+     * inside the stdClass that JsonApiResource wraps `attributes` in, so the walk has
      * to descend into objects as well as arrays.
      *
      * @param  array<array-key, mixed>  $payload

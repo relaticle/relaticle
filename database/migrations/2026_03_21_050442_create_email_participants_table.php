@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('name')->nullable();
             $table->string('role', 10);                      // from | to | cc | bcc
 
-            // Resolved FKs — nullable, filled by auto-linking logic
+            // Resolved FKs: nullable, filled by auto-linking logic
             // Named contact_id per codebase convention (see opportunities.contact_id → people.id)
             $table->foreignUlid('contact_id')
                 ->nullable()

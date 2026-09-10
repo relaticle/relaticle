@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\SystemAdministratorFactory;
 use Exception;
 use Filament\Models\Contracts\FilamentUser;
@@ -17,7 +18,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 
@@ -28,10 +28,10 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
  * @property string|null $timezone
  * @property string $password
  * @property SystemAdministratorRole $role
- * @property Carbon|null $email_verified_at
+ * @property CarbonImmutable|null $email_verified_at
  * @property string|null $remember_token
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonImmutable|null $created_at
+ * @property CarbonImmutable|null $updated_at
  */
 #[Fillable([
     'name',

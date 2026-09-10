@@ -59,6 +59,10 @@
 
         </form>
 
+        @if (\Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class))
+            @livewire('email-integration.meetings-home-widget')
+        @endif
+
         @include('chat::filament.pages.partials.my-tasks')
     </div>
 
@@ -77,7 +81,7 @@
                     : 'auto';
             },
 
-            // Scoped lookup of the dashboard's TipTap editor — avoids the
+            // Scoped lookup of the dashboard's TipTap editor, avoiding the
             // window.__dashboardEditor global which collides if any sibling
             // chat-interface instance also writes its own global. We use
             // document.querySelector keyed by data-chat-context to dodge the

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Company;
 use App\Models\People;
@@ -41,7 +42,8 @@ it('registers the meetings relation manager on the person view page', function (
         ->instance()
         ->getRelationManagers();
 
-    expect($managers)->toContain(MeetingsRelationManager::class);
+    expect($managers)->not->toContain(EmailsRelationManager::class)
+        ->and($managers)->toContain(MeetingsRelationManager::class);
 });
 
 // Column metadata is checked against a single mounted table rather than one

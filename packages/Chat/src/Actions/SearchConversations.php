@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
+use App\Support\LikePattern;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ final readonly class SearchConversations
             return collect();
         }
 
-        $needle = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $query).'%';
+        $needle = '%'.LikePattern::escape($query).'%';
 
         return DB::table('agent_conversations as ac')
             ->select(['ac.id', 'ac.title', 'ac.created_at', 'ac.updated_at'])

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final readonly class UpdateUserProfileInformation implements UpdatesUserProfileInformation
 {
@@ -22,6 +24,8 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             'profile_photo_path' => ['nullable', 'string', 'max:255'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
         ])->validateWithBag('updateProfileInformation');
+
+        $this->assertEmailChangeIsVerified($user, (string) $input['email']);
 
         $newPhotoPath = $input['profile_photo_path'] ?? null;
 
@@ -41,6 +45,25 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
     }
 
     /**
+     * A panel that verifies email changes owns the only legitimate path to a new
+     * address: prove the mailbox, then swap. Writing the address straight through
+     * here would hand any authenticated request an account takeover, since the
+     * swap also clears email_verified_at and redirects the verification mail.
+     */
+    private function assertEmailChangeIsVerified(User $user, string $email): void
+    {
+        if ($email === $user->email) {
+            return;
+        }
+
+        if (! Filament::getPanel('app')->hasEmailChangeVerification()) {
+            return;
+        }
+
+        throw new HttpException(423, __('auth.confirm.required'));
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      */
     private function updateVerifiedUser(User $user, array $input): void
@@ -56,7 +79,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
     }
 
     /**
-     * Clearing the select writes null — that is a deliberate "use the app default".
+     * Clearing the select writes null, a deliberate "use the app default".
      * An absent key means the caller is not managing the timezone at all, so the
      * stored value is left alone.
      *

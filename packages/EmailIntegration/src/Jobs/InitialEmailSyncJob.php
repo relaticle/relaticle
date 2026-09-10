@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
@@ -25,7 +20,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Queueable;
 
     public int $timeout = 300;
 
@@ -57,7 +52,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             $account->update(['initial_sync_estimated' => $page->estimatedTotal]);
         }
 
-        $allIds = $page->messageIds->all();
+        $allIds = array_values($page->messageIds->all());
 
         $storedIds = Email::query()
             ->where('connected_account_id', $account->getKey())
@@ -68,34 +63,25 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $newIds = array_values(array_diff($allIds, $storedIds));
 
         if ($newIds === []) {
-            $this->continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
+            self::continueOrFinish($account, $historyCursor, $page->nextPageToken, $page->cursor);
 
             return;
         }
 
-        $accountId = (int) $account->getKey();
         $nextPageToken = $page->nextPageToken;
         $pageCursor = $page->cursor;
 
-        $jobs = collect($newIds)
-            ->chunk(Config::integer('email-integration.sync.batch_size', 50))
-            ->flatMap(fn (Collection $chunk): array => $chunk->map(fn (string $id): StoreEmailJob => new StoreEmailJob($account, $id))->all())
-            ->all();
-
-        Bus::batch($jobs)
-            ->name("Initial sync: {$account->email_address}")
-            ->onQueue('emails-sync')
-            ->allowFailures()
-            ->then(function () use ($accountId, $historyCursor, $nextPageToken, $pageCursor): void {
-                $account = ConnectedAccount::query()->whereKey($accountId)->first();
-
-                if (! $account instanceof ConnectedAccount) {
-                    return;
-                }
-
-                $this->continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
-            })
-            ->dispatch();
+        InitialSyncPageStoreBatch::dispatchEmails(
+            account: $account,
+            pageMessageIds: $allIds,
+            messageIdsToStore: $newIds,
+            historyCursor: $historyCursor,
+            nextPageToken: $nextPageToken,
+            pageCursor: $pageCursor,
+            onPageStored: static function (ConnectedAccount $account) use ($historyCursor, $nextPageToken, $pageCursor): void {
+                self::continueOrFinish($account, $historyCursor, $nextPageToken, $pageCursor);
+            },
+        );
     }
 
     public function failed(Throwable $exception): void
@@ -122,7 +108,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         return (int) $days;
     }
 
-    private function continueOrFinish(
+    private static function continueOrFinish(
         ConnectedAccount $account,
         ?string $historyCursor,
         ?string $nextPageToken,

@@ -19,7 +19,7 @@ final class PublicEmailDomainFactory extends Factory
     {
         return [
             'team_id' => Team::factory(),
-            'domain' => $this->faker->unique()->domainName(),
+            'domain' => fake()->unique()->domainName(),
         ];
     }
 }

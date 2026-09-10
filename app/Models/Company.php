@@ -11,8 +11,9 @@ use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
 use App\Observers\CompanyObserver;
-use App\Services\AvatarService;
+use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
+use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -22,7 +23,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -35,11 +35,11 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property string $name
- * @property Carbon|null $deleted_at
+ * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
- * @property Carbon|null $last_email_at
- * @property Carbon|null $last_interaction_at
- * @property Carbon|null $last_meeting_at
+ * @property CarbonImmutable|null $last_email_at
+ * @property CarbonImmutable|null $last_interaction_at
+ * @property CarbonImmutable|null $last_meeting_at
  * @property int $email_count
  * @property int $inbound_email_count
  * @property int $outbound_email_count
@@ -51,7 +51,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
     'name',
     'creation_source',
 ])]
-final class Company extends Model implements HasCustomFields, HasMedia, HasTimeline
+final class Company extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasActivityTimeline;
@@ -94,11 +94,22 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
         ];
     }
 
-    protected function getLogoAttribute(): string
+    /**
+     * Null when no logo has been uploaded. A company with no mark falls back to
+     * the shared entity icon (App\Enums\CrmEntity), not a generated initials
+     * tile: 57% of companies carry a real logo, so colour in a company column
+     * should only ever mean "this is the brand's own mark".
+     */
+    protected function getLogoAttribute(): ?string
     {
         $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
 
-        return $logo === '' || $logo === '0' ? resolve(AvatarService::class)->generateAuto(name: $this->name) : $logo;
+        return $logo === '' || $logo === '0' ? null : $logo;
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        return $this->logo;
     }
 
     /**

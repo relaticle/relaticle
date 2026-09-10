@@ -206,6 +206,136 @@ it('labels inbound mailbox mail as received and outbound mail as sent', function
         ->and($emailEvents->has($unsentOutbound->getKey()))->toBeFalse();
 });
 
+it('hides metadata-only subjects from teammates on the activity timeline', function (): void {
+    $teammate = User::factory()->create();
+    $teammate->teams()->attach($this->team);
+    $teammate->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    $person = People::factory()->create([
+        'name' => 'Jordan Hale',
+        'team_id' => $this->team->getKey(),
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $email = Email::factory()->inbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Confidential acquisition terms',
+        'sent_at' => now()->subHour(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($teammate);
+    Filament::setTenant($this->team);
+
+    $title = $person->timeline()
+        ->get()
+        ->firstWhere('event', 'email_received')
+        ?->title;
+
+    expect($title)->toBe('(subject hidden)');
+
+    livewire(ActivityLogLivewire::class, [
+        'subjectClass' => $person::class,
+        'subjectKey' => $person->getKey(),
+        'perPage' => 20,
+    ])
+        ->assertDontSee('Confidential acquisition terms')
+        ->assertSee('(subject hidden)');
+});
+
+it('shows metadata-only subjects to the owner on the activity timeline', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    $person = People::factory()->create([
+        'name' => 'Jordan Hale',
+        'team_id' => $this->team->getKey(),
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $email = Email::factory()->inbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Confidential acquisition terms',
+        'sent_at' => now()->subHour(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $title = $person->timeline()
+        ->get()
+        ->firstWhere('event', 'email_received')
+        ?->title;
+
+    expect($title)->toBe('Confidential acquisition terms');
+
+    livewire(ActivityLogLivewire::class, [
+        'subjectClass' => $person::class,
+        'subjectKey' => $person->getKey(),
+        'perPage' => 20,
+    ])->assertSee('Confidential acquisition terms');
+});
+
+it('shows the email subject on the activity timeline when a teammate can view it', function (EmailPrivacyTier $tier): void {
+    $teammate = User::factory()->create();
+    $teammate->teams()->attach($this->team);
+    $teammate->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    $person = People::factory()->create([
+        'name' => 'Jordan Hale',
+        'team_id' => $this->team->getKey(),
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $email = Email::factory()->inbound()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Q3 pricing proposal',
+        'sent_at' => now()->subHour(),
+        'privacy_tier' => $tier,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($teammate);
+    Filament::setTenant($this->team);
+
+    $title = $person->timeline()
+        ->get()
+        ->firstWhere('event', 'email_received')
+        ?->title;
+
+    expect($title)->toBe('Q3 pricing proposal');
+
+    livewire(ActivityLogLivewire::class, [
+        'subjectClass' => $person::class,
+        'subjectKey' => $person->getKey(),
+        'perPage' => 20,
+    ])->assertSee('Q3 pricing proposal');
+})->with([
+    'subject tier' => EmailPrivacyTier::SUBJECT,
+    'full tier' => EmailPrivacyTier::FULL,
+]);
+
 describe('ActivityLogSummary::from()', function (): void {
     it('builds a one-field sentence', function (): void {
         $summary = ActivityLogSummary::from(sampleUpdatedEntry(['name' => 'New']));

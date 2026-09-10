@@ -9,13 +9,19 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class DisconnectConnectedAccountAction
 {
+    public function __construct(
+        private StopCalendarPushChannelAction $stopCalendarPushChannel,
+    ) {}
+
     public function execute(ConnectedAccount $account): void
     {
         DB::transaction(function () use ($account): void {
+            $this->stopCalendarPushChannel->execute($account);
             // Account is soft-deleted, so the DB-level cascade on email_signatures never
-            // fires. Remove dependent signatures explicitly to avoid orphaned rows whose
-            // connectedAccount relation resolves to null on the signatures page.
+            // fires. Remove dependent signatures and blocklist entries explicitly to avoid
+            // orphaned rows whose connectedAccount relation resolves to null.
             $account->signatures()->delete();
+            $account->blocklist()->delete();
 
             $wasDefault = $account->is_default;
 

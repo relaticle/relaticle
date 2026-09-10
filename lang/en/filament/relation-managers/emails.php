@@ -21,6 +21,7 @@ return [
         ],
         'request_access' => [
             'label' => 'Request Access',
+            'modal_heading' => 'Request access',
         ],
     ],
     'fields' => [
@@ -50,8 +51,8 @@ return [
         'from_address' => [
             'label' => 'From',
         ],
-        'ai_label' => [
-            'label' => 'Label',
+        'category' => [
+            'label' => 'Category',
         ],
         'direction' => [
             'label' => 'Direction',
@@ -81,7 +82,8 @@ return [
         ],
     ],
     'empty_state' => [
-        'heading' => 'No emails yet',
-        'description' => 'Emails exchanged with this record appear here.',
+        'heading' => 'No emails',
+        'description' => 'This record doesn\'t have any emails, or they may be hidden due to permissions.',
+        'compose' => 'Compose email',
     ],
 ];

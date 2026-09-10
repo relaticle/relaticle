@@ -1,6 +1,6 @@
 ---
 title: MCP Server
-description: Connect AI assistants like Claude to your CRM.
+description: Read the reference for Relaticle's 37 MCP tools, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
 updated: "2026-08-28"
 ---

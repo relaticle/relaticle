@@ -30,11 +30,9 @@ trait WithImportStore
 
     protected function import(): Import
     {
-        if ($this->import === null) {
-            $this->import = Import::query()
-                ->forTeam($this->getCurrentTeamId() ?? '')
-                ->findOrFail($this->storeId);
-        }
+        $this->import ??= Import::query()
+            ->forTeam($this->getCurrentTeamId() ?? '')
+            ->findOrFail($this->storeId);
 
         return $this->import;
     }

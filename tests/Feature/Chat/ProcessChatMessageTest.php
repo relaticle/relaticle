@@ -12,6 +12,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Support\TurnPresence;
 
 function seedConversation(User $user, string $conversationId): void
 {
@@ -118,7 +119,11 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
         turnId: 'turn-paused',
     );
 
+    TurnPresence::begin('conv-paused', turnId: 'turn-paused', message: 'hello');
+
     $job->handle($credits);
+
+    expect(TurnPresence::current('conv-paused'))->toBeNull();
 
     Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-paused'
         && $event->message === __('billing.access.paused_chat'));

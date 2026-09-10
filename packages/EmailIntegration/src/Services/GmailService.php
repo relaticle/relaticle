@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Google\Service\Exception as GoogleServiceException;
 use Google\Service\Gmail;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
@@ -15,6 +16,7 @@ use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
@@ -25,15 +27,19 @@ final readonly class GmailService implements MailServiceInterface
     /**
      * Fetch messages newer than the given cursor (incremental sync).
      * Returns new message IDs and IDs of messages where UNREAD was removed (marked as read).
+     *
+     * @throws MailHistoryExpired when Gmail invalidates startHistoryId (HTTP 404)
      */
     public function fetchDelta(string $cursor): MailDeltaResult
     {
         /** @var array<int, string> $messageIds */
         $messageIds = [];
-        /** @var array<int, string> $readMessageIds */
-        $readMessageIds = [];
-        /** @var array<int, string> $unreadMessageIds */
-        $unreadMessageIds = [];
+        // id => isRead, last-write-wins. UNREAD can be added and removed on the
+        // same message across history records in one sync; keying by id keeps
+        // the LATEST state so a message never lands in both lists (which the
+        // sync job would then apply unread-last, overriding the final state).
+        /** @var array<string, bool> $readState */
+        $readState = [];
 
         $newCursor = $cursor;
         $pageToken = null;
@@ -44,14 +50,22 @@ final readonly class GmailService implements MailServiceInterface
         do {
             $params = [
                 'startHistoryId' => $cursor,
-                'historyTypes' => ['messageAdded', 'labelsRemoved', 'labelsAdded'],
+                'historyTypes' => ['messageAdded', 'labelRemoved', 'labelAdded'],
             ];
 
             if ($pageToken !== null) {
                 $params['pageToken'] = $pageToken;
             }
 
-            $history = $this->gmail->users_history->listUsersHistory('me', $params);
+            try {
+                $history = $this->gmail->users_history->listUsersHistory('me', $params);
+            } catch (GoogleServiceException $exception) {
+                if ($exception->getCode() === 404) {
+                    throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+                }
+
+                throw $exception;
+            }
 
             foreach ($history->getHistory() ?? [] as $item) {
                 foreach ($item->getMessagesAdded() ?? [] as $added) {
@@ -64,20 +78,14 @@ final readonly class GmailService implements MailServiceInterface
                 // Track messages where the UNREAD label was removed (user read the email)
                 foreach ($item->getLabelsRemoved() ?? [] as $change) {
                     if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                        $id = $change->getMessage()->getId();
-                        if (! in_array($id, $readMessageIds, strict: true)) {
-                            $readMessageIds[] = $id;
-                        }
+                        $readState[$change->getMessage()->getId()] = true;
                     }
                 }
 
                 // Track messages where the UNREAD label was re-added (marked unread again)
                 foreach ($item->getLabelsAdded() ?? [] as $change) {
                     if (in_array('UNREAD', $change->getLabelIds() ?? [], strict: true)) {
-                        $id = $change->getMessage()->getId();
-                        if (! in_array($id, $unreadMessageIds, strict: true)) {
-                            $unreadMessageIds[] = $id;
-                        }
+                        $readState[$change->getMessage()->getId()] = false;
                     }
                 }
             }
@@ -88,6 +96,19 @@ final readonly class GmailService implements MailServiceInterface
 
             $pageToken = $history->getNextPageToken();
         } while ($pageToken !== null && $pageToken !== '');
+
+        /** @var array<int, string> $readMessageIds */
+        $readMessageIds = [];
+        /** @var array<int, string> $unreadMessageIds */
+        $unreadMessageIds = [];
+
+        foreach ($readState as $id => $isRead) {
+            if ($isRead) {
+                $readMessageIds[] = (string) $id;
+            } else {
+                $unreadMessageIds[] = (string) $id;
+            }
+        }
 
         return new MailDeltaResult(
             messageIds: collect($messageIds),
@@ -148,10 +169,14 @@ final readonly class GmailService implements MailServiceInterface
 
         $params = [
             'maxResults' => 500,
+            // Gmail's messages.list includes drafts unless we exclude them.
+            // Drafts have no SENT label, so the store job would treat them as
+            // inbound and share unsent mail with the workspace.
+            'q' => '-in:drafts',
         ];
 
         if ($daysBack !== null && $daysBack > 0) {
-            $params['q'] = 'after:'.now()->subDays($daysBack)->timestamp;
+            $params['q'] .= ' after:'.now()->subDays($daysBack)->timestamp;
         }
 
         if ($pageToken !== null && $pageToken !== '') {
@@ -173,7 +198,8 @@ final readonly class GmailService implements MailServiceInterface
 
     /**
      * Send a new email or reply to an existing thread.
-     * Pass `in_reply_to` and `thread_id` in $data to send as a reply.
+     * Pass `in_reply_to` to send as a reply. Pass `thread_id` only when it
+     * belongs to this mailbox; Gmail rejects a thread id from another account.
      *
      * @param array{
      *     subject: string,
@@ -186,20 +212,21 @@ final readonly class GmailService implements MailServiceInterface
      *     in_reply_to?: string,
      *     thread_id?: string,
      *     rfc_message_id?: string,
+     *     attachments?: array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>,
      * } $data
      * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
      */
     public function sendMessage(array $data): array
     {
-        $isReply = isset($data['in_reply_to']);
         $raw = $this->buildMimeMessage($data, $data['in_reply_to'] ?? null);
 
         $message = new Message;
         $message->setRaw(rtrim(strtr(base64_encode($raw), '+/', '-_'), '='));
 
-        if ($isReply) {
-            assert(isset($data['thread_id']), 'thread_id is required when in_reply_to is set');
-            $message->setThreadId($data['thread_id']);
+        $threadId = $data['thread_id'] ?? null;
+
+        if (is_string($threadId) && $threadId !== '') {
+            $message->setThreadId($threadId);
         }
 
         $sent = $this->gmail->users_messages->send('me', $message);
@@ -267,12 +294,20 @@ final readonly class GmailService implements MailServiceInterface
         }
 
         $attachments = $data['attachments'] ?? [];
+        $inlineAttachments = [];
+        $fileAttachments = [];
+
+        foreach ($attachments as $attachment) {
+            if (($attachment['is_inline'] ?? false) === true && filled($attachment['content_id'] ?? null)) {
+                $inlineAttachments[] = $attachment;
+            } else {
+                $fileAttachments[] = $attachment;
+            }
+        }
 
         $headers[] = 'Subject: =?UTF-8?B?'.base64_encode((string) $data['subject']).'?=';
         $headers[] = 'MIME-Version: 1.0';
-        $headers[] = $attachments === []
-            ? 'Content-Type: multipart/alternative; boundary="boundary_relaticle"'
-            : 'Content-Type: multipart/mixed; boundary="mixed_relaticle"';
+        $headers[] = $this->rootContentTypeHeader($inlineAttachments !== [], $fileAttachments !== []);
         $headers[] = 'Date: '.now()->toRfc2822String();
 
         // Stamp our own Message-ID so a retry can find an already-sent copy via
@@ -296,28 +331,81 @@ final readonly class GmailService implements MailServiceInterface
             .($data['body_html'] ?? '')."\r\n\r\n"
             .'--boundary_relaticle--';
 
-        if ($attachments === []) {
+        if ($inlineAttachments === [] && $fileAttachments === []) {
             return implode("\r\n", $headers)."\r\n\r\n".$alternative;
         }
 
-        // Attachments present: nest the alternative body inside a multipart/mixed
-        // envelope, then append each file as a base64 attachment part.
+        if ($fileAttachments === []) {
+            return implode("\r\n", $headers)."\r\n\r\n".$this->mimeRelatedBody($alternative, $inlineAttachments);
+        }
+
         $raw = implode("\r\n", $headers)."\r\n\r\n";
         $raw .= "--mixed_relaticle\r\n";
-        $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
-        $raw .= $alternative."\r\n\r\n";
 
-        foreach ($attachments as $attachment) {
-            $filename = $this->sanitizeAttachmentFilename($attachment['filename']);
+        if ($inlineAttachments === []) {
+            $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
+            $raw .= $alternative."\r\n\r\n";
+        } else {
+            $raw .= "Content-Type: multipart/related; boundary=\"related_relaticle\"\r\n\r\n";
+            $raw .= $this->mimeRelatedBody($alternative, $inlineAttachments)."\r\n\r\n";
+        }
 
-            $raw .= "--mixed_relaticle\r\n";
-            $raw .= 'Content-Type: '.$attachment['mime_type'].'; name="'.$filename."\"\r\n";
-            $raw .= "Content-Transfer-Encoding: base64\r\n";
-            $raw .= 'Content-Disposition: attachment; filename="'.$filename."\"\r\n\r\n";
-            $raw .= chunk_split(base64_encode($attachment['content']))."\r\n";
+        foreach ($fileAttachments as $attachment) {
+            $raw .= $this->mimeAttachmentPart('mixed_relaticle', $attachment, inline: false);
         }
 
         return $raw.'--mixed_relaticle--';
+    }
+
+    private function rootContentTypeHeader(bool $hasInline, bool $hasFiles): string
+    {
+        if ($hasFiles) {
+            return 'Content-Type: multipart/mixed; boundary="mixed_relaticle"';
+        }
+
+        if ($hasInline) {
+            return 'Content-Type: multipart/related; boundary="related_relaticle"';
+        }
+
+        return 'Content-Type: multipart/alternative; boundary="boundary_relaticle"';
+    }
+
+    /**
+     * @param  array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>  $inlineAttachments
+     */
+    private function mimeRelatedBody(string $alternative, array $inlineAttachments): string
+    {
+        $raw = "--related_relaticle\r\n";
+        $raw .= "Content-Type: multipart/alternative; boundary=\"boundary_relaticle\"\r\n\r\n";
+        $raw .= $alternative."\r\n\r\n";
+
+        foreach ($inlineAttachments as $attachment) {
+            $raw .= $this->mimeAttachmentPart('related_relaticle', $attachment, inline: true);
+        }
+
+        return $raw.'--related_relaticle--';
+    }
+
+    /**
+     * @param  array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}  $attachment
+     */
+    private function mimeAttachmentPart(string $boundary, array $attachment, bool $inline): string
+    {
+        $filename = $this->sanitizeAttachmentFilename($attachment['filename']);
+
+        $part = "--{$boundary}\r\n";
+        $part .= 'Content-Type: '.$attachment['mime_type'].'; name="'.$filename."\"\r\n";
+        $part .= "Content-Transfer-Encoding: base64\r\n";
+
+        if ($inline) {
+            $contentId = $this->sanitizeContentId((string) ($attachment['content_id'] ?? ''));
+            $part .= 'Content-ID: <'.$contentId.">\r\n";
+            $part .= 'Content-Disposition: inline; filename="'.$filename."\"\r\n\r\n";
+        } else {
+            $part .= 'Content-Disposition: attachment; filename="'.$filename."\"\r\n\r\n";
+        }
+
+        return $part.chunk_split(base64_encode($attachment['content']))."\r\n";
     }
 
     /**
@@ -327,6 +415,11 @@ final readonly class GmailService implements MailServiceInterface
     private function sanitizeAttachmentFilename(string $filename): string
     {
         return str_replace(['"', '\\', "\r", "\n"], '', $filename);
+    }
+
+    private function sanitizeContentId(string $contentId): string
+    {
+        return str_replace(['"', '\\', "\r", "\n", '<', '>'], '', $contentId);
     }
 
     private function formatAddress(string $name, string $email): string
@@ -352,9 +445,9 @@ final readonly class GmailService implements MailServiceInterface
      * vocabulary so we skip a paid LLM call for the high-volume noise buckets.
      *
      * Only high-confidence consumer categories are mapped. CATEGORY_UPDATES
-     * (receipts, statements, confirmations) is deliberately left unmapped — it
-     * frequently hides Invoice/Scheduling/Support mail that only AI resolves —
-     * as is an inbox-only message with no category at all.
+     * (receipts, statements, confirmations) is deliberately left unmapped,
+     * because it frequently hides Invoice/Scheduling/Support mail that only AI
+     * resolves, as is an inbox-only message with no category at all.
      *
      * @param  array<int, string>  $labelIds
      */
@@ -382,6 +475,8 @@ final readonly class GmailService implements MailServiceInterface
 
     /**
      * Recursively walk MIME parts and collect attachment metadata.
+     * The current part is inspected, not only its children, because an
+     * attachment-only message puts the file on the root payload.
      * Covers both file attachments (Content-Disposition: attachment) and
      * inline images (Content-Disposition: inline with Content-ID).
      *
@@ -392,47 +487,46 @@ final readonly class GmailService implements MailServiceInterface
     {
         $attachments = [];
 
+        $partHeaders = collect($payload->getHeaders())
+            ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
+
+        $disposition = $partHeaders->get('content-disposition')?->getValue() ?? '';
+        $filename = $payload->getFilename();
+
+        $contentId = $partHeaders->get('content-id')?->getValue();
+        if ($contentId !== null) {
+            $contentId = trim($contentId, '<>');
+        }
+
+        $mimeType = (string) $payload->getMimeType();
+        $lowerDisposition = strtolower($disposition);
+        $isInline = $contentId !== null && (
+            str_starts_with($lowerDisposition, 'inline') ||
+            isset($referencedContentIds[mb_strtolower($contentId)])
+        );
+
+        $isMultipart = str_starts_with(mb_strtolower($mimeType), 'multipart/');
+
+        if (! $isMultipart && (filled($filename) || str_starts_with($lowerDisposition, 'attachment') || $isInline)) {
+            $body = $payload->getBody();
+            // getAttachmentId() returns empty string when not present (large attachments have it set)
+            $gmailAttachmentId = $body->getAttachmentId();
+            $attachmentId = filled($gmailAttachmentId) ? $gmailAttachmentId : null;
+
+            $attachments[] = [
+                'filename' => filled($filename) ? $filename : null,
+                'mime_type' => $mimeType,
+                'size' => $body->getSize(),
+                'content_id' => $contentId,
+                'attachment_id' => $attachmentId,
+                // For small attachments (<25 KB) the binary is inlined; large ones have an attachment_id
+                'inline_data' => $attachmentId === null ? ($body->getData() ?: null) : null,
+                'is_inline' => $isInline,
+            ];
+        }
+
         foreach ($payload->getParts() as $part) {
-            $partHeaders = collect($part->getHeaders())
-                ->keyBy(fn (MessagePartHeader $header): string => strtolower((string) $header->getName()));
-
-            $disposition = $partHeaders->get('content-disposition')?->getValue() ?? '';
-            $filename = $part->getFilename();
-
-            $contentId = $partHeaders->get('content-id')?->getValue();
-            if ($contentId !== null) {
-                $contentId = trim($contentId, '<>');
-            }
-
-            $mimeType = (string) $part->getMimeType();
-            $lowerDisposition = strtolower($disposition);
-            $isInline = $contentId !== null && (
-                str_starts_with($lowerDisposition, 'inline') ||
-                isset($referencedContentIds[mb_strtolower($contentId)])
-            );
-
-            if (filled($filename) || str_starts_with($lowerDisposition, 'attachment') || $isInline) {
-                $body = $part->getBody();
-                // getAttachmentId() returns empty string when not present (large attachments have it set)
-                $gmailAttachmentId = $body->getAttachmentId();
-                $attachmentId = filled($gmailAttachmentId) ? $gmailAttachmentId : null;
-
-                $attachments[] = [
-                    'filename' => filled($filename) ? $filename : null,
-                    'mime_type' => $mimeType,
-                    'size' => $body->getSize(),
-                    'content_id' => $contentId,
-                    'attachment_id' => $attachmentId,
-                    // For small attachments (<25 KB) the binary is inlined; large ones have an attachment_id
-                    'inline_data' => $attachmentId === null ? ($body->getData() ?: null) : null,
-                    'is_inline' => $isInline,
-                ];
-            }
-
-            // Recurse into multipart containers (e.g. multipart/mixed, multipart/related)
-            if ($part->getParts()) {
-                $attachments = array_merge($attachments, $this->extractAttachments($part, $referencedContentIds));
-            }
+            $attachments = array_merge($attachments, $this->extractAttachments($part, $referencedContentIds));
         }
 
         return $attachments;

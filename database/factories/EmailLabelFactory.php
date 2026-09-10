@@ -19,16 +19,16 @@ final class EmailLabelFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
-            'label' => $this->faker->randomElement(['INBOX', 'SENT', 'IMPORTANT', 'STARRED']),
+            'label' => fake()->randomElement(['INBOX', 'SENT', 'IMPORTANT', 'STARRED']),
             'source' => 'provider',
         ];
     }
 
-    public function ai(): static
+    public function category(?string $label = null): static
     {
         return $this->state(fn (): array => [
-            'source' => 'ai',
-            'label' => $this->faker->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
+            'source' => 'system',
+            'label' => $label ?? fake()->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
         ]);
     }
 }

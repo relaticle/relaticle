@@ -15,7 +15,7 @@ final readonly class SyncTeamPlanFromSubscription
 {
     /**
      * Stripe statuses a subscription can hold without ever having granted
-     * access — a checkout whose first payment failed or was abandoned.
+     * access: a checkout whose first payment failed or was abandoned.
      *
      * @var list<string>
      */
@@ -63,6 +63,10 @@ final readonly class SyncTeamPlanFromSubscription
 
     private function targetPlan(Team $team, Subscription $subscription, Plan $subscriptionPlan): ?Plan
     {
+        if ($team->plan === Plan::Enterprise && $subscriptionPlan !== Plan::Enterprise) {
+            return null;
+        }
+
         if ($subscription->valid()) {
             return $subscriptionPlan;
         }
@@ -79,7 +83,7 @@ final readonly class SyncTeamPlanFromSubscription
             return null;
         }
 
-        // Only downgrade a plan this subscription granted — a sysadmin-assigned
+        // Only downgrade a plan this subscription granted. A sysadmin-assigned
         // plan (e.g. Enterprise) must survive an unrelated subscription ending.
         if ($team->plan === $subscriptionPlan) {
             return Plan::default();

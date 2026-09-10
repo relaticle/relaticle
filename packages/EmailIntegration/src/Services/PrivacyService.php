@@ -6,44 +6,49 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\ProtectedRecipient;
+use Relaticle\EmailIntegration\Models\EmailShare;
 
-final class PrivacyService
+final readonly class PrivacyService
 {
+    public function __construct(
+        private EmailVisibilityService $visibility,
+        private PreferredEmailCopyService $preferredCopies,
+    ) {}
+
     /**
      * Resolve the effective privacy tier this $viewer can see on $email.
-     * Returns null if the email is completely hidden (protected recipient / private / internal).
+     * Returns null if the email is completely hidden (visibility rules / private / internal).
      */
     public function effectiveTier(Email $email, User $viewer): ?EmailPrivacyTier
     {
-        // Owner always gets full access
         if ($email->user_id === $viewer->getKey()) {
+            if ($this->visibility->isHiddenFromOwner($email)) {
+                return null;
+            }
+
             return EmailPrivacyTier::FULL;
         }
 
-        // 1. Protected recipient — hard hidden for everyone except the owner
-        if ($this->isProtected($email)) {
+        if ($this->visibility->isHiddenFromTeammate($email)) {
             return null;
         }
 
-        // 2. Internal emails are hidden (all participants are workspace members)
-        if ($email->is_internal) {
-            return null;
+        if ($this->preferredCopies->viewerHasSyncedCopy($email, $viewer)) {
+            return EmailPrivacyTier::FULL;
         }
 
-        // 3. Per-email share overrides the email's own tier (uses the loaded relation when
+        // Per-email share overrides the email's own tier (uses the loaded relation when
         // eager-loaded, so filtering a list of emails doesn't issue a query per row).
-        $email->loadMissing('shares');
-        $share = $email->shares->firstWhere('shared_with', $viewer->getKey());
+        $share = $this->shareForViewer($email, $viewer);
 
-        if ($share) {
+        if ($share instanceof EmailShare) {
             return EmailPrivacyTier::from($share->tier);
         }
 
-        // 4. Email's own tier
+        // Email's own tier
         $tier = $email->privacy_tier;
 
         if ($tier === EmailPrivacyTier::PRIVATE) {
@@ -54,10 +59,14 @@ final class PrivacyService
     }
 
     /**
-     * Resolve the default tier to stamp on a newly synced email.
+     * Resolve the default tier to stamp on a newly created email.
      * User preference wins over workspace default.
+     *
+     * Pass the mailbox's workspace for background sync. `$user->current_team_id` is
+     * only the owner's currently selected workspace, so using it for imports would
+     * stamp another team's default onto this mailbox.
      */
-    public function defaultTierForUser(User $user): EmailPrivacyTier
+    public function defaultTierForUser(User $user, ?Team $workspace = null): EmailPrivacyTier
     {
         if ($user->default_email_sharing_tier) {
             return $user->default_email_sharing_tier;
@@ -65,8 +74,8 @@ final class PrivacyService
 
         // Resolve the team explicitly (instead of $user->currentTeam, whose accessor
         // larastan types as never-null and which can auto-switch teams as a side
-        // effect) so the null case — a user without a current team — is handled.
-        $team = $user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null;
+        // effect) so the null case, a user without a current team, is handled.
+        $team = $workspace ?? ($user->current_team_id !== null ? Team::query()->find($user->current_team_id) : null);
 
         if ($team === null) {
             return EmailPrivacyTier::METADATA_ONLY;
@@ -75,62 +84,27 @@ final class PrivacyService
         return $team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
     }
 
-    /**
-     * Per-team protected recipient lists, memoized for the lifetime of this instance to
-     * avoid two ProtectedRecipient queries per email when filtering a list of emails.
-     *
-     * @var array<string, array{emails: list<string>, domains: list<string>}>
-     */
-    private array $protectedCache = [];
-
-    /**
-     * Check whether any participant on this email matches a protected_recipients row.
-     */
-    private function isProtected(Email $email): bool
+    private function shareForViewer(Email $email, User $viewer): ?EmailShare
     {
-        $email->loadMissing(['participants']);
+        $email->loadMissing('shares');
+        $direct = $email->shares->firstWhere('shared_with', $viewer->getKey());
 
-        ['emails' => $protectedEmails, 'domains' => $protectedDomains] = $this->protectedRecipients($email->team_id);
-
-        foreach ($email->participants as $participant) {
-            $address = strtolower((string) $participant->email_address);
-            // Take the host after the LAST '@' so addresses with multiple '@' are
-            // read by their real domain rather than the first label.
-            $domain = str_contains($address, '@') ? Str::afterLast($address, '@') : '';
-
-            if (in_array($address, $protectedEmails, true)) {
-                return true;
-            }
-
-            if ($domain !== '' && in_array($domain, $protectedDomains, true)) {
-                return true;
-            }
+        if ($direct instanceof EmailShare) {
+            return $direct;
         }
 
-        return false;
-    }
-
-    /**
-     * @return array{emails: list<string>, domains: list<string>}
-     */
-    private function protectedRecipients(string $teamId): array
-    {
-        if (isset($this->protectedCache[$teamId])) {
-            return $this->protectedCache[$teamId];
+        if (blank($email->rfc_message_id)) {
+            return null;
         }
 
-        $byType = ProtectedRecipient::query()
-            ->where('team_id', $teamId)
-            ->whereIn('type', ['email', 'domain'])
-            ->get(['type', 'value']);
-
-        return $this->protectedCache[$teamId] = [
-            'emails' => array_values($byType->where('type', 'email')
-                ->map(fn (ProtectedRecipient $r): string => strtolower((string) $r->value))
-                ->all()),
-            'domains' => array_values($byType->where('type', 'domain')
-                ->map(fn (ProtectedRecipient $r): string => strtolower((string) $r->value))
-                ->all()),
-        ];
+        return EmailShare::query()
+            ->where('team_id', $email->team_id)
+            ->where('shared_with', $viewer->getKey())
+            ->whereHas('email', function (Builder $query) use ($email): void {
+                $query
+                    ->where('team_id', $email->team_id)
+                    ->where('rfc_message_id', $email->rfc_message_id);
+            })
+            ->first();
     }
 }

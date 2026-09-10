@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
@@ -26,7 +26,7 @@ beforeEach(function (): void {
 
 /**
  * The agent prompt tells the model the user's zone, but the tool payload used to carry
- * bare `...Z` UTC timestamps, leaving the model to do the conversion — and in a live
+ * bare `...Z` UTC timestamps, leaving the model to do the conversion, and in a live
  * chat it got it wrong, filing a task due tomorrow in Tokyo under "Due Today".
  *
  * Emitting the offset removes the arithmetic: the wall clock is already local, and a
@@ -34,8 +34,8 @@ beforeEach(function (): void {
  */
 it('emits chat list datetimes with the user offset rather than bare utc', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     $payload = (new ListTasksTool)->handle(new Request([]));
@@ -50,8 +50,8 @@ it('emits chat list datetimes with the user offset rather than bare utc', functi
 
 it('emits chat show datetimes with the user offset too, so both tools agree', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     $payload = (new GetTaskTool)->handle(new Request(['id' => (string) $task->getKey()]));
@@ -63,7 +63,7 @@ it('emits chat show datetimes with the user offset too, so both tools agree', fu
 });
 
 /**
- * Custom-field datetimes are where the live failure actually happened — a due date is
+ * Custom-field datetimes are where the live failure actually happened. A due date is
  * what the model buckets as overdue/today/upcoming.
  */
 it('converts custom-field datetimes in chat tool output', function (): void {
@@ -97,13 +97,13 @@ it('converts custom-field datetimes in chat tool output', function (): void {
 
 /**
  * The REST API and MCP share these resources, and ISO-8601 UTC is the correct contract
- * for a public API — the conversion must live in the chat layer only. This is the guard
+ * for a public API, so the conversion must live in the chat layer only. This is the guard
  * that keeps a future refactor from "simplifying" it down into the resource.
  */
 it('leaves the rest api on utc, because the conversion belongs to the chat layer', function (): void {
     $task = Task::factory()->for($this->user->currentTeam)->create([
-        'created_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
-        'updated_at' => Carbon::parse('2026-08-18 23:30:00', 'UTC'),
+        'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
+        'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 
     Sanctum::actingAs($this->user);

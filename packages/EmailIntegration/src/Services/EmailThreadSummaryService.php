@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use RuntimeException;
@@ -25,17 +26,20 @@ final readonly class EmailThreadSummaryService
      */
     public function getSummary(EmailThread $thread, User $viewer, bool $regenerate = false): AiSummary
     {
+        $prompt = $this->buildPrompt($thread, $viewer);
+        $inputHash = hash('sha256', $viewer->getKey()."\n".$prompt);
+
         if (! $regenerate) {
-            $cached = $thread->aiSummary;
+            $cached = $thread->aiSummary()->where('input_hash', $inputHash)->first();
             if ($cached !== null) {
                 return $cached;
             }
         }
 
-        return $this->generateAndCache($thread, $viewer);
+        return $this->generateAndCache($thread, $prompt, $inputHash);
     }
 
-    private function generateAndCache(EmailThread $thread, User $viewer): AiSummary
+    private function buildPrompt(EmailThread $thread, User $viewer): string
     {
         $emails = $thread->emails()
             ->with(['from', 'participants', 'body', 'labels', 'shares'])
@@ -45,14 +49,14 @@ final readonly class EmailThreadSummaryService
         $lines = [];
         $lines[] = "Email thread: \"{$thread->subject}\"";
         $lines[] = "{$thread->email_count} emails, {$thread->participant_count} participants";
-        $lines[] = 'Date range: '.($thread->first_email_at?->toDateString() ?? '—').' — '.($thread->last_email_at?->toDateString() ?? '—');
+        $lines[] = 'Date range: '.($thread->first_email_at?->toDateString() ?? '—').' to '.($thread->last_email_at?->toDateString() ?? '—');
         $lines[] = '';
 
         foreach ($emails as $index => $email) {
             $n = $index + 1;
             // `from` is eager-loaded above to avoid an N+1 across the thread's emails.
             // A malformed/draft message can carry no `from` participant, so the collection
-            // may be empty — default rather than dereference a missing row.
+            // may be empty, so default rather than dereference a missing row.
             $firstFrom = $email->from->first();
             $from = $firstFrom instanceof EmailParticipant
                 ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
@@ -76,23 +80,29 @@ final readonly class EmailThreadSummaryService
             } elseif ($tier === EmailPrivacyTier::METADATA_ONLY) {
                 $lines[] = '(metadata only)';
             } else {
-                // null tier — fully hidden from this viewer
+                // null tier: fully hidden from this viewer
                 $lines[] = '(restricted)';
             }
 
-            $aiLabels = $email->labels->where('source', 'ai')->pluck('label')->implode(', ');
-            if (filled($aiLabels)) {
-                $lines[] = "Labels: {$aiLabels}";
+            $category = $email->categoryLabel();
+
+            if ($category instanceof EmailLabel) {
+                $lines[] = "Labels: {$category->label}";
             }
 
             $lines[] = '';
         }
 
+        return implode("\n", $lines);
+    }
+
+    private function generateAndCache(EmailThread $thread, string $prompt, string $inputHash): AiSummary
+    {
         $provider = (string) config('services.email_summary.provider');
         $model = (string) config('services.email_summary.model');
 
         $response = (new ThreadSummarizer)->prompt(
-            implode("\n", $lines),
+            $prompt,
             provider: $provider,
             model: $model,
         );
@@ -107,6 +117,7 @@ final readonly class EmailThreadSummaryService
             'summarizable_type' => $thread->getMorphClass(),
             'summarizable_id' => $thread->getKey(),
             'summary' => $response->text,
+            'input_hash' => $inputHash,
             'model_used' => $model,
             'prompt_tokens' => $response->usage->promptTokens,
             'completion_tokens' => $response->usage->completionTokens,

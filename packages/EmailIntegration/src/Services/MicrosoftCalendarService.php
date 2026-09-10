@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
+use InvalidArgumentException;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
+use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
+use Relaticle\EmailIntegration\Exceptions\MeetingResponseFailed;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
-use Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
+use Throwable;
 
 final readonly class MicrosoftCalendarService implements CalendarServiceInterface
 {
@@ -35,6 +40,149 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     public function fetchDelta(string $syncToken): CalendarSyncResult
     {
         return $this->drainOnePage($syncToken, isInitial: false);
+    }
+
+    public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void
+    {
+        $action = match ($status) {
+            AttendeeResponseStatus::ACCEPTED => 'accept',
+            AttendeeResponseStatus::DECLINED => 'decline',
+            AttendeeResponseStatus::TENTATIVE => 'tentativelyAccept',
+            AttendeeResponseStatus::NEEDS_ACTION => throw new InvalidArgumentException('Cannot reset an RSVP to needsAction.'),
+        };
+
+        try {
+            $this->clientFactory->make($this->account)
+                ->post('/me/events/'.rawurlencode($eventId).'/'.$action, [
+                    'sendResponse' => true,
+                ])
+                ->throw();
+        } catch (Throwable $e) {
+            if ($this->organizerCannotRespond($e)) {
+                return;
+            }
+
+            throw MeetingResponseFailed::fromProvider($e);
+        }
+    }
+
+    public function findEventIdByICalUid(string $iCalUid, CarbonInterface $occurrenceStartsAt): ?string
+    {
+        // Microsoft assigns a distinct iCalUId per occurrence, unlike Google.
+        $escaped = str_replace("'", "''", $iCalUid);
+
+        try {
+            $id = $this->clientFactory->make($this->account)
+                ->get('/me/events', [
+                    '$filter' => "iCalUId eq '{$escaped}'",
+                    '$select' => 'id',
+                    '$top' => 1,
+                ])
+                ->throw()
+                ->json('value.0.id');
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    public function listActiveProviderEventIds(): array
+    {
+        $ids = [];
+        $windowStart = $this->historyStart();
+        $horizon = $this->horizon();
+
+        while ($windowStart->lt($horizon)) {
+            $url = $this->calendarWindowUrl($windowStart);
+
+            do {
+                $response = $this->clientFactory->make($this->account)
+                    ->get($url)
+                    ->throw()
+                    ->json();
+
+                foreach ($response['value'] ?? [] as $event) {
+                    if (isset($event['@removed']) || ($event['isCancelled'] ?? false)) {
+                        continue;
+                    }
+
+                    $id = $event['id'] ?? null;
+
+                    if (is_string($id) && $id !== '') {
+                        $ids[] = $id;
+                    }
+                }
+
+                $nextLink = $response['@odata.nextLink'] ?? null;
+
+                if (is_string($nextLink) && $nextLink !== '') {
+                    $url = $nextLink;
+
+                    continue;
+                }
+
+                break;
+            } while (true);
+
+            $windowEnd = $windowStart->copy()->addYears(self::WINDOW_YEARS);
+
+            if ($windowEnd->gte($horizon)) {
+                break;
+            }
+
+            $windowStart = $windowEnd;
+        }
+
+        return $ids;
+    }
+
+    public function ensurePushChannel(string $webhookUrl, string $verificationToken): ?CalendarPushChannelData
+    {
+        $expiresAt = now()->addDays(2);
+
+        try {
+            $response = $this->clientFactory->make($this->account)
+                ->post('/subscriptions', [
+                    'changeType' => 'created,updated,deleted',
+                    'notificationUrl' => $webhookUrl,
+                    'resource' => 'me/events',
+                    'expirationDateTime' => $expiresAt->utc()->format('Y-m-d\TH:i:s\Z'),
+                    'clientState' => $verificationToken,
+                ])
+                ->throw()
+                ->json();
+        } catch (Throwable) {
+            return null;
+        }
+
+        $subscriptionId = (string) ($response['id'] ?? '');
+
+        if ($subscriptionId === '') {
+            return null;
+        }
+
+        $expiration = $response['expirationDateTime'] ?? null;
+
+        return new CalendarPushChannelData(
+            channelId: $subscriptionId,
+            resourceId: null,
+            verificationToken: $verificationToken,
+            expiresAt: is_string($expiration) && $expiration !== ''
+                ? Date::parse($expiration)
+                : $expiresAt,
+        );
+    }
+
+    public function stopPushChannel(string $channelId, ?string $resourceId): void
+    {
+        try {
+            $this->clientFactory->make($this->account)
+                ->delete('/subscriptions/'.rawurlencode($channelId))
+                ->throw();
+        } catch (Throwable) {
+            // The subscription may already be gone.
+        }
     }
 
     /**
@@ -111,17 +259,17 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         );
     }
 
-    private function historyStart(): Carbon
+    private function historyStart(): CarbonInterface
     {
         return Date::parse('1990-01-01T00:00:00Z');
     }
 
-    private function horizon(): Carbon
+    private function horizon(): CarbonInterface
     {
         return Date::now()->addYears(self::WINDOW_YEARS);
     }
 
-    private function calendarWindowUrl(Carbon $start): string
+    private function calendarWindowUrl(CarbonInterface $start): string
     {
         $end = $start->copy()->addYears(self::WINDOW_YEARS);
         $horizon = $this->horizon();
@@ -139,7 +287,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     {
         $end = $this->endDateTimeFromUrl($currentUrl);
 
-        if (! $end instanceof Carbon) {
+        if (! $end instanceof CarbonInterface) {
             return null;
         }
 
@@ -150,7 +298,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         return $this->calendarWindowUrl($end);
     }
 
-    private function endDateTimeFromUrl(string $url): ?Carbon
+    private function endDateTimeFromUrl(string $url): ?CarbonInterface
     {
         $query = parse_url($url, PHP_URL_QUERY);
 
@@ -250,11 +398,24 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             'accepted' => 'accepted',
             'declined' => 'declined',
             'tentativelyAccepted' => 'tentative',
-            // The organizer implicitly accepts their own meeting.
-            'organizer' => 'accepted',
+            // Graph marks the host as "organizer", not accepted/declined.
+            // Leave it empty so a host RSVP chosen in Relaticle is not reset on sync.
+            'organizer' => null,
             'none', 'notResponded' => 'needsAction',
             default => null,
         };
+    }
+
+    private function organizerCannotRespond(Throwable $e): bool
+    {
+        if (! $e instanceof RequestException || $e->response->status() !== 400) {
+            return false;
+        }
+
+        return str_contains(
+            strtolower($e->getMessage().' '.$e->response->body()),
+            'organizer',
+        );
     }
 
     /**

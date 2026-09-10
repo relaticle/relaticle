@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Actions\Jetstream\InviteTeamMember;
+use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\TeamRole;
@@ -18,7 +19,6 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
@@ -121,7 +121,7 @@ final class CreateTeam extends RegisterTenant
 
     /**
      * Where "Cancel" returns to when the user backs out of creating another
-     * workspace. Null during first-run onboarding — a user with no workspace
+     * workspace. Null during first-run onboarding: a user with no workspace
      * has nowhere to go back to, so no cancel affordance is offered.
      */
     public function getCancelUrl(): ?string
@@ -191,6 +191,7 @@ final class CreateTeam extends RegisterTenant
         return Step::make(__('filament/pages/teams.create_team.steps.workspace'))
             ->schema([
                 Placeholder::make('workspace_heading')
+                    ->label(__('filament/pages/teams.create_team.headings.workspace'))
                     ->hiddenLabel()
                     ->content($this->stepHeading(__('filament/pages/teams.create_team.headings.workspace')))
                     ->dehydrated(false),
@@ -203,6 +204,7 @@ final class CreateTeam extends RegisterTenant
         return Step::make(__('filament/pages/teams.create_team.steps.attribution'))
             ->schema([
                 Placeholder::make('attribution_heading')
+                    ->label(__('filament/pages/teams.create_team.headings.attribution'))
                     ->hiddenLabel()
                     ->content($this->stepHeading(
                         __('filament/pages/teams.create_team.headings.attribution'),
@@ -211,6 +213,7 @@ final class CreateTeam extends RegisterTenant
                     ->dehydrated(false),
 
                 ToggleButtons::make('onboarding_referral_source')
+                    ->label(__('filament/pages/teams.create_team.headings.attribution'))
                     ->hiddenLabel()
                     ->options(
                         collect(OnboardingReferralSource::cases())
@@ -236,6 +239,7 @@ final class CreateTeam extends RegisterTenant
             ->key('onboarding-use-case')
             ->schema([
                 Placeholder::make('use_case_heading')
+                    ->label(__('filament/pages/teams.create_team.headings.use_case'))
                     ->hiddenLabel()
                     ->content($this->stepHeading(
                         __('filament/pages/teams.create_team.headings.use_case'),
@@ -263,7 +267,12 @@ final class CreateTeam extends RegisterTenant
                             ->all()
                     )
                     ->inline()
-                    ->live(),
+                    ->live()
+                    // Stale sub-options from the previous use case are invisible yet
+                    // fail validation silently, stranding the wizard on this step.
+                    ->afterStateUpdated(function (Set $set): void {
+                        $set('onboarding_context', []);
+                    }),
 
                 ToggleButtons::make('onboarding_context')
                     ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
@@ -293,6 +302,7 @@ final class CreateTeam extends RegisterTenant
         return Step::make(__('filament/pages/teams.create_team.steps.invite'))
             ->schema([
                 Placeholder::make('invite_heading')
+                    ->label(__('filament/pages/teams.create_team.headings.invite'))
                     ->hiddenLabel()
                     ->content($this->stepHeading(
                         __('filament/pages/teams.create_team.headings.invite'),
@@ -301,6 +311,7 @@ final class CreateTeam extends RegisterTenant
                     ->dehydrated(false),
 
                 Placeholder::make('invite_subheading')
+                    ->label(__('filament/pages/teams.create_team.headings.invite_subheading'))
                     ->hiddenLabel()
                     ->content(new HtmlString(
                         '<p class="text-sm font-medium text-gray-700 dark:text-gray-300">'
@@ -309,22 +320,25 @@ final class CreateTeam extends RegisterTenant
                     ))
                     ->dehydrated(false),
 
+                // A grid, not the repeater table: its fixed role column left the
+                // email input ~10 characters wide on phones. The grid stacks below sm.
                 Repeater::make('invites')
                     ->hiddenLabel()
-                    ->table([
-                        TableColumn::make(__('filament/pages/teams.create_team.form.invite_table_column_email')),
-                        TableColumn::make(__('filament/pages/teams.create_team.form.invite_table_column_role'))
-                            ->width('140px'),
-                    ])
+                    ->columns(['default' => 1, 'sm' => 3])
                     ->schema([
                         TextInput::make('email')
+                            ->label(__('filament/pages/teams.create_team.form.invite_email_label'))
+                            ->hiddenLabel()
                             ->email()
                             ->placeholder(__('filament/pages/teams.create_team.form.invite_email_placeholder'))
                             // Drives the submit label below: "Send invites" only once
                             // there is actually something to send.
-                            ->live(onBlur: true),
+                            ->live(onBlur: true)
+                            ->columnSpan(['default' => 1, 'sm' => 2]),
 
                         Select::make('role')
+                            ->label(__('filament/pages/teams.create_team.form.invite_role_label'))
+                            ->hiddenLabel()
                             ->options([
                                 TeamRole::Editor->value => __('filament/pages/teams.create_team.form.invite_role_member'),
                                 TeamRole::Admin->value => __('filament/pages/teams.create_team.form.invite_role_admin'),
@@ -427,12 +441,24 @@ final class CreateTeam extends RegisterTenant
         $appHost = parse_url(url()->getAppUrl(), PHP_URL_HOST);
 
         return [
-            TextInput::make('name')
-                ->label(__('filament/pages/teams.create_team.form.company_name.label'))
+            TextInput::make('user_name')
+                ->label(__('filament/pages/teams.create_team.form.your_name.label'))
                 ->required()
                 ->maxLength(255)
-                ->placeholder(__('filament/pages/teams.create_team.form.company_name.placeholder'))
+                ->placeholder(__('filament/pages/teams.create_team.form.your_name.placeholder'))
                 ->autofocus()
+                ->default(function (): string {
+                    /** @var User $user */
+                    $user = auth('web')->user();
+
+                    return $user->name;
+                }),
+
+            TextInput::make('name')
+                ->label(__('filament/pages/teams.create_team.form.workspace_name.label'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('filament/pages/teams.create_team.form.workspace_name.placeholder'))
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
@@ -538,9 +564,11 @@ final class CreateTeam extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
+        $this->updateUserNameIfChanged($user, $data);
+
         // The tenant may already be set if the user clicked "Copy invite link" earlier
         // in the wizard, which pre-creates the team so the invite URL can exist.
-        // Reconcile name/slug here so later edits don't silently disappear — a regression
+        // Reconcile name/slug here so later edits don't silently disappear. This is a regression
         // the UI currently blocks via ->hiddenHeader(), but kept as defense-in-depth.
         if ($this->tenant instanceof Team) {
             $team = $this->tenant;
@@ -565,6 +593,20 @@ final class CreateTeam extends RegisterTenant
         $this->sendOnboardingInvites($user, $team, $data);
 
         return $team;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function updateUserNameIfChanged(User $user, array $data): void
+    {
+        $name = $data['user_name'] ?? null;
+
+        if (! is_string($name) || $name === $user->name) {
+            return;
+        }
+
+        resolve(UpdateUserName::class)->execute($user, $name);
     }
 
     /**

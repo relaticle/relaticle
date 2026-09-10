@@ -1,17 +1,18 @@
 @php
-    $headingContext = $category->name ?? $tag->name ?? null;
-    $title = $headingContext
-        ? $headingContext.' - '.config('app.name').' Blog'
-        : config('app.name').' - Engineering Blog';
+    $title = match (true) {
+        isset($category) => __(':name: CRM Blog', ['name' => $category->name]),
+        isset($tag) => __(':name: CRM Blog Posts', ['name' => $tag->name]),
+        default => __('CRM Guides, Comparisons and Engineering'),
+    }.' - '.config('app.name');
     $description = match (true) {
-        isset($category) => 'Posts about '.$category->name.' from the Relaticle engineering team.',
-        isset($tag) => 'Posts tagged "'.$tag->name.'" from the Relaticle engineering team.',
-        default => 'Engineering blog from the Relaticle team. Deep dives into building an open-source CRM with MCP, AI agents, and modern Laravel.',
+        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $category->name]),
+        isset($tag) => __('Read Relaticle posts tagged :name about using an open-source CRM, from setup to working with records.', ['name' => $tag->name]),
+        default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom fields and moving CRM records.'),
     };
 
     // Listings paginate, so page 2+ must self-canonicalise or a post reachable only
-    // from there has no canonical page pointing at it. Only `page` is carried over —
-    // search and tracking params stay out. Search results are noindex,follow: they
+    // from there has no canonical page pointing at it. Only `page` is carried over,
+    // so search and tracking params stay out. Search results are noindex,follow: they
     // are an infinite, low-value URL space that should not be indexed.
     $searchQuery = request()->query('q');
     $currentPage = (int) request()->query('page', 1);
@@ -57,7 +58,7 @@
             @if($posts->isEmpty())
                 <div class="text-center py-16 space-y-4">
                     @if($posts->total() > 0)
-                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist — the archive only goes up to page {{ $posts->lastPage() }}.</p>
+                        <p class="text-gray-500 dark:text-gray-400">That page doesn't exist. The archive only goes up to page {{ $posts->lastPage() }}.</p>
                         <a href="{{ $posts->url(1) }}"
                            class="inline-flex items-center gap-1.5 text-sm font-medium text-primary dark:text-primary-400 hover:underline">
                             <x-ri-arrow-left-line class="w-4 h-4" />
@@ -79,7 +80,7 @@
             @else
                 <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
                     @foreach($posts as $post)
-                        <x-ink::post-card :post="$post" />
+                        <x-blog.post-card :post="$post" />
                     @endforeach
                 </div>
 

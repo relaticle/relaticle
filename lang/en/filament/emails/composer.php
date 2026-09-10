@@ -50,6 +50,14 @@ return [
         'restore' => 'Restore',
         'close' => 'Close',
         'discard' => 'Discard draft',
+        'grant_send' => [
+            'label' => 'Grant permission',
+        ],
+    ],
+    'grant_send' => [
+        'heading' => '":email" does not have permission to send emails.',
+        'heading_generic' => 'This mailbox does not have permission to send emails.',
+        'description' => 'Please grant permission to enable email sending.',
     ],
     'notifications' => [
         'queued' => ['title' => 'Email queued for sending'],
@@ -58,6 +66,14 @@ return [
         'attachment_too_large' => [
             'title' => 'Some files were too large',
             'body' => 'Not attached: :files. Each file must be under :max, and all attachments together under :total.',
+        ],
+        'attachment_unavailable' => [
+            'title' => 'Some attachments could not be included',
+            'body' => 'Not attached: :files. Download them from the original email and add them here if you still need them.',
+        ],
+        'send_attachment_unavailable' => [
+            'title' => 'Could not include some attachments',
+            'body' => 'The email was not sent. These files could not be downloaded: :files. Remove them, or try sending again.',
         ],
         'draft_account_disconnected' => [
             'title' => 'Original account no longer connected',

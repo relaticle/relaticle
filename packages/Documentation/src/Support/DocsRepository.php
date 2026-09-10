@@ -15,11 +15,11 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * Reads {area}/{category}/{slug}.md content files into DocPage/DocCategory
  * value objects, keyed by their path. Nav, search, sitemap entries, and the
- * `.md` variant of a page all derive from this manifest — the content files
+ * `.md` variant of a page all derive from this manifest. The content files
  * are the single source of truth, never front matter.
  *
  * Resolved as a container singleton, so the manifest is parsed once, eagerly,
- * here in the constructor — a caller resolving this class already intends to
+ * here in the constructor. A caller resolving this class already intends to
  * use it, and there is no cheaper "maybe I won't need it" case to defer for.
  */
 final readonly class DocsRepository
@@ -88,7 +88,7 @@ final readonly class DocsRepository
         [$pages, $categories] = $this->build($root);
 
         // One stable key holding the current manifest, not one key per content
-        // state — otherwise every edit abandons the previous key forever with
+        // state. Otherwise every edit abandons the previous key forever with
         // no TTL to reclaim it.
         Cache::forever(self::CACHE_KEY, [
             'signature' => $signature,
@@ -174,7 +174,7 @@ final readonly class DocsRepository
             fn (DocCategory $category): array => [$category->path => $category->order],
         )->all();
 
-        // Grouped by category, alphabetical within — a sane default listing.
+        // Grouped by category, alphabetical within, which is a sane default listing.
         // This is deliberately NOT sorted by $page->order: pagesIn() is the
         // one place that contract lives, so a regression there can't hide
         // behind an accidentally-already-sorted pages() collection.

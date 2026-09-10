@@ -44,6 +44,18 @@ describe('API routing - subdomain mode', function () {
         expect($json['version'])->toBe('v1');
     });
 
+    it('names the API the same way in the root banner and the generated spec', function (): void {
+        config(['app.api_domain' => 'api.example.com']);
+
+        Route::domain('api.example.com')
+            ->middleware('api')
+            ->group(base_path('routes/api.php'));
+
+        $bannerName = $this->get('http://api.example.com/')->assertOk()->json('name');
+
+        expect(config('scribe.title'))->toBe($bannerName);
+    });
+
     it('serves API resources on subdomain at /v1 prefix', function (): void {
         config(['app.api_domain' => 'api.example.com']);
 
@@ -90,7 +102,7 @@ describe('MCP routing - subdomain mode', function () {
      * SubdomainRootResponse middleware is exercised against the real endpoint.
      *
      * routes/ai.php is registered ahead of routes/web.php, so in production the
-     * MCP endpoint — not the domainless "/" home route — owns the root of the
+     * MCP endpoint, not the domainless "/" home route, owns the root of the
      * MCP domain. Routes added mid-test instead land in the dynamic tail of a
      * compiled collection, where the home route matches first; rehydrating a
      * plain collection restores the domain-first matching production has.

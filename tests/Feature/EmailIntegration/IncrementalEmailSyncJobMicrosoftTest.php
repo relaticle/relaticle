@@ -6,9 +6,13 @@ use App\Models\User;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Testing\Fakes\BatchFake;
+use Laravel\SerializableClosure\SerializableClosure;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
+use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -96,6 +100,84 @@ it('batches StoreEmailJob for new Microsoft messages and defers the cursor to th
     expect($account->refresh()->sync_cursor)->toBe('old-cursor');
 });
 
+it('advances the cursor after the store batch completes', function (): void {
+    Bus::fake();
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
+        messageIds: collect(['M1']),
+        readMessageIds: collect([]),
+        newCursor: 'new-cursor',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    $this->app->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
+            $closure(new BatchFake(
+                id: 'batch-1',
+                name: 'Incremental sync',
+                totalJobs: $batch->jobs->count(),
+                pendingJobs: 0,
+                failedJobs: 0,
+                failedJobIds: [],
+                options: [],
+                createdAt: now()->toImmutable(),
+            ));
+        }
+
+        return true;
+    });
+
+    expect($account->refresh()->sync_cursor)->toBe('new-cursor');
+});
+
+it('does not advance the cursor when the store batch fails', function (): void {
+    Bus::fake();
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
+        messageIds: collect(['M1']),
+        readMessageIds: collect([]),
+        newCursor: 'new-cursor',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    $this->app->instance(MailServiceFactoryInterface::class, $factory);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    Bus::assertBatched(function (PendingBatch $batch): bool {
+        foreach ($batch->finallyCallbacks() as $callback) {
+            $closure = $callback instanceof SerializableClosure ? $callback->getClosure() : $callback;
+            $closure(new BatchFake(
+                id: 'batch-1',
+                name: 'Incremental sync',
+                totalJobs: $batch->jobs->count(),
+                pendingJobs: 0,
+                failedJobs: 1,
+                failedJobIds: ['job-1'],
+                options: [],
+                createdAt: now()->toImmutable(),
+            ));
+        }
+
+        return true;
+    });
+
+    expect($account->refresh()->sync_cursor)->toBe('old-cursor');
+});
+
 it('advances the cursor inline when the delta has no new messages', function (): void {
     Bus::fake();
 
@@ -161,4 +243,28 @@ it('removes the owner read state when the provider marks a message unread', func
         'email_id' => $email->getKey(),
         'user_id' => $account->user_id,
     ]);
+});
+
+it('resets the cursor and dispatches a full import when mailbox history has expired', function (): void {
+    Bus::fake([InitialEmailSyncJob::class]);
+
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')
+        ->once()
+        ->with('old-cursor')
+        ->andThrow(MailHistoryExpired::forAccount((string) $account->getKey()));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    (new IncrementalEmailSyncJob($account))->handle($factory);
+
+    $account->refresh();
+
+    expect($account->sync_cursor)->toBeNull()
+        ->and($account->status)->toBe(EmailAccountStatus::ACTIVE);
+
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
 });

@@ -1,12 +1,18 @@
 @php
+    use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+
     $statePath = $getStatePath();
     $toggleState = '$wire.$entangle(\''.$statePath.'\', true)';
+    $disabled = $getLivewire()->contact_creation_mode === ContactCreationMode::None->value;
 @endphp
 
 <x-dynamic-component :component="$getFieldWrapperView()" :field="$field">
     <div
-        class="ei-sharing-card"
-        x-on:click="if (! $event.target.closest('.fi-toggle')) $refs.companyToggle.click()"
+        @class([
+            'ei-sharing-card',
+            'pointer-events-none opacity-60' => $disabled,
+        ])
+        x-on:click="if (@js($disabled)) { return } if (! $event.target.closest('.fi-toggle')) $refs.companyToggle.click()"
     >
         <span class="ei-sharing-card-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition dark:bg-white/10 dark:text-gray-400">
             <x-filament::icon icon="heroicon-o-building-office-2" class="h-5 w-5" />
@@ -24,6 +30,7 @@
         <x-filament::toggle
             x-ref="companyToggle"
             class="mt-1 shrink-0"
+            :disabled="$disabled"
             :state="$toggleState"
             :aria-label="__('filament/pages/email-privacy-settings.record_creation.companies.label')"
         />

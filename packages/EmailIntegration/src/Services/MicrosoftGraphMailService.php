@@ -23,6 +23,8 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     // Folder/direction is derived per message from parentFolderId in fetchMessage().
     private const string MESSAGES_DELTA = '/me/messages/delta';
 
+    private const string RECONCILIATION_PROPERTY_ID = 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId';
+
     /**
      * @var array<string, string>|null Cached folder id => lowercase displayName map per instance.
      */
@@ -203,20 +205,32 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             'bccRecipients' => $this->formatRecipients($data['bcc'] ?? []),
         ];
 
-        // Best-effort: ask Graph to use our Message-ID so a retry can reconcile via
-        // findSentMessage(). Graph may override it on /me/sendMail, in which case
-        // retry de-duplication degrades to the synthetic id below.
-        if (isset($data['rfc_message_id'])) {
-            $message['internetMessageId'] = $data['rfc_message_id'];
+        if (($data['attachments'] ?? []) !== []) {
+            $message['attachments'] = array_map(function (array $attachment): array {
+                $payload = [
+                    '@odata.type' => '#microsoft.graph.fileAttachment',
+                    'name' => $attachment['filename'],
+                    'contentType' => $attachment['mime_type'],
+                    'contentBytes' => base64_encode($attachment['content']),
+                ];
+
+                if (($attachment['is_inline'] ?? false) === true) {
+                    $payload['isInline'] = true;
+
+                    if (filled($attachment['content_id'] ?? null)) {
+                        $payload['contentId'] = $attachment['content_id'];
+                    }
+                }
+
+                return $payload;
+            }, $data['attachments']);
         }
 
-        if (($data['attachments'] ?? []) !== []) {
-            $message['attachments'] = array_map(fn (array $attachment): array => [
-                '@odata.type' => '#microsoft.graph.fileAttachment',
-                'name' => $attachment['filename'],
-                'contentType' => $attachment['mime_type'],
-                'contentBytes' => base64_encode($attachment['content']),
-            ], $data['attachments']);
+        if (isset($data['rfc_message_id'])) {
+            $message['singleValueExtendedProperties'] = [[
+                'id' => self::RECONCILIATION_PROPERTY_ID,
+                'value' => $data['rfc_message_id'],
+            ]];
         }
 
         $this->clientFactory->make($this->account)
@@ -240,7 +254,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
         $message = $this->clientFactory->make($this->account)
             ->get('/me/messages', [
-                '$filter' => "internetMessageId eq '{$escaped}'",
+                '$filter' => "singleValueExtendedProperties/Any(ep: ep/id eq '".self::RECONCILIATION_PROPERTY_ID."' and ep/value eq '{$escaped}')",
                 '$select' => 'id,conversationId,internetMessageId',
                 '$top' => 1,
             ])

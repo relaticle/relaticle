@@ -9,10 +9,7 @@ it('does not send when the composer text exceeds the character cap', function ()
     $user = User::factory()->withTeam()->create();
     $team = $user->ownedTeams()->first();
 
-    $page = $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$team->slug}")
         ->navigate("/app/{$team->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');

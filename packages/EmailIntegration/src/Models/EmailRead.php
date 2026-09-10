@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Factories\EmailReadFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
  * @property string $email_id
  * @property string $user_id
- * @property Carbon $read_at
+ * @property CarbonInterface $read_at
  */
 final class EmailRead extends Model
 {
@@ -36,10 +36,6 @@ final class EmailRead extends Model
         'read_at',
     ];
 
-    protected $casts = [
-        'read_at' => 'datetime',
-    ];
-
     /**
      * @return BelongsTo<Email, $this>
      */
@@ -54,5 +50,15 @@ final class EmailRead extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'read_at' => 'datetime',
+        ];
     }
 }

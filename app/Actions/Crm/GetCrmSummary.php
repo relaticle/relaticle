@@ -47,8 +47,8 @@ final readonly class GetCrmSummary
             $byStage = $rows
                 ->groupBy('label')
                 ->map(fn (Collection $group): array => [
-                    'count' => (int) $group->sum('count'),
-                    'total_amount' => (float) $group->sum('total_amount'),
+                    'count' => (int) $group->sum(fn (array $row): int => (int) $row['count']),
+                    'total_amount' => (float) $group->sum(fn (array $row): float => (float) $row['total_amount']),
                 ])
                 ->all();
 

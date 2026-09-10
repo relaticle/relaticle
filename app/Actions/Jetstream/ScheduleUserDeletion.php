@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Features\AccountDeletion;
 use App\Models\User;
 use App\Notifications\UserDeletionScheduledNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 
 final readonly class ScheduleUserDeletion
 {
     public function schedule(User $user): void
     {
+        abort_unless(Feature::for($user)->active(AccountDeletion::class), 403);
+
         $this->ensureUserCanBeDeleted($user);
 
         DB::transaction(function () use ($user): void {
@@ -37,7 +41,9 @@ final readonly class ScheduleUserDeletion
 
         if ($teamsWithMembers->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'team' => ["Transfer ownership of these workspaces before deleting your account: {$teamsWithMembers->implode(', ')}"],
+                'team' => [__('teams.validation.remove_members_before_deleting', [
+                    'teams' => $teamsWithMembers->implode(', '),
+                ])],
             ]);
         }
     }

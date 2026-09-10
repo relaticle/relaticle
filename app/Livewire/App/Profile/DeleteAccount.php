@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\App\Profile;
 
 use App\Actions\Jetstream\ScheduleUserDeletion;
+use App\Features\AccountDeletion;
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
-use Filament\Actions\Action;
-use Filament\Forms;
+use App\Support\Auth\IdentityConfirmation;
+use Closure;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
@@ -15,16 +18,19 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Laravel\Pennant\Feature;
 
 final class DeleteAccount extends BaseLivewireComponent
 {
+    public function boot(): void
+    {
+        abort_unless(Feature::active(AccountDeletion::class), 403);
+    }
+
     public function form(Schema $schema): Schema
     {
-        $hasPassword = $this->authUser()->hasPassword();
-
         return $schema
             ->schema([
                 Section::make(__('profile.sections.delete_account.title'))
@@ -35,41 +41,47 @@ final class DeleteAccount extends BaseLivewireComponent
                             ->hiddenLabel()
                             ->state(fn (): string|array => __('profile.sections.delete_account.notice')),
                         Actions::make([
-                            Action::make('deleteAccount')
-                                ->label(__('profile.actions.delete_account'))
-                                ->color('danger')
-                                ->requiresConfirmation()
-                                ->modalHeading(__('profile.sections.delete_account.title'))
-                                ->modalDescription($hasPassword ? __('profile.modals.delete_account.notice') : __('profile.modals.delete_account.notice_no_password'))
-                                ->modalSubmitActionLabel(__('profile.actions.delete_account'))
-                                ->modalCancelAction(false)
-                                ->schema($hasPassword ? [
-                                    Forms\Components\TextInput::make('password')
-                                        ->password()
-                                        ->revealable()
-                                        ->label(__('profile.form.password.label'))
-                                        ->required()
-                                        ->currentPassword(),
-                                ] : [])
-                                ->action(fn (array $data): Redirector|RedirectResponse|null => $this->deleteAccount($data['password'] ?? null)),
+                            $this->deleteAccountAction(),
                         ]),
                     ]),
             ]);
     }
 
-    /**
-     * Schedule deletion for the current user.
-     *
-     * @throws ValidationException
-     */
-    public function deleteAccount(?string $password = null): Redirector|RedirectResponse|null
+    public function deleteAccountAction(): ConfirmIdentityAction
+    {
+        $email = $this->authUser()->email;
+
+        return ConfirmIdentityAction::make('deleteAccount')
+            ->label(__('profile.actions.delete_account'))
+            ->color('danger')
+            ->alwaysConfirm()
+            ->resumable()
+            ->prependSchema([
+                TextInput::make('confirm_email')
+                    ->label(__('profile.sections.delete_account.confirm_email_label'))
+                    ->placeholder($email)
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail) use ($email): void {
+                        if (mb_strtolower(trim((string) $value)) !== mb_strtolower((string) $email)) {
+                            $fail(__('profile.sections.delete_account.confirm_email_mismatch'));
+                        }
+                    }),
+            ])
+            ->modalHeading(__('profile.sections.delete_account.title'))
+            ->modalDescription(__('profile.modals.delete_account.notice'))
+            ->modalSubmitActionLabel(__('profile.actions.delete_account'))
+            ->modalCancelAction(false)
+            ->confirmedUsing(fn (): Redirector|RedirectResponse|null => $this->deleteAccount());
+    }
+
+    private function deleteAccount(): Redirector|RedirectResponse|null
     {
         $user = $this->authUser();
 
-        if ($user->hasPassword() && ! Hash::check((string) $password, $user->password ?? '')) {
-            throw ValidationException::withMessages([
-                'password' => __('auth.password'),
-            ]);
+        if (! IdentityConfirmation::satisfied()) {
+            $this->notifyIdentityConfirmationFailed();
+
+            return null;
         }
 
         try {

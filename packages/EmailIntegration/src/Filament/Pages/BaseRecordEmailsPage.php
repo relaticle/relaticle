@@ -8,7 +8,6 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -19,10 +18,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
-use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
-use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
-use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
@@ -32,6 +28,9 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 abstract class BaseRecordEmailsPage extends Page
 {
@@ -54,14 +53,30 @@ abstract class BaseRecordEmailsPage extends Page
         $this->record = $this->resolveRecord($record);
     }
 
+    /**
+     * A send from this record belongs on All, not Inbox. Inbox is inbound only
+     * and would hide the just-queued outbound copy.
+     */
+    public function showQueuedSendOnRecord(?string $emailId = null): void
+    {
+        $this->folder = EmailFolder::All;
+        $this->search = '';
+
+        if (filled($emailId)) {
+            $this->selectedEmailId = $emailId;
+        }
+
+        unset($this->emails);
+    }
+
     protected function getCrmRecord(): Model
     {
         return $this->getRecord();
     }
 
     /**
-     * The last crumb. Without this it is the headlined class name — "Company Emails
-     * Page" — which reads as a class, not a place.
+     * The last crumb. Without this it is the headlined class name, "Company Emails
+     * Page", which reads as a class, not a place.
      */
     public function getBreadcrumb(): string
     {
@@ -78,7 +93,10 @@ abstract class BaseRecordEmailsPage extends Page
      */
     protected function getListeners(): array
     {
-        return ['reply-email' => 'openReplyModal'];
+        return [
+            'reply-email' => 'openReplyModal',
+            'composer:sent' => 'showQueuedSendOnRecord',
+        ];
     }
 
     /**
@@ -87,7 +105,8 @@ abstract class BaseRecordEmailsPage extends Page
     protected function getHeaderActions(): array
     {
         return [
-            $this->composeEmailAction(),
+            $this->composeEmailAction()
+                ->visible(fn (): bool => $this->hasActiveConnectedAccount() && ! $this->hidesRecordMailbox()),
         ];
     }
 
@@ -97,6 +116,10 @@ abstract class BaseRecordEmailsPage extends Page
     #[Computed]
     public function emails(): LengthAwarePaginator
     {
+        if ($this->hidesRecordMailbox()) {
+            return new LengthAwarePaginator([], 0, 20);
+        }
+
         $user = $this->authUser();
 
         /** @var Company|Opportunity|People $record */
@@ -105,8 +128,13 @@ abstract class BaseRecordEmailsPage extends Page
         $query = $record
             ->emails()
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
-            ->with(['from', 'labels', 'participants', 'shares'])
+            ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
+            ->withExists([
+                'accessRequests as viewer_has_pending_access_request' => fn (Builder $query) => $query
+                    ->where('requester_id', $user->getKey())
+                    ->where('status', EmailAccessRequestStatus::PENDING),
+            ])
             ->withGlobalScope('visible', new VisibleEmailScope($user));
 
         if ($this->folder === EmailFolder::Sent) {
@@ -116,13 +144,16 @@ abstract class BaseRecordEmailsPage extends Page
         }
 
         if (filled($this->search)) {
-            $query->where(function (Builder $q): void {
-                $q->where('subject', 'ilike', '%'.$this->search.'%')
-                    ->orWhere('snippet', 'ilike', '%'.$this->search.'%');
-            });
+            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
         }
 
-        return $query->latest('sent_at')->paginate(20);
+        resolve(PreferredEmailCopyService::class)->restrictToPreferredCopies($query->getQuery(), $user);
+
+        $paginator = $query->latest('sent_at')->paginate(20);
+
+        resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $record);
+
+        return $paginator;
     }
 
     /**
@@ -133,7 +164,7 @@ abstract class BaseRecordEmailsPage extends Page
     #[Computed]
     public function showConnectPrompt(): bool
     {
-        if ($this->hasActiveConnectedAccount()) {
+        if ($this->hidesRecordMailbox() || $this->hasActiveConnectedAccount()) {
             return false;
         }
 
@@ -147,50 +178,78 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     #[Computed]
+    public function hidesRecordMailbox(): bool
+    {
+        return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getRecord());
+    }
+
+    /**
+     * @return array{heading: string, description: string}|null
+     */
+    #[Computed]
+    public function recordMailboxHiddenCopy(): ?array
+    {
+        $record = $this->getRecord();
+
+        if (! $record instanceof People && ! $record instanceof Company) {
+            return null;
+        }
+
+        return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
+    }
+
+    #[Computed]
     public function selectedEmail(): ?Email
     {
-        if ($this->selectedEmailId === null) {
+        if ($this->selectedEmailId === null || $this->hidesRecordMailbox()) {
             return null;
         }
 
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 
-        /** @var Email|null */
-        return $record
+        /** @var Email|null $email */
+        $email = $record
             ->emails()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
             ->first();
+
+        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
     }
 
     #[Computed]
     public function inboxUnreadCount(): int
     {
+        if ($this->hidesRecordMailbox()) {
+            return 0;
+        }
+
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 
-        return $record
+        $user = $this->authUser();
+        $query = $record
             ->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
-            ->unreadFor($this->authUser()->getKey())
-            ->count();
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->unreadFor($user->getKey());
+
+        resolve(PreferredEmailCopyService::class)
+            ->restrictToPreferredCopies($query->getQuery(), $user);
+
+        return $query->count();
     }
 
     public function selectEmail(string $id): void
     {
-        $this->selectedEmailId = $id;
-
-        // A reply answers the message that was open; it cannot stay docked under a
-        // different one. The composer saves whatever was typed as a draft.
-        $this->dispatch('composer:dismiss-inline');
-
-        // ...and if this message already has an unfinished reply, bring it back up.
-        $this->dispatch('composer:resume-draft', emailId: $id);
-
-        // Optimistically mark the email as read so the unread count updates immediately
-        resolve(MarkEmailAsReadAction::class)->execute($id, $this->authUser());
+        if (! $this->openEmailReader($id)) {
+            return;
+        }
 
         unset($this->inboxUnreadCount);
     }
@@ -216,7 +275,7 @@ abstract class BaseRecordEmailsPage extends Page
     }
 
     /**
-     * Access requests waiting on the reader — only ever their own mail, since only
+     * Access requests waiting on the reader, only ever their own mail, since only
      * the owner may grant access to it.
      *
      * @return Collection<int, EmailAccessRequest>
@@ -279,74 +338,6 @@ abstract class BaseRecordEmailsPage extends Page
     {
         $this->resetPage();
         unset($this->emails);
-    }
-
-    protected function approveAccessRequestAction(): Action
-    {
-        return Action::make('approveAccessRequest')
-            ->requiresConfirmation()
-            ->modalIcon('heroicon-o-check-circle')
-            ->modalIconColor('success')
-            ->modalHeading(__('filament/pages/record-emails.actions.approve_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Grant %s access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Approve')
-            ->color('success')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['email', 'owner', 'requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/record-emails.notifications.access_request_approved.title'))
-                    ->send();
-            });
-    }
-
-    protected function denyAccessRequestAction(): Action
-    {
-        return Action::make('denyAccessRequest')
-            ->requiresConfirmation()
-            ->modalHeading(__('filament/pages/record-emails.actions.deny_access_request.modal_heading'))
-            ->modalDescription(fn (array $arguments): string => sprintf(
-                'Deny %s\'s request for access to this email?',
-                $this->requesterNameForOwnedRequest($arguments['requestId'] ?? null),
-            ))
-            ->modalSubmitActionLabel('Deny')
-            ->color('danger')
-            ->action(function (array $arguments): void {
-                $accessRequest = EmailAccessRequest::query()
-                    ->with(['requester'])
-                    ->whereKey($arguments['requestId'] ?? null)
-                    ->where('owner_id', $this->authUser()->getKey())
-                    ->first();
-
-                if ($accessRequest === null) {
-                    return;
-                }
-
-                resolve(DenyEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser());
-
-                unset($this->selectedEmail);
-
-                Notification::make()
-                    ->success()
-                    ->title(__('filament/pages/record-emails.notifications.access_request_denied.title'))
-                    ->send();
-            });
     }
 
     private function authUser(): User

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Concerns\HasTeam;
 use App\Models\Opportunity;
 use App\Models\People;
+use Carbon\CarbonInterface;
 use Database\Factories\MeetingFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -18,7 +19,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Enums\CalendarVisibility;
@@ -34,8 +34,8 @@ use Relaticle\EmailIntegration\Observers\MeetingObserver;
  * @property string $title
  * @property string|null $description
  * @property string|null $location
- * @property Carbon $starts_at
- * @property Carbon $ends_at
+ * @property CarbonInterface $starts_at
+ * @property CarbonInterface $ends_at
  * @property bool $all_day
  * @property string|null $organizer_email
  * @property string|null $organizer_name
@@ -96,7 +96,7 @@ final class Meeting extends Model
     /** @return HasMany<MeetingAttendee, $this> */
     public function attendees(): HasMany
     {
-        return $this->hasMany(MeetingAttendee::class);
+        return $this->hasMany(MeetingAttendee::class)->with('contact');
     }
 
     /** @return MorphToMany<People, $this> */
@@ -139,7 +139,7 @@ final class Meeting extends Model
     protected function durationLabel(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => $this->starts_at->diffForHumans($this->ends_at, syntax: Carbon::DIFF_ABSOLUTE),
+            get: fn (): string => $this->starts_at->diffForHumans($this->ends_at, syntax: CarbonInterface::DIFF_ABSOLUTE),
         );
     }
 }

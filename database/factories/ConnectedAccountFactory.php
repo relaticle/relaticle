@@ -27,9 +27,9 @@ final class ConnectedAccountFactory extends Factory
             'team_id' => Team::factory(),
             'user_id' => User::factory(),
             'provider' => EmailProvider::GMAIL,
-            'provider_account_id' => $this->faker->uuid(),
-            'email_address' => $this->faker->unique()->safeEmail(),
-            'display_name' => $this->faker->name(),
+            'provider_account_id' => fake()->uuid(),
+            'email_address' => fake()->unique()->safeEmail(),
+            'display_name' => fake()->name(),
             'access_token' => 'fake-token',
             'is_default' => false,
             'status' => EmailAccountStatus::ACTIVE,
@@ -70,6 +70,17 @@ final class ConnectedAccountFactory extends Factory
         return $this->state(fn (): array => [
             'hourly_send_limit' => $hourly,
             'daily_send_limit' => $daily,
+        ]);
+    }
+
+    public function withoutSend(): static
+    {
+        return $this->state(fn (): array => [
+            'capabilities' => [
+                'email' => true,
+                'send' => false,
+                'calendar' => false,
+            ],
         ]);
     }
 }

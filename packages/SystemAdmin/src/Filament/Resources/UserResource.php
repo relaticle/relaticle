@@ -34,6 +34,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
@@ -131,8 +132,9 @@ final class UserResource extends Resource
                         ->label('Last Login')
                         ->dateTime()
                         ->placeholder('Never'),
-                    TextEntry::make('subscriber_recency_bucket')
+                    TextEntry::make('engagement')
                         ->label('Engagement')
+                        ->state(self::engagementBadge(...))
                         ->badge()
                         ->placeholder('—'),
                     TextEntry::make('created_at')
@@ -172,12 +174,22 @@ final class UserResource extends Resource
                     ->sortable()
                     ->toggleable()
                     ->placeholder('Never'),
-                TextColumn::make('subscriber_recency_bucket')
+                TextColumn::make('engagement')
                     ->label('Engagement')
+                    ->state(self::engagementBadge(...))
                     ->badge()
-                    ->sortable()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('last_login_at', $direction))
                     ->toggleable()
                     ->placeholder('—'),
+                IconColumn::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->state(fn (User $record): bool => $record->rejected_subscriber_profile_hash !== null)
+                    ->boolean()
+                    ->trueIcon('heroicon-o-exclamation-triangle')
+                    ->trueColor('warning')
+                    ->falseIcon('heroicon-o-minus-small')
+                    ->falseColor('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -189,13 +201,23 @@ final class UserResource extends Resource
                 TernaryFilter::make('email_verified_at')
                     ->label('Email Verified')
                     ->nullable(),
-                SelectFilter::make('subscriber_recency_bucket')
+                TernaryFilter::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->placeholder('All users')
+                    ->trueLabel('Rejected by Mailcoach')
+                    ->falseLabel('Not rejected')
+                    ->nullable(),
+                SelectFilter::make('engagement')
                     ->label('Engagement')
                     ->options([
                         SubscriberTagEnum::Active7d->value => 'Active (7d)',
                         SubscriberTagEnum::Active30d->value => 'Active (30d)',
                         SubscriberTagEnum::Dormant->value => 'Dormant',
-                    ]),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => SubscriberTagEnum::applyRecencyWindow(
+                        $query,
+                        $data['value'] ?? null,
+                    )),
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -208,6 +230,11 @@ final class UserResource extends Resource
                     }),
                 ]),
             ]);
+    }
+
+    public static function engagementBadge(User $record): ?string
+    {
+        return SubscriberTagEnum::recencyBucketFor($record->last_login_at)?->value;
     }
 
     /**
@@ -225,6 +252,7 @@ final class UserResource extends Resource
         return [
             OwnedTeamsRelationManager::class,
             TeamsRelationManager::class,
+            SocialAccountsRelationManager::class,
         ];
     }
 

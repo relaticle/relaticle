@@ -6,7 +6,6 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -58,15 +57,15 @@ function makeEmailWithBody(string $html): Email
 }
 
 /**
- * Render the inbox/record-page email reader through its relation-manager
- * ViewAction modal — the same <x-emails.email-view> used on company/people emails.
+ * Render the email reader through the relation-manager overlay, the same
+ * `x-emails.email-view` used on company and people Emails tabs.
  */
 function mountEmailView(Email $email): Testable
 {
     return livewire(EmailsRelationManager::class, [
         'ownerRecord' => test()->person,
         'pageClass' => ViewPeople::class,
-    ])->mountAction(TestAction::make('view')->table($email));
+    ])->call('selectEmail', $email->getKey());
 }
 
 const MALICIOUS_BODY = '<p>hello <b>world</b></p>'
@@ -79,11 +78,11 @@ it('strips scripts, event handlers and javascript urls from the email view', fun
     $email = makeEmailWithBody(MALICIOUS_BODY);
 
     mountEmailView($email)
-        ->assertMountedActionModalDontSeeHtml('onerror')
-        ->assertMountedActionModalDontSeeHtml('onload="alert')
-        ->assertMountedActionModalDontSeeHtml('javascript:')
-        ->assertMountedActionModalDontSeeHtml('document.cookie')
-        ->assertMountedActionModalSeeHtml('hello');
+        ->assertDontSeeHtml('onerror')
+        ->assertDontSeeHtml('onload="alert')
+        ->assertDontSeeHtml('javascript:')
+        ->assertDontSeeHtml('document.cookie')
+        ->assertSeeHtml('hello');
 });
 
 it('preserves inline styles and presentational attributes used by email layouts', function (): void {
@@ -95,10 +94,10 @@ it('preserves inline styles and presentational attributes used by email layouts'
     );
 
     mountEmailView($email)
-        ->assertMountedActionModalSeeHtml('bgcolor=&quot;#eeeeee&quot;')
-        ->assertMountedActionModalSeeHtml('style=&quot;color:#ff0000;padding:10px&quot;')
-        ->assertMountedActionModalSeeHtml('class=&quot;lead&quot;')
-        ->assertMountedActionModalSeeHtml('align=&quot;center&quot;');
+        ->assertSeeHtml('bgcolor=&quot;#eeeeee&quot;')
+        ->assertSeeHtml('style=&quot;color:#ff0000;padding:10px&quot;')
+        ->assertSeeHtml('class=&quot;lead&quot;')
+        ->assertSeeHtml('align=&quot;center&quot;');
 });
 
 it('renders email participants and ai label through the email view helpers', function (): void {
@@ -123,15 +122,15 @@ it('renders email participants and ai label through the email view helpers', fun
     ]);
 
     $email->labels()->create([
-        'source' => 'ai',
+        'source' => 'system',
         'label' => 'Sales',
     ]);
 
     mountEmailView($email->fresh(['body', 'participants', 'labels', 'attachments']))
-        ->assertMountedActionModalSeeHtml('Alice Sender')
-        ->assertMountedActionModalSeeHtml('Tara Recipient')
-        ->assertMountedActionModalSeeHtml('Cal Copy')
-        ->assertMountedActionModalSeeHtml('Sales');
+        ->assertSeeHtml('Alice Sender')
+        ->assertSeeHtml('Tara Recipient')
+        ->assertSeeHtml('Cal Copy')
+        ->assertSeeHtml('Sales');
 });
 
 it('does not truncate email bodies larger than the sanitizer default input cap', function (): void {
@@ -146,8 +145,8 @@ it('does not truncate email bodies larger than the sanitizer default input cap',
     $email = makeEmailWithBody($body);
 
     mountEmailView($email)
-        ->assertMountedActionModalSeeHtml('START-MARKER')
-        ->assertMountedActionModalSeeHtml('END-MARKER-9F3A');
+        ->assertSeeHtml('START-MARKER')
+        ->assertSeeHtml('END-MARKER-9F3A');
 });
 
 it('wraps sanitized email html in a scriptless dark-mode preview document', function (): void {
@@ -201,12 +200,12 @@ it('renders the email view iframe without scripts and with same-origin height me
     $email = makeEmailWithBody('<p>body</p>');
 
     mountEmailView($email)
-        ->assertMountedActionModalSeeHtml('<iframe')
-        ->assertMountedActionModalSeeHtml('sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"')
-        ->assertMountedActionModalSeeHtml('referrerpolicy="no-referrer"')
-        ->assertMountedActionModalSeeHtml('dark:bg-neutral-950 dark:[color-scheme:dark]')
-        ->assertMountedActionModalSeeHtml('dark:bg-gray-950')
-        ->assertMountedActionModalDontSeeHtml('allow-scripts');
+        ->assertSeeHtml('<iframe')
+        ->assertSeeHtml('sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"')
+        ->assertSeeHtml('referrerpolicy="no-referrer"')
+        ->assertSeeHtml('dark:bg-neutral-950 dark:[color-scheme:dark]')
+        ->assertSeeHtml('dark:bg-gray-950')
+        ->assertDontSeeHtml('allow-scripts');
 });
 
 it('strips dangerous markup in the threaded email view', function (): void {

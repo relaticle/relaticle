@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordChipRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -103,4 +104,12 @@ it('wraps markdown tables in a scrollable region', function (): void {
 
     expect($html)->toContain('<div class="chat-md-table overflow-x-auto" tabindex="0" role="region"><table>')
         ->and($html)->toContain('</table></div>');
+});
+
+it('draws its chip icons from the shared CRM entity enum, not a private copy', function (): void {
+    foreach (CrmEntity::cases() as $case) {
+        expect(RecordChipRenderer::iconPath($case->value))->toBe($case->iconPath());
+    }
+
+    expect(RecordChipRenderer::iconPath('custom_field'))->toBeNull();
 });

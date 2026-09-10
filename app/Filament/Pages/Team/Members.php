@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Team;
 
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
-use App\Livewire\App\Teams\AddTeamMember;
-use App\Livewire\App\Teams\PendingTeamInvitations;
+use App\Livewire\App\Teams\InviteTeamMembers;
 use App\Livewire\App\Teams\TeamMembers;
 use App\Models\Team;
 use BackedEnum;
@@ -41,7 +40,7 @@ final class Members extends Page
         /** @var Team $tenant */
         $tenant = Filament::getTenant();
 
-        return auth()->user()?->can('update', $tenant) === true;
+        return auth()->user()?->can('manageMembers', $tenant) === true;
     }
 
     public static function getLabel(): string
@@ -65,9 +64,7 @@ final class Members extends Page
         $tenant = Filament::getTenant();
 
         return $schema->components([
-            Livewire::make(AddTeamMember::class)
-                ->data(['team' => $tenant]),
-            Livewire::make(PendingTeamInvitations::class)
+            Livewire::make(InviteTeamMembers::class)
                 ->data(['team' => $tenant]),
             Livewire::make(TeamMembers::class)
                 ->data(['team' => $tenant]),

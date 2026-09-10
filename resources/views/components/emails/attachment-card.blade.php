@@ -1,6 +1,6 @@
 {{-- One attachment, as a card: a file-type badge, the name, and its size underneath.
-     The trailing slot is the control — a download link in the reader, a remove button
-     in the composer — so both surfaces read as the same object.
+     The trailing slot is the control: a download link in the reader, a remove
+     button in the composer. Both surfaces read as the same object.
 
      `size` is bytes; pass null while a file is still being processed and the line
      falls back to `placeholder`. --}}

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Enums;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeZone;
 use Filament\Support\Contracts\HasLabel;
@@ -60,9 +60,9 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Format a Carbon instance for display.
+     * Format a date for display.
      */
-    public function format(Carbon $date, bool $withTime = false): string
+    public function format(CarbonImmutable $date, bool $withTime = false): string
     {
         if ($withTime) {
             return match ($this) {
@@ -98,12 +98,12 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Parse a date string into a Carbon instance.
+     * Parse a date string into an immutable date.
      *
      * Attempts multiple format variations to handle real-world CSV data.
      *
      * A CSV carries no offset, so a naive datetime means the wall clock where the person
-     * who exported it lives — the same thing it means when they type it into the form,
+     * who exported it lives, the same thing it means when they type it into the form,
      * which converts out of their zone before storing. `$timezone` is that zone; parsing
      * in it keeps the two paths on the same instant. Null keeps the PHP default, for
      * callers with no user in scope.
@@ -112,7 +112,7 @@ enum DateFormat: string implements HasLabel
      * and interpreting midnight in a negative-offset zone would move it to the previous
      * calendar day.
      */
-    public function parse(string $value, bool $withTime = false, ?string $timezone = null): ?Carbon
+    public function parse(string $value, bool $withTime = false, ?string $timezone = null): ?CarbonImmutable
     {
         $value = trim($value);
 
@@ -123,7 +123,7 @@ enum DateFormat: string implements HasLabel
         foreach ($this->getParseFormats($withTime) as $format) {
             $date = $this->parseStrictly($format, $value, $withTime ? $timezone : null);
 
-            if ($date instanceof Carbon) {
+            if ($date instanceof CarbonImmutable) {
                 return $withTime && $timezone !== null ? $date->utc() : $date;
             }
         }
@@ -139,7 +139,7 @@ enum DateFormat: string implements HasLabel
      * gate. The `!` prefix is still used, to zero the fields the format does not carry
      * rather than inheriting them from the current clock.
      */
-    private function parseStrictly(string $format, string $value, ?string $timezone): ?Carbon
+    private function parseStrictly(string $format, string $value, ?string $timezone): ?CarbonImmutable
     {
         $parsed = DateTimeImmutable::createFromFormat(
             '!'.$format,
@@ -165,9 +165,9 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Format a Carbon instance for use in HTML date/datetime-local input.
+     * Format a date for use in HTML date/datetime-local input.
      */
-    public function toPickerValue(Carbon $date, bool $withTime = false): string
+    public function toPickerValue(CarbonImmutable $date, bool $withTime = false): string
     {
         return $date->format($withTime ? 'Y-m-d\TH:i' : 'Y-m-d');
     }

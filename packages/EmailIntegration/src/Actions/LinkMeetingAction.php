@@ -11,11 +11,11 @@ use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
+use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PublicDomainList;
 
@@ -25,11 +25,15 @@ final readonly class LinkMeetingAction
         private AutoCreateCompanyAction $autoCreateCompany,
         private AutoCreatePersonAction $autoCreatePerson,
         private CompanyDomainMatcher $domainMatcher,
+        private AutomatedSenderMatcher $automatedSender,
+        private EmailVisibilityService $visibility,
+        private RecordCommunicationMetrics $metrics,
         private PublicDomainList $publicDomainList,
     ) {}
 
     public function execute(Meeting $meeting): void
     {
+        $countsTowardIntelligence = $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting);
         $attendees = $meeting->attendees()->where('is_self', false)->get();
         $teamId = $meeting->team_id;
         $team = $meeting->team;
@@ -37,23 +41,12 @@ final readonly class LinkMeetingAction
         $skippedDomains = $this->publicDomainList->forTeam($teamId);
 
         foreach ($attendees as $attendee) {
-            $company = null;
-            $domain = $this->extractDomain($attendee->email_address);
-
-            if ($domain && $skippedDomains->doesntContain($domain)) {
-                $company = $this->domainMatcher->firstMatching($domain, $teamId);
-
-                if (! $company && $team?->auto_create_companies) {
-                    $company = $this->autoCreateCompany->execute($domain, $teamId, $team);
-                }
-
-                if ($company instanceof Company) {
-                    $attendee->update(['company_id' => $company->getKey()]);
-                    if ($this->autoAttach($meeting->companies(), $company->getKey())) {
-                        $this->updateCompanyMetrics($company, $meeting);
-                    }
-                }
-            }
+            $isAutomatedSender = $this->automatedSender->matches($attendee->email_address);
+            $suppressCreate = $this->visibility->suppressesRecordCreation(
+                $attendee->email_address,
+                $teamId,
+                $meeting->connected_account_id,
+            );
 
             $person = People::query()->where('team_id', $teamId)
                 ->whereHas('customFieldValues', fn (Builder $valueQuery) => $valueQuery
@@ -62,7 +55,33 @@ final readonly class LinkMeetingAction
                 )
                 ->first();
 
-            if (! $person && $account && $team && $this->shouldCreatePerson($team)) {
+            $wouldCreatePerson = ! $person
+                && ! $isAutomatedSender
+                && ! $suppressCreate
+                && $account
+                && $team
+                && $this->shouldCreatePerson($team);
+
+            $company = null;
+            $rawDomain = $this->extractDomain($attendee->email_address);
+            $host = $rawDomain !== null ? $this->domainMatcher->host($rawDomain) : null;
+
+            if ($host && $skippedDomains->doesntContain($host)) {
+                $company = $this->domainMatcher->firstMatching($host, $teamId);
+
+                if (! $company && $wouldCreatePerson && $team->auto_create_companies) {
+                    $company = $this->autoCreateCompany->execute($host, $teamId, $team);
+                }
+
+                if ($company instanceof Company) {
+                    $attendee->update(['company_id' => $company->getKey()]);
+                    if ($this->autoAttach($meeting->companies(), $company->getKey()) && $countsTowardIntelligence) {
+                        $this->metrics->incrementMeetingMetrics($company, $meeting);
+                    }
+                }
+            }
+
+            if ($wouldCreatePerson) {
                 $person = $this->autoCreatePerson->execute(
                     $attendee->name ?? '',
                     $attendee->email_address,
@@ -74,8 +93,8 @@ final readonly class LinkMeetingAction
 
             if ($person) {
                 $attendee->update(['contact_id' => $person->getKey()]);
-                if ($this->autoAttach($meeting->people(), $person->getKey())) {
-                    $this->updatePersonMetrics($person, $meeting);
+                if ($this->autoAttach($meeting->people(), $person->getKey()) && $countsTowardIntelligence) {
+                    $this->metrics->incrementMeetingMetrics($person, $meeting);
                 }
 
                 if ($person->company_id) {
@@ -87,8 +106,8 @@ final readonly class LinkMeetingAction
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey())) {
-                        $this->updateOpportunityMetrics($opportunity, $meeting);
+                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey()) && $countsTowardIntelligence) {
+                        $this->metrics->incrementMeetingMetrics($opportunity, $meeting);
                     }
                 }
             }
@@ -115,7 +134,7 @@ final readonly class LinkMeetingAction
     private function autoAttach(MorphToMany $relation, string $relatedId): bool
     {
         // Only attach (with link_source 'auto') when the record isn't already
-        // linked — never touch an existing pivot, so a prior manual link keeps
+        // linked. Never touch an existing pivot, so a prior manual link keeps
         // its 'manual' source instead of being silently downgraded to 'auto'.
         if ($relation->whereKey($relatedId)->exists()) {
             return false;
@@ -124,47 +143,6 @@ final readonly class LinkMeetingAction
         $relation->attach($relatedId, ['link_source' => 'auto']);
 
         return true;
-    }
-
-    private function updatePersonMetrics(People $person, Meeting $meeting): void
-    {
-        $this->advanceMetrics($person->getTable(), $person->getKey(), $meeting->starts_at);
-    }
-
-    private function updateCompanyMetrics(Company $company, Meeting $meeting): void
-    {
-        $this->advanceMetrics($company->getTable(), $company->getKey(), $meeting->starts_at);
-    }
-
-    private function updateOpportunityMetrics(Opportunity $opportunity, Meeting $meeting): void
-    {
-        $this->advanceMetrics($opportunity->getTable(), $opportunity->getKey(), $meeting->starts_at);
-    }
-
-    /**
-     * Increments `meeting_count` and monotonically advances `last_meeting_at` / `last_interaction_at`.
-     * The timestamps are guarded at the SQL level so parallel workers processing events out of
-     * chronological order (e.g. the 90-day backfill) cannot regress a newer value to an older one.
-     */
-    private function advanceMetrics(string $table, string $id, Carbon $startsAt): void
-    {
-        DB::table($table)
-            ->where('id', $id)
-            ->update(['meeting_count' => DB::raw('meeting_count + 1')]);
-
-        $this->advanceTimestamp($table, $id, 'last_meeting_at', $startsAt);
-        $this->advanceTimestamp($table, $id, 'last_interaction_at', $startsAt);
-    }
-
-    private function advanceTimestamp(string $table, string $id, string $column, Carbon $startsAt): void
-    {
-        DB::table($table)
-            ->where('id', $id)
-            ->where(fn (QueryBuilder $q) => $q
-                ->whereNull($column)
-                ->orWhere($column, '<', $startsAt)
-            )
-            ->update([$column => $startsAt]);
     }
 
     private function extractDomain(string $email): ?string

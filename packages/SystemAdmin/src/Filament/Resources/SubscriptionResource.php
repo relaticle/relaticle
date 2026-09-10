@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
+use App\Enums\Plan;
+use App\Enums\StripeSubscriptionStatus;
 use App\Models\Team;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -56,22 +58,27 @@ final class SubscriptionResource extends Resource
         return parent::getEloquentQuery()->with('owner');
     }
 
+    /**
+     * Filament injects closure arguments by parameter name, so the callable it
+     * is handed must take `$state`. That is the only reason this sits between
+     * the column and `Plan::stripePriceLabel()`.
+     */
     public static function planLabel(?string $state): string
     {
-        return match (true) {
-            $state === config('services.stripe.prices.pro_monthly') => 'Pro · monthly',
-            $state === config('services.stripe.prices.pro_yearly') => 'Pro · yearly',
-            default => $state ?? '—',
-        };
+        return Plan::stripePriceLabel($state);
     }
 
-    public static function statusColor(string $state): string
+    /**
+     * Shared with SubscriptionsRelationManager so the two tables cannot drift
+     * apart again the way their colour maps did.
+     */
+    public static function statusColumn(): TextColumn
     {
-        return match ($state) {
-            'active', 'trialing' => 'success',
-            'past_due' => 'warning',
-            default => 'gray',
-        };
+        return TextColumn::make('stripe_status')
+            ->label('Status')
+            ->state(fn (Subscription $record): StripeSubscriptionStatus|string => StripeSubscriptionStatus::forDisplay($record->stripe_status))
+            ->tooltip(StripeSubscriptionStatus::tooltipFor(...))
+            ->badge();
     }
 
     #[Override]
@@ -92,8 +99,9 @@ final class SubscriptionResource extends Resource
                         ->formatStateUsing(self::planLabel(...)),
                     TextEntry::make('stripe_status')
                         ->label('Status')
-                        ->badge()
-                        ->color(self::statusColor(...)),
+                        ->state(fn (Subscription $record): StripeSubscriptionStatus|string => StripeSubscriptionStatus::forDisplay($record->stripe_status))
+                        ->tooltip(StripeSubscriptionStatus::tooltipFor(...))
+                        ->badge(),
                     TextEntry::make('quantity')
                         ->numeric()
                         ->placeholder('—'),
@@ -129,10 +137,7 @@ final class SubscriptionResource extends Resource
                 TextColumn::make('stripe_price')
                     ->label('Plan')
                     ->formatStateUsing(self::planLabel(...)),
-                TextColumn::make('stripe_status')
-                    ->label('Status')
-                    ->badge()
-                    ->color(self::statusColor(...)),
+                self::statusColumn(),
                 TextColumn::make('ends_at')
                     ->label('Ends')
                     ->dateTime()
@@ -145,13 +150,8 @@ final class SubscriptionResource extends Resource
             ->filters([
                 SelectFilter::make('stripe_status')
                     ->label('Status')
-                    ->options([
-                        'active' => 'Active',
-                        'trialing' => 'Trialing',
-                        'past_due' => 'Past due',
-                        'canceled' => 'Canceled',
-                        'incomplete' => 'Incomplete',
-                    ]),
+                    ->options(StripeSubscriptionStatus::class)
+                    ->multiple(),
             ])
             ->recordActions([
                 ViewAction::make(),

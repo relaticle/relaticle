@@ -9,6 +9,7 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Models\User;
 use App\Support\CompetitorFacts;
 use App\Support\DetectsPublicMarkdownRequest;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Relaticle\Ink\Models\Category;
@@ -81,6 +82,7 @@ describe('Legal pages', function () {
         expect($response->headers->get('Content-Type'))->toStartWith($contentType);
 
         $response->assertSee('Terms of Service');
+        $response->assertSeeText('To request account deletion, email privacy@relaticle.com or contact us.');
         $response->assertSee('Relaticle');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
@@ -92,11 +94,14 @@ describe('Legal pages', function () {
     it('displays the privacy policy page with current MCP disclosures as :format', function (array $headers, string $contentType) {
         $response = $this->get('/privacy-policy', $headers);
 
+        $response->assertSeeText('To request account deletion, email privacy@relaticle.com or contact us.');
+
         $response->assertStatus(200);
         expect($response->headers->get('Content-Type'))->toStartWith($contentType);
 
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
+        $response->assertSee('privacy@relaticle.com');
         $response->assertSee('August 26, 2026');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
@@ -141,7 +146,7 @@ describe('Legal pages', function () {
 
 describe('Documentation pages', function () {
     // Shiki highlights code by spawning a node subprocess per fenced block, and
-    // these pages carry ~59 between them — over half this file's runtime. None
+    // these pages carry ~59 between them, over half this file's runtime. None
     // of the assertions here read highlighted output, so it is switched off and
     // covered once, explicitly, at the end of this block.
     beforeEach(function () {
@@ -228,7 +233,7 @@ describe('Authentication redirects', function () {
     it('redirects register to app panel', function () {
         $response = $this->get('/register');
 
-        $response->assertRedirect(url()->getAppUrl('register'));
+        $response->assertRedirect(url()->getAppUrl('login'));
     });
 
     it('redirects forgot password to app panel', function () {
@@ -267,10 +272,10 @@ describe('Social authentication routes', function () {
         $response->assertStatus(429); // Too Many Requests
     });
 
-    it('accepts github as a provider for redirect', function () {
+    it('rejects github as a provider for redirect', function () {
         $response = $this->get('/auth/redirect/github');
 
-        $response->assertStatus(302); // Redirect to GitHub
+        $response->assertNotFound();
     });
 
     it('accepts google as a provider for redirect', function () {
@@ -280,7 +285,7 @@ describe('Social authentication routes', function () {
     });
 });
 
-describe('Hero AI tab — conversation', function () {
+describe('Hero AI tab: conversation', function () {
     it('renders the three exchanges in initial DOM', function () {
         $response = $this->get('/');
 
@@ -325,20 +330,22 @@ describe('Hero AI tab — conversation', function () {
         $body = (string) $this->get('/')->assertSuccessful()->getContent();
 
         // Both writes the demo performs are proposals in the product
-        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction),
-        // so each must reach the transcript carrying an Approved outcome, and
-        // the dock must offer a decision for each before it lands. Advertising
-        // an unattended write would contradict the review-before-write contract
-        // the demo's own second exchange is built to show off.
+        // (BaseWriteCreateTool / BaseWriteUpdateTool return a PendingAction), so
+        // each must be announced as a proposal and the dock must offer a
+        // decision before it lands. Advertising an unattended write would
+        // contradict the review-before-write contract the demo's own second
+        // exchange is built to show off.
         //
-        // Asserted on the review CHROME rather than on a card heading: the row
-        // renders the record as a chip plus an operation label, and pinning that
-        // wording made this test fail on a pure restyle while the invariant it
-        // guards -- no write without an approval -- still held.
-        expect(substr_count($body, 'Approved'))->toBeGreaterThanOrEqual(2)
-            ->and(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
+        // Asserted on the review CHROME rather than on a card heading or an
+        // outcome badge: the decided row renders the record as a chip plus an
+        // operation label, and pinning that wording made this test fail on a
+        // pure restyle while the invariant it guards -- no write without an
+        // approval -- still held.
+        expect(substr_count($body, 'Review before continuing'))->toBeGreaterThanOrEqual(1)
             ->and($body)->toContain('Review the proposal below to update the task')
-            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems');
+            ->and($body)->toContain('Review the proposal below to add her to Kovra Systems')
+            ->and($body)->toContain('Discard')
+            ->and($body)->toContain('Save changes');
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -351,9 +358,10 @@ describe('Hero AI tab — conversation', function () {
             ->and($body)->not->toContain('rounded-br-md bg-primary-50')
             ->and($body)->not->toContain('rounded-br-md bg-primary-600');
 
-        // A decided proposal collapses to one line carrying the dock's identity:
-        // an operation-tinted entity tile and the record label in bold, NOT a
-        // record pill (chips are reserved for inline clickable references).
+        // The docked proposal names the operation it is asking to approve; the
+        // decided row it collapses into carries only the operation-tinted entity
+        // tile and the record label in bold, NOT a record pill (chips are
+        // reserved for inline clickable references).
         expect($body)->toContain('Create Person')
             ->and($body)->toContain('Update Task')
             ->and($body)->not->toContain('uppercase tracking-wider text-amber-600');
@@ -364,7 +372,7 @@ describe('Hero AI tab — conversation', function () {
     });
 });
 
-describe('Hero AI tab — app shell', function () {
+describe('Hero AI tab: app shell', function () {
     it('renders the sidebar navigation items', function () {
         $response = $this->get('/');
 
@@ -391,7 +399,7 @@ describe('Hero AI tab — app shell', function () {
         $response->assertStatus(200);
         $response->assertSee('Overdue tasks this week');
         $response->assertSee('Follow up with Priya Nair');
-        $response->assertSee('Renewal prep — Daniel Okafor', false);
+        $response->assertSee('Renewal prep: Daniel Okafor', false);
         $response->assertSee('All chats');
     });
 
@@ -414,7 +422,7 @@ describe('Hero AI tab — app shell', function () {
     });
 });
 
-describe('Hero AI tab — demo CTA', function () {
+describe('Hero AI tab: demo CTA', function () {
     it('does not show the Watch demo link when video file is missing', function () {
         $videoPath = public_path('videos/hero-demo.mp4');
         if (file_exists($videoPath)) {
@@ -468,6 +476,24 @@ describe('Blog pages', function () {
         $this->get('/blog')
             ->assertStatus(200)
             ->assertSee($post->title);
+    });
+
+    it('renders the post cover uncropped on the index', function () {
+        Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
+
+        $this->get('/blog')
+            ->assertStatus(200)
+            ->assertSee('storage/ink/cover.png')
+            ->assertSee('aspect-video');
+    });
+
+    it('renders related posts through the shared card on a post page', function () {
+        $category = Category::factory()->create();
+        [$post, $related] = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+
+        $this->get("/blog/{$post->slug}")
+            ->assertStatus(200)
+            ->assertSee($related->title);
     });
 
     it('canonicalises a paginated listing to its own page', function () {
@@ -762,7 +788,7 @@ describe('Response meta', function () {
     });
 });
 
-describe('Hero AI tab — animation timeline', function () {
+describe('Hero AI tab: animation timeline', function () {
     it('hides the data-table outer container at cycle start', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -781,7 +807,7 @@ describe('Hero AI tab — animation timeline', function () {
 
         // Hold is the read-time after exchange 3 settles before the loop
         // restarts from the entry phase. cycleMs no longer exists as a
-        // single magic number — timing is composed from entryHold +
+        // single magic number. Timing is composed from entryHold +
         // transition + exchange budgets.
         expect($body)->toContain('holdMs: 1500');
     });
@@ -845,7 +871,7 @@ describe('Hero AI tab — animation timeline', function () {
     });
 });
 
-describe('Hero AI tab — entry phase', function () {
+describe('Hero AI tab: entry phase', function () {
     it('renders the dashboard greeting mirroring app /', function () {
         $response = $this->get('/');
         $response->assertSuccessful();
@@ -904,5 +930,106 @@ describe('Hero AI tab — entry phase', function () {
         expect($body)->toContain('transitionToConversation');
         expect($body)->toContain('entryHoldMs');
         expect($body)->toContain('entryTransitionMs');
+    });
+});
+
+describe('Page metadata', function () {
+    it('keeps the title, description and heading of :path within search-result bounds', function (string $path, bool $expectsHeading) {
+        $html = $this->get($path)->assertOk()->getContent();
+
+        preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+        preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+
+        $titleText = html_entity_decode(trim($title[1] ?? ''));
+        $descriptionText = html_entity_decode($description[1] ?? '');
+
+        expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
+            ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$path} title: {$titleText}")
+            ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
+            ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}")
+            ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+
+        if ($expectsHeading) {
+            expect(substr_count($html, '<h1'))->toBe(1, "{$path} must render exactly one h1");
+        }
+    })->with([
+        ['/', true],
+        ['/pricing', true],
+        ['/ai', true],
+        ['/ai-native-crm', true],
+        ['/self-hosted', true],
+        ['/press', true],
+        ['/contact', true],
+        ['/help', true],
+        ['/developers', true],
+        ['/developers/api', false],
+        ['/blog', true],
+        ['/compare/relaticle-vs-twenty', true],
+        ['/compare/relaticle-vs-espocrm', true],
+        ['/alternatives/attio', true],
+        ['/alternatives/hubspot', true],
+        ['/privacy-policy', true],
+        ['/terms-of-service', true],
+    ]);
+
+    it('bounds the blog index metadata and names the taxonomy on a category and tag page', function () {
+        $category = Category::factory()->create(['name' => 'Guides']);
+        $tag = Tag::factory()->create(['name' => 'mcp']);
+        Post::factory()->published()->create(['category_id' => $category->id]);
+
+        $listings = [
+            '/blog' => null,
+            "/blog/category/{$category->slug}" => $category->name,
+            "/blog/tag/{$tag->slug}" => $tag->name,
+        ];
+
+        foreach ($listings as $path => $taxonomy) {
+            $html = $this->get($path)->assertOk()->getContent();
+
+            preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+            preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+
+            $titleText = html_entity_decode(trim($title[1] ?? ''));
+            $descriptionText = html_entity_decode($description[1] ?? '');
+
+            expect($titleText)->toEndWith(' - '.config('app.name'), $path)
+                ->and(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
+                ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
+                ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}");
+
+            if ($taxonomy !== null) {
+                expect($titleText)->toContain($taxonomy)
+                    ->and($descriptionText)->toContain($taxonomy);
+
+                continue;
+            }
+
+            expect(mb_strlen($titleText))->toBeGreaterThanOrEqual(30, "{$path} title: {$titleText}");
+        }
+    });
+
+    it('renders one heading on each legal page and keeps it in the markdown version', function (string $path, string $heading) {
+        $html = $this->get($path)->assertOk()->getContent();
+        $markdown = $this->get($path, ['Accept' => 'text/markdown'])->assertOk()->getContent();
+
+        expect(substr_count($html, '<h1'))->toBe(1)
+            ->and(preg_match_all('/^\s*(# )?'.preg_quote($heading, '/').'\s*$/m', $markdown))->toBe(1);
+    })->with([
+        ['/privacy-policy', 'Privacy Policy'],
+        ['/terms-of-service', 'Terms of Service'],
+    ]);
+});
+
+describe('security.txt', function () {
+    it('serves the security contact with a future expiry', function () {
+        $response = $this->get('/.well-known/security.txt');
+
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
+        $response->assertSee('Contact: mailto:security@relaticle.com', false);
+        $response->assertSee('Canonical:', false);
+
+        preg_match('/Expires: (.+)/', (string) $response->getContent(), $matches);
+        expect(Date::parse($matches[1])->isFuture())->toBeTrue();
     });
 });

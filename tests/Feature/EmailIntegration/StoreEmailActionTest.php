@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Team;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
@@ -12,6 +13,7 @@ use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -268,6 +270,90 @@ it('stores inline attachment metadata', function (): void {
         ->assertExists((string) $attachment->storage_path);
 });
 
+it('stores embedded bytes for ordinary attachments that have no provider id', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $data = makeFetchedEmailData([
+        'hasAttachments' => true,
+        'attachments' => [
+            [
+                'filename' => 'notes.txt',
+                'mime_type' => 'text/plain',
+                'size' => 11,
+                'content_id' => null,
+                'attachment_id' => null,
+                'inline_data' => rtrim(strtr(base64_encode('hello-bytes'), '+/', '-_'), '='),
+                'is_inline' => false,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('notes.txt')
+        ->and($attachment->is_inline)->toBeFalse()
+        ->and($attachment->provider_attachment_id)->toBeNull()
+        ->and($attachment->storage_path)->not->toBeNull();
+
+    Storage::disk(EmailAttachment::DISK)
+        ->assertExists((string) $attachment->storage_path);
+
+    expect(Storage::disk(EmailAttachment::DISK)->get((string) $attachment->storage_path))
+        ->toBe('hello-bytes');
+});
+
+it('stores a nameless inline cid image with a generated filename', function (): void {
+    $data = makeFetchedEmailData([
+        'attachments' => [
+            [
+                'filename' => null,
+                'mime_type' => 'image/png',
+                'size' => 2769,
+                'content_id' => '64dde1dcdd71c_619bcc205105b@9fe1defa658f4522965e4f05974e142d-527074092.mail',
+                'attachment_id' => 'ANGjdJ_C0D5OGQiXtzOJg0HWAuQuorPLxx4bmjkY1a6C7rYa4ts9PBKBZ7ZSite2',
+                'inline_data' => null,
+                'is_inline' => true,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('inline.png')
+        ->and($attachment->mime_type)->toBe('image/png')
+        ->and($attachment->content_id)->toBe('64dde1dcdd71c_619bcc205105b@9fe1defa658f4522965e4f05974e142d-527074092.mail')
+        ->and($attachment->is_inline)->toBeTrue()
+        ->and($attachment->provider_attachment_id)->toBe('ANGjdJ_C0D5OGQiXtzOJg0HWAuQuorPLxx4bmjkY1a6C7rYa4ts9PBKBZ7ZSite2');
+});
+
+it('stores a nameless file attachment with a generated filename', function (): void {
+    $data = makeFetchedEmailData([
+        'hasAttachments' => true,
+        'attachments' => [
+            [
+                'filename' => null,
+                'mime_type' => 'application/pdf',
+                'size' => 204800,
+                'content_id' => null,
+                'attachment_id' => 'att-unnamed',
+                'inline_data' => null,
+            ],
+        ],
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
+
+    $attachment = $email->attachments()->sole();
+
+    expect($attachment->filename)->toBe('attachment.pdf')
+        ->and($attachment->is_inline)->toBeFalse()
+        ->and($attachment->provider_attachment_id)->toBe('att-unnamed');
+});
+
 it('cleans up stored inline files when storing the email rolls back', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
@@ -313,6 +399,22 @@ it('marks email as internal when all participants are team members', function ()
     $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->is_internal)->toBeTrue();
+});
+
+it('stamps the mailbox workspace privacy default when the owner has switched current team', function (): void {
+    $this->user->update(['default_email_sharing_tier' => null]);
+    $this->team->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+
+    $otherTeam = Team::factory()->create([
+        'user_id' => $this->user->getKey(),
+        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+    ]);
+    $this->user->teams()->attach($otherTeam, ['role' => 'admin']);
+    $this->user->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account->fresh(), makeFetchedEmailData());
+
+    expect($email->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
 it('treats a member as internal even when their active team is a different team', function (): void {
@@ -514,4 +616,20 @@ it('stores body in email_bodies table', function (): void {
         'email_id' => $email->getKey(),
         'body_text' => 'Plain text body',
     ]);
+});
+
+it('bumps mailbox import progress while the history cursor is still empty', function (): void {
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(0);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(1);
+});
+
+it('does not bump mailbox import progress after the history cursor is written', function (): void {
+    $this->account->update(['sync_cursor' => 'history-1']);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
+
+    expect($this->account->fresh()?->initial_sync_imported)->toBe(0);
 });

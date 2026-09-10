@@ -4,16 +4,25 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
-use App\Enums\SubscriberTagEnum;
-use App\Enums\TagAction;
-use App\Jobs\Email\ModifySubscriberTagsJob;
+use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\AiSummary;
 use App\Models\User;
+use App\Observers\Concerns\TagsFirstCrmData;
+use App\Support\Email\SubscriberProfileDeriver;
 
+/**
+ * Syncs the authenticated user's Mailcoach profile when the first AI summary is
+ * generated in one of their workspaces, so has-ai-usage lands immediately
+ * instead of waiting for the nightly reconcile sweep.
+ *
+ * Mirrors {@see TagsFirstCrmData}: the fast path only covers interactive
+ * sessions, and everything else converges through the sweep.
+ */
 final readonly class AiSummaryObserver
 {
     public function created(AiSummary $summary): void
     {
+        // Guarded here too so the request path skips the exists-probes below.
         if (! config('mailcoach-sdk.enabled_subscribers_sync', false)) {
             return;
         }
@@ -21,24 +30,14 @@ final readonly class AiSummaryObserver
         /** @var User|null $user */
         $user = auth()->user();
 
-        if (! $user instanceof User || ! $user->mailcoach_subscriber_uuid) {
+        if (! $user instanceof User) {
             return;
         }
 
-        $teamIds = $user->allTeams()->pluck('id');
-        $alreadyHadSummary = AiSummary::query()
-            ->whereIn('team_id', $teamIds)
-            ->whereKeyNot($summary->getKey())
-            ->exists();
-
-        if ($alreadyHadSummary) {
+        if (resolve(SubscriberProfileDeriver::class)->hasAiUsage($user, $summary)) {
             return;
         }
 
-        dispatch(new ModifySubscriberTagsJob(
-            $user->mailcoach_subscriber_uuid,
-            [SubscriberTagEnum::HasAiUsage->value],
-            TagAction::Add,
-        ))->afterCommit();
+        SyncSubscriberJob::dispatchFor((string) $user->id);
     }
 }

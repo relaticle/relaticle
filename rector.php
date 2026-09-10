@@ -12,6 +12,7 @@ use Rector\Privatization\Rector\ClassMethod\PrivatizeFinalClassMethodRector;
 use RectorLaravel\Rector\Class_\AddHasFactoryToModelsRector;
 use RectorLaravel\Rector\Class_\AppendsPropertyToAppendsAttributeRector;
 use RectorLaravel\Rector\Class_\BackoffPropertyToBackoffAttributeRector;
+use RectorLaravel\Rector\Class_\EmptyGuardedPropertyToUnguardedAttributeRector;
 use RectorLaravel\Rector\Class_\FillablePropertyToFillableAttributeRector;
 use RectorLaravel\Rector\Class_\HiddenPropertyToHiddenAttributeRector;
 use RectorLaravel\Rector\Class_\TablePropertyToTableAttributeRector;
@@ -19,14 +20,15 @@ use RectorLaravel\Rector\Class_\TimeoutPropertyToTimeoutAttributeRector;
 use RectorLaravel\Rector\Class_\TriesPropertyToTriesAttributeRector;
 use RectorLaravel\Rector\Class_\UniqueForPropertyToUniqueForAttributeRector;
 use RectorLaravel\Rector\Class_\UseForwardsCallsTraitRector;
+use RectorLaravel\Rector\ClassMethod\AddGenericBuilderToScopesRector;
+use RectorLaravel\Rector\ClassMethod\MigrateToSimplifiedAttributeRector;
 use RectorLaravel\Rector\Coalesce\ApplyDefaultInsteadOfNullCoalesceRector;
 use RectorLaravel\Rector\Empty_\EmptyToBlankAndFilledFuncRector;
 use RectorLaravel\Rector\MethodCall\EloquentWhereTypeHintClosureParameterRector;
+use RectorLaravel\Rector\StaticCall\CarbonToDateFacadeRector;
 use RectorLaravel\Set\LaravelSetList;
-use RectorLaravel\Set\LaravelSetProvider;
 
 return RectorConfig::configure()
-    ->withSetProviders(LaravelSetProvider::class)
     ->withComposerBased(laravel: true)
     // Keep the result cache inside the project so CI can restore it between runs.
     // Rector otherwise caches to the system temp dir, which GitHub Actions discards.
@@ -50,6 +52,7 @@ return RectorConfig::configure()
         // refactor best handled in dedicated PRs, not bundled into dependency updates.
         AppendsPropertyToAppendsAttributeRector::class,
         BackoffPropertyToBackoffAttributeRector::class,
+        EmptyGuardedPropertyToUnguardedAttributeRector::class,
         FillablePropertyToFillableAttributeRector::class,
         HiddenPropertyToHiddenAttributeRector::class,
         TablePropertyToTableAttributeRector::class,
@@ -57,13 +60,20 @@ return RectorConfig::configure()
         TriesPropertyToTriesAttributeRector::class,
         UniqueForPropertyToUniqueForAttributeRector::class,
         EloquentWhereTypeHintClosureParameterRector::class,
+        MigrateToSimplifiedAttributeRector::class,
+        // Rewrites imported `Builder<Model>` scope docblocks to fully qualified
+        // `Builder<self>`, which regresses the docblock import rule for no type gain.
+        AddGenericBuilderToScopesRector::class,
         RemoveUnusedPrivateMethodRector::class => [
             // Skip Filament importer lifecycle hooks - they're called dynamically via callHook()
             __DIR__.'/app/Filament/Imports/*',
         ],
         PrivatizeFinalClassMethodRector::class => [
-            // Filament expects protected visibility for lifecycle hooks
+            // Filament runs lifecycle hooks through callHook() in BasePage scope,
+            // so a private hook on a final page is a fatal error at runtime.
             __DIR__.'/app/Filament/Imports/*',
+            __DIR__.'/app/Filament/Pages/*',
+            __DIR__.'/packages/EmailIntegration/src/Filament/Pages/*',
         ],
         ArrayToFirstClassCallableRector::class => [
             // class_exists has optional bool param that conflicts with Collection::first signature
@@ -100,6 +110,10 @@ return RectorConfig::configure()
         LaravelSetList::LARAVEL_TYPE_DECLARATIONS,
     ])
     ->withRules([
+        // Dates are immutable application-wide via Date::use(CarbonImmutable::class).
+        // A hardcoded Carbon:: static call bypasses that factory and hands back a
+        // mutable date the type hints no longer accept.
+        CarbonToDateFacadeRector::class,
         EmptyToBlankAndFilledFuncRector::class,
         UseForwardsCallsTraitRector::class,
     ])

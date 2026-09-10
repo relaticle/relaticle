@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
-use App\Features\EmailIntegration;
-use App\Filament\Components\Infolists\AvatarName;
+use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
@@ -21,11 +20,12 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
+use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
-use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewCompany extends ViewRecord
 {
@@ -34,11 +34,8 @@ final class ViewCompany extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('viewEmails')
+            ViewRecordEmailsAction::make()
                 ->label(__('filament/resources/company.pages.view.actions.view_emails.label'))
-                ->icon('heroicon-o-envelope')
-                ->color('gray')
-                ->visible(fn (): bool => Feature::active(EmailIntegration::class))
                 ->url(fn (): string => CompanyResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
@@ -84,26 +81,15 @@ final class ViewCompany extends ViewRecord
                 Flex::make([
                     Section::make([
                         Flex::make([
-                            AvatarName::make('logo')
-                                ->avatar('logo')
-                                ->name('name')
-                                ->avatarSize('lg')
-                                ->textSize('xl')
-                                ->square()
-                                ->label(__('filament/resources/company.pages.view.infolist.fields.logo.label')),
-                            AvatarName::make('creator')
-                                ->avatar('creator.avatar')
-                                ->name('creator.name')
-                                ->avatarSize('sm')
-                                ->textSize('sm')
-                                ->circular()
+                            RecordChipEntry::make('name')
+                                ->chipSize('lg')
+                                ->size(TextSize::Large)
+                                ->label(__('filament/resources/company.pages.view.infolist.fields.name.label')),
+                            RecordChipEntry::make('creator.name')
+                                ->chipSize('sm')
                                 ->label(__('filament/resources/company.pages.view.infolist.fields.creator.label')),
-                            AvatarName::make('accountOwner')
-                                ->avatar('accountOwner.avatar')
-                                ->name('accountOwner.name')
-                                ->avatarSize('sm')
-                                ->textSize('sm')
-                                ->circular()
+                            RecordChipEntry::make('accountOwner.name')
+                                ->chipSize('sm')
                                 ->label(__('filament/resources/company.pages.view.infolist.fields.account_owner.label')),
                         ]),
                         CustomFields::infolist()->forSchema($schema)->build(),
@@ -120,40 +106,7 @@ final class ViewCompany extends ViewRecord
                     ])->grow(false),
                 ])->columnSpan('full'),
 
-                Section::make('Communication Intelligence')
-                    ->icon(Heroicon::ChartBar)
-                    ->schema([
-                        TextEntry::make('last_interaction_at')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.last_interaction.label'))
-                            ->dateTime()
-                            ->placeholder(__('filament/resources/company.pages.view.communication_intelligence.fields.last_interaction.placeholder')),
-
-                        TextEntry::make('last_email_at')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.last_email.label'))
-                            ->dateTime()
-                            ->placeholder(__('filament/resources/company.pages.view.communication_intelligence.fields.last_email.placeholder')),
-
-                        TextEntry::make('days_since_last_email')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.label'))
-                            ->getStateUsing(fn (Company $record): string => $record->last_email_at
-                                ? __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.value', ['days' => (int) now()->diffInDays($record->last_email_at, true)])
-                                : __('filament/resources/company.pages.view.communication_intelligence.fields.days_since_last_email.empty')
-                            ),
-
-                        TextEntry::make('email_count')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.email_count.label'))
-                            ->default(0),
-
-                        TextEntry::make('inbound_email_count')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.inbound_email_count.label')),
-
-                        TextEntry::make('outbound_email_count')
-                            ->label(__('filament/resources/company.pages.view.communication_intelligence.fields.outbound_email_count.label')),
-                    ])
-                    ->columns(3)
-                    ->columnSpanFull()
-                    ->collapsible()
-                    ->collapsed(fn (Company $record): bool => ($record->email_count ?? 0) === 0),
+                CommunicationIntelligenceInfolist::section(),
 
             ]);
     }

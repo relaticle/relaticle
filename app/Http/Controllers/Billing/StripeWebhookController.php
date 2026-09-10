@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Billing;
 
 use App\Actions\Billing\GrantPurchasedCredits;
+use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\RestoreWorkspaceTrial;
 use App\Models\Team;
 use Illuminate\Support\Facades\Log;
@@ -15,14 +16,27 @@ final class StripeWebhookController extends CashierWebhookController
 {
     /**
      * Stripe statuses a subscription can be created in without ever granting
-     * access — a checkout whose first payment failed or was abandoned.
+     * access: a checkout whose first payment failed or was abandoned.
      *
      * @var list<string>
      */
     private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
 
-    public function __construct(private readonly RestoreWorkspaceTrial $restoreTrial, private readonly GrantPurchasedCredits $grantCredits)
-    {
+    /**
+     * Why an invoice was raised, for the failures worth alarming a workspace
+     * about: a renewal, and a plan change billed immediately. Both belong to a
+     * subscription the workspace already has, which is what the notification's
+     * wording assumes.
+     *
+     * @var list<string>
+     */
+    private const array ALARMING_BILLING_REASONS = ['subscription_cycle', 'subscription_update'];
+
+    public function __construct(
+        private readonly RestoreWorkspaceTrial $restoreTrial,
+        private readonly GrantPurchasedCredits $grantCredits,
+        private readonly NotifyWorkspaceOfPaymentFailure $notifyPaymentFailure,
+    ) {
         parent::__construct();
     }
 
@@ -56,9 +70,58 @@ final class StripeWebhookController extends CashierWebhookController
     }
 
     /**
+     * Cashier ships no handler for this event, so WebhookHandled never fires for
+     * it and a listener on that event could never see it.
+     *
+     * The subscription lives at parent.subscription_details on the current API
+     * version, which dropped the top-level `subscription` key. Reading the old
+     * key would match nothing and silently notify no one. A credit-pack invoice
+     * has no such parent and must not raise a subscription alarm.
+     *
+     * Stripe repeats this event for every retry of the same invoice, eight over
+     * two weeks under the default Smart Retries policy, so only the first
+     * attempt is news. A missing count is read as the first, because failing
+     * toward one extra alarm beats failing toward silence.
+     *
+     * The notification tells the owner to update their card "to keep Pro", so
+     * it only fits a subscription that is already running. A failed first
+     * charge is `subscription_create`, where nothing was ever kept and Stripe
+     * expires the attempt instead of retrying it; the checkout flow reports
+     * that one synchronously.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function handleInvoicePaymentFailed(array $payload): Response
+    {
+        /** @var array<string, mixed> $object */
+        $object = $payload['data']['object'] ?? [];
+        $customer = $object['customer'] ?? null;
+
+        if (($object['parent']['type'] ?? null) !== 'subscription_details' || ! is_string($customer)) {
+            return $this->successMethod();
+        }
+
+        if (! in_array($object['billing_reason'] ?? null, self::ALARMING_BILLING_REASONS, true)) {
+            return $this->successMethod();
+        }
+
+        if (($object['attempt_count'] ?? 1) !== 1) {
+            return $this->successMethod();
+        }
+
+        $team = Team::query()->where('stripe_id', $customer)->first();
+
+        if ($team instanceof Team) {
+            $this->notifyPaymentFailure->execute($team);
+        }
+
+        return $this->successMethod();
+    }
+
+    /**
      * Fulfill credit-pack purchases for a checkout that settled synchronously.
      * Delayed-notification payment methods complete with payment_status
-     * 'unpaid' and settle later via checkout.session.async_payment_succeeded —
+     * 'unpaid' and settle later via checkout.session.async_payment_succeeded, so
      * fulfilling here without the gate would grant credits before the money
      * arrives, with nothing to reverse them if payment ultimately fails.
      *
@@ -95,7 +158,7 @@ final class StripeWebhookController extends CashierWebhookController
     /**
      * Fulfill credit-pack purchases for a settled (payment_status=paid)
      * checkout session. Subscription checkouts emit the same events and are
-     * ignored here (mode filter) — customer.subscription.* handles them.
+     * ignored here (mode filter); customer.subscription.* handles them.
      *
      * @param  array<string, mixed>  $session
      */

@@ -10,14 +10,18 @@ use Filament\Pages\Page;
 use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final class EmailAccountsPage extends Page
 {
-    use HasConnectedAccountActions, HasEmailFeatureFlag;
+    use HasConnectedAccountActions;
+    use HasConnectMailboxActions;
+    use HasEmailFeatureFlag;
 
     protected string $view = 'email-integration::filament.pages.email-accounts';
 
@@ -36,7 +40,7 @@ final class EmailAccountsPage extends Page
 
     /**
      * Heading and subheading are rendered inside the content column (see the page
-     * view) so they sit with the accounts panel under the cluster tabs — the page
+     * view) so they sit with the accounts panel under the cluster tabs. The page
      * header itself stays empty.
      */
     public function getHeading(): string
@@ -56,7 +60,7 @@ final class EmailAccountsPage extends Page
 
     /**
      * Keep the "Accounts" cluster item highlighted while a single account's
-     * settings page — a child of this one — is open.
+     * settings page, a child of this one, is open.
      *
      * @return array<int, string>
      */
@@ -88,28 +92,6 @@ final class EmailAccountsPage extends Page
         return $this->ownedAccountsQuery()->defaultFirst()->get();
     }
 
-    public function connectGmailAction(): Action
-    {
-        return Action::make('connectGmail')
-            ->label(__('filament/pages/email-accounts.actions.connect_gmail'))
-            ->icon('icon-google')
-            ->color('gray')
-            ->outlined()
-            ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'gmail']), true);
-    }
-
-    public function connectAzureAction(): Action
-    {
-        return Action::make('connectAzure')
-            ->label(__('filament/pages/email-accounts.actions.connect_azure'))
-            ->icon('heroicon-o-envelope')
-            ->color('gray')
-            ->outlined()
-            // Outlook/Azure connection is hidden for now; re-enable when the provider is ready.
-            ->hidden()
-            ->url(fn (): string => route('email-accounts.redirect', ['provider' => 'azure']), true);
-    }
-
     public function editSettingsAction(): Action
     {
         return Action::make('editSettings')
@@ -125,6 +107,20 @@ final class EmailAccountsPage extends Page
     public function refreshAccounts(): void
     {
         $this->connectedAccounts = $this->getAccounts();
+    }
+
+    public function isImportingAnyAccount(): bool
+    {
+        return $this->connectedAccounts->contains(
+            fn (ConnectedAccount $account): bool => $account->showsSyncProgress(),
+        );
+    }
+
+    public function connectedSectionDescription(): HtmlString
+    {
+        return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
+            'url' => route('policy.show'),
+        ]));
     }
 
     protected function afterAccountChanged(): void

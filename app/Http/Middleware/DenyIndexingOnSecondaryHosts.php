@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Everything that must legitimately answer on a non-primary host — panel
- * pages, the sysadmin login, API/MCP responses, exempted plumbing — is still
+ * Everything that must legitimately answer on a non-primary host (panel
+ * pages, the sysadmin login, API/MCP responses, exempted plumbing) is still
  * not search content. The header keeps crawlers from indexing those hosts
  * even where a 200 is the correct response.
  */

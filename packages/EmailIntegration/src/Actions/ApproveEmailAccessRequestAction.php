@@ -8,6 +8,7 @@ use App\Models\User;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 
@@ -32,13 +33,15 @@ final readonly class ApproveEmailAccessRequestAction
         }
 
         // Don't grant a share to a requester who is no longer in the email's team.
-        abort_unless($requester->current_team_id === $email->team_id, 403);
+        abort_unless($requester->belongsToTeamId($email->team_id), 403);
 
         $tier = EmailPrivacyTier::from($accessRequest->tier_requested);
 
         $this->sharingService->shareEmail($email, $owner, $requester, $tier);
 
         $accessRequest->update(['status' => EmailAccessRequestStatus::APPROVED]);
+
+        EmailAccessRequestedNotification::dismissFor($accessRequest);
 
         $requester->notify(new EmailAccessRespondedNotification($accessRequest));
     }

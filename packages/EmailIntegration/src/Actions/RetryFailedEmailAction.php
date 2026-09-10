@@ -18,12 +18,12 @@ final readonly class RetryFailedEmailAction
             $lockedEmail = Email::query()->lockForUpdate()->findOrFail($email->getKey());
 
             if ($lockedEmail->status !== EmailStatus::FAILED) {
-                throw new RuntimeException("Only failed emails can be retried — status is {$lockedEmail->status->value}.");
+                throw new RuntimeException("Only failed emails can be retried. Status is {$lockedEmail->status->value}.");
             }
 
             // Keep `attempts` intact (a failed email has attempted >= 1). Zeroing it
             // would make EmailSendingService treat the next send as a first attempt and
-            // skip the provider-side reconciliation lookup — re-delivering an email that
+            // skip the provider-side reconciliation lookup, re-delivering an email that
             // a prior attempt already handed to the provider before crashing.
             $lockedEmail->update([
                 'status' => EmailStatus::QUEUED,

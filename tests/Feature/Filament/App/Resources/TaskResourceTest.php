@@ -279,7 +279,7 @@ it('denies non-team-member from viewing another team task', function (): void {
 
 /**
  * The picker resolves its timezone from the same TimezoneManager the table columns read,
- * so display and entry cannot drift apart — this asserts the *input* direction, where a
+ * so display and entry cannot drift apart. This asserts the *input* direction, where a
  * regression would silently shift every datetime a user types.
  */
 it('stores a datetime typed in the user timezone as utc', function (): void {

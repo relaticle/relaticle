@@ -29,6 +29,15 @@ function teamMemberSelectWorkspace(): array
     return [$team, $owner, $member];
 }
 
+/**
+ * The member label carries the user's avatar as markup, so ordering and the
+ * "(You)" suffix are asserted against the text a user reads.
+ */
+function memberOptionText(string $label): string
+{
+    return trim((string) preg_replace('/\s+/', ' ', strip_tags($label)));
+}
+
 it('orders the acting user first and the rest by name', function (): void {
     teamMemberSelectWorkspace();
 
@@ -107,14 +116,14 @@ it('orders the acting user first through the real BelongsToMany relationship pat
 
     $options = $component->getOptionsFromRelationship();
 
-    expect(array_values($options))->toBe([
+    expect(array_map(memberOptionText(...), array_values($options)))->toBe([
         __('filament/panel.selects.member_self', ['name' => 'Zoe Zimmer']),
         'Alice Anderson',
     ]);
 
     $searchResults = $component->getSearchResultsFromRelationship('Zo');
 
-    expect(array_values($searchResults))->toBe([
+    expect(array_map(memberOptionText(...), array_values($searchResults)))->toBe([
         __('filament/panel.selects.member_self', ['name' => 'Zoe Zimmer']),
     ]);
 });
@@ -144,8 +153,10 @@ it('labels the acting user with the "(You)" suffix via getOptionLabelFromRecordU
 
     $select = TeamMemberSelect::make('member');
 
-    expect($select->getOptionLabelFromRecord($owner))
+    expect(memberOptionText($select->getOptionLabelFromRecord($owner)))
         ->toBe(__('filament/panel.selects.member_self', ['name' => 'Zoe Zimmer']))
-        ->and($select->getOptionLabelFromRecord($member))
-        ->toBe('Alice Anderson');
+        ->and(memberOptionText($select->getOptionLabelFromRecord($member)))
+        ->toBe('Alice Anderson')
+        ->and($select->getOptionLabelFromRecord($owner))
+        ->toContain($owner->getFilamentAvatarUrl());
 });

@@ -1,6 +1,6 @@
 ---
 title: Records
-description: Everything about company, people, and opportunity records — pages, links between them, exports, and recovery.
+description: Everything about company, people, and opportunity records, from pages and links between them to exports and recovery.
 order: 5
 ---
 

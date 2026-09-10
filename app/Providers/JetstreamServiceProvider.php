@@ -12,10 +12,12 @@ use App\Actions\Jetstream\InviteTeamMember;
 use App\Actions\Jetstream\RemoveTeamMember;
 use App\Actions\Jetstream\UpdateTeamName;
 use App\Enums\TeamRole;
+use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Jetstream\Jetstream;
+use Livewire\Livewire;
 
 final class JetstreamServiceProvider extends ServiceProvider
 {
@@ -35,6 +37,8 @@ final class JetstreamServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configurePermissions();
         $this->configureActions();
+
+        Livewire::component('profile.delete-user-form', DeleteAccount::class);
     }
 
     /**
@@ -79,5 +83,9 @@ final class JetstreamServiceProvider extends ServiceProvider
             'create',
             'update',
         ])->description(__('teams.roles.editor.description'));
+
+        Jetstream::role(TeamRole::Viewer->value, 'Viewer', [
+            'read',
+        ])->description(__('teams.roles.viewer.description'));
     }
 }

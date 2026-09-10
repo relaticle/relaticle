@@ -8,8 +8,12 @@ use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Enums\TeamRole;
+use App\Models\ActivityLog\Activity;
+use App\Models\ActivityLog\Scopes\TeamScope;
 use App\Services\AvatarService;
 use App\Support\ReservedSlugAwareGenerateSlugAction;
+use Carbon\CarbonImmutable;
 use Database\Factories\TeamFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,9 +24,9 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -45,17 +49,18 @@ use Spatie\Sluggable\SlugOptions;
  * @property bool $auto_create_companies
  * @property Plan $plan
  * @property ?string $invite_link_token
- * @property ?Carbon $invite_link_token_expires_at
+ * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
- * @property Carbon|null $scheduled_deletion_at
+ * @property CarbonImmutable|null $scheduled_deletion_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
  * @property ?string $pm_last_four
- * @property Carbon|null $trial_ends_at
- * @property Carbon|null $pro_trial_used_at
- * @property Carbon|null $hosted_free_grandfathered_at
+ * @property CarbonImmutable|null $trial_ends_at
+ * @property CarbonImmutable|null $pro_trial_used_at
+ * @property CarbonImmutable|null $hosted_free_grandfathered_at
+ * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `team_user` row, populated only when the team was
  *     loaded through `User::teams()`; null on a team reached any other way
  */
@@ -69,6 +74,7 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_use_case',
     'onboarding_context',
     'onboarding_referral_source',
+    'invite_link_default_role',
 ])]
 #[Hidden([
     'invite_link_token',
@@ -96,7 +102,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         'login', 'logout', 'register', 'signin', 'signout', 'signup',
         'auth', 'oauth', 'sso', 'callback', '.well-known',
         'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
-        'confirm-password', 'two-factor-challenge',
+        'confirm-password', 'two-factor-challenge', 'passkeys', 'identity',
 
         // Administration
         'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',
@@ -125,7 +131,7 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
         'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
-        'press', 'compare', 'alternatives', 'ai', 'self-hosted',
+        'press', 'compare', 'alternatives', 'ai', 'ai-native-crm', 'self-hosted',
 
         // Communication
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
@@ -162,6 +168,15 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
         'created' => TeamCreated::class,
         'updated' => TeamUpdated::class,
         'deleted' => TeamDeleted::class,
+    ];
+
+    /**
+     * The model's default attribute values.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'invite_link_default_role' => TeamRole::Editor->value,
     ];
 
     /**
@@ -206,6 +221,24 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
             'invite_link_token' => Str::random(40),
             'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
         ])->save();
+    }
+
+    /**
+     * Clearing the token is what turns the link off: every lookup matches on the
+     * column, and no request token can equal null, so the link stops resolving
+     * without a second flag that could disagree with it.
+     */
+    public function disableInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => null,
+            'invite_link_token_expires_at' => null,
+        ])->save();
+    }
+
+    public function hasInviteLink(): bool
+    {
+        return $this->invite_link_token !== null;
     }
 
     public function isInviteLinkTokenExpired(): bool
@@ -277,6 +310,28 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     public function billingStatus(): BillingStatus
     {
         return BillingStatus::fromTeam($this);
+    }
+
+    /**
+     * The single row `Cashier::subscription()` resolves: the newest `default`
+     * subscription. It exists so a query can ask what `billingStatus()` asks:
+     * `whereHas('subscriptions', ...)` would match a superseded row and label a
+     * workspace by a subscription it no longer bills on.
+     *
+     * The type filter lives in the aggregate closure because the `ofMany`
+     * sub-query is built from a fresh query and does not inherit outer
+     * constraints. Filtering only on the outside would take MAX(created_at)
+     * across every type and then discard it.
+     *
+     * @return HasOne<Subscription, $this>
+     */
+    public function latestDefaultSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class, $this->getForeignKey())
+            ->ofMany(
+                ['created_at' => 'MAX', 'id' => 'MAX'],
+                fn (Builder $query): Builder => $query->where('type', 'default'),
+            );
     }
 
     /**
@@ -367,5 +422,17 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
     public function imports(): HasMany
     {
         return $this->hasMany(Import::class);
+    }
+
+    /**
+     * The relation already pins `team_id`, so the tenant scope adds nothing.
+     * Outside the app panel there is no tenant, which would narrow it to
+     * nothing at all.
+     *
+     * @return HasMany<Activity, $this>
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class)->withoutGlobalScope(TeamScope::class);
     }
 }

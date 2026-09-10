@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Data;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 final readonly class ConnectAccountData
 {
@@ -17,7 +17,8 @@ final readonly class ConnectAccountData
         public ?string $providerAccountId,
         public string $accessToken,
         public ?string $refreshToken,
-        public ?Carbon $tokenExpiresAt,
+        public ?CarbonInterface $tokenExpiresAt,
         public bool $hasCalendar,
+        public bool $hasSend,
     ) {}
 }

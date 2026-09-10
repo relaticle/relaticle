@@ -8,9 +8,9 @@
 @endphp
 
 <x-guest-layout
-    :title="__('Press Kit & Facts') . ' - Relaticle'"
+    :title="__('Press kit: License, stack and pricing') . ' - Relaticle'"
     :description="__('Relaticle press kit: founding date, license, GitHub stars, pricing, tech stack, and product screenshots for journalists covering open-source CRM.')"
-    :ogTitle="__('Press Kit & Facts') . ' - Relaticle'"
+    :ogTitle="__('Press kit: License, stack and pricing') . ' - Relaticle'"
     :ogDescription="__('Everything a listicle author or journalist needs to cover Relaticle in ten minutes: dated company facts, product screenshots, and logo downloads.')"
 >
     <section class="relative pt-32 pb-24 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
@@ -32,7 +32,7 @@
                     {{ __('Press Kit & Facts') }}
                 </h1>
                 <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Relaticle is the self-host-first, agent-native open-source CRM — AI that acts with your approval, works out of the box, one flat price for the whole team.') }}
+                    {{ __('Relaticle is the self-host-first, agent-native open-source CRM. The AI acts with your approval, it works out of the box, and one flat price covers the whole team.') }}
                 </p>
             </div>
 
@@ -44,7 +44,7 @@
 
                 {{--
                     List layout kept for responsive styling; tables DO convert to
-                    markdown since the TableAwareLeagueDriver landed — see the same
+                    markdown since the TableAwareLeagueDriver landed. See the same
                     note in pricing.blade.php.
                 --}}
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -70,7 +70,7 @@
                     </li>
                     <li class="px-4 py-3 sm:px-6 sm:py-4">
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('AI & MCP') }}</p>
-                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">{{ __(':count MCP tools plus a built-in AI chat assistant — both work fully self-hosted.', ['count' => $mcpToolCount]) }}</p>
+                        <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">{{ __(':count MCP tools plus a built-in AI chat assistant. Both work fully self-hosted.', ['count' => $mcpToolCount]) }}</p>
                     </li>
                     <li class="px-4 py-3 sm:px-6 sm:py-4">
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Links') }}</p>

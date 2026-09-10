@@ -111,13 +111,17 @@ arch('avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        // Replace laravel/passkeys actions through the container; PHP forbids a
+        // readonly class extending a non-readonly one.
+        'App\Actions\Passkeys\DeletePasskey',
+        'App\Actions\Passkeys\VerifyPasskey',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
         'App\Health',
         'App\Http\Controllers\Chat',
         'App\Http\Controllers\Mcp',
-        // Extends Cashier's WebhookController — its documented handler
+        // Extends Cashier's WebhookController, its documented handler
         // extension point; PHP forbids a readonly class extending a
         // non-readonly one.
         'App\Http\Controllers\Billing\StripeWebhookController',
@@ -134,11 +138,11 @@ arch('avoid mutation')
         'App\Notifications',
         'App\Providers',
         'App\Support\ActivityLog\CleanActivityLogAction',
-        // Request-scoped batch_uuid holder — mutable by design (lazily caches the
+        // Request-scoped batch_uuid holder, mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
         // Request/job-scoped creation-source cache, same shape as
-        // RequestActivityBatch above — mutable by design, reset per request/job
+        // RequestActivityBatch above: mutable by design, reset per request/job
         // via the scoped container binding in AppServiceProvider.
         'App\Services\WorkspaceActivationFacts',
         // Extends the non-readonly sluggable GenerateSlugAction to hook slug
@@ -159,6 +163,10 @@ arch('avoid inheritance')
     ->classes()
     ->toExtendNothing()
     ->ignoring([
+        // Replace laravel/passkeys actions through the container, so they must
+        // extend the class they stand in for.
+        'App\Actions\Passkeys\DeletePasskey',
+        'App\Actions\Passkeys\VerifyPasskey',
         'App\Console\Commands',
         'App\Exceptions',
         'App\Filament',
@@ -190,7 +198,7 @@ arch('avoid inheritance')
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by
 // the rule above. Readonly/no-inheritance is enforced only on their plain-PHP
-// service layers — the rest of each package is framework-shaped (Filament,
+// service layers. The rest of each package is framework-shaped (Filament,
 // Livewire, Models, Tools, Jobs) and would be ignored wholesale anyway, exactly
 // as the App rules above ignore those namespaces.
 // (tests/Arch/ConventionsTest.php forces this list to be revisited when a
@@ -214,20 +222,20 @@ arch('package service layers avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
-        // Grandfathered (2026-06-12) — make each readonly, then unlist:
+        // Grandfathered (2026-06-12). Make each readonly, then unlist:
         'Relaticle\Chat\Agents\CrmAssistant',
         'Relaticle\Chat\Services\TipTapDocumentParser',
         'Relaticle\Chat\Support\ChatTelemetry',
-        'Relaticle\Chat\Support\LikePattern',
         'Relaticle\Chat\Support\PromptText',
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',
         'Relaticle\Documentation\Services\DocumentationService',
         // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
+        'Relaticle\EmailIntegration\Services\EmailVisibilityService',
+        'Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory',
+        'Relaticle\EmailIntegration\Services\TeamMemberDirectory',
         'Relaticle\EmailIntegration\Services\MicrosoftGraphMailService',
         'Relaticle\EmailIntegration\Services\PrivacyService',
-        // Exceptions necessarily extend a base throwable:
-        'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
         'Relaticle\ImportWizard\Support\EntityLinkResolver',
         'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',
@@ -244,11 +252,7 @@ arch('package service layers avoid mutation')
 arch('package service layers avoid inheritance')
     ->expect($packageServiceLayers)
     ->classes()
-    ->toExtendNothing()
-    ->ignoring([
-        // Exceptions necessarily extend a base throwable:
-        'Relaticle\EmailIntegration\Services\Exceptions\CalendarSyncTokenExpired',
-    ]);
+    ->toExtendNothing();
 
 arch('main app must not depend on SystemAdmin module')
     ->expect('App')
@@ -310,11 +314,11 @@ arch('UI surfaces must not use the DB facade directly')
         'Illuminate\Support\Facades\DB',
     ])
     ->ignoring([
-        // Grandfathered (2026-06-12) — move these writes into actions, then unlist:
+        // Grandfathered (2026-06-12). Move these writes into actions, then unlist:
         'App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard',
         'App\Filament\Resources\TaskResource\Pages\TasksBoard',
         'App\Livewire\App\AccessTokens\CreateAccessToken',
-        // Session-table infrastructure (no Eloquent model) — legitimate DB facade use:
+        // Session-table infrastructure (no Eloquent model), a legitimate DB facade use:
         'App\Livewire\App\Profile\LogoutOtherBrowserSessions',
         // Read-only aggregate join for stream recovery:
         'Relaticle\Chat\Livewire\Chat\ChatInterface',
@@ -355,7 +359,6 @@ it('keeps Eloquent models off the client-callable surface of Livewire components
     // Verified safe (2026-08-25): each passes the client-supplied team straight to an
     // action that authorizes the ACTING user against THAT team, and returns void.
     $grandfathered = [
-        'App\Livewire\App\Teams\AddTeamMember::addTeamMember',
         'App\Livewire\App\Teams\DeleteTeam::cancelTeamDeletion',
         'App\Livewire\App\Teams\DeleteTeam::deleteTeam',
         'App\Livewire\App\Teams\TeamMembers::leaveTeam',

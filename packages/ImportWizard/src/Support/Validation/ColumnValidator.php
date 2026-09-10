@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Support\Validation;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -32,7 +32,7 @@ final class ColumnValidator
     {
         $format = $column->dateFormat ?? DateFormat::ISO;
 
-        if (! $format->parse($value, $column->getType()->isTimestamp()) instanceof Carbon) {
+        if (! $format->parse($value, $column->getType()->isTimestamp()) instanceof CarbonImmutable) {
             return ValidationError::message("Invalid date format. Expected: {$format->getLabel()}");
         }
 

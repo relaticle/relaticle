@@ -44,7 +44,7 @@ abstract class BaseReadShowTool implements Tool
      * Custom field types whose values are free-form prose that can run to
      * kilobytes of markup (rich text) or long paragraphs (plain long text).
      * Values on these fields are stripped of markup and capped for included
-     * (related) records — everything else (numbers, dates, booleans, choice
+     * (related) records. Everything else (numbers, dates, booleans, choice
      * labels, short text) passes through untouched. Mirrors the old
      * `RecordContextBuilder::stripHtml()` behaviour.
      *
@@ -359,7 +359,7 @@ abstract class BaseReadShowTool implements Tool
      * persisted to `tool_results` and replayed on every subsequent turn.
      *
      * Only applied to included records, not the primary record a tool call
-     * targets — a direct "get this note" call is the user asking for that
+     * targets. A direct "get this note" call is the user asking for that
      * note's full content, and should return it verbatim.
      *
      * @param  array<string, mixed>  $payload

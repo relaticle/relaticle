@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
  *
  * Gated to field types that accept arbitrary values AND own an option list
  * (tags-input). Email/phone/link also accept arbitrary values but own no
- * option list, so they are excluded — see CustomField::promotesValuesToOptions().
+ * option list, so they are excluded. See CustomField::promotesValuesToOptions().
  */
 final readonly class EnsureTagOptionsExist
 {
@@ -59,7 +59,7 @@ final readonly class EnsureTagOptionsExist
                     'sort_order' => ++$sortOrder,
                 ]);
             } catch (UniqueConstraintViolationException) {
-                // A concurrent import/edit created this option first — the option
+                // A concurrent import/edit created this option first. The option
                 // now exists, so treat it as a no-op rather than failing the row.
             }
 

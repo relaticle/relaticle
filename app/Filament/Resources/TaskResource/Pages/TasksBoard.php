@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -20,13 +21,13 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
@@ -121,6 +122,7 @@ final class TasksBoard extends BoardResourcePage
             })
             ->columnActions([
                 CreateAction::make()
+                    ->authorize(fn (): bool => Gate::allows('create', Task::class))
                     ->label(__('filament/pages/boards.tasks.actions.add'))
                     ->icon('heroicon-o-plus')
                     ->iconButton()
@@ -149,6 +151,7 @@ final class TasksBoard extends BoardResourcePage
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
+                    ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('update', $record))
                     ->label(__('filament/pages/boards.tasks.actions.edit'))
                     ->slideOver()
                     ->modalWidth(Width::ThreeExtraLarge)
@@ -161,6 +164,7 @@ final class TasksBoard extends BoardResourcePage
                         $record->update($data);
                     }),
                 Action::make('delete')
+                    ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
                     ->label(__('filament/pages/boards.tasks.actions.delete'))
                     ->icon('heroicon-o-trash')
                     ->color('danger')
@@ -170,7 +174,7 @@ final class TasksBoard extends BoardResourcePage
                     }),
             ])
             ->filters([
-                SelectFilter::make('assignees')
+                RecordSelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
                     ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
                     ->searchable()
@@ -203,6 +207,8 @@ final class TasksBoard extends BoardResourcePage
         /** @var Task|null $card */
         $card = (clone $query)->with(['assignees'])->find($cardId);
         throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
+
+        abort_unless(Gate::allows('update', $card), 403);
 
         // Calculate new position using DecimalPosition (via v3 trait helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);

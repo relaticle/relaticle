@@ -16,11 +16,14 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
 mutates(LinkEmailAction::class);
 mutates(AutoCreatePersonAction::class);
+mutates(AutoCreateCompanyAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -238,7 +241,10 @@ it('updates participant contact_id when linked to a person', function (): void {
 });
 
 it('does not auto-create companies when auto_create_companies is false', function (): void {
-    $this->team->update(['auto_create_companies' => false]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => false,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -254,8 +260,177 @@ it('does not auto-create companies when auto_create_companies is false', functio
     expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create a company when record creation is None', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::None,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'prospect@none-corp.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company in Selective mode for inbound-only addresses', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::Selective,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'inbound@selective-corp.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('auto-creates a company in Selective mode for outbound addresses', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::Selective,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'prospect@selective-corp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Selective-corp')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company when the person already exists', function (): void {
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->team->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->first();
+
+    if (! $emailField) {
+        $this->markTestSkipped('No emails custom field seeded for this team.');
+    }
+
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Known Contact',
+        'creator_id' => $this->user->id,
+    ]);
+    $person->saveCustomFieldValue($emailField, ['known@orphan-corp.com'], $this->team);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'known@orphan-corp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company for a www-prefixed public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.gmail.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
+it('does not auto-create a company for a www-prefixed configured public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    config()->set('email-integration.public_domains', [
+        ...((array) config('email-integration.public_domains', [])),
+        'www.example.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Public Domain Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Public Domain Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company for a www-prefixed team public domain', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    PublicEmailDomain::factory()->create([
+        'team_id' => $this->team->id,
+        'domain' => 'www.example.com',
+    ]);
+
+    $countBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'user@www.example.com',
+        'name' => 'Team Public Domain Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($countBefore)
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Team Public Domain Contact')->exists())->toBeTrue();
+});
+
 it('auto-creates a company when auto_create_companies is true', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -270,7 +445,10 @@ it('auto-creates a company when auto_create_companies is true', function (): voi
 });
 
 it('derives the company name from the registrable domain, not a mail subdomain', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -281,12 +459,31 @@ it('derives the company name from the registrable domain, not a mail subdomain',
 
     app(LinkEmailAction::class)->execute($email);
 
-    expect(Company::where('team_id', $this->team->id)->where('name', 'Anthropic')->exists())->toBeTrue()
+    $company = Company::where('team_id', $this->team->id)
+        ->where('name', 'Anthropic')
+        ->with('customFieldValues.customField')
+        ->first();
+
+    expect($company)->not->toBeNull()
         ->and(Company::where('team_id', $this->team->id)->where('name', 'Email')->exists())->toBeFalse();
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    expect($domainsField)->not->toBeNull();
+    expect($company->getCustomFieldValue($domainsField))
+        ->toContain('www.email.anthropic.com')
+        ->not->toContain('www.anthropic.com');
 });
 
 it('derives the company name from the registrable label across TLD shapes', function (string $address, string $expected): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -309,7 +506,10 @@ it('derives the company name from the registrable label across TLD shapes', func
 ]);
 
 it('does not auto-create a company for a no-reply / automated sender', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -344,7 +544,10 @@ it('does not auto-create a person for a no-reply / automated sender', function (
 });
 
 it('seeds an auto-created company with a protocol-less domain and ICP set to false', function (): void {
-    $this->team->update(['auto_create_companies' => true]);
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
 
     $email = makeLinkEmail();
 
@@ -383,6 +586,70 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
     }
 });
 
+it('creates distinct companies for different subdomains of the same apex', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    foreach (['a@accounts.printtest.com', 'b@ideas.printtest.com'] as $address) {
+        $email = makeLinkEmail();
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => $address,
+        ]);
+        app(LinkEmailAction::class)->execute($email);
+    }
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    $companies = Company::where('team_id', $this->team->id)
+        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('name', 'Printtest')
+        ->with('customFieldValues.customField')
+        ->get();
+
+    expect($companies)->toHaveCount(2);
+    expect($domainsField)->not->toBeNull();
+
+    $stored = $companies
+        ->map(fn (Company $company): string => json_encode($company->getCustomFieldValue($domainsField)) ?: '')
+        ->implode(' ');
+
+    expect($stored)->toContain('www.accounts.printtest.com');
+    expect($stored)->toContain('www.ideas.printtest.com');
+});
+
+it('reuses one company when the host only differs by a www prefix', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $first = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $first->getKey(),
+        'email_address' => 'hello@cap.so',
+    ]);
+    app(LinkEmailAction::class)->execute($first);
+
+    $second = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $second->getKey(),
+        'email_address' => 'alerts@www.cap.so',
+    ]);
+    app(LinkEmailAction::class)->execute($second);
+
+    expect(Company::where('team_id', $this->team->id)
+        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('name', 'Cap')
+        ->count())->toBe(1);
+});
+
 it('does not create a duplicate company when the domain is already owned', function (): void {
     $action = app(AutoCreateCompanyAction::class);
 
@@ -391,6 +658,59 @@ it('does not create a duplicate company when the domain is already owned', funct
 
     expect($second->getKey())->toBe($first->getKey());
     expect(Company::where('team_id', $this->team->id)->where('name', 'Brandnewcorp')->count())->toBe(1);
+});
+
+it('creates distinct companies for a mail subdomain and the apex domain', function (): void {
+    $action = app(AutoCreateCompanyAction::class);
+
+    $first = $action->execute('cap.so', $this->team->id, $this->team);
+    $second = $action->execute('send.cap.so', $this->team->id, $this->team);
+
+    expect($second->getKey())->not->toBe($first->getKey());
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Cap')->count())->toBe(2);
+});
+
+it('creates distinct companies when a subdomain is stored before the apex', function (): void {
+    $action = app(AutoCreateCompanyAction::class);
+
+    $subdomain = $action->execute('send.cap.so', $this->team->id, $this->team);
+    $apex = $action->execute('cap.so', $this->team->id, $this->team);
+
+    expect($apex->getKey())->not->toBe($subdomain->getKey());
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Cap')->count())->toBe(2);
+});
+
+it('does not attach a parent company to a subdomain sender when creation is off', function (): void {
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $this->team->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->first();
+
+    expect($domainsField)->not->toBeNull();
+
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => false,
+    ]);
+
+    $company = Company::create([
+        'team_id' => $this->team->id,
+        'name' => 'Cap',
+        'creator_id' => $this->user->id,
+    ]);
+    $company->saveCustomFieldValue($domainsField, 'www.cap.so', $this->team);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'alerts@send.cap.so',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($email->companies()->where('companies.id', $company->getKey())->exists())->toBeFalse();
 });
 
 it('reuses an existing company that already owns the domain instead of creating one', function (): void {
@@ -478,6 +798,129 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
     expect(People::where('team_id', $this->team->id)->where('name', 'New Contact')->exists())->toBeTrue();
 });
 
+it('does not auto-create a person for a workspace-blocked address', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@partner.com',
+        'name' => 'Blocked Contact',
+    ]);
+
+    $companyCountBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Blocked Contact')->exists())->toBeFalse();
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($companyCountBefore);
+});
+
+it('still auto-creates a person for a protected address', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->protected()->email('vip@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'vip@partner.com',
+        'name' => 'Protected Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Protected Contact')->exists())->toBeTrue();
+});
+
+it('does not auto-create a person for a mailbox-blocklisted address', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    EmailBlocklist::factory()->email('spam@badactor.com')->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'spam@badactor.com',
+        'name' => 'Spam Sender',
+    ]);
+
+    $companyCountBefore = Company::where('team_id', $this->team->id)->count();
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Spam Sender')->exists())->toBeFalse();
+    expect(Company::where('team_id', $this->team->id)->count())->toBe($companyCountBefore);
+});
+
+it('auto-creates other participants when one address is blocked', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
+
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@partner.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'blocked@partner.com',
+        'name' => 'Blocked Contact',
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'customer@acme.com',
+        'name' => 'Real Customer',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'Blocked Contact')->exists())->toBeFalse()
+        ->and(People::where('team_id', $this->team->id)->where('name', 'Real Customer')->exists())->toBeTrue();
+});
+
+it('does not auto-create a company for a workspace-blocked domain', function (): void {
+    $this->team->update(['auto_create_companies' => true]);
+
+    TeamEmailBlocklist::factory()->blocked()->domain('blockedcorp.com')->create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'anyone@blockedcorp.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('team_id', $this->team->id)->where('name', 'Blockedcorp')->exists())->toBeFalse();
+});
+
 it('creates distinct people for participants sharing a display name but different emails', function (): void {
     $this->team->update(['contact_creation_mode' => ContactCreationMode::All]);
 
@@ -544,6 +987,57 @@ it('does not auto-create a person when Selective and the address has only inboun
     expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
 });
 
+it('does not auto-create people or companies for internal email', function (): void {
+    $this->team->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+
+    $peopleBefore = People::where('team_id', $this->team->id)->count();
+    $companiesBefore = Company::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail(['is_internal' => true]);
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $this->user->email,
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $teammate->email,
+        'name' => 'Teammate',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->count())->toBe($peopleBefore)
+        ->and(Company::where('team_id', $this->team->id)->count())->toBe($companiesBefore);
+});
+
+it('does not auto-create a person when Selective outbound only reaches a teammate', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
+
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => 'editor']);
+
+    $countBefore = People::where('team_id', $this->team->id)->count();
+
+    $email = makeLinkEmail(['direction' => EmailDirection::OUTBOUND]);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $teammate->email,
+        'name' => 'Teammate',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('team_id', $this->team->id)->count())->toBe($countBefore);
+});
+
 it('auto-creates a person and company on the first outbound email in Selective mode', function (): void {
     $this->team->update([
         'contact_creation_mode' => ContactCreationMode::Selective,
@@ -598,6 +1092,41 @@ it('creates a person in Selective mode when a teammate already sent to the addre
     app(LinkEmailAction::class)->execute($inbound);
 
     expect(People::where('team_id', $this->team->id)->where('name', 'Shared Contact')->exists())->toBeTrue();
+});
+
+it('creates a person in Selective mode when outbound history is on a disconnected account', function (): void {
+    $this->team->update(['contact_creation_mode' => ContactCreationMode::Selective]);
+
+    $disconnectedAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    $address = 'history@partner.com';
+
+    $outbound = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $disconnectedAccount->getKey(),
+        'direction' => EmailDirection::OUTBOUND,
+    ]);
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $outbound->getKey(),
+        'email_address' => $address,
+    ]);
+
+    $disconnectedAccount->delete();
+
+    $inbound = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $inbound->getKey(),
+        'email_address' => $address,
+        'name' => 'History Contact',
+    ]);
+
+    app(LinkEmailAction::class)->execute($inbound);
+
+    expect(People::where('team_id', $this->team->id)->where('name', 'History Contact')->exists())->toBeTrue();
 });
 
 it('increments person email_count when linked', function (): void {

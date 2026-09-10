@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Icons\Heroicon;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -62,6 +63,53 @@ it('queued tab shows only this user\'s queued OUTBOUND emails', function (): voi
         ->assertCanNotSeeTableRecords([$failed, $theirs]);
 });
 
+it('shows a just-sent email in the queued tab during the undo window', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Just composed',
+        'scheduled_for' => now()->addSeconds(5),
+    ]);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$justSent]);
+});
+
+it('refreshes the queued list when a send is queued', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $component = livewire(OutboxTable::class);
+
+    $justSent = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Arrived after render',
+        'scheduled_for' => now()->addSeconds(5),
+    ]);
+
+    $component
+        ->dispatch('outbox:changed')
+        ->assertCanSeeTableRecords([$justSent]);
+});
+
+it('keeps a later send on the scheduled tab instead of queued', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $undoWindow = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Sending in 5 seconds',
+        'scheduled_for' => now()->addSeconds(5),
+    ]);
+    $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, [
+        'subject' => 'Send tomorrow',
+        'scheduled_for' => now()->addDay(),
+    ]);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$undoWindow])
+        ->assertCanNotSeeTableRecords([$later])
+        ->filterTable('status_tab', 'scheduled')
+        ->assertCanSeeTableRecords([$later])
+        ->assertCanNotSeeTableRecords([$undoWindow]);
+});
+
 it('failed tab filters to failed emails', function (): void {
     $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED, [
@@ -111,8 +159,21 @@ it('locked failed mode lists every failed email owned by the user', function ():
 });
 
 it('locked failed mode has a dedicated empty state', function (): void {
-    livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
-        ->assertSee('No failed emails');
+    $component = livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+        ->assertSee(__('filament/pages/email-inbox.failed.empty.heading'))
+        ->assertSee(__('filament/pages/email-inbox.failed.empty.description'));
+
+    expect($component->instance()->getTable()->getEmptyStateIcon())
+        ->toBe(Heroicon::OutlinedExclamationCircle);
+});
+
+it('uses an outlined clock for the outbox empty state', function (): void {
+    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false])
+        ->assertSee(__('filament/pages/email-inbox.outbox.empty.heading'))
+        ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
+
+    expect($component->instance()->getTable()->getEmptyStateIcon())
+        ->toBe(Heroicon::OutlinedClock);
 });
 
 it('can exclude failed from the status filter without changing standalone outbox', function (): void {

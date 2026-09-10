@@ -1,6 +1,6 @@
 # Billing
 
-Relaticle Cloud bills **per workspace, never per seat**. This is a product commitment — the
+Relaticle Cloud bills **per workspace, never per seat**. This is a product commitment, and the
 pricing page says "No per-seat pricing. Ever." and the billing architecture enforces it:
 nothing in the billing pipeline reads or multiplies by member count.
 
@@ -24,7 +24,7 @@ the published commitment. The full comparison is recorded in the
 - Managed-Cloud access is a separate entitlement evaluated by `HostedWorkspaceAccess`. Billing
   disabled (self-hosted), a live trial/subscription, a manual paid grant, or
   `teams.hosted_free_grandfathered_at` grants access. Otherwise the workspace is paused.
-- A plan gates **AI usage** (monthly credit allowance, model access, request rate limits) —
+- A plan gates **AI usage** (monthly credit allowance, model access, request rate limits),
   the value metric is the work AI does for a workspace, not how many people log in.
 - Member counts are tracked for visibility and enterprise license compliance only.
 - Enterprise is sales-assisted: manual invoicing plus a sysadmin plan grant. Self-serve
@@ -39,7 +39,7 @@ and remittance. `Team` is the Cashier billable model.
 
 Because Managed Payments is enabled per transaction on our own Stripe account, the customers,
 payment methods, and subscriptions are ours. Disabling it later (own tax ops, lower fees) is a
-config flip — `services.stripe.managed_payments` — with no other code change.
+config flip on `services.stripe.managed_payments`, with no other code change.
 
 ```text
 Workspace onboarding (billing enabled)
@@ -77,7 +77,7 @@ deletion remain reachable.
 14-day Pro trial, no card, one per user (`users.pro_trial_used_at`). It starts automatically when
 a hosted workspace is created. `StartProTrial` uses row locks so concurrent workspace creation
 cannot grant multiple trials, then sets
-`team.plan = pro` and `teams.trial_ends_at` (Cashier generic trial — no Stripe objects until
+`team.plan = pro` and `teams.trial_ends_at` (Cashier generic trial, so no Stripe objects until
 conversion). The daily `billing:process-trials` command emails a "3 days left" reminder and
 sets expired, unconverted teams back to the internal Free bundle. Hosted access is already paused
 as soon as `trial_ends_at` passes, without waiting for the daily command. Converting mid-trial is
@@ -95,15 +95,15 @@ workspaces retain the previously promised Cloud Free access; new rows default to
 | `STRIPE_MANAGED_PAYMENTS` | `true` enables the MoR layer per checkout (the off-ramp switch) |
 | `STRIPE_PRICE_PRO_MONTHLY` | Stripe price id mapped to the `pro` plan (monthly) |
 | `STRIPE_PRICE_PRO_YEARLY` | Stripe price id mapped to the `pro` plan (yearly) |
-| `RELATICLE_FEATURE_BILLING` | Pennant flag — gates every billing surface; keep `false` in prod until Stripe is live |
+| `RELATICLE_FEATURE_BILLING` | Pennant flag gating every billing surface; keep `false` in prod until Stripe is live |
 
-Stripe products must carry an eligible Managed Payments tax code (AIaaS — Business Use,
+Stripe products must carry an eligible Managed Payments tax code (AIaaS for Business Use,
 `txcd_10105002`), and the Managed Payments Terms of Service must be accepted in the Stripe
 dashboard before activation.
 
 ## Rollout runbook
 
-Engineering never blocks on paperwork — Stripe **test mode works before activation**.
+Engineering never blocks on paperwork. Stripe **test mode works before activation**.
 
 1. Code merges to `main` dark behind `RELATICLE_FEATURE_BILLING` (off in prod).
 2. Human track (parallel): Atlas LLC → Stripe activation + Managed Payments ToS + banking
@@ -128,9 +128,9 @@ Engineering never blocks on paperwork — Stripe **test mode works before activa
 
 ### Compliance calendar
 
-- Delaware franchise tax — June 1 annually
-- Form 5472 + pro-forma 1120 — ~April 15 annually (filing service; $25k penalty if missed)
-- Registered agent renewal — annually
+- Delaware franchise tax, due June 1 annually
+- Form 5472 + pro-forma 1120, due ~April 15 annually (filing service; $25k penalty if missed)
+- Registered agent renewal, annually
 
 ## Observability
 

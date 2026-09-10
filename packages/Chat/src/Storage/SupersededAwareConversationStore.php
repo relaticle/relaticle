@@ -20,7 +20,7 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
  *
  * Regenerate/edit mark replaced turns with superseded_at (see
  * ChatController::supersedeMessages). Without this filter the model keeps
- * "remembering" turns the user replaced — answering "I already proposed that"
+ * "remembering" turns the user replaced, answering "I already proposed that"
  * against a transcript the user can no longer see.
  *
  * Replayed tool results are NEVER rewritten to reflect a later decision. A
@@ -101,14 +101,14 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      * Scope every message query the store makes to the non-superseded rows.
      *
      * The filter lives here rather than in a getLatestConversationMessages()
-     * override so that history rebuilding — attachment rehydration, paused
-     * tool-turn reconstruction, approval-result bookkeeping — stays owned by
+     * override so that history rebuilding (attachment rehydration, paused
+     * tool-turn reconstruction, approval-result bookkeeping) stays owned by
      * the parent and cannot drift from it.
      *
      * Inserts are unaffected (insert() ignores wheres), but the approval-result
      * update in DatabaseConversationStore::storeApprovalResults() does go
      * through here, so a superseded turn cannot have approvals written back to
-     * it — deliberate, and consistent with its lookup query being filtered too.
+     * it. That is deliberate, and consistent with its lookup query being filtered too.
      */
     protected function table(string $table): Builder
     {
