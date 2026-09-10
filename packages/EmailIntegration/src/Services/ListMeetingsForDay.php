@@ -21,7 +21,7 @@ final readonly class ListMeetingsForDay
         $timezone = $user->effectiveTimezone();
 
         $next = Meeting::query()
-            ->withGlobalScope('visible', new VisibleMeetingScope($user))
+            ->withGlobalScope('visible', VisibleMeetingScope::personal($user))
             ->where('starts_at', '>', $day->timezone($timezone)->endOfDay()->utc())
             ->reorder()
             ->oldest('starts_at')
@@ -44,7 +44,7 @@ final readonly class ListMeetingsForDay
         $endUtc = $day->timezone($timezone)->endOfDay()->utc();
 
         $query = Meeting::query()
-            ->withGlobalScope('visible', new VisibleMeetingScope($user))
+            ->withGlobalScope('visible', VisibleMeetingScope::personal($user))
             ->whereBetween('starts_at', [$startUtc, $endUtc]);
 
         $identity = "COALESCE('uid:' || NULLIF(meetings.ical_uid, ''), 'id:' || meetings.id)";
@@ -59,7 +59,7 @@ final readonly class ListMeetingsForDay
 
         $meetings = $query
             ->whereIn('meetings.id', $copies)
-            ->with(['team', 'attendees.contact', 'connectedAccount'])
+            ->with(['team', 'attendees.contact', 'connectedAccount.user'])
             ->orderBy('starts_at')
             ->orderBy('id')
             ->get();

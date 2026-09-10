@@ -31,6 +31,7 @@ use Relaticle\EmailIntegration\Filament\Actions\MeetingRsvpActions;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 
 final class MeetingDetailInfolist
@@ -55,8 +56,10 @@ final class MeetingDetailInfolist
             $record = $schema->getRecord();
 
             if ($record instanceof Meeting) {
-                $record->loadMissing(['attendees.contact', 'connectedAccount']);
-                $record->load(['people', 'companies', 'opportunities']);
+                $record->loadMissing(['attendees.contact', 'people', 'companies', 'opportunities', 'connectedAccount.user']);
+                $record->attendees->each(
+                    fn (MeetingAttendee $attendee) => $attendee->setRelation('meeting', $record),
+                );
                 resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$record]);
             }
 
