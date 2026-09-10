@@ -30,11 +30,13 @@ use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 /**
  * @property-read Collection<int, Meeting> $meetings
+ * @property-read list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: int, hasCalendar: bool, isInitialImport: bool}> $mailboxSyncRows
  * @property-read list<array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool}> $meetingCards
  * @property-read Action $connectGmailAction
  */
@@ -130,6 +132,114 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         }
 
         return ConnectedAccount::hasActiveFor($user, $team instanceof Team ? $team : null);
+    }
+
+    public function isMailboxSyncing(): bool
+    {
+        return $this->mailboxSyncRows !== [];
+    }
+
+    public function shouldPollMailboxSync(): bool
+    {
+        return $this->isMailboxSyncing();
+    }
+
+    public function syncDisplayPercent(): int
+    {
+        $percents = array_map(
+            fn (array $row): int => $row['percent'],
+            $this->mailboxSyncRows,
+        );
+
+        return $percents === [] ? 0 : max($percents);
+    }
+
+    public function syncEmailsProcessed(): int
+    {
+        return array_sum(array_map(
+            fn (array $row): int => $row['emailsImported'],
+            $this->mailboxSyncRows,
+        ));
+    }
+
+    public function syncMeetingsProcessed(): int
+    {
+        return array_sum(array_map(
+            fn (array $row): int => $row['meetingsImported'],
+            $this->mailboxSyncRows,
+        ));
+    }
+
+    public function syncShowsMeetingsProcessed(): bool
+    {
+        return array_any(
+            $this->mailboxSyncRows,
+            fn (array $row): bool => $row['hasCalendar'],
+        );
+    }
+
+    public function syncIsInitialImport(): bool
+    {
+        return array_any(
+            $this->mailboxSyncRows,
+            fn (array $row): bool => $row['isInitialImport'],
+        );
+    }
+
+    public function syncShowsPercent(): bool
+    {
+        if ($this->syncIsInitialImport()) {
+            return true;
+        }
+
+        return $this->syncDisplayPercent() > 0;
+    }
+
+    public function syncShowsProcessedCounts(): bool
+    {
+        if ($this->syncEmailsProcessed() > 0) {
+            return true;
+        }
+
+        return $this->syncShowsMeetingsProcessed() && $this->syncMeetingsProcessed() > 0;
+    }
+
+    public function refreshMailboxSync(): void
+    {
+        unset($this->mailboxSyncRows, $this->meetings, $this->meetingCards);
+    }
+
+    /**
+     * @return list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: int, hasCalendar: bool, isInitialImport: bool}>
+     */
+    #[Computed]
+    public function mailboxSyncRows(): array
+    {
+        $rows = [];
+
+        foreach ($this->ownedAccounts() as $account) {
+            if (! $account->showsSyncProgress()) {
+                continue;
+            }
+
+            $isInitialImport = $account->isImportingHistory();
+
+            $rows[] = [
+                'id' => (string) $account->getKey(),
+                'email' => $account->email_address,
+                'emailsImported' => $isInitialImport
+                    ? $account->syncEmailsProcessedCount()
+                    : ($account->isEmailSyncing() ? MailboxSyncTracker::emailProcessedCount($account) : 0),
+                'meetingsImported' => $isInitialImport
+                    ? $account->syncMeetingsProcessedCount()
+                    : ($account->isCalendarSyncing() ? MailboxSyncTracker::calendarProcessedCount($account) : 0),
+                'percent' => $account->syncDisplayPercent(),
+                'hasCalendar' => $account->hasCalendar(),
+                'isInitialImport' => $isInitialImport,
+            ];
+        }
+
+        return $rows;
     }
 
     public function nextDayWithMeetings(): ?CarbonImmutable
@@ -379,6 +489,21 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         }
 
         return array_values($states);
+    }
+
+    /**
+     * @return Collection<int, ConnectedAccount>
+     */
+    private function ownedAccounts(): Collection
+    {
+        $user = auth()->user();
+        $team = Filament::getTenant();
+
+        if (! $user instanceof User || ! $team instanceof Team) {
+            return new Collection;
+        }
+
+        return ConnectedAccount::query()->ownedBy($user, $team)->get();
     }
 
     private function resolveVisibleMeeting(string $meetingId): ?Meeting

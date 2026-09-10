@@ -66,6 +66,16 @@ return [
         'happening_now' => 'Now',
         'time_range' => ':start to :end',
         'load_more' => 'Load more',
+        'syncing' => [
+            'title' => 'Syncing',
+            'title_with_percent' => 'Syncing (:percent%)',
+            'description_initial' => 'We are processing your email and calendar events...',
+            'description_update' => 'Checking for new emails and calendar updates...',
+            'emails_processed' => '{1}:count email processed|[2,*]:count emails processed',
+            'meetings_processed' => '{1}:count meeting found|[2,*]:count meetings found',
+            'emails_updated' => '{1}:count new email|[2,*]:count new emails',
+            'meetings_updated' => '{1}:count meeting updated|[2,*]:count meetings updated',
+        ],
     ],
     'tasks' => [
         'heading' => 'Tasks',
