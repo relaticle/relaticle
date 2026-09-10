@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 /**
  * @property-read Collection<int, Meeting> $meetings
+ * @property-read list<array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool}> $meetingCards
  * @property-read Action $connectGmailAction
  */
 final class MeetingsHomeWidget extends Component implements HasActions, HasSchemas
@@ -212,9 +213,40 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     }
 
     /**
+     * @return list<array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool}>
+     */
+    #[Computed]
+    public function meetingCards(): array
+    {
+        $cards = [];
+
+        foreach ($this->meetings as $meeting) {
+            $cards[] = $this->meetingCard($meeting);
+        }
+
+        return $cards;
+    }
+
+    /**
+     * @return array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool}
+     */
+    private function meetingCard(Meeting $meeting): array
+    {
+        return [
+            'id' => (string) $meeting->getKey(),
+            'title' => (string) $meeting->title,
+            'all_day' => $meeting->all_day,
+            'participants' => $this->cardParticipants($meeting),
+            'response_status' => $this->viewerResponseStatus($meeting),
+            'time' => $this->meetingTime($meeting),
+            'happening_now' => $this->isHappeningNow($meeting),
+        ];
+    }
+
+    /**
      * @return list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>
      */
-    public function attendeeState(Meeting $meeting): array
+    private function attendeeState(Meeting $meeting): array
     {
         return array_values($meeting->attendees->values()->map(
             fn (MeetingAttendee $attendee): array => resolve(MeetingAttendeePresenter::class)->present($attendee),
@@ -224,7 +256,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     /**
      * @return array{start: string, end: string|null, range: string, datetime: string}
      */
-    public function meetingTime(Meeting $meeting): array
+    private function meetingTime(Meeting $meeting): array
     {
         $timezone = $this->viewerTimezone();
         $start = $meeting->starts_at->timezone($timezone);
@@ -257,7 +289,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         ];
     }
 
-    public function isHappeningNow(Meeting $meeting): bool
+    private function isHappeningNow(Meeting $meeting): bool
     {
         if ($meeting->all_day) {
             return false;
@@ -273,7 +305,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     /**
      * @return array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}
      */
-    public function cardParticipants(Meeting $meeting): array
+    private function cardParticipants(Meeting $meeting): array
     {
         $states = $this->uniqueAttendeeStates($meeting);
         $visible = 3;
@@ -296,7 +328,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
      * The viewer's own RSVP. Colour is paired with the status label so the
      * card never relies on the rail or dot alone.
      */
-    public function viewerResponseStatus(Meeting $meeting): AttendeeResponseStatus
+    private function viewerResponseStatus(Meeting $meeting): AttendeeResponseStatus
     {
         $user = auth()->user();
 
@@ -328,7 +360,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     private function resetVisibleList(): void
     {
         $this->visibleCount = self::PAGE_SIZE;
-        unset($this->meetings);
+        unset($this->meetings, $this->meetingCards);
     }
 
     /**
