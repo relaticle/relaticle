@@ -382,32 +382,44 @@ it('publishes an input format for every custom field type', function (string $ty
         ->resource(CompanySchemaResource::class)
         ->assertOk()
         ->assertSee($expectedFormat);
-})->with([
-    ['text', '"input_format": "string"'],
-    ['textarea', '"input_format": "string"'],
-    ['number', 'numeric value'],
-    ['currency', 'numeric value (amount)'],
-    ['email', 'array of email strings'],
-    ['phone', 'array of phone strings'],
-    ['link', 'array of URL strings'],
-    ['checkbox', '"input_format": "boolean"'],
-    ['toggle', '"input_format": "boolean"'],
-    ['select', 'option label or option ID (see options)'],
-    ['radio', 'option label or option ID (see options)'],
-    ['toggle-buttons', 'option label or option ID (see options)'],
-    ['multi-select', 'array of option labels or IDs (see options)'],
-    ['checkbox-list', 'array of option labels or IDs (see options)'],
-    ['tags-input', 'array of arbitrary string values'],
-    ['rich-editor', 'markdown, or HTML when the value starts with'],
-    ['markdown-editor', '"input_format": "markdown"'],
-    ['color-picker', 'hex color string'],
-    ['date', 'ISO 8601 date"'],
-    ['date-time', 'ISO 8601 datetime string'],
-    ['record', 'array of record IDs of the lookup entity'],
-]);
+})->with(customFieldHintRows());
 
-it('covers every custom field type in the hint dataset', function (): void {
-    $covered = ['text', 'textarea', 'number', 'currency', 'email', 'phone', 'link', 'checkbox', 'toggle', 'select', 'radio', 'toggle-buttons', 'multi-select', 'checkbox-list', 'tags-input', 'rich-editor', 'markdown-editor', 'color-picker', 'date', 'date-time', 'record', 'file-upload'];
+/** @return list<array{0: string, 1: string}> */
+function customFieldHintRows(): array
+{
+    return [
+        ['text', '"input_format": "string"'],
+        ['textarea', '"input_format": "string"'],
+        ['number', 'numeric value'],
+        ['currency', 'numeric value (amount)'],
+        ['email', 'array of email strings'],
+        ['phone', 'array of phone strings'],
+        ['link', 'array of URL strings'],
+        ['checkbox', '"input_format": "boolean"'],
+        ['toggle', '"input_format": "boolean"'],
+        ['select', 'option label or option ID (see options)'],
+        ['radio', 'option label or option ID (see options)'],
+        ['toggle-buttons', 'option label or option ID (see options)'],
+        ['multi-select', 'array of option labels or IDs (see options)'],
+        ['checkbox-list', 'array of option labels or IDs (see options)'],
+        ['tags-input', 'array of arbitrary string values'],
+        ['rich-editor', 'markdown, or HTML when the value starts with'],
+        ['markdown-editor', '"input_format": "markdown"'],
+        ['color-picker', 'hex color string'],
+        ['date', 'ISO 8601 date"'],
+        ['date-time', 'ISO 8601 datetime string'],
+        ['record', 'array of record IDs of the lookup entity'],
+    ];
+}
 
-    expect(array_map(fn (CustomFieldType $case): string => $case->value, CustomFieldType::cases()))->toEqualCanonicalizing($covered);
+it('exercises the hint of every custom field type a tenant can create', function (): void {
+    $exercised = array_column(customFieldHintRows(), 0);
+
+    $creatable = array_values(array_diff(
+        array_map(fn (CustomFieldType $case): string => $case->value, CustomFieldType::cases()),
+        // file-upload is disabled product-wide (config/custom-fields.php) and its writes ship in #699.
+        [CustomFieldType::FILE_UPLOAD->value],
+    ));
+
+    expect($exercised)->toEqualCanonicalizing($creatable);
 });

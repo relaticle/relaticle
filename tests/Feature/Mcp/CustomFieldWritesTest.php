@@ -20,6 +20,7 @@ use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -407,3 +408,96 @@ it('resolves a dangling record reference without one query per row', function ()
 
     expect(teamScopedCompanyLookups())->toHaveCount(1);
 });
+
+it('rejects a record field whose lookup type is not a CRM entity', function (): void {
+    CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'owning_team',
+        'name' => 'Owning Team',
+        'type' => 'record',
+        'lookup_type' => 'team',
+        'sort_order' => 60,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Bad lookup', 'custom_fields' => ['owning_team' => [$this->team->getKey()]]])
+        ->assertHasErrors()
+        ->assertSee('Owning Team')
+        ->assertSee('cannot be written by API, MCP, or chat');
+});
+
+it('sets then clears a value for every writable custom field type', function (string $type, mixed $value, mixed $stored): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'probe',
+        'name' => 'Probe',
+        'type' => $type,
+        'lookup_type' => $type === 'record' ? 'company' : null,
+        'sort_order' => 70,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    if (in_array($type, ['select', 'radio', 'toggle-buttons', 'multi-select', 'checkbox-list'], true)) {
+        CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'Gold', 'sort_order' => 1]);
+    }
+
+    if ($type === 'record') {
+        $value = [Company::factory()->create(['team_id' => $this->team->getKey()])->getKey()];
+        $stored = $value;
+    }
+
+    if ($stored === 'OPTION_ID') {
+        $stored = (string) $field->fresh('options')->options->firstWhere('name', 'Gold')->getKey();
+        $value = 'gold';
+    }
+
+    if ($stored === 'OPTION_ID_LIST') {
+        $stored = [(string) $field->fresh('options')->options->firstWhere('name', 'Gold')->getKey()];
+        $value = ['gold'];
+    }
+
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['probe' => $value]])
+        ->assertOk();
+
+    $written = $task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field);
+
+    expect($written instanceof CarbonInterface ? $written->toIso8601String() : $written)->toEqual($stored);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['probe' => null]])
+        ->assertOk();
+
+    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field))->toBeNull();
+})->with([
+    'text' => ['text', 'Acme renewal', 'Acme renewal'],
+    'textarea' => ['textarea', "line one\nline two", "line one\nline two"],
+    'number' => ['number', 42, 42],
+    'currency' => ['currency', 1500.5, 1500.5],
+    'email' => ['email', ['ada@example.com'], ['ada@example.com']],
+    'phone' => ['phone', ['+14155552671'], ['+14155552671']],
+    'link' => ['link', ['https://example.com'], ['https://example.com']],
+    'checkbox' => ['checkbox', true, true],
+    'toggle' => ['toggle', true, true],
+    'tags-input' => ['tags-input', ['priority', 'customer'], ['priority', 'customer']],
+    'color-picker' => ['color-picker', '#0A80EA', '#0A80EA'],
+    'date' => ['date', '2026-09-10', '2026-09-10T00:00:00+00:00'],
+    'date-time' => ['date-time', '2026-09-10T10:30:00Z', '2026-09-10T10:30:00+00:00'],
+    'markdown-editor' => ['markdown-editor', '**Follow up** Friday', '**Follow up** Friday'],
+    'rich-editor' => ['rich-editor', '**bold**', "<p><strong>bold</strong></p>\n"],
+    'select' => ['select', null, 'OPTION_ID'],
+    'radio' => ['radio', null, 'OPTION_ID'],
+    'toggle-buttons' => ['toggle-buttons', null, 'OPTION_ID'],
+    'multi-select' => ['multi-select', null, 'OPTION_ID_LIST'],
+    'checkbox-list' => ['checkbox-list', null, 'OPTION_ID_LIST'],
+    'record' => ['record', null, null],
+]);
