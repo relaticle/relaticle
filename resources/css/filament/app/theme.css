@@ -21,7 +21,8 @@
 @source '../../../../packages/ImportWizardNew/resources';
 
 /* EmailIntegration */
-@source '../../../../packages/EmailIntegration/*';
+@source '../../../../packages/EmailIntegration/resources';
+@source '../../../../packages/EmailIntegration/src';
 
 /* Custom Fields */
 @source '../../../../vendor/relaticle/flowforge/resources/views/**/*.blade.php';

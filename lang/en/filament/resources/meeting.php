@@ -17,6 +17,10 @@ return [
         ],
         'linked_records' => [
             'heading' => 'Linked records',
+            'empty' => [
+                'heading' => 'No linked records',
+                'description' => 'Link people, companies, or deals to connect this meeting to your CRM.',
+            ],
         ],
         'description' => [
             'heading' => 'Description',
@@ -24,6 +28,9 @@ return [
     ],
     'attendees' => [
         'host' => 'Host',
+        'guest' => 'Guest',
+        'show_more' => 'Show more',
+        'show_less' => 'Show less',
     ],
     'actions' => [
         'link_records' => [

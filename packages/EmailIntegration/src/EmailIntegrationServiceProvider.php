@@ -28,14 +28,16 @@ use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
-use Relaticle\EmailIntegration\Livewire\MailboxConnectPrompt;
 use Relaticle\EmailIntegration\Livewire\MailboxImportStatus;
+use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
+use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
+use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
@@ -47,6 +49,8 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         // Parse the Public Suffix List once per process.
         $this->app->singleton(PublicSuffixList::class);
+        $this->app->singleton(TeamMemberDirectory::class);
+        $this->app->singleton(MailboxDisplayNameDirectory::class);
 
         // Not gated by the feature flag: these are inert while the feature is off, and
         // static analysis (which runs with it off) can only resolve
@@ -94,7 +98,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.mailbox-import-status', MailboxImportStatus::class);
-        Livewire::component('email-integration.mailbox-connect-prompt', MailboxConnectPrompt::class);
+        Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the
