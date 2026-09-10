@@ -42,7 +42,7 @@ final readonly class MeetingParticipantStackPresenter
             'overflow_tooltip' => $overflowStates === []
                 ? null
                 : implode("\n", array_map(
-                    fn (array $state): string => $this->tooltip($state),
+                    $this->tooltip(...),
                     $overflowStates,
                 )),
         ];
