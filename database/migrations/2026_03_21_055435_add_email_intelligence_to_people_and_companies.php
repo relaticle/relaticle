@@ -10,13 +10,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        foreach (['people', 'companies'] as $tbl) {
-            Schema::table($tbl, function (Blueprint $table): void {
-                $table->timestamp('last_email_at')->nullable()->after('creation_source');
-                $table->timestamp('last_interaction_at')->nullable()->after('last_email_at');
-                $table->unsignedInteger('email_count')->default(0)->after('last_interaction_at');
-                $table->unsignedInteger('inbound_email_count')->default(0)->after('email_count');
-                $table->unsignedInteger('outbound_email_count')->default(0)->after('inbound_email_count');
+        foreach (['people', 'companies', 'opportunities'] as $tableName) {
+            Schema::table($tableName, function (Blueprint $table): void {
+                $table->timestamp('last_email_at')->nullable();
+                $table->timestamp('last_interaction_at')->nullable();
+                $table->unsignedInteger('email_count')->default(0);
+                $table->unsignedInteger('inbound_email_count')->default(0);
+                $table->unsignedInteger('outbound_email_count')->default(0);
+                $table->unsignedInteger('meeting_count')->default(0);
+                $table->timestamp('last_meeting_at')->nullable();
             });
         }
     }
