@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
@@ -345,6 +346,41 @@ it('opens the meeting slideover from the card', function (): void {
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
 });
 
+it('does not list a teammate meeting on home when the viewer is not invited', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $teammate->id,
+        ])
+    );
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $teammateAccount->id,
+        'title' => 'Meeting with client',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Client',
+        'email_address' => 'client@example.test',
+        'is_self' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Meeting with client');
+
+    expect(Meeting::query()
+        ->withGlobalScope('visible', VisibleMeetingScope::personal($this->user))
+        ->find($meeting->getKey()))
+        ->toBeNull();
+});
+
 it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
     $this->user->forceFill(['name' => 'Alice Viewer'])->save();
 
@@ -378,6 +414,13 @@ it('names a self attendee from the meeting mailbox when viewing a teammate copy'
     ]);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->id,
+        'name' => 'Alice Viewer',
+        'email_address' => strtolower((string) $this->user->email),
+        'is_self' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
         'name' => 'Guest',
         'email_address' => 'guest@acme.test',
         'is_self' => false,
@@ -385,9 +428,8 @@ it('names a self attendee from the meeting mailbox when viewing a teammate copy'
 
     livewire(MeetingsHomeWidget::class)
         ->assertSee('Shared standup')
-        ->assertDontSee('Alice Viewer')
         ->call('openMeeting', $meeting->id)
         ->assertActionMounted('view')
         ->assertMountedActionModalSee('Bob Owner')
-        ->assertMountedActionModalDontSee('Alice Viewer');
+        ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'));
 });

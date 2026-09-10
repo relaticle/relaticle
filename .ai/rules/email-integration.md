@@ -36,3 +36,14 @@ viewer has no share.
 current viewer. Name that row from `meeting.connectedAccount.user` (or the
 account display name). Never substitute `auth()->user()`. Alice viewing
 Bob's copy must still show Bob.
+
+## Personal calendar vs workspace meetings
+
+Home (`ListMeetingsForDay`, `MeetingsHomeWidget`) is a personal calendar.
+Use `VisibleMeetingScope::personal($viewer)`. Show only meetings synced from
+one of the viewer's connected mailboxes or where the viewer is on the guest
+list (user email plus every connected-account address).
+
+Record Meetings tabs, communication-intelligence aggregates, and other
+workspace surfaces keep the default `VisibleMeetingScope` (teammate meetings
+with an external guest stay visible there).
