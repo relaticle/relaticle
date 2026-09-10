@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\Security;
+use App\Http\Controllers\Auth\IdentityConfirmationRedirectController;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Models\User;
+use App\Models\UserSocialAccount;
+use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +20,12 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Laravel\Passkeys\Passkey;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 
 mutates(LogoutOtherBrowserSessions::class, ConfirmIdentityAction::class, IdentityConfirmation::class);
+mutates(AuthenticationSession::class, IdentityConfirmationRedirectController::class);
 mutates(EnsureAuthenticationComplete::class);
 
 test('social user can log out other sessions without confirmation', function (): void {
@@ -304,4 +312,70 @@ test('a restored session with enrolled MFA dispatches the same challenge event e
         TwoFactorAuthenticationChallenged::class,
         fn (TwoFactorAuthenticationChallenged $event): bool => $event->user->is($user),
     );
+});
+
+test('a provider-only user returns from confirmation with the log-out modal already open', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    $account = UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+    $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->mountAction('deleteBrowserSessions')
+        ->mountAction('confirmWithProvider');
+
+    $this->from($settingsUrl)
+        ->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))
+        ->assertRedirect();
+
+    Socialite::fake('google', (new SocialiteUser)->map([
+        'id' => $account->provider_id,
+        'name' => $user->name,
+        'email' => $user->email,
+    ]));
+
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect($settingsUrl);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->assertActionMounted('deleteBrowserSessions')
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+});
+
+test('opening the modal without starting the round trip records nothing to reopen', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)->mountAction('deleteBrowserSessions');
+
+    IdentityConfirmation::markConfirmed();
+
+    Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
+});
+
+test('a round trip that returns without the proof is not reopened by a later unrelated confirmation', function (): void {
+    $user = User::factory()->withTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+    ]);
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->mountAction('deleteBrowserSessions')
+        ->mountAction('confirmWithProvider');
+
+    Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
+
+    IdentityConfirmation::markConfirmed();
+
+    Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
 });

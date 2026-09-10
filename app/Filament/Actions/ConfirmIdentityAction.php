@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component as LivewireComponent;
@@ -39,8 +40,8 @@ use LogicException;
  * confirmedUsing() runs. The password path validates and marks confirmed
  * inline, with no ceremony. A user with neither a password nor a passkey has
  * no inline proof to give; if a linked provider offers one, it becomes the
- * modal's only footer action, a link the user must actually complete, never a
- * bypass.
+ * modal's only footer action, a round trip the user must actually complete,
+ * never a bypass.
  *
  * Irreversible actions opt into alwaysConfirm(): the freshness window is
  * ignored and a fresh proof is demanded on every attempt. Re-entry is scoped to
@@ -60,7 +61,13 @@ final class ConfirmIdentityAction extends Action
 
     private ?string $operation = null;
 
+    private bool $resumable = false;
+
     private Closure|string|null $target = null;
+
+    private bool $providerAccountResolved = false;
+
+    private ?UserSocialAccount $providerAccount = null;
 
     /** @var array<int, Component> */
     private array $prependedSchema = [];
@@ -103,6 +110,17 @@ final class ConfirmIdentityAction extends Action
     {
         $this->operation = $operation;
         $this->target = $target;
+
+        return $this;
+    }
+
+    /**
+     * Re-open this action when the provider round trip returns. Off by default:
+     * an action that reads page form state would come back to an empty one.
+     */
+    public function resumable(bool $condition = true): static
+    {
+        $this->resumable = $condition;
 
         return $this;
     }
@@ -222,17 +240,7 @@ final class ConfirmIdentityAction extends Action
         }
 
         if ($this->operation !== null) {
-            $pending = AuthenticationSession::pendingOperation();
-
-            // A forged or stale attempt id must never fall through to the
-            // generic window: an unrelated confirmation elsewhere would then
-            // silently authorize this operation with zero proof for it. Only
-            // an exact, still-present grant may ask "has it been proven yet".
-            if ($pending === [] || $pending['id'] !== $attemptId) {
-                return true;
-            }
-
-            return ! $pending['proven'];
+            return ! AuthenticationSession::operationProven($attemptId);
         }
 
         $user = $this->confirmingUser();
@@ -441,6 +449,8 @@ final class ConfirmIdentityAction extends Action
 
     /**
      * Rendering this marks nothing confirmed; only completing the round trip does.
+     * The descriptor is recorded on the click, not here, so merely opening and
+     * abandoning the modal leaves nothing behind to re-open later.
      */
     private function providerConfirmationAction(): ?Action
     {
@@ -450,10 +460,16 @@ final class ConfirmIdentityAction extends Action
             return null;
         }
 
+        $provider = $account->provider_name;
+
         return Action::make('confirmWithProvider')
-            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($account->provider_name)]))
-            ->icon(SocialiteProvider::tryFrom($account->provider_name)?->icon())
-            ->url(route('auth.socialite.confirm.redirect', ['provider' => $account->provider_name]));
+            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($provider)]))
+            ->icon(SocialiteProvider::tryFrom($provider)?->icon())
+            ->action(function () use ($provider): RedirectResponse {
+                $this->rememberResumableAction();
+
+                return redirect()->to(route('auth.socialite.confirm.redirect', ['provider' => $provider]));
+            });
     }
 
     /**
@@ -475,15 +491,43 @@ final class ConfirmIdentityAction extends Action
         return ! IdentityConfirmation::confirmedRecently($this->alwaysConfirm ? null : $this->within);
     }
 
-    private function linkedProviderAccount(): ?UserSocialAccount
+    private function rememberResumableAction(): void
     {
-        $user = $this->confirmingUser();
-
-        if ($user->hasPassword() || $user->hasPasskey()) {
-            return null;
+        if (! $this->resumable) {
+            return;
         }
 
-        return $user->socialAccounts()->first();
+        $livewire = $this->getLivewire();
+
+        assert($livewire instanceof LivewireComponent);
+
+        AuthenticationSession::rememberResumableAction(
+            $this->confirmingUser(),
+            $livewire->getName(),
+            $this->getName(),
+            $this->getArguments(),
+            $this->operation === null ? null : (AuthenticationSession::pendingOperation()['id'] ?? null),
+        );
+    }
+
+    /**
+     * Resolved several times per modal render, and each resolution costs a
+     * passkey-exists plus a social-account query. The action lives one request.
+     */
+    private function linkedProviderAccount(): ?UserSocialAccount
+    {
+        if ($this->providerAccountResolved) {
+            return $this->providerAccount;
+        }
+
+        $this->providerAccountResolved = true;
+        $user = $this->confirmingUser();
+
+        if (! $user->hasPassword() && ! $user->hasPasskey()) {
+            $this->providerAccount = $user->socialAccounts()->first();
+        }
+
+        return $this->providerAccount;
     }
 
     private function confirmingUser(): User

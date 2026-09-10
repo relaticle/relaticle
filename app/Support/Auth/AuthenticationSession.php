@@ -29,6 +29,8 @@ final readonly class AuthenticationSession
 
     private const string LINK_SUGGESTION_KEY = 'auth.link_suggestion';
 
+    private const string RESUME_KEY = 'auth.confirm.resume';
+
     private const int LIFETIME_MINUTES = 10;
 
     private const int OPERATION_LIFETIME_MINUTES = 15;
@@ -114,6 +116,7 @@ final readonly class AuthenticationSession
             self::OPERATION_KEY,
             self::ATTEMPT_KEY,
             self::PROVIDER_CONFIRM_KEY,
+            self::RESUME_KEY,
             'auth.password_confirmed_at',
             'login.id',
             'login.remember',
@@ -243,6 +246,84 @@ final readonly class AuthenticationSession
         }
 
         session()->forget(self::OPERATION_KEY);
+    }
+
+    /**
+     * The provider round trip is a full page load, so the Livewire component
+     * holding the modal is destroyed before the user returns.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    public static function rememberResumableAction(User $user, string $component, string $action, array $arguments, ?string $grantId): void
+    {
+        session()->put(self::RESUME_KEY, [
+            'user_id' => (string) $user->getAuthIdentifier(),
+            'component' => $component,
+            'action' => $action,
+            'arguments' => $arguments,
+            'grant_id' => $grantId,
+            'expires_at' => now()->addMinutes(self::OPERATION_LIFETIME_MINUTES)->getTimestamp(),
+        ]);
+    }
+
+    /**
+     * One-time read, for the named component only, and only once the proof it
+     * was waiting on landed.
+     *
+     * @return array{action: string, arguments: array<string, mixed>}|null
+     */
+    public static function pullResumableAction(User $user, string $component): ?array
+    {
+        $resume = session()->get(self::RESUME_KEY);
+
+        if (
+            ! is_array($resume)
+            || ! isset($resume['user_id'], $resume['component'], $resume['action'], $resume['arguments'], $resume['expires_at'])
+            || ! is_string($resume['user_id'])
+            || ! is_string($resume['component'])
+            || ! is_string($resume['action'])
+            || ! is_array($resume['arguments'])
+            || ! is_int($resume['expires_at'])
+            || ! array_key_exists('grant_id', $resume)
+            || (! is_string($resume['grant_id']) && $resume['grant_id'] !== null)
+        ) {
+            return null;
+        }
+
+        // A sibling component on the same page must not consume a descriptor
+        // addressed elsewhere; once it is ours it is spent either way.
+        if ($resume['user_id'] !== (string) $user->getAuthIdentifier() || $resume['component'] !== $component) {
+            return null;
+        }
+
+        session()->forget(self::RESUME_KEY);
+
+        if ($resume['expires_at'] <= now()->getTimestamp() || ! self::resumeProofSatisfied($resume['grant_id'])) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $arguments */
+        $arguments = $resume['arguments'];
+
+        return ['action' => $resume['action'], 'arguments' => $arguments];
+    }
+
+    /**
+     * Whether this exact grant is still the one in the slot and has been proven.
+     * A forged or superseded id must never fall through to the generic window.
+     */
+    public static function operationProven(string $grantId): bool
+    {
+        $pending = self::pendingOperation();
+
+        return $pending !== [] && $pending['id'] === $grantId && $pending['proven'];
+    }
+
+    private static function resumeProofSatisfied(?string $grantId): bool
+    {
+        return $grantId === null
+            ? IdentityConfirmation::confirmedRecently()
+            : self::operationProven($grantId);
     }
 
     /**

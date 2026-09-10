@@ -182,6 +182,8 @@ test('a passwordless account can set a password after returning from its linked 
     $this->get(route('auth.socialite.confirm.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
         ->assertRedirect();
 
+    Livewire::test(UpdatePasswordComponent::class)->assertActionNotMounted();
+
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
             'password' => 'new-password',

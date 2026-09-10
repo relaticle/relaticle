@@ -29,7 +29,6 @@ final readonly class IdentityConfirmationRedirectController
 
         if (
             $user instanceof User
-            && AuthenticationSession::pendingOperation() !== []
             && ! $request->session()->has('url.intended')
             && is_string($referrer)
             && $referrer !== route('password.confirm')

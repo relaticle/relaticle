@@ -249,6 +249,34 @@ test('social user completes deletion after confirming through their linked provi
     expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });
 
+test('a provider-only user returns from confirmation with the delete-account modal already open', function (): void {
+    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $this->actingAs($user);
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => 'confirmed-google-id',
+    ]);
+
+    Livewire::test(DeleteAccount::class)
+        ->mountAction('deleteAccount')
+        ->mountAction('confirmWithProvider');
+
+    $this->get(route('auth.socialite.confirm.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect();
+
+    $socialiteUser = new SocialiteUser;
+    $socialiteUser->id = 'confirmed-google-id';
+    $socialiteUser->name = $user->name;
+    $socialiteUser->email = $user->email;
+    Socialite::fake(SocialiteProvider::GOOGLE->value, $socialiteUser);
+
+    $this->get(route('auth.socialite.confirm.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'accepted']))
+        ->assertRedirect();
+
+    Livewire::test(DeleteAccount::class)->assertActionMounted('deleteAccount');
+});
+
 test('a provider identity mismatch does not confirm a pending deletion', function (): void {
     $user = User::factory()->withPersonalTeam()->socialOnly()->create();
     $this->actingAs($user);
