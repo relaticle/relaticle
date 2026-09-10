@@ -88,6 +88,8 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             $result->events,
         );
 
+        MailboxSyncTracker::setCalendarRunTotal($account, count($jobs));
+
         Bus::batch($jobs)
             ->name("Incremental calendar sync: {$account->email_address}")
             ->onQueue('emails-sync')

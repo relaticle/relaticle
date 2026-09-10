@@ -299,9 +299,22 @@ final class ConnectedAccount extends Model
         return $this->hasCalendar() && $this->calendar_sync_cursor === null;
     }
 
+    public function isImportingCalendarHistory(): bool
+    {
+        return $this->isActive()
+            && $this->hasCalendar()
+            && $this->calendar_sync_cursor === null;
+    }
+
     public function isCalendarSyncing(): bool
     {
         return MailboxSyncTracker::isCalendarSyncing($this);
+    }
+
+    public function showsCalendarSyncProgress(): bool
+    {
+        return $this->isImportingCalendarHistory()
+            || ($this->hasCalendar() && $this->isCalendarSyncing());
     }
 
     public function isEmailSyncing(): bool
@@ -356,6 +369,41 @@ final class ConnectedAccount extends Model
         }
 
         return min(100, (int) round(($this->initial_sync_imported / $estimated) * 100));
+    }
+
+    public function syncEmailsProcessedCount(): int
+    {
+        if ($this->isEmailSyncing()) {
+            return MailboxSyncTracker::emailProcessedCount($this);
+        }
+
+        if ($this->isImportingHistory() && $this->hasEmail() && $this->sync_cursor === null) {
+            return $this->initial_sync_imported;
+        }
+
+        return $this->initial_sync_imported;
+    }
+
+    public function syncMeetingsProcessedCount(): int
+    {
+        if ($this->isCalendarSyncing()) {
+            return MailboxSyncTracker::calendarProcessedCount($this);
+        }
+
+        if ($this->isImportingCalendarHistory()) {
+            return $this->initial_calendar_sync_imported;
+        }
+
+        return $this->initial_calendar_sync_imported;
+    }
+
+    public function syncDisplayPercent(): int
+    {
+        if ($this->isImportingHistory()) {
+            return $this->initialSyncProgressPercent();
+        }
+
+        return MailboxSyncTracker::runProgressPercent($this);
     }
 
     /**

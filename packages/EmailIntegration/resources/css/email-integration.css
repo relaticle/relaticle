@@ -292,11 +292,3 @@
 .fi-meetings-date:hover .fi-fo-date-time-picker-display-text-input {
     @apply text-gray-900 dark:text-white;
 }
-
-/* ── Meeting attendee: host badge ──────────────────────────────────────────
-   Same 2px-padding problem as the email direction badge: at xs the label
-   touches the pill edge, so the tag reads as tinted text. */
-.fi-meeting-attendee-badge.fi-badge {
-    padding-block: 1px;
-    padding-inline: calc(var(--spacing) * 1.5);
-}
