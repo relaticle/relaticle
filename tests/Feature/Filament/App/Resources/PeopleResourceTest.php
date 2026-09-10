@@ -34,14 +34,14 @@ it('can render the view page', function (): void {
         ->assertOk();
 });
 
-it('registers the emails and meetings relation managers on the person view page', function (): void {
+it('registers the meetings relation manager on the person view page', function (): void {
     $record = People::factory()->recycle([$this->user, $this->team])->create();
 
     $managers = livewire(ViewPeople::class, ['record' => $record->getKey()])
         ->instance()
         ->getRelationManagers();
 
-    expect($managers)->toContain(EmailsRelationManager::class)
+    expect($managers)->not->toContain(EmailsRelationManager::class)
         ->and($managers)->toContain(MeetingsRelationManager::class);
 });
 
