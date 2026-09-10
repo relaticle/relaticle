@@ -214,30 +214,9 @@
 
                         @if ($hasParticipants)
                             <span
-                                data-testid="meeting-card-participants-preview"
-                                class="inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-200 bg-gray-50 py-0.5 pe-1 ps-1.5 text-gray-400 dark:border-white/10 dark:bg-white/5"
+                                class="inline-flex shrink-0 text-gray-400"
                                 aria-hidden="true"
                             >
-                                @if ($participants['avatars'] !== [])
-                                    <span class="flex -space-x-1.5">
-                                        @foreach ($participants['avatars'] as $avatar)
-                                            @include('email-integration::filament.infolists.partials.meeting-attendee-avatar', [
-                                                'src' => $avatar['src'],
-                                                'alt' => $avatar['alt'],
-                                                'hasName' => $avatar['has_name'],
-                                                'size' => 'sm',
-                                                'class' => 'ring-2 ring-gray-50 dark:ring-white/5',
-                                            ])
-                                        @endforeach
-                                    </span>
-                                @endif
-
-                                @if ($participants['overflow'] > 0)
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ __('filament/pages/dashboard.meetings.more_participants', ['count' => $participants['overflow']]) }}
-                                    </span>
-                                @endif
-
                                 <span
                                     class="inline-flex transition-transform duration-200 motion-reduce:transition-none"
                                     x-bind:class="expanded && 'rotate-180'"
