@@ -25,7 +25,7 @@ final class EmailBlocklistFactory extends Factory
             'team_id' => Team::factory(),
             'connected_account_id' => ConnectedAccount::factory(),
             'type' => EmailBlocklistType::EMAIL,
-            'value' => $this->faker->unique()->safeEmail(),
+            'value' => fake()->unique()->safeEmail(),
         ];
     }
 

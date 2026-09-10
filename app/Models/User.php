@@ -56,6 +56,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
  * @property CarbonImmutable|null $email_verified_at
+ * @property CarbonImmutable|null $email_sign_in_enabled_at
  * @property CarbonImmutable|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
  * @property string|null $subscriber_profile_hash
@@ -115,6 +116,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return [
             'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
+            'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
             'default_email_sharing_tier' => EmailPrivacyTier::class,

@@ -19,10 +19,10 @@ final class EmailAttachmentFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
-            'filename' => $this->faker->word().'.pdf',
+            'filename' => fake()->word().'.pdf',
             'mime_type' => 'application/pdf',
-            'size' => $this->faker->numberBetween(1024, 10485760),
-            'storage_path' => 'attachments/'.$this->faker->uuid().'.pdf',
+            'size' => fake()->numberBetween(1024, 10485760),
+            'storage_path' => 'attachments/'.fake()->uuid().'.pdf',
             'is_inline' => false,
         ];
     }
@@ -30,7 +30,7 @@ final class EmailAttachmentFactory extends Factory
     public function inline(): static
     {
         return $this->state(fn (): array => [
-            'content_id' => 'cid-'.$this->faker->uuid(),
+            'content_id' => 'cid-'.fake()->uuid(),
             'mime_type' => 'image/png',
             'filename' => 'image.png',
             'is_inline' => true,

@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Features\AccountDeletion;
 use App\Filament\Clusters\Settings;
 use App\Livewire\App\Profile\DeleteAccount;
-use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
-use App\Livewire\App\Profile\ManagePasskeys;
-use App\Livewire\App\Profile\UpdatePassword;
 use App\Livewire\App\Profile\UpdateProfileInformation;
 use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Schema;
+use Laravel\Pennant\Feature;
 
 final class EditProfile extends Page
 {
@@ -37,10 +36,8 @@ final class EditProfile extends Page
     {
         return $schema->components([
             Livewire::make(UpdateProfileInformation::class),
-            Livewire::make(UpdatePassword::class),
-            Livewire::make(ManagePasskeys::class),
-            Livewire::make(LogoutOtherBrowserSessions::class),
-            Livewire::make(DeleteAccount::class),
+            Livewire::make(DeleteAccount::class)
+                ->visible(fn (): bool => Feature::active(AccountDeletion::class)),
         ]);
     }
 

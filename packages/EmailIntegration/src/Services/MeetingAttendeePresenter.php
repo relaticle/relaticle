@@ -36,7 +36,7 @@ final readonly class MeetingAttendeePresenter
         $selfName = $mailboxPerson !== null ? $this->usableName($mailboxPerson['name'], $email) : null;
         $memberName = $member !== null ? $this->usableName($member['name'], $email) : null;
         $calendarName = $this->usableName($attendee->name, $email);
-        $mailboxName = $email !== '' ? $this->mailboxName($attendee, $email) : null;
+        $mailboxName = $email !== '' ? $this->mailboxName($email) : null;
         $named = $contactName
             ?? $selfName
             ?? $memberName
@@ -86,17 +86,21 @@ final readonly class MeetingAttendeePresenter
         $user = $account->relationLoaded('user')
             ? $account->getRelation('user')
             : null;
-        $name = $user instanceof User && trim($user->name) !== ''
-            ? trim($user->name)
-            : trim((string) ($account->display_name ?? ''));
 
-        if ($name === '' || Str::lower($name) === Str::lower(trim($account->email_address))) {
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $mailboxEmail = Str::lower(trim($account->email_address));
+        $userEmail = Str::lower(trim($user->email));
+
+        if ($mailboxEmail === '' || $mailboxEmail !== $userEmail || trim($user->name) === '') {
             return null;
         }
 
         return [
-            'name' => $name,
-            'avatar' => $user instanceof User ? $user->profile_photo_url : null,
+            'name' => trim($user->name),
+            'avatar' => $user->profile_photo_url,
         ];
     }
 
@@ -114,15 +118,15 @@ final readonly class MeetingAttendeePresenter
         return $this->teamMembers->find($teamId, $email);
     }
 
-    private function mailboxName(MeetingAttendee $attendee, string $email): ?string
+    private function mailboxName(string $email): ?string
     {
-        $teamId = $this->teamId($attendee);
+        $viewer = auth()->user();
 
-        if ($teamId === null) {
+        if (! $viewer instanceof User) {
             return null;
         }
 
-        return $this->mailboxNames->find($teamId, $email);
+        return $this->mailboxNames->find($viewer, $email);
     }
 
     private function usableName(mixed $name, string $email): ?string

@@ -7,6 +7,7 @@ namespace App\Livewire\App\Onboarding;
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Data\ActivationStepData;
 use App\Enums\ActivationStep;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\Team\Members;
 use App\Filament\Resources\PeopleResource;
 use App\Models\Team;
@@ -14,8 +15,12 @@ use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 use Spatie\Onboard\OnboardingStep;
 
@@ -40,6 +45,11 @@ final class ActivationChecklist extends Component
         resolve(DismissActivationChecklist::class)->execute($this->user(), $team);
 
         unset($this->steps);
+    }
+
+    public function refreshEmailSyncProgress(): void
+    {
+        unset($this->emailSyncProgress);
     }
 
     public function render(): View
@@ -118,10 +128,42 @@ final class ActivationChecklist extends Component
     {
         return match ($step) {
             ActivationStep::FirstRecord => PeopleResource::getUrl('index'),
+            ActivationStep::SyncEmail => EmailAccountsPage::getUrl(),
             ActivationStep::Import => ImportPeople::getUrl(),
             ActivationStep::Invite => Members::getUrl(),
             ActivationStep::AskRela => null,
         };
+    }
+
+    /**
+     * Progress for the current user's mailbox import, shown inline on the
+     * sync_email row while the initial backfill or an incremental run is in flight.
+     *
+     * @return array{percent: int, showsPercent: bool}|null
+     */
+    #[Computed]
+    public function emailSyncProgress(): ?array
+    {
+        if (! Feature::active(EmailIntegration::class)) {
+            return null;
+        }
+
+        $team = $this->team();
+
+        if (! $team instanceof Team) {
+            return null;
+        }
+
+        $syncingAccounts = ConnectedAccount::query()
+            ->ownedBy($this->user(), $team)
+            ->get()
+            ->filter(fn (ConnectedAccount $account): bool => $account->showsSyncProgress());
+
+        if ($syncingAccounts->isEmpty()) {
+            return null;
+        }
+
+        return $this->buildEmailSyncProgress($syncingAccounts);
     }
 
     /**
@@ -202,5 +244,25 @@ final class ActivationChecklist extends Component
         $user = Filament::auth()->user();
 
         return $user;
+    }
+
+    /**
+     * @param  Collection<int, ConnectedAccount>  $syncingAccounts
+     * @return array{percent: int, showsPercent: bool}
+     */
+    private function buildEmailSyncProgress(Collection $syncingAccounts): array
+    {
+        $isInitialImport = $syncingAccounts->contains(
+            fn (ConnectedAccount $account): bool => $account->isImportingHistory(),
+        );
+
+        $percent = (int) $syncingAccounts
+            ->map(fn (ConnectedAccount $account): int => $account->syncDisplayPercent())
+            ->max();
+
+        return [
+            'percent' => $percent,
+            'showsPercent' => $isInitialImport || $percent > 0,
+        ];
     }
 }

@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
@@ -28,7 +25,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class EnsureCalendarPushChannelJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Queueable;
 
     public int $tries = 3;
 

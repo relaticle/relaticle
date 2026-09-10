@@ -13,6 +13,8 @@ use App\Onboarding\ActivationSteps;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Spatie\Onboard\OnboardingStep;
 
 mutates(ActivationSteps::class, WorkspaceActivationFacts::class);
@@ -36,7 +38,14 @@ function stepByKey(Team $team, string $key): OnboardingStep
         ->first(fn (OnboardingStep $step): bool => $step->attribute('key') === ActivationStep::from($key));
 }
 
-it('registers exactly four steps for a team', function (): void {
+it('registers exactly five steps for a team when email integration is enabled', function (): void {
+    expect($this->team->onboarding()->steps())->toHaveCount(5);
+});
+
+it('registers four steps when email integration is disabled', function (): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
     expect($this->team->onboarding()->steps())->toHaveCount(4);
 });
 
@@ -54,6 +63,31 @@ it('completes first_record only for non-system records', function (): void {
         'creation_source' => CreationSource::WEB,
     ]);
     expect(stepByKey($this->team->refresh(), 'first_record')->complete())->toBeTrue();
+});
+
+it('completes sync_email when the user has connected a mailbox', function (): void {
+    $this->actingAs($this->owner);
+
+    ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->owner->getKey(),
+    ]);
+
+    expect(stepByKey($this->team->refresh(), 'sync_email')->complete())->toBeTrue();
+});
+
+it('does not complete sync_email for another user\'s mailbox', function (): void {
+    $teammate = User::factory()->create();
+    $this->team->users()->attach($teammate, ['role' => TeamRole::Editor->value]);
+
+    ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $teammate->getKey(),
+    ]);
+
+    $this->actingAs($this->owner);
+
+    expect(stepByKey($this->team->refresh(), 'sync_email')->complete())->toBeFalse();
 });
 
 it('completes import when an imported record exists', function (): void {
@@ -186,6 +220,7 @@ it('orders the steps by measured value, not by build order', function (): void {
 
     expect($keys)->toBe([
         ActivationStep::FirstRecord->value,
+        ActivationStep::SyncEmail->value,
         ActivationStep::AskRela->value,
         ActivationStep::Import->value,
         ActivationStep::Invite->value,

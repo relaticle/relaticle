@@ -14,6 +14,7 @@ use App\Observers\PeopleObserver;
 use App\Services\AvatarService;
 use Carbon\CarbonImmutable;
 use Database\Factories\PeopleFactory;
+use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -46,7 +47,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'name',
     'creation_source',
 ])]
-final class People extends Model implements HasCustomFields, HasTimeline
+final class People extends Model implements HasAvatar, HasCustomFields, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasActivityTimeline;
@@ -89,6 +90,11 @@ final class People extends Model implements HasCustomFields, HasTimeline
     protected function getAvatarAttribute(): string
     {
         return resolve(AvatarService::class)->generateAuto(name: $this->name, initialCount: 1);
+    }
+
+    public function getFilamentAvatarUrl(): string
+    {
+        return $this->avatar;
     }
 
     /**
