@@ -33,9 +33,11 @@ viewer has no share.
 ## Meeting attendee "self"
 
 `MeetingAttendee.is_self` is the mailbox that owns that meeting copy, not the
-current viewer. Name that row from `meeting.connectedAccount.user` (or the
-account display name). Never substitute `auth()->user()`. Alice viewing
-Bob's copy must still show Bob.
+current viewer. Name that row from `meeting.connectedAccount.user` only when
+the mailbox address is that user's email. Never substitute `auth()->user()`,
+and never apply the connecting user's workspace name to a different mailbox
+address. A shared inbox stays that address, or its calendar name. Alice viewing
+Bob's copy still shows Bob when the mailbox is Bob's email.
 
 ## Meeting attendee mailbox names
 

@@ -86,17 +86,21 @@ final readonly class MeetingAttendeePresenter
         $user = $account->relationLoaded('user')
             ? $account->getRelation('user')
             : null;
-        $name = $user instanceof User && trim($user->name) !== ''
-            ? trim($user->name)
-            : trim((string) ($account->display_name ?? ''));
 
-        if ($name === '' || Str::lower($name) === Str::lower(trim($account->email_address))) {
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $mailboxEmail = Str::lower(trim($account->email_address));
+        $userEmail = Str::lower(trim($user->email));
+
+        if ($mailboxEmail === '' || $mailboxEmail !== $userEmail || trim($user->name) === '') {
             return null;
         }
 
         return [
-            'name' => $name,
-            'avatar' => $user instanceof User ? $user->profile_photo_url : null,
+            'name' => trim($user->name),
+            'avatar' => $user->profile_photo_url,
         ];
     }
 

@@ -706,6 +706,37 @@ it('collapses duplicate guest emails on the card', function (): void {
         ->assertDontSee('maya@example.test');
 });
 
+it('does not name a card guest from the workspace user for a different connected mailbox', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill([
+        'email_address' => 'whiteshark.devs@example.test',
+        'display_name' => 'Whiteshark',
+    ])->save();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Whiteshark Devs',
+        'email_address' => 'whiteshark.devs@example.test',
+        'is_self' => false,
+        'is_organizer' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Whiteshark Devs')
+        ->assertDontSee('Oliver Workspace');
+});
+
 it('shows a person icon when the attendee has no name', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
@@ -923,7 +954,10 @@ it('does not list a teammate meeting on home when the viewer is not invited', fu
 it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
     $this->user->forceFill(['name' => 'Alice Viewer'])->save();
 
-    $bob = User::factory()->create(['name' => 'Bob Owner']);
+    $bob = User::factory()->create([
+        'name' => 'Bob Owner',
+        'email' => 'bob@example.com',
+    ]);
     $bob->teams()->attach($this->team, ['role' => 'admin']);
     $bob->forceFill(['current_team_id' => $this->team->id])->save();
 
