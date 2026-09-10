@@ -60,10 +60,6 @@
         </form>
 
         @if (\Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class))
-            @island(name: 'mailbox-import')
-                @livewire('email-integration.mailbox-import-status', ['placement' => 'home'])
-            @endisland
-
             @livewire('email-integration.meetings-home-widget')
         @endif
 

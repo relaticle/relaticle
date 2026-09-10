@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
@@ -37,6 +38,9 @@ beforeEach(function (): void {
         fn (): ConnectedAccount => ConnectedAccount::factory()->create([
             'team_id' => $this->team->id,
             'user_id' => $this->user->id,
+            'sync_cursor' => 'done',
+            'calendar_sync_cursor' => 'done',
+            'last_synced_at' => now(),
         ])
     );
 });
@@ -55,6 +59,167 @@ it('renders the empty day copy on home', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.empty.title'))
         ->assertSee(__('filament/pages/dashboard.meetings.empty.description'))
         ->assertSee(__('filament/pages/dashboard.meetings.date.today'));
+});
+
+it('shows mailbox sync progress inside the meetings section', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => null,
+        'calendar_sync_cursor' => null,
+        'initial_sync_imported' => 12,
+        'initial_sync_estimated' => 40,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 30]))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.description_initial'))
+        ->assertSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_processed', 12, ['count' => 12]))
+        ->assertDontSee(trans_choice('filament/pages/dashboard.meetings.syncing.meetings_processed', 0, ['count' => 0]))
+        ->assertSee('role="progressbar"', false)
+        ->assertSee('aria-valuenow="30"', false)
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('shows mailbox sync progress during email-only history import', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => false],
+        'sync_cursor' => null,
+        'initial_sync_imported' => 0,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 0]))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('hides meetings while mailbox sync is in progress', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Board review',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    $this->account->update([
+        'sync_cursor' => null,
+        'initial_sync_imported' => 8,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertDontSee('Board review')
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('hides meetings while calendar sync is in progress', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Board review',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'calendar_sync_cursor' => null,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertDontSee('Board review')
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('shows reconnect sync progress with percent and new item counts', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => 'done',
+        'calendar_sync_cursor' => 'done',
+    ]);
+
+    MailboxSyncTracker::markEmailStarted($this->account);
+    MailboxSyncTracker::setEmailRunTotal($this->account, 10);
+    MailboxSyncTracker::bumpEmailProcessed($this->account);
+    MailboxSyncTracker::bumpEmailProcessed($this->account);
+
+    MailboxSyncTracker::markCalendarStarted($this->account);
+    MailboxSyncTracker::setCalendarRunTotal($this->account, 4);
+    MailboxSyncTracker::bumpCalendarProcessed($this->account);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 25]))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.description_update'))
+        ->assertSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_updated', 2, ['count' => 2]))
+        ->assertSee(trans_choice('filament/pages/dashboard.meetings.syncing.meetings_updated', 1, ['count' => 1]))
+        ->assertSee('aria-valuenow="25"', false);
+});
+
+it('hides zero counts during reconnect sync before new items arrive', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => 'done',
+        'calendar_sync_cursor' => 'done',
+        'initial_sync_imported' => 643,
+        'initial_calendar_sync_imported' => 120,
+    ]);
+
+    MailboxSyncTracker::markEmailStarted($this->account);
+    MailboxSyncTracker::markCalendarStarted($this->account);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title'))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.description_update'))
+        ->assertDontSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_processed', 643, ['count' => 643]))
+        ->assertDontSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_updated', 0, ['count' => 0]))
+        ->assertDontSee('aria-valuenow=', false);
+});
+
+it('shows meetings after calendar sync finishes', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'calendar_sync_cursor' => 'done',
+    ]);
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Board review',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MailboxSyncTracker::markCalendarStarted($this->account);
+
+    $component = livewire(MeetingsHomeWidget::class)
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertDontSee('Board review');
+
+    MailboxSyncTracker::markCalendarFinished($this->account);
+
+    $component->call('refreshMailboxSync')
+        ->assertDontSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertSee('Board review');
+});
+
+it('shows mailbox sync progress on the dashboard inside meetings', function (): void {
+    $this->account->update([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => null,
+        'calendar_sync_cursor' => null,
+        'initial_sync_imported' => 4,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    livewire(Dashboard::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 4]))
+        ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
+        ->assertDontSee('data-mailbox-import="home"', false);
 });
 
 it('moves to tomorrow and yesterday from the date controls', function (): void {

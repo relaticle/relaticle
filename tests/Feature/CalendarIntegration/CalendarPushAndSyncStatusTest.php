@@ -84,7 +84,7 @@ it('shows calendar-only sync progress on the dashboard', function (): void {
     MailboxSyncTracker::markCalendarStarted($account);
 
     Livewire::test(MailboxImportStatus::class, ['placement' => 'home'])
-        ->assertSee(__('filament/pages/email-accounts.importing_calendar'))
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 0]))
         ->assertSee(__('filament/pages/email-accounts.sync_status.title_syncing'));
 });
 
