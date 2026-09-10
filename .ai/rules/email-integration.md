@@ -47,3 +47,12 @@ list (user email plus every connected-account address).
 Record Meetings tabs, communication-intelligence aggregates, and other
 workspace surfaces keep the default `VisibleMeetingScope` (teammate meetings
 with an external guest stay visible there).
+
+## All-day meetings are calendar dates
+
+All-day events are stored as a UTC date at midnight (`GoogleCalendarService`
+parses the provider's bare `Y-m-d` in UTC). Filter them with `whereDate` on
+that calendar date. Do not convert them through the viewer's timezone: a
+Los Angeles day window starts at 07:00 UTC, so a September 10 all-day event
+would otherwise appear on the 9th. Timed meetings still use local-day UTC
+bounds.
