@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\EmptyState;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -122,7 +123,8 @@ final class MeetingDetailInfolist
                                     ->state(fn (Meeting $record): int => self::linkedCount($record)),
                             ])
                             ->afterHeader([
-                                self::linkRecordsAction('linkRecords'),
+                                self::linkRecordsAction('linkRecords')
+                                    ->visible(fn (Meeting $record): bool => self::linkedCount($record) > 0),
                             ])
                             ->schema([
                                 RepeatableEntry::make('linked_records')
@@ -146,6 +148,15 @@ final class MeetingDetailInfolist
                                                 ->size(TextSize::Small),
                                         ])->alignment(Alignment::Between),
                                     ]),
+                                EmptyState::make(__('filament/resources/meeting.sections.linked_records.empty.heading'))
+                                    ->description(__('filament/resources/meeting.sections.linked_records.empty.description'))
+                                    ->icon(Heroicon::OutlinedLink)
+                                    ->contained(false)
+
+                                    ->footer([
+                                        self::linkRecordsAction('linkRecords', asButton: true),
+                                    ])
+                                    ->visible(fn (Meeting $record): bool => self::linkedCount($record) === 0),
                             ])
                             ->columnSpan(2),
                     ]),
@@ -214,13 +225,12 @@ final class MeetingDetailInfolist
         ];
     }
 
-    public static function linkRecordsAction(string $name): Action
+    public static function linkRecordsAction(string $name, bool $asButton = false): Action
     {
-        return Action::make($name)
+        $action = Action::make($name)
             ->label(__('filament/resources/meeting.actions.link_records.label'))
             ->icon(Heroicon::Plus)
             ->schema(self::linkRecordFields())
-            ->link()
             ->action(function (array $data, Meeting $record): void {
                 $target = self::resolveLinkTarget(
                     (string) $data['target_type'],
@@ -234,6 +244,12 @@ final class MeetingDetailInfolist
                     ->title(__('filament/relation-managers/meetings.notifications.linked.title'))
                     ->send();
             });
+
+        if ($asButton) {
+            return $action->button();
+        }
+
+        return $action->link();
     }
 
     /**
