@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace App\Support\CustomFields;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomFieldValue;
-use Relaticle\CustomFields\Services\ValueResolver\LookupAttributeResolver;
-use Relaticle\CustomFields\Services\ValueResolver\LookupCache;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class RecordNameResolver
 {
-    public function __construct(
-        private LookupCache $cache,
-        private LookupAttributeResolver $attributes,
-    ) {}
+    /** @var Collection<string, ?string> */
+    private Collection $names;
+
+    public function __construct()
+    {
+        $this->names = new Collection;
+    }
 
     /** @param  iterable<Model>  $models */
     public function prime(iterable $models): void
@@ -37,8 +40,10 @@ final readonly class RecordNameResolver
                     continue;
                 }
 
+                $lookupType = (string) $value->customField->lookup_type;
+
                 foreach ($this->ids($value->getValue()) as $id) {
-                    $wanted[(string) $value->customField->lookup_type][] = $id;
+                    $wanted[$lookupType][] = $id;
                 }
             }
         }
@@ -48,35 +53,61 @@ final readonly class RecordNameResolver
         }
     }
 
-    public function name(string $lookupType, string $id): ?string
+    /**
+     * @param  array<int, string>  $ids
+     * @return array<string, ?string>
+     */
+    public function names(string $lookupType, array $ids): array
     {
-        $this->warm($lookupType, [$id]);
+        $this->warm($lookupType, $ids);
 
-        return $this->cache->titleFor($lookupType, $id);
+        $result = [];
+
+        foreach ($ids as $id) {
+            $result[$id] = $this->names->get($this->key($lookupType, $id));
+        }
+
+        return $result;
     }
 
-    /** @param  list<string>  $ids */
-    /** @param  list<string>  $ids */
+    /** @param  array<int, string>  $ids */
     private function warm(string $lookupType, array $ids): void
     {
-        $missing = array_values(array_map(
-            static fn (int|string $id): string => (string) $id,
-            $this->cache->missing($lookupType, $ids),
-        ));
+        $missing = array_values(array_unique(array_filter(
+            $ids,
+            fn (string $id): bool => $id !== '' && ! $this->names->has($this->key($lookupType, $id)),
+        )));
 
         if ($missing === []) {
             return;
         }
 
-        [$lookupInstance, $titleAttribute] = $this->attributes->resolve($lookupType);
+        $teamId = TenantContextService::getCurrentTenantId();
+        $entity = $teamId !== null ? CrmEntity::tryFrom($lookupType) : null;
 
-        $titles = $lookupInstance->newQuery()
+        if ($entity === null) {
+            foreach ($missing as $id) {
+                $this->names->put($this->key($lookupType, $id), null);
+            }
+
+            return;
+        }
+
+        $model = $entity->model();
+
+        $found = $model::query()
+            ->where('team_id', $teamId)
             ->whereIn('id', $missing)
-            ->pluck($titleAttribute, 'id')
-            ->map(static fn (mixed $title): string => (string) $title)
-            ->all();
+            ->pluck($entity->titleColumn(), 'id');
 
-        $this->cache->remember($lookupType, $titles + array_fill_keys($missing, null));
+        foreach ($missing as $id) {
+            $this->names->put($this->key($lookupType, $id), isset($found[$id]) ? (string) $found[$id] : null);
+        }
+    }
+
+    private function key(string $lookupType, string $id): string
+    {
+        return $lookupType.':'.$id;
     }
 
     /** @return list<string> */

@@ -90,18 +90,31 @@ trait FormatsCustomFields
     }
 
     /**
-     * @return array<int, array{id: string, name: ?string}>
+     * @return array<int, array{id: string, name: ?string}>|null
      */
-    private function resolveRecordValue(CustomField $customField, mixed $rawValue): array
+    private function resolveRecordValue(CustomField $customField, mixed $rawValue): ?array
     {
-        $values = $rawValue instanceof Collection ? $rawValue->all() : (array) ($rawValue ?? []);
-        $resolver = resolve(RecordNameResolver::class);
+        if ($rawValue === null) {
+            return null;
+        }
+
+        $values = $rawValue instanceof Collection ? $rawValue->all() : (array) $rawValue;
         $lookupType = (string) $customField->lookup_type;
 
-        return collect($values)
-            ->filter(fn (mixed $id): bool => is_string($id) || is_int($id))
-            ->map(fn (mixed $id): array => ['id' => (string) $id, 'name' => $resolver->name($lookupType, (string) $id)])
+        $ids = collect($values)
+            ->filter(fn (mixed $id): bool => (is_string($id) || is_int($id)) && (string) $id !== '')
+            ->map(fn (mixed $id): string => (string) $id)
             ->values()
+            ->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $names = resolve(RecordNameResolver::class)->names($lookupType, $ids);
+
+        return collect($ids)
+            ->map(fn (string $id): array => ['id' => $id, 'name' => $names[$id] ?? null])
             ->all();
     }
 }

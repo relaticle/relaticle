@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Concerns\NormalizesCustomFields;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
@@ -45,4 +46,27 @@ it('stores markdown note bodies as html', function (): void {
     $this->postJson('/api/v1/notes', ['title' => 'Md note', 'custom_fields' => ['body' => '**bold**']])
         ->assertCreated()
         ->assertJsonPath('data.attributes.custom_fields.body', fn (string $body): bool => str_contains($body, '<strong>bold</strong>'));
+});
+
+it('returns a record field as id and name pairs for an own-team company', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $company = Company::factory()->create(['team_id' => $this->team->getKey(), 'name' => 'Globex']);
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($field, [$company->getKey()]);
+
+    $this->getJson("/api/v1/tasks/{$task->getKey()}")
+        ->assertOk()
+        ->assertJsonPath('data.attributes.custom_fields.related_company.0.id', $company->getKey())
+        ->assertJsonPath('data.attributes.custom_fields.related_company.0.name', 'Globex');
 });

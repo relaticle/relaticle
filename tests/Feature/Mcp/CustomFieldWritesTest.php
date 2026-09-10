@@ -20,7 +20,9 @@ use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
@@ -32,11 +34,23 @@ beforeEach(function (): void {
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
+    TenantContextService::setTenantId($this->team->getKey());
+});
+
+afterEach(function (): void {
+    TenantContextService::setTenantId(null);
 });
 
 function statusOptionId(CustomField $field, string $label): string
 {
     return (string) $field->options->firstWhere('name', $label)->getKey();
+}
+
+function teamScopedCompanyLookups(): Collection
+{
+    return collect(DB::getQueryLog())->filter(
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'team_id'),
+    );
 }
 
 it('creates a task with a select value given as a label', function (): void {
@@ -288,7 +302,7 @@ it('returns record values as id and name pairs', function (): void {
         ->assertSee('Globex');
 });
 
-it('lists tasks with record names in one query per lookup type', function (): void {
+it('lists tasks with record names in one team-scoped query per lookup type', function (): void {
     $field = CustomField::query()->create([
         'tenant_id' => $this->team->getKey(),
         'entity_type' => 'task',
@@ -311,11 +325,60 @@ it('lists tasks with record names in one query per lookup type', function (): vo
 
     RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
 
-    $nameLookups = collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'in ('),
-    );
+    expect(teamScopedCompanyLookups())->toHaveCount(1);
+});
 
-    expect($nameLookups)->toHaveCount(1);
+it('reads a foreign-team record value as a null name', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $otherTeam = User::factory()->withPersonalTeam()->create()->personalTeam();
+    $foreign = Company::factory()->create(['team_id' => $otherTeam->getKey(), 'name' => 'Initech']);
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($field, [$foreign->getKey()]);
+
+    $response = RelaticleServer::actingAs($this->user)
+        ->tool(GetTaskTool::class, ['id' => $task->getKey()])
+        ->assertOk();
+
+    $response->assertDontSee('Initech');
+    $response->assertSee('"name":null');
+});
+
+it('resolves a record field with several own-team ids in one team-scoped query', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $companies = Company::factory()->count(3)->create(['team_id' => $this->team->getKey()]);
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($field, $companies->pluck('id')->all());
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetTaskTool::class, ['id' => $task->getKey()])
+        ->assertOk();
+
+    expect(teamScopedCompanyLookups())->toHaveCount(1);
 });
 
 it('resolves a dangling record reference without one query per row', function (): void {
@@ -342,9 +405,5 @@ it('resolves a dangling record reference without one query per row', function ()
 
     RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
 
-    $nameLookups = collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'in ('),
-    );
-
-    expect($nameLookups->count())->toBeLessThanOrEqual(2);
+    expect(teamScopedCompanyLookups())->toHaveCount(1);
 });
