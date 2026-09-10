@@ -118,6 +118,8 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        MailboxSyncTracker::setEmailRunTotal($account, count($newIds));
+
         $accountId = (string) $account->getKey();
         $newCursor = $delta->newCursor;
 
