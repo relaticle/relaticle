@@ -50,6 +50,12 @@ return [
         'opportunities' => 'Opportunity',
     ],
     'fields' => [
+        'record_type' => [
+            'label' => 'Type',
+        ],
+        'record' => [
+            'label' => 'Record',
+        ],
         'organizer' => [
             'label' => 'Organizer',
         ],
