@@ -383,15 +383,15 @@ it('publishes an input format for every custom field type', function (string $ty
         ->assertOk()
         ->assertSee($expectedFormat);
 })->with([
-    ['text', 'string'],
-    ['textarea', 'string'],
+    ['text', '"input_format": "string"'],
+    ['textarea', '"input_format": "string"'],
     ['number', 'numeric value'],
     ['currency', 'numeric value (amount)'],
     ['email', 'array of email strings'],
     ['phone', 'array of phone strings'],
     ['link', 'array of URL strings'],
-    ['checkbox', 'boolean'],
-    ['toggle', 'boolean'],
+    ['checkbox', '"input_format": "boolean"'],
+    ['toggle', '"input_format": "boolean"'],
     ['select', 'option label or option ID (see options)'],
     ['radio', 'option label or option ID (see options)'],
     ['toggle-buttons', 'option label or option ID (see options)'],
