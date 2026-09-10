@@ -213,6 +213,12 @@ it('shows an empty participants line when there are no attendees', function (): 
 });
 
 it('shows the current user attendee row when is_self is true', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill(['email_address' => 'oliver@relaticle.test'])->save();
+
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -220,22 +226,83 @@ it('shows the current user attendee row when is_self is true', function (): void
 
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->id,
-        'name' => 'Current User',
-        'email_address' => 'self@example.test',
+        'name' => 'Calendar Oliver',
+        'email_address' => 'oliver@relaticle.test',
         'is_self' => true,
         'is_organizer' => false,
         'response_status' => AttendeeResponseStatus::ACCEPTED,
     ]);
 
-    // A self attendee is named from this meeting copy's mailbox owner,
-    // not the calendar copy of the name.
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
-        ->assertMountedActionModalSee($this->user->name)
-        ->assertMountedActionModalSee('self@example.test')
+        ->assertMountedActionModalSee('Oliver Workspace')
+        ->assertMountedActionModalSee('oliver@relaticle.test')
+        ->assertMountedActionModalDontSee('Calendar Oliver')
         ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
         ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false)
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
+});
+
+it('does not name a self attendee from the workspace user when the mailbox address differs', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill([
+        'email_address' => 'whiteshark.devs@example.test',
+        'display_name' => 'Whiteshark',
+    ])->save();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'whiteshark.devs@example.test',
+        'is_self' => true,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('whiteshark.devs@example.test')
+        ->assertMountedActionModalDontSee('Oliver Workspace')
+        ->assertMountedActionModalDontSee('Whiteshark');
+});
+
+it('keeps the calendar name for a guest on a different connected mailbox', function (): void {
+    $this->user->forceFill([
+        'name' => 'Oliver Workspace',
+        'email' => 'oliver@relaticle.test',
+    ])->save();
+    $this->account->forceFill([
+        'email_address' => 'whiteshark.devs@example.test',
+        'display_name' => 'Whiteshark',
+    ])->save();
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Whiteshark Devs',
+        'email_address' => 'whiteshark.devs@example.test',
+        'is_self' => false,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Whiteshark Devs')
+        ->assertMountedActionModalSee('whiteshark.devs@example.test')
+        ->assertMountedActionModalDontSee('Oliver Workspace');
 });
 
 it('shows the linked person name above the attendee email', function (): void {
