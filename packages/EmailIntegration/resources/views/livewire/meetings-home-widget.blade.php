@@ -112,7 +112,6 @@
         <div class="flex flex-col divide-y divide-[var(--surface-block-border)]">
             @foreach (array_slice($this->meetingCards, 0, $this->visibleCount) as $card)
                 @php
-                    $participants = $card['participants'];
                     $responseStatus = $card['response_status'];
                     $dotColor = $responseStatus->getColor();
                     $time = $card['time'];
@@ -120,68 +119,22 @@
                     $isPast = $card['is_past'];
                     $meetingKey = $card['id'];
                     $openTarget = "openMeeting('{$meetingKey}')";
-                    $participantsId = "meeting-home-participants-{$meetingKey}";
-                    $hasParticipants = $participants['attendees'] !== [];
-                    $expandLabel = __('filament/pages/dashboard.meetings.expand_participants', ['title' => $card['title']]);
-                    $collapseLabel = __('filament/pages/dashboard.meetings.collapse_participants', ['title' => $card['title']]);
                     $timeIcon = $card['all_day']
                         ? \Filament\Support\Icons\Heroicon::OutlinedCalendarDays
                         : \Filament\Support\Icons\Heroicon::OutlinedClock;
                 @endphp
                 <div
                     wire:key="meeting-home-{{ $meetingKey }}"
-                    x-data="{
-                        expanded: false,
-                        showCard: false,
-                        expandLabel: @js($expandLabel),
-                        collapseLabel: @js($collapseLabel),
-                        toggle() {
-                            if (this.expanded) {
-                                this.expanded = false;
-                                window.setTimeout(() => {
-                                    if (! this.expanded) {
-                                        this.showCard = false;
-                                    }
-                                }, 320);
-
-                                return;
-                            }
-
-                            this.showCard = true;
-                            this.expanded = true;
-                        },
-                        onPanelTransitionEnd(event) {
-                            if (event.propertyName !== 'grid-template-rows' || this.expanded) {
-                                return;
-                            }
-
-                            this.showCard = false;
-                        },
-                    }"
                     data-testid="meeting-card"
-                    class="py-0.5"
+                    class="px-2.5 py-2"
                 >
-                    <div
-                        class="px-2.5 py-2 transition-[border-color,background-color,box-shadow] duration-300 ease-in-out motion-reduce:transition-none"
-                        x-bind:class="showCard
-                            ? 'rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] shadow-sm'
-                            : 'border border-transparent'"
-                    >
                     <div
                         data-testid="meeting-card-row"
                         class="flex min-h-9 cursor-pointer items-center gap-2.5"
-                        @if ($hasParticipants)
-                            x-on:click="toggle()"
-                            x-bind:aria-expanded="expanded.toString()"
-                            aria-expanded="false"
-                            aria-controls="{{ $participantsId }}"
-                            x-bind:aria-label="expanded ? collapseLabel : expandLabel"
-                        @else
-                            wire:click="{{ $openTarget }}"
-                            wire:loading.attr="disabled"
-                            wire:target="{{ $openTarget }}"
-                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
-                        @endif
+                        wire:click="{{ $openTarget }}"
+                        wire:loading.attr="disabled"
+                        wire:target="{{ $openTarget }}"
+                        aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                     >
                         <span
                             @class([
@@ -244,47 +197,6 @@
                                 </x-filament::badge>
                             @endif
                         </time>
-
-                        @if ($hasParticipants)
-                            <span
-                                class="inline-flex shrink-0 text-gray-400"
-                                aria-hidden="true"
-                            >
-                                <span
-                                    class="inline-flex transition-transform duration-300 ease-in-out motion-reduce:transition-none"
-                                    x-bind:class="expanded && 'rotate-180'"
-                                >
-                                    <x-filament::icon
-                                        :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronDown"
-                                        class="size-3.5 shrink-0"
-                                    />
-                                </span>
-                            </span>
-                        @endif
-                    </div>
-
-                    @if ($hasParticipants)
-                        <div
-                            id="{{ $participantsId }}"
-                            data-testid="meeting-card-participants"
-                            role="region"
-                            class="grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none"
-                            x-bind:class="expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
-                            x-on:transitionend="onPanelTransitionEnd($event)"
-                        >
-                            <div class="min-h-0 overflow-hidden">
-                                <div class="mt-2 rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]">
-                                    @foreach ($participants['attendees'] as $state)
-                                        @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
-                                            'state' => $state,
-                                            'showEmail' => false,
-                                            'compact' => true,
-                                        ])
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    @endif
                     </div>
                 </div>
             @endforeach

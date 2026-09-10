@@ -439,7 +439,7 @@ it('colours the row dot by the viewer RSVP without showing the label', function 
     'pending is grey' => ['needsAction', 'bg-gray-400', 'Pending'],
 ]);
 
-it('hides attendee avatars on the collapsed row but keeps the accordion panel', function (): void {
+it('does not list attendees on the home meeting row', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -454,14 +454,10 @@ it('hides attendee avatars on the collapsed row but keeps the accordion panel', 
         'email_address' => 'maya@example.test',
     ]);
 
-    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
-
-    expect($html)
-        ->toContain('Staff call')
-        ->toContain('data-testid="meeting-card-participants"')
-        ->toContain('Maya Chen')
-        ->not->toContain('data-testid="meeting-card-participants-preview"')
-        ->not->toContain('more_participants');
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Staff call')
+        ->assertDontSee('Maya Chen')
+        ->assertDontSee('data-testid="meeting-card-participants"', escape: false);
 });
 
 it('marks an in-progress meeting as happening now', function (): void {
@@ -539,18 +535,13 @@ it('opens the meeting slideover from the title expand control', function (): voi
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
 });
 
-it('renders a compact row with a hover expand control on the title', function (): void {
+it('opens the meeting modal from the row and title expand control', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
         'title' => 'Call',
         'starts_at' => Date::parse('2026-09-09 16:00:00'),
         'ends_at' => Date::parse('2026-09-09 17:00:00'),
-    ]);
-    MeetingAttendee::factory()->create([
-        'meeting_id' => $meeting->id,
-        'name' => 'Maya Chen',
-        'email_address' => 'maya@example.test',
     ]);
 
     $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
@@ -559,15 +550,11 @@ it('renders a compact row with a hover expand control on the title', function ()
         ->toContain('data-testid="meeting-card-title"')
         ->toContain('data-testid="meeting-card-open"')
         ->toContain('data-testid="meeting-card-row"')
-        ->toContain('data-testid="meeting-card-participants"')
+        ->toContain("openMeeting('{$meeting->id}')")
         ->toContain('M3.75 3.75v4.5m0-4.5h4.5')
         ->toContain('group-hover/title:opacity-100')
-        ->toContain('aria-expanded="false"')
-        ->toContain('grid-template-rows')
-        ->toContain('grid-rows-[1fr]')
-        ->toContain('grid-rows-[0fr]')
-        ->toContain('onPanelTransitionEnd')
-        ->not->toContain('data-testid="meeting-card-participants-preview"');
+        ->not->toContain('data-testid="meeting-card-participants"')
+        ->not->toContain('aria-expanded=');
 });
 
 it('shows four meetings and load more when the day has more', function (): void {
