@@ -258,6 +258,6 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
 
     // The menu reuses Filament's own tool handlers, so a name that stops being a tool
     // would otherwise ship a menu entry that quietly does nothing.
-    expect(collect($items)->pluck('action')->filter()->all())->toHaveCount(count($items))
-        ->and(collect($items)->pluck('icon')->filter()->all())->toHaveCount(count($items));
+    expect(collect($items)->pluck('action')->filter()->all())->toHaveSameSize($items)
+        ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
 });
