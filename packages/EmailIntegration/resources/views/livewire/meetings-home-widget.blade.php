@@ -130,12 +130,21 @@
                 >
                     <div
                         data-testid="meeting-card-row"
-                        class="flex min-h-9 cursor-pointer items-center gap-2.5"
+                        class="relative flex min-h-9 cursor-pointer items-center gap-2.5"
                         wire:click="{{ $openTarget }}"
                         wire:loading.attr="disabled"
                         wire:target="{{ $openTarget }}"
                         aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                     >
+                        <span
+                            wire:loading.flex
+                            wire:target="{{ $openTarget }}"
+                            class="pointer-events-none absolute inset-0 z-10 items-center justify-center rounded-md bg-[var(--surface-block-bg)]/80 dark:bg-gray-950/80"
+                            role="status"
+                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                        >
+                            <x-filament::loading-indicator class="size-4 text-primary-500" />
+                        </span>
                         <span
                             @class([
                                 'size-1.5 shrink-0 rounded-full',
@@ -167,7 +176,7 @@
                                 wire:target="{{ $openTarget }}"
                                 x-on:click.stop
                                 @class([
-                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/title:opacity-100 disabled:cursor-wait disabled:opacity-60',
+                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/title:opacity-100',
                                     'text-success-600 hover:bg-success-50 dark:text-success-400 dark:hover:bg-success-500/10' => $dotColor === 'success',
                                     'text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10' => $dotColor === 'danger',
                                     'text-warning-600 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-500/10' => $dotColor === 'warning',
