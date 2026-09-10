@@ -6,7 +6,9 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
@@ -19,19 +21,41 @@ final readonly class ListMeetingsForDay
     public function nextDayWithMeetings(User $user, CarbonImmutable $day): ?CarbonImmutable
     {
         $timezone = $user->effectiveTimezone();
+        $localDay = $day->timezone($timezone)->startOfDay();
+        $calendarDate = $localDay->toDateString();
+        $endUtc = $localDay->endOfDay()->utc();
 
-        $next = Meeting::query()
-            ->withGlobalScope('visible', VisibleMeetingScope::personal($user))
-            ->where('starts_at', '>', $day->timezone($timezone)->endOfDay()->utc())
+        $nextTimed = $this->visibleMeetings($user)
+            ->where('all_day', false)
+            ->where('starts_at', '>', $endUtc)
             ->reorder()
             ->oldest('starts_at')
             ->value('starts_at');
 
-        if (! $next instanceof CarbonImmutable) {
+        $nextAllDay = $this->visibleMeetings($user)
+            ->where('all_day', true)
+            ->whereDate('starts_at', '>', $calendarDate)
+            ->reorder()
+            ->oldest('starts_at')
+            ->value('starts_at');
+
+        $nextDays = [];
+
+        if ($nextTimed instanceof CarbonImmutable) {
+            $nextDays[] = $nextTimed->timezone($timezone)->startOfDay();
+        }
+
+        if ($nextAllDay instanceof CarbonImmutable) {
+            $nextDays[] = Date::parse($nextAllDay->utc()->toDateString(), $timezone)->startOfDay();
+        }
+
+        if ($nextDays === []) {
             return null;
         }
 
-        return $next->timezone($timezone)->startOfDay();
+        usort($nextDays, fn (CarbonImmutable $left, CarbonImmutable $right): int => $left <=> $right);
+
+        return $nextDays[0];
     }
 
     /**
@@ -40,12 +64,21 @@ final readonly class ListMeetingsForDay
     public function execute(User $user, CarbonImmutable $day): Collection
     {
         $timezone = $user->effectiveTimezone();
-        $startUtc = $day->timezone($timezone)->startOfDay()->utc();
-        $endUtc = $day->timezone($timezone)->endOfDay()->utc();
+        $localDay = $day->timezone($timezone)->startOfDay();
+        $calendarDate = $localDay->toDateString();
+        $startUtc = $localDay->utc();
+        $endUtc = $localDay->endOfDay()->utc();
 
-        $query = Meeting::query()
-            ->withGlobalScope('visible', VisibleMeetingScope::personal($user))
-            ->whereBetween('starts_at', [$startUtc, $endUtc]);
+        $query = $this->visibleMeetings($user)
+            ->where(function (Builder $query) use ($startUtc, $endUtc, $calendarDate): void {
+                $query->where(function (Builder $timed) use ($startUtc, $endUtc): void {
+                    $timed->where('all_day', false)
+                        ->whereBetween('starts_at', [$startUtc, $endUtc]);
+                })->orWhere(function (Builder $allDay) use ($calendarDate): void {
+                    $allDay->where('all_day', true)
+                        ->whereDate('starts_at', $calendarDate);
+                });
+            });
 
         $identity = "COALESCE('uid:' || NULLIF(meetings.ical_uid, ''), 'id:' || meetings.id)";
         $copies = (clone $query)
@@ -67,5 +100,14 @@ final readonly class ListMeetingsForDay
         resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($meetings);
 
         return $meetings;
+    }
+
+    /**
+     * @return Builder<Meeting>
+     */
+    private function visibleMeetings(User $user): Builder
+    {
+        return Meeting::query()
+            ->withGlobalScope('visible', VisibleMeetingScope::personal($user));
     }
 }
