@@ -151,13 +151,14 @@ There are two ways to run a self-hosted model, and you can use either or both:
 
 ### Feature Flags
 
-Toggle features on or off. All are enabled by default. Useful for forks and custom deployments that want to disable specific functionality without modifying code.
+Toggle features on or off. All are enabled by default unless noted. Useful for forks and custom deployments that want to disable specific functionality without modifying code.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
+| `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. |
 
 ---
 

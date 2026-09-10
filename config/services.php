@@ -53,6 +53,11 @@ return [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
 
+    'turnstile' => [
+        'key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'discord' => [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
