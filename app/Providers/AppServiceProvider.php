@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Enums\Plan;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
+use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -49,6 +50,8 @@ use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Assets\Js;
+use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
@@ -512,9 +515,12 @@ final class AppServiceProvider extends ServiceProvider
         //
         // `date` gets the entry only. A bare date has no time of day, so converting one
         // would move it a day for every viewer west of UTC.
+        //
+        // `rich-editor` swaps only the form component, to add the `/` command menu.
         CustomFieldsType::register([
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
+            'rich-editor' => RichEditorFieldType::class,
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
@@ -601,6 +607,13 @@ final class AppServiceProvider extends ServiceProvider
 
             return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
+
+        // Downloaded only once a rich editor is on the page, so panels without one
+        // pay nothing. Republish with `php artisan filament:assets` after editing it.
+        FilamentAsset::register([
+            Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
+                ->loadedOnRequest(),
+        ]);
     }
 
     /**

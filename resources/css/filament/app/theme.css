@@ -959,3 +959,75 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
         @apply md:sticky md:top-8 md:self-start;
     }
 }
+
+/* Rich editor slash menu. The panel is appended to <body> so it escapes the
+   modal's overflow clipping; z-index 40 clears the modal window at 30. Rows are
+   one line so all twelve entries fit without scrolling; the description rides on
+   the row's title attribute. */
+.fi-slash-menu {
+    @apply absolute z-40 max-h-[28rem] w-screen overflow-y-auto p-1;
+}
+
+.fi-slash-menu-empty {
+    @apply px-2.5 py-3 text-center text-xs text-gray-500 dark:text-gray-400;
+}
+
+.fi-slash-menu-group {
+    @apply px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500;
+
+    &:first-child {
+        @apply pt-1;
+    }
+}
+
+.fi-slash-menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start;
+
+    &[aria-selected='true'] {
+        @apply bg-gray-100 dark:bg-white/10;
+    }
+}
+
+.fi-slash-menu-item-icon {
+    @apply flex size-6 shrink-0 items-center justify-center rounded bg-gray-50 text-gray-500 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10;
+
+    svg {
+        @apply size-3.5;
+    }
+}
+
+.fi-slash-menu-item-label {
+    @apply flex-1 truncate text-[0.8125rem] text-gray-950 dark:text-white;
+}
+
+.fi-slash-menu-item-shortcut {
+    @apply shrink-0 rounded border border-gray-200 bg-gray-50 px-1 font-sans text-[0.6875rem] text-gray-400 dark:border-white/10 dark:bg-white/5 dark:text-gray-500;
+}
+
+/* Rich editor without the input chrome: the field label and placeholder carry the
+   affordance, so the box would only box in what should read as a document. */
+.fi-fo-rich-editor-seamless {
+    @apply rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
+
+    &:not(.fi-disabled):not(:has(.fi-ac-action:focus)) {
+        @apply focus-within:ring-0;
+    }
+
+    /* The canvas height is measured in JS (see slash-menu.js); this is only the
+       floor it starts from. Content grows past it and the modal scrolls, so no
+       max-height here, which would nest a second scrollbar inside the first. */
+    .fi-fo-rich-editor-content {
+        @apply min-h-40 px-0 py-0 text-[0.9375rem]/[1.65];
+    }
+}
+
+/* The editor renders its own placeholder as a decoration, so the trigger character
+   can be a key cap. Filament's `content: attr(data-placeholder)` cannot style part
+   of itself. */
+.fi-slash-placeholder {
+    @apply pointer-events-none absolute inline-flex select-none items-center gap-1 text-gray-400 dark:text-gray-500;
+
+    kbd {
+        @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
+    }
+}
