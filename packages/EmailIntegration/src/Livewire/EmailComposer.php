@@ -438,14 +438,15 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
+        [$copiedPaths, $copiedNames, $copiedAttributes, $copiedUnavailable] = $this->copySavedAttachments();
         [$forwardedPaths, $forwardedNames, $forwardedAttributes, $unavailable] = $this->copyForwardedSourceAttachments();
         [$inlinePaths, $inlineNames, $inlineAttributes, $inlineUnavailable] = $this->copyForwardedInlineAttachments();
 
-        $unavailable = [...$unavailable, ...$inlineUnavailable];
+        $unavailable = [...$copiedUnavailable, ...$unavailable, ...$inlineUnavailable];
 
         if ($unavailable !== []) {
             $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: true);
-            $this->deleteCopiedAttachmentFiles([...$forwardedPaths, ...$inlinePaths]);
+            $this->deleteCopiedAttachmentFiles([...$copiedPaths, ...$forwardedPaths, ...$inlinePaths]);
 
             return;
         }
@@ -453,7 +454,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $renderer = resolve(EmailTemplateRenderService::class);
 
         [$pendingPaths, $pendingNames, $pendingAttributes] = $this->storeAttachments();
-        [$copiedPaths, $copiedNames, $copiedAttributes] = $this->copySavedAttachments();
 
         $attachmentPaths = [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths];
         $attachmentNames = [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames];
@@ -1265,20 +1265,22 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * or deleting the draft right after send (see {@see self::send()}) would pull
      * the files out from under a message that has not gone out yet.
      *
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>}
+     * Rows with no bytes (a forward whose provider download failed at save)
+     * are retried here. A second failure aborts send the same way a direct
+     * forward does.
+     *
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copySavedAttachments(): array
     {
         if ($this->draftId === null || $this->savedAttachments === []) {
-            return [[], [], []];
+            return [[], [], [], []];
         }
 
-        $disk = Storage::disk(EmailAttachment::DISK);
-        $paths = [];
-        $names = [];
-
         $attachments = EmailAttachment::query()
+            ->with('email.connectedAccount')
             ->where('email_id', $this->draftId)
+            ->where('is_inline', false)
             ->whereIn('id', array_column($this->savedAttachments, 'id'))
             ->whereHas('email', fn (Builder $query): Builder => $query
                 ->where('user_id', $this->authUser()->getKey())
@@ -1286,24 +1288,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->where('status', EmailStatus::DRAFT))
             ->get();
 
-        foreach ($attachments as $attachment) {
-            $source = $attachment->storage_path;
-            if ($source === null) {
-                continue;
-            }
-            if (! $disk->exists($source)) {
-                continue;
-            }
+        [$paths, $names, $attributes, $unavailable] = $this->copyAttachmentRecords($attachments);
 
-            $copy = 'email-attachments/'.Str::ulid().'.'.pathinfo($source, PATHINFO_EXTENSION);
+        // A missing local upload is still omitted. Placeholders and provider-backed
+        // files abort send, matching a direct forward.
+        $unavailable = array_values(array_filter(
+            $unavailable,
+            fn (EmailAttachment $attachment): bool => $attachment->storage_path === null
+                || filled($attachment->provider_attachment_id),
+        ));
 
-            $disk->copy($source, $copy);
-
-            $paths[] = $copy;
-            $names[$copy] = (string) $attachment->filename;
-        }
-
-        return [$paths, $names, []];
+        return [$paths, $names, $attributes, $unavailable];
     }
 
     /**
@@ -1359,7 +1354,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * them onto a draft. After persist, {@see $savedAttachments} holds draft
      * ids and this becomes a no-op. The source files themselves stay put.
      *
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copyForwardedSourceAttachments(): array
     {
@@ -1388,7 +1383,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * on the source email. After persist they live on the draft (hidden from
      * chips) and must be copied from there so send does not share those bytes.
      *
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copyForwardedInlineAttachments(): array
     {
@@ -1400,7 +1395,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copySourceInlineAttachments(): array
     {
@@ -1424,7 +1419,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copyDraftInlineAttachments(): array
     {
@@ -1433,6 +1428,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $attachments = EmailAttachment::query()
+            ->with('email.connectedAccount')
             ->where('email_id', $this->draftId)
             ->where('is_inline', true)
             ->whereHas('email', fn (Builder $query): Builder => $query
@@ -1446,7 +1442,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * @param  iterable<int, EmailAttachment>  $attachments
-     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<string>}
+     * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */
     private function copyAttachmentRecords(iterable $attachments, bool $inline = false): array
     {
@@ -1459,7 +1455,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             $copy = $this->copyAttachmentFile($attachment);
 
             if ($copy === null) {
-                $unavailable[] = (string) $attachment->filename;
+                $unavailable[] = $attachment;
 
                 continue;
             }
@@ -1479,9 +1475,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @param  list<string>  $filenames
+     * @param  list<EmailAttachment>  $attachments
      */
-    private function notifyUnavailableForwardedAttachments(array $filenames, bool $abortingSend): void
+    private function notifyUnavailableForwardedAttachments(array $attachments, bool $abortingSend): void
     {
         $key = $abortingSend
             ? 'filament/emails/composer.notifications.send_attachment_unavailable'
@@ -1490,7 +1486,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $notification = Notification::make()
             ->title(__($key.'.title'))
             ->body(__($key.'.body', [
-                'files' => implode(', ', $filenames),
+                'files' => implode(', ', array_map(
+                    fn (EmailAttachment $attachment): string => (string) $attachment->filename,
+                    $attachments,
+                )),
             ]));
 
         $abortingSend ? $notification->danger() : $notification->warning();
@@ -1544,11 +1543,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $email = $attachment->email;
         $providerAttachmentId = $attachment->provider_attachment_id;
 
-        if (! $email instanceof Email || blank($email->provider_message_id) || blank($providerAttachmentId)) {
+        if (! $email instanceof Email || blank($providerAttachmentId)) {
             return null;
         }
 
-        $account = $email->connectedAccount;
+        $source = $this->providerDownloadSource($email);
+
+        if (! $source instanceof Email || blank($source->provider_message_id)) {
+            return null;
+        }
+
+        $account = $source->connectedAccount;
 
         if (! $account instanceof ConnectedAccount) {
             return null;
@@ -1557,12 +1562,38 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         try {
             return resolve(MailServiceFactoryInterface::class)
                 ->make($account)
-                ->downloadAttachment($email->provider_message_id, $providerAttachmentId);
+                ->downloadAttachment($source->provider_message_id, $providerAttachmentId);
         } catch (Throwable $exception) {
             report($exception);
 
             return null;
         }
+    }
+
+    /**
+     * Provider downloads need the original message id and mailbox. A draft
+     * placeholder copied from a forward has neither; the source email still does.
+     */
+    private function providerDownloadSource(Email $email): ?Email
+    {
+        if (filled($email->provider_message_id)) {
+            return $email;
+        }
+
+        if ($email->status !== EmailStatus::DRAFT || blank($email->in_reply_to)) {
+            return null;
+        }
+
+        $user = $this->authUser();
+
+        $source = Email::query()
+            ->with('connectedAccount')
+            ->where('team_id', $user->current_team_id)
+            ->where('rfc_message_id', $email->in_reply_to)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->first();
+
+        return $source instanceof Email && $user->can('viewBody', $source) ? $source : null;
     }
 
     /**
@@ -1612,6 +1643,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'attachments' => [...$attachmentPaths, ...$forwardedPaths, ...$inlinePaths],
                 'attachment_file_names' => [...$attachmentNames, ...$forwardedNames, ...$inlineNames],
                 'attachment_attributes' => [...$attachmentAttributes, ...$forwardedAttributes, ...$inlineAttributes],
+                // Keep failed downloads on the draft so reopen still lists them
+                // and send can retry, then abort if they are still missing.
+                'unresolved_attachments' => $this->unresolvedAttachmentPayload($unavailable),
             ],
             draftId: $this->draftId,
         );
@@ -1627,6 +1661,22 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // The drafts tab and its badge are rendered by other components; without
         // this they only pick the new draft up on a full page load.
         $this->dispatch('drafts:changed');
+    }
+
+    /**
+     * @param  list<EmailAttachment>  $attachments
+     * @return list<array{filename: string, mime_type: string, size: int, is_inline: bool, content_id: ?string, provider_attachment_id: ?string}>
+     */
+    private function unresolvedAttachmentPayload(array $attachments): array
+    {
+        return array_map(fn (EmailAttachment $attachment): array => [
+            'filename' => (string) $attachment->filename,
+            'mime_type' => (string) ($attachment->mime_type ?: 'application/octet-stream'),
+            'size' => (int) $attachment->size,
+            'is_inline' => $attachment->is_inline,
+            'content_id' => $attachment->content_id,
+            'provider_attachment_id' => $attachment->provider_attachment_id,
+        ], $attachments);
     }
 
     private function isDraftEmpty(): bool

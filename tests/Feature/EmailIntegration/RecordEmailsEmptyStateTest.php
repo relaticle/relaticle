@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -676,6 +677,103 @@ it('does not match hidden subject or snippet text when searching metadata-only e
         ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Secret preview text']))
         ->set('search', 'Customer')
         ->assertSee('Customer');
+});
+
+it('does not match hidden subject or snippet text when a metadata-only share overrides a full default', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $viewer = User::factory()->create(['current_team_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'editor']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $person = People::factory()->create([
+        'team_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'subject' => 'Quarterly forecast',
+        'snippet' => 'Secret preview text',
+    ]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::METADATA_ONLY)->create([
+        'email_id' => $email->getKey(),
+        'team_id' => $team->id,
+        'shared_by' => $owner->id,
+        'shared_with' => $viewer->id,
+    ]);
+
+    EmailParticipant::query()->create([
+        'email_id' => $email->id,
+        'email_address' => 'customer@acme.com',
+        'name' => 'Customer',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+        ->set('search', 'Quarterly forecast')
+        ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Quarterly forecast']))
+        ->set('search', 'Secret preview text')
+        ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Secret preview text']))
+        ->set('search', 'Customer')
+        ->assertSee('Customer');
+});
+
+it('does not match snippet text when a subject share overrides a full default', function (): void {
+    $owner = User::factory()->withTeam()->create();
+    $team = $owner->currentTeam;
+    $viewer = User::factory()->create(['current_team_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'editor']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $person = People::factory()->create([
+        'team_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $email = Email::factory()->create([
+        'team_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'subject' => 'Quarterly forecast',
+        'snippet' => 'Secret preview text',
+    ]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::SUBJECT)->create([
+        'email_id' => $email->getKey(),
+        'team_id' => $team->id,
+        'shared_by' => $owner->id,
+        'shared_with' => $viewer->id,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+        ->set('search', 'Quarterly forecast')
+        ->assertSee('Quarterly forecast')
+        ->set('search', 'Secret preview text')
+        ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Secret preview text']));
 });
 
 it('shows a request access pill on record mailbox rows without body access', function (): void {
