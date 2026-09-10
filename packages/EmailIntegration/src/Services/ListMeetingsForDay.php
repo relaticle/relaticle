@@ -14,6 +14,27 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 final readonly class ListMeetingsForDay
 {
     /**
+     * The first local day after $day that holds a meeting the user can see.
+     */
+    public function nextDayWithMeetings(User $user, CarbonImmutable $day): ?CarbonImmutable
+    {
+        $timezone = $user->effectiveTimezone();
+
+        $next = Meeting::query()
+            ->withGlobalScope('visible', new VisibleMeetingScope($user))
+            ->where('starts_at', '>', $day->timezone($timezone)->endOfDay()->utc())
+            ->reorder()
+            ->oldest('starts_at')
+            ->value('starts_at');
+
+        if (! $next instanceof CarbonImmutable) {
+            return null;
+        }
+
+        return $next->timezone($timezone)->startOfDay();
+    }
+
+    /**
      * @return Collection<int, Meeting>
      */
     public function execute(User $user, CarbonImmutable $day): Collection

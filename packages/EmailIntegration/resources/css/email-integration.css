@@ -265,3 +265,38 @@
     cursor: wait;
     opacity: 0.6;
 }
+
+/* ── Meetings home: the date reads as a label, not a field ─────────────────
+   The header date is a Filament date picker so it opens a real calendar, but
+   in place of a form input it has to look like the small grey text beside it.
+   That means stripping the field chrome and sizing the trigger to its own
+   word, since a full-width input would push the day controls off the row. */
+.fi-meetings-date {
+    cursor: pointer;
+}
+
+.fi-meetings-date .fi-fo-date-time-picker,
+.fi-meetings-date .fi-input-wrp {
+    @apply bg-transparent shadow-none ring-0 dark:bg-transparent dark:ring-0;
+}
+
+.fi-meetings-date .fi-fo-date-time-picker-trigger {
+    @apply w-auto;
+}
+
+.fi-meetings-date .fi-fo-date-time-picker-display-text-input {
+    @apply w-14 cursor-pointer px-0 py-0 text-xs leading-none text-gray-500 dark:text-gray-400;
+    field-sizing: content;
+}
+
+.fi-meetings-date:hover .fi-fo-date-time-picker-display-text-input {
+    @apply text-gray-900 dark:text-white;
+}
+
+/* ── Meeting attendee: host badge ──────────────────────────────────────────
+   Same 2px-padding problem as the email direction badge: at xs the label
+   touches the pill edge, so the tag reads as tinted text. */
+.fi-meeting-attendee-badge.fi-badge {
+    padding-block: 1px;
+    padding-inline: calc(var(--spacing) * 1.5);
+}

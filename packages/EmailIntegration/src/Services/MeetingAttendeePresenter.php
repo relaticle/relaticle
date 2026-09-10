@@ -20,7 +20,7 @@ final readonly class MeetingAttendeePresenter
     ) {}
 
     /**
-     * @return array{name: string, avatar: string, is_organizer: bool, response_status: AttendeeResponseStatus|null}
+     * @return array{name: string, email: string, avatar: string, is_organizer: bool, response_status: AttendeeResponseStatus|null}
      */
     public function present(MeetingAttendee $attendee): array
     {
@@ -38,7 +38,9 @@ final readonly class MeetingAttendeePresenter
             $attendee->is_self && $viewer instanceof User && trim($viewer->name) !== '' => trim($viewer->name),
             $member !== null => $member['name'],
             $calendarName !== '' && Str::lower($calendarName) !== $email => $calendarName,
-            $email !== '' => $this->nameFromEmail($email),
+            // Never invent a name. A title-cased local part reads like a real
+            // person we know, and we do not know them. Show the address.
+            $email !== '' => $email,
             default => __('filament/resources/meeting.attendees.guest'),
         };
 
@@ -49,6 +51,7 @@ final readonly class MeetingAttendeePresenter
 
         return [
             'name' => $name,
+            'email' => $email,
             'avatar' => $avatar,
             'is_organizer' => $attendee->is_organizer,
             'response_status' => $attendee->response_status,
@@ -86,18 +89,5 @@ final readonly class MeetingAttendeePresenter
         }
 
         return null;
-    }
-
-    private function nameFromEmail(string $email): string
-    {
-        $local = Str::before($email, '@');
-        $local = Str::before($local, '+');
-        $normalized = trim((string) preg_replace('/[._-]+/', ' ', $local));
-
-        if ($normalized === '') {
-            return __('filament/resources/meeting.attendees.guest');
-        }
-
-        return Str::title($normalized);
     }
 }
