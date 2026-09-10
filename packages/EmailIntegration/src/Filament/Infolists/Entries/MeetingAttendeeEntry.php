@@ -14,7 +14,7 @@ final class MeetingAttendeeEntry extends Entry
     protected string $view = 'email-integration::filament.infolists.meeting-attendee';
 
     /**
-     * @return array{name: string, email: string, avatar: string, is_organizer: bool, response_status: AttendeeResponseStatus|null}
+     * @return array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}
      */
     public function getState(): array
     {
@@ -25,6 +25,7 @@ final class MeetingAttendeeEntry extends Entry
                 'name' => '',
                 'email' => '',
                 'avatar' => '',
+                'has_name' => false,
                 'is_organizer' => false,
                 'response_status' => null,
             ];

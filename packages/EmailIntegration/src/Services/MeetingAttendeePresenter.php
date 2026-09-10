@@ -15,44 +15,40 @@ use Relaticle\EmailIntegration\Models\MeetingAttendee;
 final readonly class MeetingAttendeePresenter
 {
     public function __construct(
-        private AvatarService $avatars,
         private TeamMemberDirectory $teamMembers,
+        private MailboxDisplayNameDirectory $mailboxNames,
+        private AvatarService $avatars,
     ) {}
 
     /**
-     * @return array{name: string, email: string, avatar: string, is_organizer: bool, response_status: AttendeeResponseStatus|null}
+     * @return array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}
      */
     public function present(MeetingAttendee $attendee): array
     {
         $contact = $attendee->relationLoaded('contact')
             ? $attendee->getRelation('contact')
             : $attendee->contact;
-        $contactName = $contact instanceof People ? trim((string) $contact->name) : '';
-        $calendarName = trim((string) ($attendee->name ?? ''));
         $email = Str::lower(trim((string) $attendee->email_address));
         $viewer = auth()->user();
         $member = $email !== '' ? $this->teamMember($attendee, $email) : null;
-
-        $name = match (true) {
-            $contactName !== '' => $contactName,
-            $attendee->is_self && $viewer instanceof User && trim($viewer->name) !== '' => trim($viewer->name),
-            $member !== null => $member['name'],
-            $calendarName !== '' && Str::lower($calendarName) !== $email => $calendarName,
-            // Never invent a name. A title-cased local part reads like a real
-            // person we know, and we do not know them. Show the address.
-            $email !== '' => $email,
-            default => __('filament/resources/meeting.attendees.guest'),
-        };
-
-        $avatar = ($contact instanceof People ? $contact->avatar : null)
-            ?? ($attendee->is_self && $viewer instanceof User ? $viewer->profile_photo_url : null)
-            ?? ($member !== null ? $member['avatar'] : null)
-            ?? $this->avatars->generateAuto(name: $name, initialCount: 2);
+        $contactName = $contact instanceof People ? $this->usableName($contact->name, $email) : null;
+        $viewerName = $attendee->is_self && $viewer instanceof User
+            ? $this->usableName($viewer->name, $email)
+            : null;
+        $memberName = $member !== null ? $this->usableName($member['name'], $email) : null;
+        $calendarName = $this->usableName($attendee->name, $email);
+        $mailboxName = $email !== '' ? $this->mailboxName($attendee, $email) : null;
+        $named = $contactName
+            ?? $viewerName
+            ?? $memberName
+            ?? $calendarName
+            ?? $mailboxName;
 
         return [
-            'name' => $name,
+            'name' => $named ?? ($email !== '' ? $email : __('filament/resources/meeting.attendees.guest')),
             'email' => $email,
-            'avatar' => $avatar,
+            'avatar' => $named !== null ? $this->avatars->generateAuto($named) : '',
+            'has_name' => $named !== null,
             'is_organizer' => $attendee->is_organizer,
             'response_status' => $attendee->response_status,
         ];
@@ -70,6 +66,28 @@ final readonly class MeetingAttendeePresenter
         }
 
         return $this->teamMembers->find($teamId, $email);
+    }
+
+    private function mailboxName(MeetingAttendee $attendee, string $email): ?string
+    {
+        $teamId = $this->teamId($attendee);
+
+        if ($teamId === null) {
+            return null;
+        }
+
+        return $this->mailboxNames->find($teamId, $email);
+    }
+
+    private function usableName(mixed $name, string $email): ?string
+    {
+        $trimmed = trim((string) $name);
+
+        if ($trimmed === '' || Str::lower($trimmed) === $email) {
+            return null;
+        }
+
+        return $trimmed;
     }
 
     private function teamId(MeetingAttendee $attendee): ?string
