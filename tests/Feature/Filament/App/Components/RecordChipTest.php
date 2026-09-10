@@ -214,8 +214,21 @@ it('squares a company chip and rounds a person chip', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->team])->create();
     $person = People::factory()->recycle([$this->user, $this->team])->create();
 
-    expect(RecordChip::forRecord($company)->circular)->toBeFalse()
-        ->and(RecordChip::forRecord($person)->circular)->toBeTrue();
+    $companyChip = RecordChip::forRecord($company)->toHtml();
+    $personChip = RecordChip::forRecord($person)->toHtml();
+
+    expect($companyChip)->toMatch('/\brounded(?![-\w])/')
+        ->and($companyChip)->not->toContain('rounded-full')
+        ->and($personChip)->toContain('rounded-full');
+});
+
+it('keeps a chip avatar smaller than the themed filament avatar', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->team])->create();
+
+    $chip = RecordChip::forRecord($person)->toHtml();
+
+    expect($chip)->toContain('size-5')
+        ->and($chip)->not->toContain('fi-avatar');
 });
 
 it('renders no chip when the related record is missing', function (): void {
