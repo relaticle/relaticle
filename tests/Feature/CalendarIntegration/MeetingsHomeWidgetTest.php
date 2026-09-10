@@ -480,6 +480,34 @@ it('marks an in-progress meeting as happening now', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.happening_now'));
 });
 
+it('strikes through the title when a meeting is in the past', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Morning sync',
+        'starts_at' => Date::parse('2026-09-09 10:00:00'),
+        'ends_at' => Date::parse('2026-09-09 10:30:00'),
+        'all_day' => false,
+    ]);
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Afternoon review',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+        'all_day' => false,
+    ]);
+
+    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
+
+    expect($html)
+        ->toContain('Morning sync')
+        ->toContain('Afternoon review')
+        ->toMatch('/Morning sync.*line-through/s')
+        ->not->toMatch('/Afternoon review.*line-through/s');
+});
+
 it('does not mark a later meeting as happening now', function (): void {
     Meeting::factory()->create([
         'team_id' => $this->team->id,
@@ -536,6 +564,7 @@ it('renders a compact row with a hover expand control on the title', function ()
         ->toContain('group-hover/title:opacity-100')
         ->toContain('aria-expanded="false"')
         ->toContain('x-cloak')
+        ->toContain('x-collapse.duration.300ms')
         ->not->toContain('data-testid="meeting-card-participants-preview"');
 });
 

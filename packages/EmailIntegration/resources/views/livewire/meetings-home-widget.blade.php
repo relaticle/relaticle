@@ -117,6 +117,7 @@
                     $dotColor = $responseStatus->getColor();
                     $time = $card['time'];
                     $happeningNow = $card['happening_now'];
+                    $isPast = $card['is_past'];
                     $meetingKey = $card['id'];
                     $openTarget = "openMeeting('{$meetingKey}')";
                     $participantsId = "meeting-home-participants-{$meetingKey}";
@@ -134,9 +135,10 @@
                     class="py-0.5"
                 >
                     <div
+                        class="px-2.5 py-2 transition-[border-color,background-color,box-shadow] duration-300 ease-out motion-reduce:transition-none"
                         x-bind:class="expanded
-                            ? 'rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-2.5 py-2 shadow-sm'
-                            : 'px-2.5 py-2'"
+                            ? 'rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] shadow-sm'
+                            : 'border border-transparent'"
                     >
                     <div
                         data-testid="meeting-card-row"
@@ -169,7 +171,11 @@
                             class="group/title relative flex min-w-0 flex-1 items-center gap-1.5"
                             data-testid="meeting-card-title"
                         >
-                            <span class="min-w-0 truncate text-sm font-medium text-gray-950 dark:text-white">
+                            <span @class([
+                                'min-w-0 truncate text-sm font-medium',
+                                'text-gray-400 line-through dark:text-gray-500' => $isPast,
+                                'text-gray-950 dark:text-white' => ! $isPast,
+                            ])>
                                 {{ $card['title'] }}
                             </span>
 
@@ -218,7 +224,7 @@
                                 aria-hidden="true"
                             >
                                 <span
-                                    class="inline-flex transition-transform duration-200 motion-reduce:transition-none"
+                                    class="inline-flex transition-transform duration-300 ease-out motion-reduce:transition-none"
                                     x-bind:class="expanded && 'rotate-180'"
                                 >
                                     <x-filament::icon
@@ -237,8 +243,8 @@
                             role="region"
                             x-cloak
                             x-show="expanded"
-                            x-collapse
-                            class="mt-2 rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]"
+                            x-collapse.duration.300ms
+                            class="mt-2 overflow-hidden rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]"
                         >
                             @foreach ($participants['attendees'] as $state)
                                 @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
