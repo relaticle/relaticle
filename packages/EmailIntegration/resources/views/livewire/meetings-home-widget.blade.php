@@ -131,12 +131,16 @@
                     wire:key="meeting-home-{{ $meetingKey }}"
                     x-data="{ expanded: false, expandLabel: @js($expandLabel), collapseLabel: @js($collapseLabel) }"
                     data-testid="meeting-card"
-                    x-bind:class="expanded && '-mx-1 my-1 rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-4 py-3 shadow-sm'"
+                    class="py-0.5"
                 >
                     <div
+                        x-bind:class="expanded
+                            ? 'rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-2.5 py-2 shadow-sm'
+                            : 'px-2.5 py-2'"
+                    >
+                    <div
                         data-testid="meeting-card-row"
-                        class="flex min-h-11 cursor-pointer items-center gap-3 py-3"
-                        x-bind:class="expanded && 'py-0'"
+                        class="flex min-h-9 cursor-pointer items-center gap-2.5"
                         @if ($hasParticipants)
                             x-on:click="expanded = ! expanded"
                             x-bind:aria-expanded="expanded.toString()"
@@ -211,7 +215,7 @@
                         @if ($hasParticipants)
                             <span
                                 data-testid="meeting-card-participants-preview"
-                                class="inline-flex shrink-0 items-center gap-1.5 text-gray-400"
+                                class="inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-200 bg-gray-50 py-0.5 pe-1 ps-1.5 text-gray-400 dark:border-white/10 dark:bg-white/5"
                                 aria-hidden="true"
                             >
                                 @if ($participants['avatars'] !== [])
@@ -222,7 +226,7 @@
                                                 'alt' => $avatar['alt'],
                                                 'hasName' => $avatar['has_name'],
                                                 'size' => 'sm',
-                                                'class' => 'ring-2 ring-[var(--surface-block-bg)]',
+                                                'class' => 'ring-2 ring-gray-50 dark:ring-white/5',
                                             ])
                                         @endforeach
                                     </span>
@@ -240,7 +244,7 @@
                                 >
                                     <x-filament::icon
                                         :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronDown"
-                                        class="size-4 shrink-0"
+                                        class="size-3.5 shrink-0"
                                     />
                                 </span>
                             </span>
@@ -255,16 +259,18 @@
                             x-cloak
                             x-show="expanded"
                             x-collapse
-                            class="mt-3 border-t border-[var(--surface-block-border)] pt-2"
+                            class="mt-2 rounded-lg bg-gray-50 px-2 py-1 dark:bg-white/[0.03]"
                         >
                             @foreach ($participants['attendees'] as $state)
                                 @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
                                     'state' => $state,
                                     'showEmail' => false,
+                                    'compact' => true,
                                 ])
                             @endforeach
                         </div>
                     @endif
+                    </div>
                 </div>
             @endforeach
 
