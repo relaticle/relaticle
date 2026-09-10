@@ -14,6 +14,12 @@ return new class extends Migration
             $table->string('default_email_sharing_tier', 30)
                 ->default('metadata_only')
                 ->after('personal_team');
+            $table->string('contact_creation_mode', 20)
+                ->default('selective')
+                ->after('default_email_sharing_tier');
+            $table->boolean('auto_create_companies')
+                ->default(true)
+                ->after('contact_creation_mode');
         });
     }
 };

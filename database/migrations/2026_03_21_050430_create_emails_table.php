@@ -34,6 +34,7 @@ return new class extends Migration
             $table->string('status', 30)->default('synced');     // synced | draft | queued | sending | sent | failed | cancelled
             $table->text('last_error')->nullable();
             $table->unsignedTinyInteger('attempts')->default(0);
+            $table->timestamp('linked_at')->nullable();
             $table->string('priority', 10)->default('bulk');
 
             // Privacy: owner-set default for team visibility (no shared_with_team boolean)
@@ -62,6 +63,10 @@ return new class extends Migration
             $table->index('batch_id');
             $table->index(['connected_account_id', 'status', 'scheduled_for'], 'idx_emails_dispatcher');
             $table->index(['user_id', 'status'], 'idx_emails_user_status');
+            $table->index(
+                ['team_id', 'user_id', 'rfc_message_id'],
+                'emails_team_user_message_id_idx',
+            );
         });
     }
 };
