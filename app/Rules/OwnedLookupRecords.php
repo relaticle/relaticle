@@ -29,19 +29,27 @@ final readonly class OwnedLookupRecords implements ValidationRule
             return;
         }
 
-        $ids = collect(is_array($value) ? $value : [$value])
-            ->filter(fn (mixed $id): bool => is_string($id) || is_int($id))
-            ->map(fn (mixed $id): string => (string) $id)
-            ->unique()
-            ->values();
+        $items = is_array($value) ? $value : [$value];
 
-        if ($ids->isEmpty()) {
+        if ($items === []) {
             return;
         }
 
+        foreach ($items as $item) {
+            if (! is_string($item) && ! is_int($item)) {
+                $fail(__('validation.custom_field.record_ids', ['field' => $this->fieldName]));
+
+                return;
+            }
+        }
+
+        $ids = collect($items)
+            ->map(fn (string|int $id): string => (string) $id)
+            ->unique()
+            ->values();
+
         $model = $entity->model();
         $owned = $model::query()
-            ->withoutGlobalScopes()
             ->whereIn('id', $ids->all())
             ->where('team_id', $this->teamId)
             ->pluck('id')

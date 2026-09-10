@@ -217,3 +217,45 @@ it('accepts a record id from the caller workspace', function (): void {
 
     expect(Task::query()->where('title', 'Own')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($field))->toBe([$own->getKey()]);
 });
+
+it('rejects a soft-deleted record id from the caller workspace', function (): void {
+    CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $trashed = Company::factory()->create(['team_id' => $this->team->getKey()]);
+    $trashed->delete();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Trashed', 'custom_fields' => ['related_company' => [$trashed->getKey()]]])
+        ->assertHasErrors()
+        ->assertSee('do not belong');
+});
+
+it('rejects a nested value in a record field', function (): void {
+    CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Nested record', 'custom_fields' => ['related_company' => [['id' => 'x']]]])
+        ->assertHasErrors()
+        ->assertSee('array of record IDs');
+});
