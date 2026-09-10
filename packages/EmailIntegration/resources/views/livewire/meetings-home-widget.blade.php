@@ -109,12 +109,10 @@
             @endif
         </div>
     @else
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col divide-y divide-[var(--surface-block-border)]">
             @foreach (array_slice($this->meetingCards, 0, $this->visibleCount) as $card)
                 @php
                     $participants = $card['participants'];
-                    $responseStatus = $card['response_status'];
-                    $dotColor = $responseStatus->getColor();
                     $time = $card['time'];
                     $happeningNow = $card['happening_now'];
                     $meetingKey = $card['id'];
@@ -131,19 +129,50 @@
                     wire:key="meeting-home-{{ $meetingKey }}"
                     x-data="{ expanded: false, expandLabel: @js($expandLabel), collapseLabel: @js($collapseLabel) }"
                     data-testid="meeting-card"
-                    class="flex min-h-11 w-full flex-col gap-1.5 rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] p-3 shadow-none transition duration-200 hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm motion-reduce:transition-none dark:hover:border-white/20 dark:hover:bg-white/5 dark:hover:shadow-none"
+                    x-bind:class="expanded && '-mx-1 my-1 rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] px-4 py-3 shadow-sm'"
                 >
-                    <div class="flex items-center gap-2">
+                    <div class="flex min-h-11 items-center gap-3 py-3" x-bind:class="expanded && 'py-0'">
+                        <span
+                            class="size-1.5 shrink-0 rounded-full bg-primary-500"
+                            aria-hidden="true"
+                        ></span>
+
+                        <div
+                            class="min-w-0 flex-1 truncate text-sm font-medium text-gray-950 dark:text-white"
+                            data-testid="meeting-card-title"
+                        >
+                            {{ $card['title'] }}
+                        </div>
+
+                        <time
+                            class="inline-flex shrink-0 items-center gap-1.5 text-xs font-normal tabular-nums text-gray-500 dark:text-gray-400"
+                            datetime="{{ $time['datetime'] }}"
+                        >
+                            <x-filament::icon
+                                :icon="$timeIcon"
+                                class="size-3.5 shrink-0 text-gray-400 dark:text-gray-500"
+                            />
+                            <span class="whitespace-nowrap">{{ $time['range'] }}</span>
+                            @if ($happeningNow)
+                                <x-filament::badge color="primary" size="sm">
+                                    {{ __('filament/pages/dashboard.meetings.happening_now') }}
+                                </x-filament::badge>
+                            @endif
+                        </time>
+
                         <button
                             type="button"
-                            data-testid="meeting-card-title"
+                            data-testid="meeting-card-open"
                             wire:click="{{ $openTarget }}"
                             wire:loading.attr="disabled"
                             wire:target="{{ $openTarget }}"
-                            class="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-950 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait disabled:opacity-60 dark:text-white"
+                            class="inline-flex shrink-0 items-center justify-center rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-white/10 dark:hover:text-gray-300"
                             aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                         >
-                            {{ $card['title'] }}
+                            <x-filament::icon
+                                :icon="\Filament\Support\Icons\Heroicon::OutlinedMagnifyingGlass"
+                                class="size-4 shrink-0"
+                            />
                         </button>
 
                         @if ($hasParticipants)
@@ -191,38 +220,6 @@
                         @endif
                     </div>
 
-                    <div class="flex items-center justify-between gap-3">
-                        <time
-                            class="inline-flex min-w-0 items-center gap-1.5 text-xs font-normal tabular-nums text-gray-500 dark:text-gray-400"
-                            datetime="{{ $time['datetime'] }}"
-                        >
-                            <x-filament::icon
-                                :icon="$timeIcon"
-                                class="size-3.5 shrink-0 text-gray-400 dark:text-gray-500"
-                            />
-                            <span class="truncate">{{ $time['range'] }}</span>
-                            @if ($happeningNow)
-                                <x-filament::badge color="primary" size="sm">
-                                    {{ __('filament/pages/dashboard.meetings.happening_now') }}
-                                </x-filament::badge>
-                            @endif
-                        </time>
-
-                        <span class="inline-flex shrink-0 items-center gap-1.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-                            <span
-                                @class([
-                                    'size-1.5 rounded-full',
-                                    'bg-success-500' => $dotColor === 'success',
-                                    'bg-danger-500' => $dotColor === 'danger',
-                                    'bg-warning-500' => $dotColor === 'warning',
-                                    'bg-gray-400' => $dotColor === 'gray',
-                                ])
-                                aria-hidden="true"
-                            ></span>
-                            <span>{{ $responseStatus->getLabel() }}</span>
-                        </span>
-                    </div>
-
                     @if ($hasParticipants)
                         <div
                             id="{{ $participantsId }}"
@@ -231,7 +228,7 @@
                             x-cloak
                             x-show="expanded"
                             x-collapse
-                            class="border-t border-[var(--surface-block-border)] pt-2"
+                            class="mt-3 border-t border-[var(--surface-block-border)] pt-2"
                         >
                             @foreach ($participants['attendees'] as $state)
                                 @include('email-integration::filament.infolists.partials.meeting-attendee-row', [
