@@ -90,7 +90,7 @@ New features or modified behavior should include corresponding Pest tests. There
 - No empty zero-parameter constructors
 - Short nullable: `?string` not `string|null`
 - Always use curly braces, even single-line bodies
-- PHPDoc over inline comments; only comment genuinely complex logic
+- Write code that needs no comment. A 2-line *why* only where the code cannot say it, never what it does; docblocks carry types only
 - Enum keys: TitleCase (`FavoritePerson`, `Monthly`)
 
 ## Code Style

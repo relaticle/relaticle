@@ -339,6 +339,85 @@ it('does not show a meeting that starts on another day', function (): void {
         ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
+/**
+ * All-day events are stored as a UTC date at midnight. Converting that timestamp
+ * into the viewer's zone moves the day for anyone west of UTC. Los Angeles is
+ * UTC-7 in September, so 2026-09-10 00:00 UTC would otherwise land on the 9th.
+ */
+it('shows an all-day event on its calendar date for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->set('selectedDate', '2026-09-10')
+        ->assertSee('Company offsite')
+        ->assertSee(__('filament/pages/dashboard.meetings.all_day'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('does not show an all-day event on the previous local day for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertDontSee('Company offsite')
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.title'));
+});
+
+it('jumps to the calendar date of a later all-day event for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Company offsite',
+        'starts_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    $component = livewire(MeetingsHomeWidget::class)
+        ->assertSee(__('filament/pages/dashboard.meetings.empty.next_with_meetings'))
+        ->call('goToNextDayWithMeetings')
+        ->assertSee('Company offsite');
+
+    expect($component->instance()->selectedDate)->toBe('2026-09-10');
+});
+
+it('lists a late-evening timed meeting on the local day for a viewer west of UTC', function (): void {
+    $this->user->forceFill(['timezone' => 'America/Los_Angeles'])->save();
+
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'West coast standup',
+        'starts_at' => Date::parse('2026-09-10 04:00:00', 'UTC'),
+        'ends_at' => Date::parse('2026-09-10 05:00:00', 'UTC'),
+        'all_day' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('West coast standup')
+        ->set('selectedDate', '2026-09-10')
+        ->assertDontSee('West coast standup');
+});
+
 it('shows one copy when two calendars share an ical uid', function (): void {
     $teammate = User::factory()->create();
     $otherAccount = ConnectedAccount::withoutEvents(
@@ -667,7 +746,10 @@ it('does not list a teammate meeting on home when the viewer is not invited', fu
 it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
     $this->user->forceFill(['name' => 'Alice Viewer'])->save();
 
-    $bob = User::factory()->create(['name' => 'Bob Owner']);
+    $bob = User::factory()->create([
+        'name' => 'Bob Owner',
+        'email' => 'bob@example.com',
+    ]);
     $bob->teams()->attach($this->team, ['role' => 'admin']);
     $bob->forceFill(['current_team_id' => $this->team->id])->save();
 

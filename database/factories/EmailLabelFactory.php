@@ -19,7 +19,7 @@ final class EmailLabelFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
-            'label' => $this->faker->randomElement(['INBOX', 'SENT', 'IMPORTANT', 'STARRED']),
+            'label' => fake()->randomElement(['INBOX', 'SENT', 'IMPORTANT', 'STARRED']),
             'source' => 'provider',
         ];
     }
@@ -28,7 +28,7 @@ final class EmailLabelFactory extends Factory
     {
         return $this->state(fn (): array => [
             'source' => 'system',
-            'label' => $label ?? $this->faker->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
+            'label' => $label ?? fake()->randomElement(['Scheduling', 'Marketing', 'Invoice', 'Support', 'Sales', 'Personal']),
         ]);
     }
 }

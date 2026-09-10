@@ -12,14 +12,14 @@
             <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-white/10 dark:border-white/10">
                 @foreach ($personas as $persona)
                     <div
-                        class="flex items-center justify-between gap-3 px-3 py-2"
+                        class="relative flex items-center justify-between gap-3 px-3 py-2"
                         title="{{ $persona->purpose }}"
                     >
                         <x-login-link
                             :email="$persona->email"
                             :label="$persona->email"
                             :redirect-url="url()->getAppUrl()"
-                            class="font-mono text-xs text-gray-600 hover:underline dark:text-gray-300"
+                            class="cursor-pointer font-mono text-xs text-gray-600 after:absolute after:inset-0 hover:underline dark:text-gray-300"
                         />
 
                         <x-filament::badge :color="$persona->expect->getColor()">

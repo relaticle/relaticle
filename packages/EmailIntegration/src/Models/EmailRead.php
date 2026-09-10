@@ -36,10 +36,6 @@ final class EmailRead extends Model
         'read_at',
     ];
 
-    protected $casts = [
-        'read_at' => 'datetime',
-    ];
-
     /**
      * @return BelongsTo<Email, $this>
      */
@@ -54,5 +50,15 @@ final class EmailRead extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'read_at' => 'datetime',
+        ];
     }
 }

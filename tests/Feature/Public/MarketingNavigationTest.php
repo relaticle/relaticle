@@ -172,10 +172,8 @@ it('renders the works-with strip on the homepage with a link to the developer do
         ->and($strip)->toContain('21,000+');
 });
 
-it('shows one product hunt badge per theme in the footer', function (): void {
+it('renders the homepage without the product hunt launch badge', function (): void {
     $html = $this->get('/')->assertOk()->getContent();
 
-    expect($html)->toContain('https://www.producthunt.com/products/relaticle?embed=true')
-        ->and($html)->toContain('featured.svg?post_id=1238864&amp;theme=light')
-        ->and($html)->toContain('featured.svg?post_id=1238864&amp;theme=dark');
+    expect($html)->not->toContain('producthunt.com', 'Product Hunt');
 });

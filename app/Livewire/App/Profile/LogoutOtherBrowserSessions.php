@@ -45,6 +45,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
     {
         return ConfirmIdentityAction::make('deleteBrowserSessions')
             ->label(__('profile.actions.log_out_other_browsers'))
+            ->resumable()
             ->modalHeading(__('profile.modals.log_out_other_browsers.title'))
             ->modalDescription(__('profile.modals.log_out_other_browsers.description'))
             ->modalSubmitActionLabel(__('profile.actions.log_out_other_browsers'))
@@ -56,7 +57,7 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
     {
         $user = $this->authUser();
 
-        if (! IdentityConfirmation::satisfied($user)) {
+        if (! IdentityConfirmation::satisfied()) {
             $this->notifyIdentityConfirmationFailed();
 
             return;

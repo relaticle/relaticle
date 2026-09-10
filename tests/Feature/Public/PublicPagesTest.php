@@ -82,6 +82,7 @@ describe('Legal pages', function () {
         expect($response->headers->get('Content-Type'))->toStartWith($contentType);
 
         $response->assertSee('Terms of Service');
+        $response->assertSeeText('To request account deletion, email privacy@relaticle.com or contact us.');
         $response->assertSee('Relaticle');
         $response->assertDontSee('word usage');
         $response->assertDontSee('Basic" plan');
@@ -92,6 +93,8 @@ describe('Legal pages', function () {
 
     it('displays the privacy policy page with current MCP disclosures as :format', function (array $headers, string $contentType) {
         $response = $this->get('/privacy-policy', $headers);
+
+        $response->assertSeeText('To request account deletion, email privacy@relaticle.com or contact us.');
 
         $response->assertStatus(200);
         expect($response->headers->get('Content-Type'))->toStartWith($contentType);

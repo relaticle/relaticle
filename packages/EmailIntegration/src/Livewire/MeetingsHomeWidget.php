@@ -476,7 +476,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             ->find($meetingId);
 
         if ($meeting instanceof Meeting) {
-            resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$meeting]);
+            resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($user, [$meeting]);
         }
 
         return $meeting;

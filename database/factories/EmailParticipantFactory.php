@@ -20,8 +20,8 @@ final class EmailParticipantFactory extends Factory
     {
         return [
             'email_id' => Email::factory(),
-            'email_address' => $this->faker->unique()->safeEmail(),
-            'name' => $this->faker->name(),
+            'email_address' => fake()->unique()->safeEmail(),
+            'name' => fake()->name(),
             'role' => EmailParticipantRole::FROM,
         ];
     }

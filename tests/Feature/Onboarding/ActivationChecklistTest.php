@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Onboarding\DismissActivationChecklist;
+use App\Enums\ActivationStep;
 use App\Enums\CreationSource;
 use App\Enums\TeamRole;
 use App\Filament\Pages\ChatConversation;
@@ -17,6 +18,9 @@ use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(ActivationChecklist::class, DismissActivationChecklist::class);
 
@@ -48,10 +52,11 @@ function stepState(string $key, bool $complete): string
 it('starts every step incomplete in a fresh workspace', function (): void {
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('first_record', false))
+        ->assertSeeHtml(stepState('sync_email', false))
         ->assertSeeHtml(stepState('import', false))
         ->assertSeeHtml(stepState('invite', false))
         ->assertSeeHtml(stepState('ask_rela', false))
-        ->assertSee('0/4 steps completed');
+        ->assertSee('0/5 steps completed');
 });
 
 it('completes the first-record step once the workspace holds a record the team made', function (): void {
@@ -63,7 +68,7 @@ it('completes the first-record step once the workspace holds a record the team m
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('first_record', true))
-        ->assertSee('1/4 steps completed');
+        ->assertSee('1/5 steps completed');
 });
 
 it('leaves the first-record step incomplete while only seeded demo records exist', function (): void {
@@ -74,7 +79,7 @@ it('leaves the first-record step incomplete while only seeded demo records exist
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('first_record', false))
-        ->assertSee('0/4 steps completed');
+        ->assertSee('0/5 steps completed');
 });
 
 it('completes the import step for an imported record', function (): void {
@@ -86,6 +91,38 @@ it('completes the import step for an imported record', function (): void {
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('import', true))
         ->assertSeeHtml(stepState('first_record', true));
+});
+
+it('hides the sync email step when email integration is disabled', function (): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
+    livewire(ActivationChecklist::class)
+        ->assertDontSeeHtml('data-step="'.ActivationStep::SyncEmail->value.'"')
+        ->assertDontSee(__('filament/pages/dashboard.activation.steps.sync_email.label'))
+        ->assertSee('0/4 steps completed');
+});
+
+it('links the sync email step to the email accounts settings page', function (): void {
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml('href="'.EmailAccountsPage::getUrl().'"')
+        ->assertSee(__('filament/pages/dashboard.activation.steps.sync_email.label'));
+});
+
+it('shows an inline syncing row while the mailbox import is in flight', function (): void {
+    ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->owner->getKey(),
+        'sync_cursor' => null,
+        'initial_sync_imported' => 12,
+        'initial_sync_estimated' => 100,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('sync_email', true))
+        ->assertSeeHtml('data-testid="activation-email-sync-progress"')
+        ->assertSee(__('filament/pages/dashboard.activation.steps.sync_email.syncing'))
+        ->assertSee('12%');
 });
 
 it('completes the invite step while an invitation is pending', function (): void {
@@ -197,6 +234,12 @@ it('disappears once every step is done', function (): void {
         'updated_at' => now(),
     ]);
 
+    ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->owner->getKey(),
+        'sync_cursor' => 'history-complete',
+    ]);
+
     livewire(ActivationChecklist::class)
         ->assertDontSeeHtml('data-testid="activation-step"');
 });
@@ -238,7 +281,7 @@ it('mentions sample data only while seeded records remain', function (): void {
         ->assertSee(__('filament/pages/dashboard.activation.sample_data'));
 });
 
-it('answers all four steps without repeating a query', function (): void {
+it('answers all five steps without repeating a query', function (): void {
     DB::enableQueryLog();
 
     livewire(ActivationChecklist::class);

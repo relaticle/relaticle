@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ResumesIdentityConfirmation;
 use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
@@ -23,6 +24,7 @@ abstract class BaseLivewireComponent extends Component implements HasActions, Ha
 {
     use InteractsWithActions;
     use InteractsWithForms;
+    use ResumesIdentityConfirmation;
     use WithRateLimiting;
 
     public function authUser(): User

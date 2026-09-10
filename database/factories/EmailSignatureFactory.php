@@ -25,8 +25,8 @@ final class EmailSignatureFactory extends Factory
             'user_id' => fn (array $attributes): string => ConnectedAccount::query()
                 ->whereKey($attributes['connected_account_id'])
                 ->value('user_id'),
-            'name' => $this->faker->words(2, true),
-            'content_html' => '<p>'.$this->faker->sentence().'</p>',
+            'name' => fake()->words(2, true),
+            'content_html' => '<p>'.fake()->sentence().'</p>',
             'is_default' => false,
         ];
     }
