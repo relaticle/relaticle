@@ -30,13 +30,12 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
-use Relaticle\EmailIntegration\Services\MeetingParticipantStackPresenter;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
 /**
  * @property-read Collection<int, Meeting> $meetings
  * @property-read list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: int, hasCalendar: bool, isInitialImport: bool}> $mailboxSyncRows
- * @property-read list<array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool, tooltip: string}>, overflow: int, overflow_tooltip: string|null}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}> $meetingCards
+ * @property-read list<array{id: string, title: string, all_day: bool, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}> $meetingCards
  * @property-read Action $connectGmailAction
  */
 final class MeetingsHomeWidget extends Component implements HasActions, HasSchemas
@@ -322,7 +321,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     }
 
     /**
-     * @return list<array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool, tooltip: string}>, overflow: int, overflow_tooltip: string|null}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}>
+     * @return list<array{id: string, title: string, all_day: bool, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}>
      */
     #[Computed]
     public function meetingCards(): array
@@ -337,7 +336,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     }
 
     /**
-     * @return array{id: string, title: string, all_day: bool, participants: array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool, tooltip: string}>, overflow: int, overflow_tooltip: string|null}, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}
+     * @return array{id: string, title: string, all_day: bool, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}
      */
     private function meetingCard(Meeting $meeting): array
     {
@@ -345,7 +344,6 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             'id' => (string) $meeting->getKey(),
             'title' => (string) $meeting->title,
             'all_day' => $meeting->all_day,
-            'participants' => resolve(MeetingParticipantStackPresenter::class)->forMeeting($meeting),
             'response_status' => $this->viewerResponseStatus($meeting),
             'time' => $this->meetingTime($meeting),
             'happening_now' => $this->isHappeningNow($meeting),
