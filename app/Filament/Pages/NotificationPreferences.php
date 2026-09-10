@@ -14,7 +14,7 @@ final class NotificationPreferences extends Page
 
     protected static ?string $slug = 'notifications';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bell';
 

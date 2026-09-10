@@ -23,8 +23,10 @@ You must be at least 16 years old to use our services.
 
 You own your data. We do not claim any intellectual property rights over the data you store in Relaticle.
 
-- **Cloud users:** Your data is stored on our servers. You can export your data at any time via the application or the REST API. If you delete your account, we will delete your data within 30 days.
+- **Cloud users:** Your data is stored on our servers. You can export your data at any time via the application or the REST API. To request account deletion, email privacy@relaticle.com or contact us.
 - **Self-hosted users:** Your data never touches our servers. You have full control.
+
+Account deletion uses a 30-day grace period once scheduled. Signing in before the deletion date lets you cancel. Records in shared workspaces remain after your account is removed.
 
 ## 4. Acceptable Use
 

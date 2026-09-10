@@ -86,12 +86,18 @@ test('company morph to many notes', function () {
         ->and($company->notes->first()->getKey())->toBe($note->getKey());
 });
 
-test('company has logo attribute', function () {
+test('company logo is null until one is uploaded', function () {
     $company = Company::factory()->create([
         'name' => 'Test Company',
     ]);
 
-    expect($company->logo)->not->toBeNull();
+    expect($company->logo)->toBeNull();
+
+    $company->addMediaFromString('logo-bytes')
+        ->usingFileName('logo.png')
+        ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    expect($company->refresh()->logo)->toContain('logo.png');
 });
 
 test('company uses media library', function () {

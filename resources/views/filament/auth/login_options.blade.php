@@ -59,7 +59,9 @@
                     },
                 });
 
-                localStorage.setItem('relaticle:last-login', 'passkey');
+                if (response?.redirect && response.redirect !== @js(route('two-factor.login'))) {
+                    localStorage.setItem('relaticle:last-login', 'passkey');
+                }
 
                 window.location.href = response?.redirect ?? '{{ filament()->getPanel('app')->getUrl() }}';
             } catch (e) {

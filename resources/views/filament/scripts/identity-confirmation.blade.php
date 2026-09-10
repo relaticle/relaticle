@@ -30,7 +30,13 @@
             startProcessing(@js(__('profile.sections.passkeys.waiting')));
 
             try {
-                await window.Passkeys.verify({ routes });
+                const result = await window.Passkeys.verify({ routes });
+
+                if (! result.confirmed) {
+                    window.location.href = result.redirect;
+
+                    return;
+                }
 
                 startProcessing(@js(__('profile.sections.passkeys.confirmed')));
                 await new Promise((resolve) => setTimeout(resolve, 600));

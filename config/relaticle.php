@@ -17,17 +17,6 @@ return [
         'address' => env('RELATICLE_COMPANY_ADDRESS', ''),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Feature Flags
-    |--------------------------------------------------------------------------
-    |
-    | Toggle Relaticle features on or off. Useful for forks and custom
-    | deployments that want to disable specific functionality without
-    | modifying upstream code. All features are enabled by default.
-    |
-    */
-
     'deletion' => [
         'grace_period_days' => 30,
         'reminder_days_before' => 5,
@@ -67,6 +56,7 @@ return [
     ],
 
     'features' => [
+        'account_deletion' => (bool) env('RELATICLE_FEATURE_ACCOUNT_DELETION', false),
         'onboard_seed' => (bool) env('RELATICLE_FEATURE_ONBOARD_SEED', true),
         'social_auth' => (bool) env('RELATICLE_FEATURE_SOCIAL_AUTH', true),
         'documentation' => (bool) env('RELATICLE_FEATURE_DOCUMENTATION', true),
