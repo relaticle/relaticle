@@ -23,14 +23,14 @@
 
             <x-filament::icon-button
                 color="gray"
-                size="sm"
+                size="xs"
                 :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
                 :label="__('filament/pages/dashboard.meetings.previous_day')"
                 wire:click="previousDay"
             />
             <x-filament::icon-button
                 color="gray"
-                size="sm"
+                size="xs"
                 :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
                 :label="__('filament/pages/dashboard.meetings.next_day')"
                 wire:click="nextDay"
