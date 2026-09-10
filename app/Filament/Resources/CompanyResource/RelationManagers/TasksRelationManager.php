@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\AttachAction;
@@ -36,15 +37,11 @@ final class TasksRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns([
                 TextColumn::make('title'),
-                TextColumn::make('assignees.name')
+                RecordChipColumn::make('assignees.name')
                     ->label(__('filament/resources/company.relation_managers.tasks.fields.assignees.label'))
-                    ->badge()
-                    ->color('primary')
                     ->searchable(),
-                TextColumn::make('people.name')
+                RecordChipColumn::make('people.name')
                     ->label(__('filament/resources/company.relation_managers.tasks.fields.people.label'))
-                    ->badge()
-                    ->color('primary')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->label(__('filament/resources/company.relation_managers.tasks.fields.created_at.label'))

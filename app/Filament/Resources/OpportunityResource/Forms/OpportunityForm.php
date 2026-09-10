@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Forms;
 
-use Filament\Forms\Components\Select;
+use App\Filament\Components\Forms\RecordSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -19,12 +19,12 @@ final class OpportunityForm
                     ->required()
                     ->placeholder(__('filament/resources/opportunity.fields.name.placeholder'))
                     ->columnSpanFull(),
-                Select::make('company_id')
+                RecordSelect::make('company_id')
                     ->relationship('company', 'name')
                     ->searchable()
                     ->preload()
                     ->columnSpan(2),
-                Select::make('contact_id')
+                RecordSelect::make('contact_id')
                     ->relationship('contact', 'name')
                     ->searchable()
                     ->preload()

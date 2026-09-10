@@ -9,6 +9,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Support\IconPath;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -56,6 +57,43 @@ enum CrmEntity: string
             self::Task, self::Note => 'title',
             self::Company, self::People, self::Opportunity => 'name',
         };
+    }
+
+    /**
+     * The Heroicon name for the record type: the app panel's navigation icon,
+     * the chat chip glyph and every avatar-less record tile read this, so a
+     * company looks like a company on every surface.
+     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Company => 'heroicon-o-building-office',
+            self::People => 'heroicon-o-user',
+            self::Opportunity => 'heroicon-o-currency-dollar',
+            self::Task => 'heroicon-o-clipboard-document-check',
+            self::Note => 'heroicon-o-document-text',
+        };
+    }
+
+    /**
+     * The icon's raw `d` attribute, for the two surfaces that cannot render a
+     * Blade component: chat's server-side Markdown renderer and its client-side
+     * mirror in chat.js.
+     */
+    public function iconPath(): string
+    {
+        return IconPath::for($this->icon());
+    }
+
+    public static function tryFromModel(Model $record): ?self
+    {
+        foreach (self::cases() as $case) {
+            if ($record instanceof ($case->model())) {
+                return $case;
+            }
+        }
+
+        return null;
     }
 
     public function urlType(): string

@@ -48,6 +48,21 @@ function entityPickers(Schema $schema): array
     return $found;
 }
 
+/**
+ * Option labels carry the record's avatar as markup, so the assertions below
+ * compare the text a user reads rather than the chip HTML around it.
+ *
+ * @param  array<string|int, string>  $options
+ * @return array<int, string>
+ */
+function pickerOptionText(array $options): array
+{
+    return array_values(array_map(
+        fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
+        $options,
+    ));
+}
+
 it('shows companies and people without typing on the task form', function (): void {
     Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zeta Industries']);
     Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
@@ -65,8 +80,8 @@ it('shows companies and people without typing on the task form', function (): vo
             ->and($pickers[$name]->getOptionsFromRelationship())->not->toBeEmpty();
     }
 
-    expect(array_values($pickers['companies']->getOptionsFromRelationship()))->toBe(['Acme Corp', 'Zeta Industries'])
-        ->and(array_values($pickers['people']->getOptionsFromRelationship()))->toBe(['Adam Clark', 'Zoe Baker']);
+    expect(pickerOptionText($pickers['companies']->getOptionsFromRelationship()))->toBe(['Acme Corp', 'Zeta Industries'])
+        ->and(pickerOptionText($pickers['people']->getOptionsFromRelationship()))->toBe(['Adam Clark', 'Zoe Baker']);
 });
 
 it('shows companies and people without typing on the note form', function (): void {
@@ -95,7 +110,7 @@ it('scopes the preloaded options to the acting tenant', function (): void {
     $this->get(TaskResource::getUrl('index', tenant: $this->team));
 
     $pickers = entityPickers(TaskForm::get(Schema::make(app(ManageTasks::class))->model(Task::class)));
-    $options = array_values($pickers['companies']->getOptionsFromRelationship());
+    $options = pickerOptionText($pickers['companies']->getOptionsFromRelationship());
 
     expect($options)->toContain('Mine Co')->not->toContain('Theirs Co');
 });
