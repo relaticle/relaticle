@@ -11,14 +11,11 @@ use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\ValueResolver\LookupAttributeResolver;
 use Relaticle\CustomFields\Services\ValueResolver\LookupCache;
 
-final class RecordNameResolver
+final readonly class RecordNameResolver
 {
-    /** @var array<string, array<string, true>> */
-    private array $attempted = [];
-
     public function __construct(
-        private readonly LookupCache $cache,
-        private readonly LookupAttributeResolver $attributes,
+        private LookupCache $cache,
+        private LookupAttributeResolver $attributes,
     ) {}
 
     /** @param  iterable<Model>  $models */
@@ -59,19 +56,16 @@ final class RecordNameResolver
     }
 
     /** @param  list<string>  $ids */
+    /** @param  list<string>  $ids */
     private function warm(string $lookupType, array $ids): void
     {
-        $missing = array_values(array_filter(
+        $missing = array_values(array_map(
+            static fn (int|string $id): string => (string) $id,
             $this->cache->missing($lookupType, $ids),
-            fn (int|string $id): bool => ! isset($this->attempted[$lookupType][(string) $id]),
         ));
 
         if ($missing === []) {
             return;
-        }
-
-        foreach ($missing as $id) {
-            $this->attempted[$lookupType][(string) $id] = true;
         }
 
         [$lookupInstance, $titleAttribute] = $this->attributes->resolve($lookupType);
@@ -82,7 +76,7 @@ final class RecordNameResolver
             ->map(static fn (mixed $title): string => (string) $title)
             ->all();
 
-        $this->cache->remember($lookupType, $titles);
+        $this->cache->remember($lookupType, $titles + array_fill_keys($missing, null));
     }
 
     /** @return list<string> */
