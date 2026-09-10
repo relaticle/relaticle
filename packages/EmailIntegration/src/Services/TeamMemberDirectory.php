@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final class TeamMemberDirectory
 {
@@ -48,32 +47,6 @@ final class TeamMemberDirectory
                 $members[$email] = [
                     'name' => trim($user->name),
                     'avatar' => $user->profile_photo_url,
-                ];
-            });
-
-        ConnectedAccount::query()
-            ->where('team_id', $teamId)
-            ->with('user')
-            ->get()
-            ->each(function (ConnectedAccount $account) use (&$members): void {
-                $email = Str::lower(trim($account->email_address));
-
-                if ($email === '' || isset($members[$email])) {
-                    return;
-                }
-
-                $user = $account->user;
-                $name = $user instanceof User && trim($user->name) !== ''
-                    ? trim($user->name)
-                    : trim((string) ($account->display_name ?? ''));
-
-                if ($name === '' || Str::lower($name) === $email) {
-                    return;
-                }
-
-                $members[$email] = [
-                    'name' => $name,
-                    'avatar' => $user instanceof User ? $user->profile_photo_url : null,
                 ];
             });
 
