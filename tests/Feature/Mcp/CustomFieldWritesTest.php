@@ -7,14 +7,17 @@ use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Mcp\Tools\Task\CreateTaskTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
+use App\Rules\OwnedLookupRecords;
+use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -169,4 +172,48 @@ it('escapes inline html inside markdown', function (): void {
         ->firstOrFail();
 
     expect(Task::query()->where('title', 'Esc')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($description))->not->toContain('<script>');
+});
+
+it('rejects a record id from another workspace', function (): void {
+    CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $otherTeam = User::factory()->withPersonalTeam()->create()->personalTeam();
+    $foreign = Company::factory()->create(['team_id' => $otherTeam->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Foreign', 'custom_fields' => ['related_company' => [$foreign->getKey()]]])
+        ->assertHasErrors()
+        ->assertSee('do not belong to this workspace');
+});
+
+it('accepts a record id from the caller workspace', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $own = Company::factory()->create(['team_id' => $this->team->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Own', 'custom_fields' => ['related_company' => [$own->getKey()]]])
+        ->assertOk();
+
+    expect(Task::query()->where('title', 'Own')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($field))->toBe([$own->getKey()]);
 });

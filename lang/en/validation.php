@@ -32,6 +32,8 @@ return [
         'ambiguous_option' => ':field: option ":value" is ambiguous, pass the option ID.',
         'single_option' => ':field: pass a single option label or ID.',
         'option_list' => ':field: pass an array of option labels or IDs.',
+        'foreign_records' => ':field: records :ids do not belong to this workspace.',
+        'unsupported_lookup' => ':field: lookup type ":type" cannot be written through the API.',
     ],
     'date' => 'The :attribute field must be a valid date.',
     'date_equals' => 'The :attribute field must be a date equal to :date.',
