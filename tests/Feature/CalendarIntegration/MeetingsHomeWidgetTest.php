@@ -480,7 +480,7 @@ it('names a card guest from mailbox history without a person record', function (
         ->assertDontSee('attendee-avatar-guest', escape: false);
 });
 
-it('shows a primary dot on each meeting row without the viewer RSVP label', function (string $status, string $unexpectedLabel): void {
+it('colours the row dot by the viewer RSVP without showing the label', function (string $status, string $expectedClass, string $unexpectedLabel): void {
     Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -491,13 +491,13 @@ it('shows a primary dot on each meeting row without the viewer RSVP label', func
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertSee('bg-primary-500', escape: false)
+        ->assertSee($expectedClass, escape: false)
         ->assertDontSee($unexpectedLabel);
 })->with([
-    'accepted hides label' => ['accepted', 'Accepted'],
-    'declined hides label' => ['declined', 'Declined'],
-    'maybe hides label' => ['tentative', 'Maybe'],
-    'pending hides label' => ['needsAction', 'Pending'],
+    'accepted is green' => ['accepted', 'bg-success-500', 'Accepted'],
+    'declined is red' => ['declined', 'bg-danger-500', 'Declined'],
+    'maybe is orange' => ['tentative', 'bg-warning-500', 'Maybe'],
+    'pending is grey' => ['needsAction', 'bg-gray-400', 'Pending'],
 ]);
 
 it('shows three guests on the card and an overflow for the rest', function (): void {
@@ -606,7 +606,7 @@ it('does not mark a later meeting as happening now', function (): void {
         ->assertDontSee(__('filament/pages/dashboard.meetings.happening_now'));
 });
 
-it('opens the meeting slideover from the zoom button', function (): void {
+it('opens the meeting slideover from the title expand control', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -622,7 +622,7 @@ it('opens the meeting slideover from the zoom button', function (): void {
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
 });
 
-it('keeps participants collapsed and opens only from the zoom button', function (): void {
+it('keeps participants collapsed and toggles from the row', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -641,12 +641,14 @@ it('keeps participants collapsed and opens only from the zoom button', function 
     expect($html)
         ->toContain('data-testid="meeting-card-title"')
         ->toContain('data-testid="meeting-card-open"')
-        ->toContain("openMeeting('{$meeting->id}')")
-        ->toContain('data-testid="meeting-card-toggle"')
+        ->toContain('data-testid="meeting-card-row"')
+        ->toContain('data-testid="meeting-card-participants-preview"')
         ->toContain('data-testid="meeting-card-participants"')
+        ->toContain('M3.75 3.75v4.5m0-4.5h4.5')
+        ->toContain('group-hover/title:opacity-100')
         ->toContain('aria-expanded="false"')
         ->toContain('x-cloak')
-        ->not->toMatch('/<button[^>]*data-testid="meeting-card-title"/');
+        ->not->toContain('data-testid="meeting-card-toggle"');
 });
 
 it('hides the participant toggle when a meeting has no guests', function (): void {
@@ -662,7 +664,8 @@ it('hides the participant toggle when a meeting has no guests', function (): voi
         ->assertSee('Focus block')
         ->assertSee('data-testid="meeting-card-title"', escape: false)
         ->assertSee('data-testid="meeting-card-open"', escape: false)
-        ->assertDontSee('data-testid="meeting-card-toggle"', escape: false)
+        ->assertSee('data-testid="meeting-card-row"', escape: false)
+        ->assertDontSee('data-testid="meeting-card-participants-preview"', escape: false)
         ->assertDontSee('data-testid="meeting-card-participants"', escape: false);
 });
 
