@@ -19,12 +19,15 @@ use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
-mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class);
+mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, MailboxDisplayNameDirectory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -183,11 +186,11 @@ it('lists attendees with host and rsvp in the view modal', function (): void {
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.participants.heading'))
         ->assertMountedActionModalSee('Asmit Magan')
-        ->assertMountedActionModalDontSee('asmit@example.test')
+        ->assertMountedActionModalSee('asmit@example.test')
         ->assertMountedActionModalSee(__('filament/resources/meeting.attendees.host'))
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel())
         ->assertMountedActionModalSee('Asmit Nepali')
-        ->assertMountedActionModalDontSee('guest@example.test')
+        ->assertMountedActionModalSee('guest@example.test')
         ->assertMountedActionModalSee(AttendeeResponseStatus::NEEDS_ACTION->getLabel());
 });
 
@@ -228,11 +231,13 @@ it('shows the current user attendee row when is_self is true', function (): void
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee($this->user->name)
-        ->assertMountedActionModalDontSee('self@example.test')
+        ->assertMountedActionModalSee('self@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false)
         ->assertMountedActionModalSee(AttendeeResponseStatus::ACCEPTED->getLabel());
 });
 
-it('prefers the linked person name over the calendar email', function (): void {
+it('shows the linked person name above the attendee email', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -251,7 +256,9 @@ it('prefers the linked person name over the calendar email', function (): void {
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('Maya Chen')
-        ->assertMountedActionModalDontSee('maya@example.test');
+        ->assertMountedActionModalSee('maya@example.test')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
 });
 
 it('shows the address itself rather than inventing a name from the email', function (): void {
@@ -271,7 +278,147 @@ it('shows the address itself rather than inventing a name from the email', funct
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee('only@example.test')
-        ->assertMountedActionModalDontSee(__('filament/resources/meeting.attendees.guest'));
+        ->assertMountedActionModalDontSee(__('filament/resources/meeting.attendees.guest'))
+        ->assertMountedActionModalSee('attendee-avatar-guest', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-initials', escape: false);
+});
+
+it('names a guest from mailbox history without a person record', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'name' => 'Asmit Nepali',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+});
+
+it('ignores a linked person whose name is the email and uses the mailbox name', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $person = People::factory()->for($this->team)->create([
+        'name' => 'mail2asmitnepali@gmail.com',
+    ]);
+    $mail = Email::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'name' => 'Asmit Nepali',
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'mail2asmitnepali@gmail.com',
+        'contact_id' => $person->id,
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalSee('mail2asmitnepali@gmail.com')
+        ->assertMountedActionModalSee('attendee-avatar-initials', escape: false)
+        ->assertMountedActionModalDontSee('attendee-avatar-guest', escape: false);
+});
+
+it('does not use another team mailbox name for a guest', function (): void {
+    $stranger = User::factory()->withTeam()->create();
+    $strangerAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $stranger->currentTeam->id,
+            'user_id' => $stranger->id,
+        ]),
+    );
+    $mail = Email::factory()->create([
+        'team_id' => $stranger->currentTeam->id,
+        'user_id' => $stranger->id,
+        'connected_account_id' => $strangerAccount->id,
+    ]);
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $mail->id,
+        'email_address' => 'guest@example.test',
+        'name' => 'Secret Tenant Name',
+    ]);
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'guest@example.test',
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('guest@example.test')
+        ->assertMountedActionModalDontSee('Secret Tenant Name');
+});
+
+it('uses the most common mailbox name for a guest', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    foreach (['Rare Guest', 'Asmit Nepali', 'Asmit Nepali'] as $name) {
+        $mail = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->id,
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $mail->id,
+            'email_address' => 'guest@example.test',
+            'name' => $name,
+        ]);
+    }
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => null,
+        'email_address' => 'guest@example.test',
+        'is_organizer' => false,
+        'response_status' => AttendeeResponseStatus::NEEDS_ACTION,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Asmit Nepali')
+        ->assertMountedActionModalDontSee('Rare Guest');
 });
 
 it('shows link, location, and description when they are filled', function (): void {

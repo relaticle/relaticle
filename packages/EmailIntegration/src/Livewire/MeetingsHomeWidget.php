@@ -29,6 +29,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
+use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 
@@ -42,12 +43,13 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     use InteractsWithActions;
     use InteractsWithSchemas;
 
+    private const int PAGE_SIZE = 4;
+
     public string $selectedDate = '';
 
     public ?string $viewingMeetingId = null;
 
-    /** @var list<string> */
-    public array $expandedMeetingIds = [];
+    public int $visibleCount = self::PAGE_SIZE;
 
     public function mount(): void
     {
@@ -84,8 +86,21 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
      */
     public function updatedSelectedDate(): void
     {
-        $this->expandedMeetingIds = [];
-        unset($this->meetings);
+        $this->resetVisibleList();
+    }
+
+    public function loadMore(): void
+    {
+        if (! $this->hasMoreMeetings()) {
+            return;
+        }
+
+        $this->visibleCount += self::PAGE_SIZE;
+    }
+
+    public function hasMoreMeetings(): bool
+    {
+        return $this->meetings->count() > $this->visibleCount;
     }
 
     public function datePickerSchema(Schema $schema): Schema
@@ -128,20 +143,6 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             $user,
             Date::parse($this->selectedDate, $user->effectiveTimezone()),
         );
-    }
-
-    public function toggleAttendees(string $meetingId): void
-    {
-        if (in_array($meetingId, $this->expandedMeetingIds, true)) {
-            $this->expandedMeetingIds = array_values(array_filter(
-                $this->expandedMeetingIds,
-                fn (string $id): bool => $id !== $meetingId,
-            ));
-
-            return;
-        }
-
-        $this->expandedMeetingIds[] = $meetingId;
     }
 
     public function openMeeting(string $meetingId): void
@@ -211,23 +212,89 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     }
 
     /**
-     * @return list<array{name: string, email: string, avatar: string, is_organizer: bool, response_status: AttendeeResponseStatus|null}>
+     * @return list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>
      */
-    public function attendeeState(Meeting $meeting, int $limit = 0): array
+    public function attendeeState(Meeting $meeting): array
     {
-        $attendees = $meeting->attendees;
-        $visible = $limit > 0 && ! in_array($meeting->getKey(), $this->expandedMeetingIds, true)
-            ? $attendees->take($limit)
-            : $attendees;
-
-        return array_values($visible->values()->map(
+        return array_values($meeting->attendees->values()->map(
             fn (MeetingAttendee $attendee): array => resolve(MeetingAttendeePresenter::class)->present($attendee),
         )->all());
     }
 
     /**
-     * The viewer's own RSVP, shown as the dot on the card. Colour alone carries
-     * the meaning, so the label travels with it for screen readers and hover.
+     * @return array{start: string, end: string|null, range: string, datetime: string}
+     */
+    public function meetingTime(Meeting $meeting): array
+    {
+        $timezone = $this->viewerTimezone();
+        $start = $meeting->starts_at->timezone($timezone);
+
+        if ($meeting->all_day) {
+            $label = __('filament/pages/dashboard.meetings.all_day');
+
+            return [
+                'start' => $label,
+                'end' => null,
+                'range' => $label,
+                'datetime' => $start->toIso8601String(),
+            ];
+        }
+
+        $end = $meeting->ends_at->timezone($timezone);
+        $startLabel = $start->format('g:i A');
+        $endLabel = $end->equalTo($start) ? null : $end->format('g:i A');
+
+        return [
+            'start' => $startLabel,
+            'end' => $endLabel,
+            'range' => $endLabel === null
+                ? $startLabel
+                : __('filament/pages/dashboard.meetings.time_range', [
+                    'start' => $startLabel,
+                    'end' => $endLabel,
+                ]),
+            'datetime' => $start->toIso8601String(),
+        ];
+    }
+
+    public function isHappeningNow(Meeting $meeting): bool
+    {
+        if ($meeting->all_day) {
+            return false;
+        }
+
+        $now = Date::now($this->viewerTimezone());
+        $start = $meeting->starts_at->timezone($this->viewerTimezone());
+        $end = $meeting->ends_at->timezone($this->viewerTimezone());
+
+        return $now->gte($start) && $now->lt($end);
+    }
+
+    /**
+     * @return array{attendees: list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>, avatars: list<array{src: string, alt: string, has_name: bool}>, overflow: int}
+     */
+    public function cardParticipants(Meeting $meeting): array
+    {
+        $states = $this->uniqueAttendeeStates($meeting);
+        $visible = 3;
+
+        return [
+            'attendees' => $states,
+            'overflow' => max(0, count($states) - $visible),
+            'avatars' => array_map(
+                fn (array $state): array => [
+                    'src' => $state['avatar'],
+                    'alt' => $state['name'],
+                    'has_name' => $state['has_name'],
+                ],
+                array_slice($states, 0, $visible),
+            ),
+        ];
+    }
+
+    /**
+     * The viewer's own RSVP. Colour is paired with the status label so the
+     * card never relies on the rail or dot alone.
      */
     public function viewerResponseStatus(Meeting $meeting): AttendeeResponseStatus
     {
@@ -255,8 +322,31 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     private function goToDay(CarbonImmutable $day): void
     {
         $this->selectedDate = $day->toDateString();
-        $this->expandedMeetingIds = [];
+        $this->resetVisibleList();
+    }
+
+    private function resetVisibleList(): void
+    {
+        $this->visibleCount = self::PAGE_SIZE;
         unset($this->meetings);
+    }
+
+    /**
+     * @return list<array{name: string, email: string, avatar: string, has_name: bool, is_organizer: bool, response_status: AttendeeResponseStatus|null}>
+     */
+    private function uniqueAttendeeStates(Meeting $meeting): array
+    {
+        $states = [];
+
+        foreach ($this->attendeeState($meeting) as $state) {
+            $key = $state['email'] !== '' ? $state['email'] : $state['name'];
+
+            if (! isset($states[$key])) {
+                $states[$key] = $state;
+            }
+        }
+
+        return array_values($states);
     }
 
     private function resolveVisibleMeeting(string $meetingId): ?Meeting
@@ -267,9 +357,15 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             return null;
         }
 
-        return Meeting::query()
+        $meeting = Meeting::query()
             ->withGlobalScope('visible', new VisibleMeetingScope($user))
             ->with(['team', 'attendees.contact', 'connectedAccount', 'people', 'companies', 'opportunities'])
             ->find($meetingId);
+
+        if ($meeting instanceof Meeting) {
+            resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$meeting]);
+        }
+
+        return $meeting;
     }
 }

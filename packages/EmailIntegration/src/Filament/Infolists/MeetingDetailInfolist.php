@@ -27,6 +27,7 @@ use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 
 final class MeetingDetailInfolist
 {
@@ -50,6 +51,7 @@ final class MeetingDetailInfolist
 
             if ($record instanceof Meeting) {
                 $record->loadMissing(['attendees.contact', 'people', 'companies', 'opportunities', 'connectedAccount']);
+                resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$record]);
             }
 
             $rsvpGroup = MeetingRsvpActions::group();
