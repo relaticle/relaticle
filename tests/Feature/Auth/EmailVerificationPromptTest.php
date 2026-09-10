@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\Auth\EmailVerificationPrompt;
+use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 use App\Notifications\Auth\VerifyEmail;
 use App\Providers\FortifyServiceProvider;
@@ -85,4 +86,64 @@ test('the prompt lets a signed-in user sign out to use another address', functio
     $this->post($logoutUrl)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
 
     $this->assertGuest();
+});
+
+test('the emailed verification link persists verification for the signed-in recipient', function (): void {
+    $user = User::factory()->unverified()->create();
+    $notification = new VerifyEmail;
+    $notification->url = Filament::getVerifyEmailUrl($user);
+    $html = (string) $notification->toMail($user)->render();
+    $document = new DOMDocument;
+    @$document->loadHTML($html);
+    $link = (new DOMXPath($document))->query('//a[contains(@href, "email-verification/verify")]')->item(0);
+
+    expect($link)->toBeInstanceOf(DOMElement::class);
+
+    $this->actingAs($user)->get($link->getAttribute('href'))->assertRedirect();
+
+    expect($user->refresh()->email_verified_at)->not->toBeNull();
+});
+
+test('opening a verification link without a session requires login and resumes verification afterward', function (): void {
+    $user = User::factory()->unverified()->create();
+    $url = Filament::getVerifyEmailUrl($user);
+
+    $this->get($url)
+        ->assertRedirect(Filament::getLoginUrl())
+        ->assertSessionHas('url.intended', $url);
+
+    expect($user->refresh()->email_verified_at)->toBeNull();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertHasNoErrors()
+        ->assertRedirect($url);
+
+    $this->get($url)->assertRedirect();
+
+    expect($user->refresh()->email_verified_at)->not->toBeNull();
+});
+
+test('an expired verification link leaves the recipient unverified', function (): void {
+    $this->freezeTime();
+    $user = User::factory()->unverified()->create();
+    $url = Filament::getVerifyEmailUrl($user);
+    $this->travel(61)->minutes();
+
+    $this->actingAs($user)->get($url)->assertForbidden();
+
+    expect($user->refresh()->email_verified_at)->toBeNull();
+});
+
+test('a verification link cannot verify a different signed-in user', function (): void {
+    $recipient = User::factory()->unverified()->create();
+    $otherUser = User::factory()->unverified()->create();
+
+    $this->actingAs($otherUser)->get(Filament::getVerifyEmailUrl($recipient))->assertForbidden();
+
+    expect($recipient->refresh()->email_verified_at)->toBeNull()
+        ->and($otherUser->refresh()->email_verified_at)->toBeNull();
 });

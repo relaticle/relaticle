@@ -158,4 +158,24 @@ return [
 
     'confirmation_window' => env('AUTH_CONFIRMATION_WINDOW', 900),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Email Challenge Limits
+    |--------------------------------------------------------------------------
+    |
+    | Bounds for the six-digit email code flow: how often one email/purpose
+    | pair may be sent a new code, and how often one source IP may trigger a
+    | send across every purpose.
+    |
+    */
+
+    'email_codes' => [
+        'code_length' => env('AUTH_EMAIL_CODE_LENGTH', 6),
+        'cooldown_seconds' => env('AUTH_EMAIL_CODE_COOLDOWN_SECONDS', 60),
+        'window_seconds' => env('AUTH_EMAIL_CODE_WINDOW_SECONDS', 900),
+        'window_max_attempts' => env('AUTH_EMAIL_CODE_WINDOW_MAX_ATTEMPTS', 3),
+        'ip_decay_seconds' => env('AUTH_EMAIL_CODE_IP_DECAY_SECONDS', 3600),
+        'ip_max_attempts' => env('AUTH_EMAIL_CODE_IP_MAX_ATTEMPTS', 20),
+    ],
+
 ];

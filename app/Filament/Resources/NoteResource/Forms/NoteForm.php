@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\NoteResource\Forms;
 
-use Filament\Forms\Components\Select;
+use App\Filament\Components\Forms\RecordSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -28,7 +28,7 @@ final class NoteForm
         ];
 
         if (! in_array('companies', $excludeFields)) {
-            $components[] = Select::make('companies')
+            $components[] = RecordSelect::make('companies')
                 ->label(__('filament/resources/note.fields.companies.label'))
                 ->multiple()
                 ->relationship('companies', 'name')
@@ -36,7 +36,7 @@ final class NoteForm
         }
 
         if (! in_array('people', $excludeFields)) {
-            $components[] = Select::make('people')
+            $components[] = RecordSelect::make('people')
                 ->label(__('filament/resources/note.fields.people.label'))
                 ->multiple()
                 ->relationship('people', 'name')

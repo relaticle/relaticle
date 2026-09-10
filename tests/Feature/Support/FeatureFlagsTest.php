@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Features\AccountDeletion;
 use App\Features\Billing;
 use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
 use App\Filament\Pages\CreateTeam;
+use App\Filament\Pages\EditProfile;
+use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\Company;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
@@ -17,7 +21,26 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class);
+mutates(AccountDeletion::class, OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, EditProfile::class);
+
+describe('AccountDeletion', function (): void {
+    it('hides account deletion from Profile by default', function (): void {
+        $this->actingAs($user = User::factory()->withTeam()->create());
+        Filament::setTenant($user->currentTeam);
+
+        livewire(EditProfile::class)->assertDontSeeLivewire(DeleteAccount::class);
+
+        expect(Feature::active(AccountDeletion::class))->toBeFalse();
+    });
+
+    it('shows account deletion when enabled through config', function (): void {
+        config()->set('relaticle.features.account_deletion', true);
+        $this->actingAs($user = User::factory()->withTeam()->create());
+        Filament::setTenant($user->currentTeam);
+
+        livewire(EditProfile::class)->assertSeeLivewire(DeleteAccount::class);
+    });
+});
 
 describe('Billing', function (): void {
     it('is off by default', function (): void {

@@ -5,6 +5,12 @@ declare(strict_types=1);
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\EditProfile;
 use App\Filament\Pages\NotificationPreferences;
+use App\Filament\Pages\Security;
+use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
+use App\Livewire\App\Profile\ManageMfa;
+use App\Livewire\App\Profile\ManagePasskeys;
+use App\Livewire\App\Profile\UpdatePassword;
+use App\Livewire\App\Profile\UpdateProfileInformation;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use App\Providers\MacroServiceProvider;
@@ -15,7 +21,7 @@ use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\ChatServiceProvider;
 
-mutates(MacroServiceProvider::class, AppPanelProvider::class, ChatServiceProvider::class);
+mutates(EditProfile::class, Security::class, MacroServiceProvider::class, AppPanelProvider::class, ChatServiceProvider::class);
 
 describe('app panel configuration - path mode (default)', function () {
     it('registers panel with path prefix and no domain constraint', function () {
@@ -35,7 +41,7 @@ describe('app panel configuration - path mode (default)', function () {
         $components = Filament::getPanel('app')->getClusteredComponents(Settings::class);
 
         expect($components)
-            ->toContain(EditProfile::class, NotificationPreferences::class)
+            ->toContain(EditProfile::class, Security::class, NotificationPreferences::class)
             ->and(array_count_values($components))->each->toBe(1);
     });
 });
@@ -253,4 +259,21 @@ it('does not let one chat route consume another route\'s rate limit allowance', 
     $conversations = $this->get(route('chat.conversations'));
 
     expect($conversations->status())->not->toBe(429);
+});
+
+test('profile and security have separate settings', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentTeam);
+
+    livewire(EditProfile::class)
+        ->assertSeeLivewire(UpdateProfileInformation::class)
+        ->assertDontSeeLivewire(ManageMfa::class);
+
+    livewire(Security::class)
+        ->assertSeeLivewire(UpdatePassword::class)
+        ->assertSeeLivewire(ManagePasskeys::class)
+        ->assertSeeLivewire(ManageMfa::class)
+        ->assertSeeLivewire(LogoutOtherBrowserSessions::class)
+        ->assertDontSeeLivewire(UpdateProfileInformation::class);
 });

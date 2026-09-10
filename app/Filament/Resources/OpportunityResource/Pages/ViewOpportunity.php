@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
+use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
@@ -17,6 +18,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
@@ -32,7 +34,16 @@ final class ViewOpportunity extends ViewRecord
             ViewRecordEmailsAction::make()
                 ->label(__('filament/resources/opportunity.pages.view.actions.view_emails.label'))
                 ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
-            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/opportunity.pages.view.actions.edit.label')),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->label(__('filament/resources/opportunity.pages.view.actions.edit.label'))
+                ->after(function (): void {
+                    $this->getRecord()
+                        ->refresh()
+                        ->load(['company.media', 'contact', 'customFieldValues.customField.options']);
+
+                    resolve(PartialsComponentHook::class)->forceRender($this);
+                }),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
@@ -75,12 +86,12 @@ final class ViewOpportunity extends ViewRecord
             Section::make()->schema([
                 Flex::make([
                     TextEntry::make('name')->grow(true),
-                    TextEntry::make('company.name')
+                    RecordChipEntry::make('company.name')
                         ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
                         ->color('primary')
                         ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null)
                         ->grow(false),
-                    TextEntry::make('contact.name')
+                    RecordChipEntry::make('contact.name')
                         ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
                         ->color('primary')
                         ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null)

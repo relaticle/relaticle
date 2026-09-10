@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
 
 /**
  * @extends Factory<User>
@@ -99,6 +100,18 @@ final class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'password' => null,
+        ]);
+    }
+
+    public function withConfirmedMfa(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXP'),
+            'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode([
+                'recovery-code-one',
+                'recovery-code-two',
+            ], JSON_THROW_ON_ERROR)),
+            'two_factor_confirmed_at' => now(),
         ]);
     }
 
