@@ -76,7 +76,8 @@ final readonly class ListMeetingsForDay
                         ->whereBetween('starts_at', [$startUtc, $endUtc]);
                 })->orWhere(function (Builder $allDay) use ($calendarDate): void {
                     $allDay->where('all_day', true)
-                        ->whereDate('starts_at', $calendarDate);
+                        ->whereDate('starts_at', '<=', $calendarDate)
+                        ->whereDate('ends_at', '>=', $calendarDate);
                 });
             });
 
