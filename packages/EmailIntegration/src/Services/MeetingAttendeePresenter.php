@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AvatarService;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 
@@ -30,12 +31,12 @@ final readonly class MeetingAttendeePresenter
         $contactName = $contact instanceof People ? trim((string) $contact->name) : '';
         $calendarName = trim((string) ($attendee->name ?? ''));
         $email = Str::lower(trim((string) $attendee->email_address));
-        $viewer = auth()->user();
+        $mailboxPerson = $attendee->is_self ? $this->mailboxPerson($attendee) : null;
         $member = $email !== '' ? $this->teamMember($attendee, $email) : null;
 
         $name = match (true) {
             $contactName !== '' => $contactName,
-            $attendee->is_self && $viewer instanceof User && trim($viewer->name) !== '' => trim($viewer->name),
+            $mailboxPerson !== null => $mailboxPerson['name'],
             $member !== null => $member['name'],
             $calendarName !== '' && Str::lower($calendarName) !== $email => $calendarName,
             // Never invent a name. A title-cased local part reads like a real
@@ -45,7 +46,7 @@ final readonly class MeetingAttendeePresenter
         };
 
         $avatar = ($contact instanceof People ? $contact->avatar : null)
-            ?? ($attendee->is_self && $viewer instanceof User ? $viewer->profile_photo_url : null)
+            ?? ($mailboxPerson !== null ? $mailboxPerson['avatar'] : null)
             ?? ($member !== null ? $member['avatar'] : null)
             ?? $this->avatars->generateAuto(name: $name, initialCount: 2);
 
@@ -55,6 +56,46 @@ final readonly class MeetingAttendeePresenter
             'avatar' => $avatar,
             'is_organizer' => $attendee->is_organizer,
             'response_status' => $attendee->response_status,
+        ];
+    }
+
+    /**
+     * @return array{name: string, avatar: string|null}|null
+     */
+    private function mailboxPerson(MeetingAttendee $attendee): ?array
+    {
+        $attendee->loadMissing('meeting.connectedAccount.user');
+
+        $meeting = $attendee->relationLoaded('meeting')
+            ? $attendee->getRelation('meeting')
+            : null;
+
+        if (! $meeting instanceof Meeting) {
+            return null;
+        }
+
+        $account = $meeting->relationLoaded('connectedAccount')
+            ? $meeting->getRelation('connectedAccount')
+            : null;
+
+        if (! $account instanceof ConnectedAccount) {
+            return null;
+        }
+
+        $user = $account->relationLoaded('user')
+            ? $account->getRelation('user')
+            : null;
+        $name = $user instanceof User && trim($user->name) !== ''
+            ? trim($user->name)
+            : trim((string) ($account->display_name ?? ''));
+
+        if ($name === '' || Str::lower($name) === Str::lower(trim($account->email_address))) {
+            return null;
+        }
+
+        return [
+            'name' => $name,
+            'avatar' => $user instanceof User ? $user->profile_photo_url : null,
         ];
     }
 

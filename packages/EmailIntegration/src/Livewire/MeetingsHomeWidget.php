@@ -221,7 +221,11 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             : $attendees;
 
         return array_values($visible->values()->map(
-            fn (MeetingAttendee $attendee): array => resolve(MeetingAttendeePresenter::class)->present($attendee),
+            function (MeetingAttendee $attendee) use ($meeting): array {
+                $attendee->setRelation('meeting', $meeting);
+
+                return resolve(MeetingAttendeePresenter::class)->present($attendee);
+            },
         )->all());
     }
 
@@ -269,7 +273,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
 
         return Meeting::query()
             ->withGlobalScope('visible', new VisibleMeetingScope($user))
-            ->with(['team', 'attendees.contact', 'connectedAccount', 'people', 'companies', 'opportunities'])
+            ->with(['team', 'attendees.contact', 'connectedAccount.user', 'people', 'companies', 'opportunities'])
             ->find($meetingId);
     }
 }

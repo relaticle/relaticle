@@ -222,8 +222,8 @@ it('shows the current user attendee row when is_self is true', function (): void
         'response_status' => AttendeeResponseStatus::ACCEPTED,
     ]);
 
-    // A self attendee is named from the signed-in account, not the calendar
-    // copy of the name, so the row reads as the viewer sees themselves.
+    // A self attendee is named from this meeting copy's mailbox owner,
+    // not the calendar copy of the name.
     meetingDetailsOnRecord([$meeting])
         ->mountAction(TestAction::make('view')->table($meeting))
         ->assertMountedActionModalSee($this->user->name)

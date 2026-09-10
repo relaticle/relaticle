@@ -10,6 +10,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -342,4 +343,51 @@ it('opens the meeting slideover from the card', function (): void {
         ->assertActionMounted('view')
         ->assertMountedActionModalSee('Call')
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
+});
+
+it('names a self attendee from the meeting mailbox when viewing a teammate copy', function (): void {
+    $this->user->forceFill(['name' => 'Alice Viewer'])->save();
+
+    $bob = User::factory()->create(['name' => 'Bob Owner']);
+    $bob->teams()->attach($this->team, ['role' => 'admin']);
+    $bob->forceFill(['current_team_id' => $this->team->id])->save();
+
+    $bobAccount = ConnectedAccount::withoutEvents(
+        fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $bob->id,
+            'email_address' => 'bob@example.com',
+        ])
+    );
+
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $bobAccount->id,
+        'title' => 'Shared standup',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Calendar Bob',
+        'email_address' => 'bob@example.com',
+        'is_self' => true,
+        'is_organizer' => true,
+        'response_status' => AttendeeResponseStatus::ACCEPTED,
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->id,
+        'name' => 'Guest',
+        'email_address' => 'guest@acme.test',
+        'is_self' => false,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->assertSee('Shared standup')
+        ->assertDontSee('Alice Viewer')
+        ->call('openMeeting', $meeting->id)
+        ->assertActionMounted('view')
+        ->assertMountedActionModalSee('Bob Owner')
+        ->assertMountedActionModalDontSee('Alice Viewer');
 });
