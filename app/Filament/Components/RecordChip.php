@@ -4,27 +4,40 @@ declare(strict_types=1);
 
 namespace App\Filament\Components;
 
-use App\Models\Company;
+use App\Enums\CrmEntity;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
+/**
+ * A record rendered as one avatar-and-name pill.
+ *
+ * Three ways to draw the leading mark, in order: the record's own image, the
+ * shared entity icon for a record type that has no per-record image worth
+ * inventing (a company with no logo), and a name-derived initials tile for a
+ * person, whose hue is the only thing telling two of them apart.
+ */
 final readonly class RecordChip implements Htmlable
 {
     public function __construct(
         public string $name,
-        public ?string $avatarUrl = null,
+        public ?string $imageUrl = null,
+        public ?string $iconPath = null,
         public bool $circular = true,
         public string $size = 'sm',
     ) {}
 
     public static function forRecord(Model $record, ?string $name = null, string $size = 'sm'): self
     {
+        $entity = CrmEntity::tryFromModel($record);
+        $image = $record instanceof HasAvatar ? $record->getFilamentAvatarUrl() : null;
+
         return new self(
             name: $name ?? (string) $record->getAttribute('name'),
-            avatarUrl: $record instanceof HasAvatar ? $record->getFilamentAvatarUrl() : null,
-            circular: ! $record instanceof Company,
+            imageUrl: $image,
+            iconPath: $image === null ? $entity?->iconPath() : null,
+            circular: $entity !== CrmEntity::Company,
             size: $size,
         );
     }

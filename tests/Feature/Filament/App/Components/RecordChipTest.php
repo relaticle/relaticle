@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\RecordChip;
@@ -97,20 +98,20 @@ it('renders the person avatar in the people list name column', function (): void
         ->assertSee($person->avatar, escape: false);
 });
 
-it('renders the company logo in the people list company column', function (): void {
+it('renders the company entity icon in the people list company column', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
     People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->getKey()]);
 
     livewire(ListPeople::class)
         ->assertSee('Acme Corp')
-        ->assertSee($company->logo, escape: false);
+        ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
-it('renders the company logo in the companies list name column', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+it('renders the company entity icon in the companies list name column', function (): void {
+    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
 
     livewire(ListCompanies::class)
-        ->assertSee($company->logo, escape: false);
+        ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
 it('renders an avatar for every related person in a multi-record column', function (): void {
@@ -132,12 +133,12 @@ it('renders the person avatar on the view page', function (): void {
         ->assertSee($person->avatar, escape: false);
 });
 
-it('renders the company logo in a picker option label', function (): void {
+it('renders the company entity icon in a picker option label', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
 
     $label = peoplePicker('company_id')->getOptionLabelFromRecord($company);
 
-    expect($label)->toContain($company->logo)
+    expect($label)->toContain(CrmEntity::Company->iconPath())
         ->and($label)->toContain('Acme Corp');
 });
 
@@ -200,13 +201,40 @@ it('renders member chips in the assignees filter and lets the caller order win',
         ->toBe([$this->user->name, 'Aaron Ant']);
 });
 
+it('falls back to the shared entity icon for a company with no logo', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+
+    $chip = RecordChip::forRecord($company);
+
+    expect($chip->imageUrl)->toBeNull()
+        ->and($chip->iconPath)->toBe(CrmEntity::Company->iconPath())
+        ->and($chip->toHtml())->toContain('<svg')
+        ->and($chip->toHtml())->not->toContain('<img');
+});
+
+it('gives two logoless companies the same icon, so colour only ever means a real logo', function (): void {
+    $acme = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $zeta = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zeta Industries']);
+
+    expect(RecordChip::forRecord($acme)->iconPath)->toBe(RecordChip::forRecord($zeta)->iconPath);
+});
+
+it('still colours people by name so two of them stay distinguishable', function (): void {
+    $adam = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Adam Clark']);
+    $zoe = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zoe Baker']);
+
+    expect($adam->avatar)->not->toBe($zoe->avatar)
+        ->and(RecordChip::forRecord($adam)->iconPath)->toBeNull()
+        ->and(RecordChip::forRecord($adam)->imageUrl)->toBe($adam->avatar);
+});
+
 it('carries the avatar in a global search result title', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
 
     $results = CompanyResource::getGlobalSearchResults('Acme');
 
     expect($results)->toHaveCount(1)
-        ->and($results->first()->title->toHtml())->toContain($company->logo)
+        ->and($results->first()->title->toHtml())->toContain(CrmEntity::Company->iconPath())
         ->and($results->first()->title->toHtml())->toContain('Acme Corp');
 });
 

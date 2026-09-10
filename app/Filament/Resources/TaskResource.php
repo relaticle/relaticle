@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\RecordChipColumn;
@@ -43,7 +44,7 @@ final class TaskResource extends Resource
 
     protected static ?string $navigationLabel = null;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static ?string $recordTitleAttribute = 'title';
 
@@ -62,6 +63,11 @@ final class TaskResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/task.navigation_label');
+    }
+
+    public static function getNavigationIcon(): string
+    {
+        return CrmEntity::Task->icon();
     }
 
     public static function form(Schema $schema): Schema

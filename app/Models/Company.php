@@ -10,7 +10,6 @@ use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasTeam;
 use App\Observers\CompanyObserver;
-use App\Services\AvatarService;
 use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
 use Filament\Models\Contracts\HasAvatar;
@@ -82,14 +81,20 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         ];
     }
 
-    protected function getLogoAttribute(): string
+    /**
+     * Null when no logo has been uploaded. A company with no mark falls back to
+     * the shared entity icon (App\Enums\CrmEntity), not a generated initials
+     * tile: 57% of companies carry a real logo, so colour in a company column
+     * should only ever mean "this is the brand's own mark".
+     */
+    protected function getLogoAttribute(): ?string
     {
         $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
 
-        return $logo === '' || $logo === '0' ? resolve(AvatarService::class)->generateAuto(name: $this->name) : $logo;
+        return $logo === '' || $logo === '0' ? null : $logo;
     }
 
-    public function getFilamentAvatarUrl(): string
+    public function getFilamentAvatarUrl(): ?string
     {
         return $this->logo;
     }

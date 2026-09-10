@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
@@ -36,7 +37,7 @@ final class NoteResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static ?int $navigationSort = 5;
 
@@ -53,6 +54,11 @@ final class NoteResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/note.navigation_label');
+    }
+
+    public static function getNavigationIcon(): string
+    {
+        return CrmEntity::Note->icon();
     }
 
     public static function form(Schema $schema): Schema

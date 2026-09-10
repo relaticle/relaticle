@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
@@ -60,7 +61,7 @@ it('displays opportunities in the correct board columns', function (): void {
         ->toContain($closedWonOpportunity->id);
 });
 
-it('renders the company logo on a board card', function (): void {
+it('renders the company entity icon on a board card', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
     $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
 
@@ -74,7 +75,7 @@ it('renders the company logo on a board card', function (): void {
 
     livewire(OpportunitiesBoard::class)
         ->assertSee('Acme Corp')
-        ->assertSee($company->logo, escape: false);
+        ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
 it('orders the company filter alphabetically and chips each option', function (): void {
@@ -95,7 +96,7 @@ it('orders the company filter alphabetically and chips each option', function ()
 
     expect($field)->not->toBeNull()
         ->and($field->isHtmlAllowed())->toBeTrue()
-        ->and($field->getOptionLabelFromRecord($acme))->toContain($acme->logo);
+        ->and($field->getOptionLabelFromRecord($acme))->toContain(CrmEntity::Company->iconPath());
 
     $labels = array_values(array_map(
         fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),

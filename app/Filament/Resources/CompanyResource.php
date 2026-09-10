@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\RecordChipColumn;
@@ -42,7 +43,7 @@ final class CompanyResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static ?int $navigationSort = 2;
 
@@ -152,6 +153,11 @@ final class CompanyResource extends Resource
     public static function getNavigationLabel(): string
     {
         return __('filament/resources/company.navigation_label');
+    }
+
+    public static function getNavigationIcon(): string
+    {
+        return CrmEntity::Company->icon();
     }
 
     public static function getGloballySearchableAttributes(): array
