@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Filament\Infolists;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -60,7 +61,12 @@ final class MeetingDetailInfolist
                 $record->attendees->each(
                     fn (MeetingAttendee $attendee) => $attendee->setRelation('meeting', $record),
                 );
-                resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$record]);
+
+                $viewer = auth()->user();
+
+                if ($viewer instanceof User) {
+                    resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($viewer, [$record]);
+                }
             }
 
             $rsvpGroup = MeetingRsvpActions::group();
