@@ -19,6 +19,7 @@ return new class extends Migration
             $table->unsignedBigInteger('size');              // bytes
             $table->string('storage_path')->nullable();
             $table->string('content_id')->nullable();        // for inline/CID images
+            $table->boolean('is_inline')->default(false);
             $table->timestamps();
         });
     }
