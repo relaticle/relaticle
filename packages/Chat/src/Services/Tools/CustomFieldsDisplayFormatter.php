@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFields\RecordNameResolver;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -59,7 +60,9 @@ final readonly class CustomFieldsDisplayFormatter
                 'type' => $this->displayType($field, $dataType),
             ];
 
-            if ($dataType === FieldDataType::MULTI_CHOICE && $field->type !== CustomFieldType::LINK->value && is_array($newValue)) {
+            if ($field->type === CustomFieldType::RECORD->value) {
+                $row['values'] = $this->recordNames($field, $newValue);
+            } elseif ($dataType === FieldDataType::MULTI_CHOICE && $field->type !== CustomFieldType::LINK->value && is_array($newValue)) {
                 $row['values'] = $this->optionNames($field, $newValue);
             }
 
@@ -168,6 +171,10 @@ final readonly class CustomFieldsDisplayFormatter
             return is_array($value) ? $this->optionNames($field, $value) : null;
         }
 
+        if ($field->type === CustomFieldType::RECORD->value) {
+            return $this->recordNames($field, $value);
+        }
+
         if ($dataType === FieldDataType::MULTI_CHOICE) {
             return is_array($value) ? $this->optionNames($field, $value) : null;
         }
@@ -215,6 +222,10 @@ final readonly class CustomFieldsDisplayFormatter
             return null;
         }
 
+        if ($field->type === CustomFieldType::RECORD->value) {
+            return $this->renderRecords($field, $value);
+        }
+
         $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
 
         return match ($dataType) {
@@ -232,6 +243,36 @@ final readonly class CustomFieldsDisplayFormatter
         $option = $field->options->firstWhere('id', (string) $value);
 
         return $option instanceof CustomFieldOption ? $option->name : (string) $value;
+    }
+
+    private function renderRecords(CustomField $field, mixed $value): string
+    {
+        return implode(', ', $this->recordNames($field, $value));
+    }
+
+    /**
+     * A card that shows a bare ULID hides the record being approved, which is the
+     * one thing the approver has to check.
+     *
+     * @return list<string>
+     */
+    private function recordNames(CustomField $field, mixed $value): array
+    {
+        $ids = array_values(array_map(
+            strval(...),
+            array_filter(
+                $value instanceof Collection ? $value->all() : (array) $value,
+                fn (mixed $id): bool => (is_string($id) || is_int($id)) && (string) $id !== '',
+            ),
+        ));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $names = resolve(RecordNameResolver::class)->names((string) $field->lookup_type, $ids);
+
+        return array_map(fn (string $id): string => $names[$id] ?? $id, $ids);
     }
 
     private function renderMultiChoice(CustomField $field, mixed $value): string
