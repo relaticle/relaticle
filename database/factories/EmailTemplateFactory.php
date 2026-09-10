@@ -21,9 +21,9 @@ final class EmailTemplateFactory extends Factory
         return [
             'team_id' => Team::factory(),
             'created_by' => User::factory(),
-            'name' => $this->faker->words(3, true),
-            'subject' => $this->faker->sentence(),
-            'body_html' => '<p>'.$this->faker->paragraph().'</p>',
+            'name' => fake()->words(3, true),
+            'subject' => fake()->sentence(),
+            'body_html' => '<p>'.fake()->paragraph().'</p>',
             'variables' => [],
             'is_shared' => false,
         ];

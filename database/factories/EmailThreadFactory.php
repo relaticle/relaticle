@@ -21,8 +21,8 @@ final class EmailThreadFactory extends Factory
         return [
             'team_id' => Team::factory(),
             'connected_account_id' => ConnectedAccount::factory(),
-            'thread_id' => 'thread-'.$this->faker->uuid(),
-            'subject' => $this->faker->sentence(),
+            'thread_id' => 'thread-'.fake()->uuid(),
+            'subject' => fake()->sentence(),
             'email_count' => 1,
             'participant_count' => 2,
             'first_email_at' => now()->subHour(),

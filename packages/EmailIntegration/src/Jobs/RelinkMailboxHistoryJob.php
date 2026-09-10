@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use App\Models\Team;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
@@ -24,7 +21,7 @@ use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 #[DeleteWhenMissingModels]
 final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Queueable;
 
     public int $timeout = 300;
 

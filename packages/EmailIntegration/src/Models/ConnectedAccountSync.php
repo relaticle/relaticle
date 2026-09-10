@@ -36,18 +36,24 @@ final class ConnectedAccountSync extends Model
         'error_details',
     ];
 
-    protected $casts = [
-        'started_at' => 'datetime',
-        'completed_at' => 'datetime',
-        'emails_synced' => 'integer',
-        'errors_encountered' => 'integer',
-    ];
-
     /**
      * @return BelongsTo<ConnectedAccount, $this>
      */
     public function connectedAccount(): BelongsTo
     {
         return $this->belongsTo(ConnectedAccount::class, 'connected_account_id');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
+            'emails_synced' => 'integer',
+            'errors_encountered' => 'integer',
+        ];
     }
 }

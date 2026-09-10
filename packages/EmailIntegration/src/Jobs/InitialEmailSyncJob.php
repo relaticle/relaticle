@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
@@ -23,7 +20,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use DetectsAuthErrors, Queueable;
 
     public int $timeout = 300;
 

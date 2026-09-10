@@ -51,6 +51,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string|null $calendar_push_resource_id
  * @property string|null $calendar_push_verification_token
  * @property CarbonInterface|null $calendar_push_expires_at
+ * @property EmailAccountStatus $status
  */
 final class ConnectedAccount extends Model
 {
@@ -93,27 +94,6 @@ final class ConnectedAccount extends Model
         'sync_sent',
         'daily_send_limit',
         'hourly_send_limit',
-    ];
-
-    protected $casts = [
-        'provider' => EmailProvider::class,
-        'status' => EmailAccountStatus::class,
-        'token_expires_at' => 'datetime',
-        'last_synced_at' => 'datetime',
-        'last_calendar_synced_at' => 'datetime',
-        'calendar_push_expires_at' => 'datetime',
-        'initial_sync_imported' => 'integer',
-        'initial_sync_estimated' => 'integer',
-        'initial_calendar_sync_imported' => 'integer',
-        'is_default' => 'boolean',
-        'sync_inbox' => 'boolean',
-        'sync_sent' => 'boolean',
-        'capabilities' => 'array',
-        'access_token' => 'encrypted',
-        'refresh_token' => 'encrypted',
-        'calendar_push_verification_token' => 'encrypted',
-        'daily_send_limit' => 'integer',
-        'hourly_send_limit' => 'integer',
     ];
 
     // Scopes
@@ -499,5 +479,32 @@ final class ConnectedAccount extends Model
     public function meetings(): HasMany
     {
         return $this->hasMany(Meeting::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'provider' => EmailProvider::class,
+            'status' => EmailAccountStatus::class,
+            'token_expires_at' => 'datetime',
+            'last_synced_at' => 'datetime',
+            'last_calendar_synced_at' => 'datetime',
+            'calendar_push_expires_at' => 'datetime',
+            'initial_sync_imported' => 'integer',
+            'initial_sync_estimated' => 'integer',
+            'initial_calendar_sync_imported' => 'integer',
+            'is_default' => 'boolean',
+            'sync_inbox' => 'boolean',
+            'sync_sent' => 'boolean',
+            'capabilities' => 'array',
+            'access_token' => 'encrypted',
+            'refresh_token' => 'encrypted',
+            'calendar_push_verification_token' => 'encrypted',
+            'daily_send_limit' => 'integer',
+            'hourly_send_limit' => 'integer',
+        ];
     }
 }

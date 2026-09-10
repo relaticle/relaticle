@@ -35,16 +35,22 @@ final class EmailTemplate extends Model
         'is_shared',
     ];
 
-    protected $casts = [
-        'variables' => 'array',
-        'is_shared' => 'boolean',
-    ];
-
     /**
      * @return BelongsTo<User, $this>
      */
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'variables' => 'array',
+            'is_shared' => 'boolean',
+        ];
     }
 }

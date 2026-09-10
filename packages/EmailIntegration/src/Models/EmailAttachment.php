@@ -46,16 +46,22 @@ final class EmailAttachment extends Model
         'provider_attachment_id',
     ];
 
-    protected $casts = [
-        'size' => 'integer',
-        'is_inline' => 'boolean',
-    ];
-
     /**
      * @return BelongsTo<Email, $this>
      */
     public function email(): BelongsTo
     {
         return $this->belongsTo(Email::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'size' => 'integer',
+            'is_inline' => 'boolean',
+        ];
     }
 }

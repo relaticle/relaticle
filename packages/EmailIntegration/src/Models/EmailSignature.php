@@ -33,10 +33,6 @@ final class EmailSignature extends Model
         'is_default',
     ];
 
-    protected $casts = [
-        'is_default' => 'boolean',
-    ];
-
     /**
      * @return BelongsTo<ConnectedAccount, $this>
      */
@@ -51,5 +47,15 @@ final class EmailSignature extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_default' => 'boolean',
+        ];
     }
 }

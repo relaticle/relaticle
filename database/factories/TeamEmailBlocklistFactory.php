@@ -23,7 +23,7 @@ final class TeamEmailBlocklistFactory extends Factory
         return [
             'team_id' => Team::factory(),
             'type' => EmailBlocklistType::EMAIL,
-            'value' => $this->faker->unique()->safeEmail(),
+            'value' => fake()->unique()->safeEmail(),
             'enforcement_level' => EmailVisibilityEnforcement::Blocked,
             'created_by' => User::factory(),
         ];
