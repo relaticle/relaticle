@@ -109,20 +109,20 @@
         </div>
     @else
         <div class="flex flex-col gap-2">
-            @foreach ($this->meetings->take($this->visibleCount) as $meeting)
+            @foreach (array_slice($this->meetingCards, 0, $this->visibleCount) as $card)
                 @php
-                    $participants = $this->cardParticipants($meeting);
-                    $responseStatus = $this->viewerResponseStatus($meeting);
+                    $participants = $card['participants'];
+                    $responseStatus = $card['response_status'];
                     $dotColor = $responseStatus->getColor();
-                    $time = $this->meetingTime($meeting);
-                    $happeningNow = $this->isHappeningNow($meeting);
-                    $meetingKey = $meeting->getKey();
+                    $time = $card['time'];
+                    $happeningNow = $card['happening_now'];
+                    $meetingKey = $card['id'];
                     $openTarget = "openMeeting('{$meetingKey}')";
                     $participantsId = "meeting-home-participants-{$meetingKey}";
                     $hasParticipants = $participants['attendees'] !== [];
-                    $expandLabel = __('filament/pages/dashboard.meetings.expand_participants', ['title' => $meeting->title]);
-                    $collapseLabel = __('filament/pages/dashboard.meetings.collapse_participants', ['title' => $meeting->title]);
-                    $timeIcon = $meeting->all_day
+                    $expandLabel = __('filament/pages/dashboard.meetings.expand_participants', ['title' => $card['title']]);
+                    $collapseLabel = __('filament/pages/dashboard.meetings.collapse_participants', ['title' => $card['title']]);
+                    $timeIcon = $card['all_day']
                         ? \Filament\Support\Icons\Heroicon::OutlinedCalendarDays
                         : \Filament\Support\Icons\Heroicon::OutlinedClock;
                 @endphp
@@ -140,9 +140,9 @@
                             wire:loading.attr="disabled"
                             wire:target="{{ $openTarget }}"
                             class="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-950 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait disabled:opacity-60 dark:text-white"
-                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $meeting->title]) }}"
+                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                         >
-                            {{ $meeting->title }}
+                            {{ $card['title'] }}
                         </button>
 
                         @if ($hasParticipants)

@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
+use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -436,6 +437,19 @@ it('shows link, location, and description when they are filled', function (): vo
         ->assertMountedActionModalSee('Rooftop Terrace 7B')
         ->assertMountedActionModalSee('Kickoff notes')
         ->assertMountedActionModalSee(__('filament/resources/meeting.sections.description.heading'));
+});
+
+it('shows an empty state when a meeting has no linked records', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+
+    livewire(MeetingsHomeWidget::class)
+        ->call('openMeeting', $meeting->id)
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.linked_records.empty.heading'))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.sections.linked_records.empty.description'))
+        ->assertMountedActionModalSee(__('filament/resources/meeting.actions.link_records.label'));
 });
 
 it('lists linked people, companies, and opportunities in the view modal', function (): void {

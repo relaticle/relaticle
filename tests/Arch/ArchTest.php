@@ -224,6 +224,8 @@ arch('package service layers avoid mutation')
         'Relaticle\Documentation\Services\DocumentationService',
         // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
         'Relaticle\EmailIntegration\Services\EmailVisibilityService',
+        'Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory',
+        'Relaticle\EmailIntegration\Services\TeamMemberDirectory',
         'Relaticle\EmailIntegration\Services\MicrosoftGraphMailService',
         'Relaticle\EmailIntegration\Services\PrivacyService',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
