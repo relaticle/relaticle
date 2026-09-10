@@ -17,6 +17,12 @@ return [
                 'label' => 'Add your first contact',
                 'description' => 'Put one real person in the CRM and the rest follows',
             ],
+            'sync_email' => [
+                'label' => 'Sync your email account',
+                'description' => 'Connect your mailbox to pull conversations and meetings into the CRM',
+                'syncing' => 'Syncing email...',
+                'syncing_percent' => 'Syncing email (:percent%)',
+            ],
             'import' => [
                 'label' => 'Import your existing contacts',
                 'description' => 'Bring a CSV from your spreadsheet or old CRM',
