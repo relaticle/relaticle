@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
-use App\Filament\Components\Infolists\AvatarName;
+use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
@@ -19,6 +19,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -74,26 +75,15 @@ final class ViewCompany extends ViewRecord
                 Flex::make([
                     Section::make([
                         Flex::make([
-                            AvatarName::make('logo')
-                                ->avatar('logo')
-                                ->name('name')
-                                ->avatarSize('lg')
-                                ->textSize('xl')
-                                ->square()
-                                ->label(__('filament/resources/company.pages.view.infolist.fields.logo.label')),
-                            AvatarName::make('creator')
-                                ->avatar('creator.avatar')
-                                ->name('creator.name')
-                                ->avatarSize('sm')
-                                ->textSize('sm')
-                                ->circular()
+                            RecordChipEntry::make('name')
+                                ->chipSize('lg')
+                                ->size(TextSize::Large)
+                                ->label(__('filament/resources/company.pages.view.infolist.fields.name.label')),
+                            RecordChipEntry::make('creator.name')
+                                ->chipSize('sm')
                                 ->label(__('filament/resources/company.pages.view.infolist.fields.creator.label')),
-                            AvatarName::make('accountOwner')
-                                ->avatar('accountOwner.avatar')
-                                ->name('accountOwner.name')
-                                ->avatarSize('sm')
-                                ->textSize('sm')
-                                ->circular()
+                            RecordChipEntry::make('accountOwner.name')
+                                ->chipSize('sm')
                                 ->label(__('filament/resources/company.pages.view.infolist.fields.account_owner.label')),
                         ]),
                         CustomFields::infolist()->forSchema($schema)->build(),
