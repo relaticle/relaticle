@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Requests\Api\V1\Concerns;
+namespace App\Http\Concerns;
 
 use App\Models\User;
 use App\Support\CustomFields\CustomFieldInput;

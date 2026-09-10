@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Http\Requests\Api\V1\Concerns\NormalizesCustomFields;
+use App\Http\Concerns\NormalizesCustomFields;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
