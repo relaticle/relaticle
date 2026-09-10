@@ -14,18 +14,21 @@ use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Flex;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
-use InvalidArgumentException;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
+use Relaticle\EmailIntegration\Enums\MeetingLinkedRecordType;
 use Relaticle\EmailIntegration\Filament\Actions\MeetingRsvpActions;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
-use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 
@@ -34,9 +37,10 @@ final class MeetingDetailInfolist
     public static function viewAction(): ViewAction
     {
         return ViewAction::make()
-            ->slideOver()
+            ->slideOver(false)
             ->modalHeading(__('filament/resources/meeting.view.heading'))
-            ->modalWidth(Width::Large)
+            ->modalWidth(Width::SevenExtraLarge)
+            ->modalCancelAction(false)
             ->schema(fn (Schema $schema): Schema => self::configure($schema))
             ->registerModalActions([
                 self::linkRecordsAction('linkRecords'),
@@ -50,7 +54,8 @@ final class MeetingDetailInfolist
             $record = $schema->getRecord();
 
             if ($record instanceof Meeting) {
-                $record->loadMissing(['attendees.contact', 'people', 'companies', 'opportunities', 'connectedAccount']);
+                $record->loadMissing(['attendees.contact', 'connectedAccount']);
+                $record->load(['people', 'companies', 'opportunities']);
                 resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings([$record]);
             }
 
@@ -79,6 +84,7 @@ final class MeetingDetailInfolist
                     }),
                 TextEntry::make('html_link')
                     ->hiddenLabel()
+                    ->color('primary')
                     ->icon(Heroicon::OutlinedLink)
                     ->url(fn (Meeting $record): ?string => $record->html_link, shouldOpenInNewTab: true)
                     ->visible(fn (Meeting $record): bool => filled($record->html_link)),
@@ -86,36 +92,62 @@ final class MeetingDetailInfolist
                     ->hiddenLabel()
                     ->icon(Heroicon::OutlinedMapPin)
                     ->visible(fn (Meeting $record): bool => filled($record->location)),
-                Section::make(__('filament/resources/meeting.sections.participants.heading'))
-                    ->afterHeader([
-                        TextEntry::make('attendees_badge')
-                            ->hiddenLabel()
-                            ->badge()
-                            ->state(fn (Meeting $record): int => $record->attendees->count()),
-                    ])
+                Grid::make(5)
                     ->schema([
-                        RepeatableEntry::make('attendees')
-                            ->hiddenLabel()
+                        Section::make(__('filament/resources/meeting.sections.participants.heading'))
+                            ->afterHeader([
+                                TextEntry::make('attendees_badge')
+                                    ->hiddenLabel()
+                                    ->badge()
+                                    ->state(fn (Meeting $record): int => $record->attendees->count()),
+                            ])
                             ->schema([
-                                MeetingAttendeeEntry::make('attendee')->hiddenLabel(),
-                            ]),
-                        TextEntry::make('attendees_empty')
-                            ->hiddenLabel()
-                            ->state(__('filament/resources/meeting.sections.participants.empty'))
-                            ->visible(fn (Meeting $record): bool => $record->attendees->isEmpty()),
-                    ]),
-                Section::make(__('filament/resources/meeting.sections.linked_records.heading'))
-                    ->afterHeader([
-                        TextEntry::make('linked_badge')
-                            ->hiddenLabel()
-                            ->badge()
-                            ->state(fn (Meeting $record): int => self::linkedCount($record)),
-                    ])
-                    ->schema([
-                        MeetingLinkedRecordsEntry::make('linked_records')
-                            ->hiddenLabel()
-                            ->visible(fn (Meeting $record): bool => self::linkedCount($record) > 0),
-                        self::linkRecordsAction('linkRecords'),
+                                RepeatableEntry::make('attendees')
+                                    ->contained(false)
+                                    ->hiddenLabel()
+                                    ->schema([
+                                        MeetingAttendeeEntry::make('attendee')->hiddenLabel(),
+                                    ]),
+                                TextEntry::make('attendees_empty')
+                                    ->hiddenLabel()
+                                    ->state(__('filament/resources/meeting.sections.participants.empty'))
+                                    ->visible(fn (Meeting $record): bool => $record->attendees->isEmpty()),
+                            ])
+                            ->columnSpan(3),
+                        Section::make(__('filament/resources/meeting.sections.linked_records.heading'))
+                            ->afterLabel([
+                                TextEntry::make('linked_badge')
+                                    ->hiddenLabel()
+                                    ->badge()
+                                    ->state(fn (Meeting $record): int => self::linkedCount($record)),
+                            ])
+                            ->afterHeader([
+                                self::linkRecordsAction('linkRecords'),
+                            ])
+                            ->schema([
+                                RepeatableEntry::make('linked_records')
+                                    ->contained(false)
+                                    ->hiddenLabel()
+                                    ->state(fn (Meeting $record): array => self::linkedRecordsState($record))
+                                    ->visible(fn (Meeting $record): bool => self::linkedCount($record) > 0)
+                                    ->schema([
+                                        Flex::make([
+                                            TextEntry::make('name')
+                                                ->hiddenLabel()
+                                                ->weight(FontWeight::Medium)
+                                                ->grow(),
+                                            TextEntry::make('record_type')
+                                                ->hiddenLabel()
+                                                ->badge()
+                                                ->formatStateUsing(fn (string $state): string => MeetingLinkedRecordType::from($state)->getLabel())
+                                                ->icon(fn (string $state): Heroicon => MeetingLinkedRecordType::from($state)->getIcon())
+                                                ->color(fn (string $state): string => MeetingLinkedRecordType::from($state)->getColor())
+                                                ->grow(false)
+                                                ->size(TextSize::Small),
+                                        ])->alignment(Alignment::Between),
+                                    ]),
+                            ])
+                            ->columnSpan(2),
                     ]),
                 Section::make(__('filament/resources/meeting.sections.description.heading'))
                     ->schema([
@@ -149,12 +181,46 @@ final class MeetingDetailInfolist
         return $meeting->people->count() + $meeting->companies->count() + $meeting->opportunities->count();
     }
 
+    /**
+     * @return list<array{name: string, record_type: string}>
+     */
+    public static function linkedRecordsState(Meeting $meeting): array
+    {
+        $state = [];
+
+        foreach ($meeting->people as $person) {
+            $state[] = self::linkedRecordItem($person->name, MeetingLinkedRecordType::People);
+        }
+
+        foreach ($meeting->companies as $company) {
+            $state[] = self::linkedRecordItem($company->name, MeetingLinkedRecordType::Company);
+        }
+
+        foreach ($meeting->opportunities as $opportunity) {
+            $state[] = self::linkedRecordItem($opportunity->name, MeetingLinkedRecordType::Opportunity);
+        }
+
+        return $state;
+    }
+
+    /**
+     * @return array{name: string, record_type: string}
+     */
+    private static function linkedRecordItem(string $name, MeetingLinkedRecordType $recordType): array
+    {
+        return [
+            'name' => $name,
+            'record_type' => $recordType->value,
+        ];
+    }
+
     public static function linkRecordsAction(string $name): Action
     {
         return Action::make($name)
             ->label(__('filament/resources/meeting.actions.link_records.label'))
             ->icon(Heroicon::Plus)
             ->schema(self::linkRecordFields())
+            ->link()
             ->action(function (array $data, Meeting $record): void {
                 $target = self::resolveLinkTarget(
                     (string) $data['target_type'],
@@ -194,11 +260,7 @@ final class MeetingDetailInfolist
      */
     private static function linkTargetTypeOptions(): array
     {
-        return [
-            'People' => __('filament/resources/meeting.linked_record_types.people'),
-            'Company' => __('filament/resources/meeting.linked_record_types.companies'),
-            'Opportunity' => __('filament/resources/meeting.linked_record_types.opportunities'),
-        ];
+        return MeetingLinkedRecordType::linkTargetTypeOptions();
     }
 
     private static function linkTargetLabel(string $type): string
@@ -217,10 +279,10 @@ final class MeetingDetailInfolist
     {
         $teamId = filament()->getTenant()?->getKey();
 
-        return match ($type) {
-            'People' => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-            'Company' => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+        return match (MeetingLinkedRecordType::tryFromLinkTargetType($type)) {
+            MeetingLinkedRecordType::People => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            MeetingLinkedRecordType::Company => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            MeetingLinkedRecordType::Opportunity => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
             default => [],
         };
     }
@@ -229,11 +291,10 @@ final class MeetingDetailInfolist
     {
         $teamId = filament()->getTenant()?->getKey();
 
-        return match ($type) {
-            'People' => People::query()->where('team_id', $teamId)->findOrFail($id),
-            'Company' => Company::query()->where('team_id', $teamId)->findOrFail($id),
-            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->findOrFail($id),
-            default => throw new InvalidArgumentException('Unsupported type: '.$type),
+        return match (MeetingLinkedRecordType::fromLinkTargetType($type)) {
+            MeetingLinkedRecordType::People => People::query()->where('team_id', $teamId)->findOrFail($id),
+            MeetingLinkedRecordType::Company => Company::query()->where('team_id', $teamId)->findOrFail($id),
+            MeetingLinkedRecordType::Opportunity => Opportunity::query()->where('team_id', $teamId)->findOrFail($id),
         };
     }
 }

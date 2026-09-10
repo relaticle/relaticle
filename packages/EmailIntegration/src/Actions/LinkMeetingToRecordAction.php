@@ -40,10 +40,10 @@ final readonly class LinkMeetingToRecordAction
             $record->getKey() => ['link_source' => 'manual'],
         ]);
 
-        if ($wasAlreadyLinked) {
-            return;
+        if (! $wasAlreadyLinked) {
+            $this->metrics->incrementMeetingMetrics($scorable, $meeting);
         }
 
-        $this->metrics->incrementMeetingMetrics($scorable, $meeting);
+        $meeting->load(['people', 'companies', 'opportunities']);
     }
 }

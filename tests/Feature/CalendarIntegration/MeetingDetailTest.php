@@ -492,6 +492,25 @@ it('links a record from the meeting view modal', function (): void {
     expect($meeting->fresh()?->people()->count())->toBe(1);
 });
 
+it('shows a newly linked record in the open view modal without reloading the page', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+    ]);
+    $person = People::factory()->for($this->team)->create(['name' => 'Fresh Link']);
+
+    meetingDetailsOnRecord([$meeting])
+        ->callAction([
+            TestAction::make('view')->table($meeting),
+            TestAction::make('linkRecords'),
+        ], [
+            'target_type' => 'People',
+            'target_id' => $person->getKey(),
+        ])
+        ->assertNotified()
+        ->assertMountedActionModalSee('Fresh Link');
+});
+
 it('labels the link record picker with the selected type', function (string $type, string $labelKey): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
