@@ -11,6 +11,7 @@ use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 final readonly class StoreMeetingAction
 {
@@ -158,9 +159,15 @@ final readonly class StoreMeetingAction
 
     private function bumpInitialCalendarImportProgress(ConnectedAccount $connectedAccount): void
     {
-        ConnectedAccount::query()
-            ->whereKey($connectedAccount->getKey())
-            ->whereNull('calendar_sync_cursor')
-            ->increment('initial_calendar_sync_imported');
+        if ($connectedAccount->calendar_sync_cursor === null) {
+            ConnectedAccount::query()
+                ->whereKey($connectedAccount->getKey())
+                ->whereNull('calendar_sync_cursor')
+                ->increment('initial_calendar_sync_imported');
+        }
+
+        if (MailboxSyncTracker::isCalendarSyncing($connectedAccount)) {
+            MailboxSyncTracker::bumpCalendarProcessed($connectedAccount);
+        }
     }
 }
