@@ -19,13 +19,25 @@ use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 /**
  * Hides calendar events that workspace or mailbox visibility rules exclude.
  *
+ * Personal calendar mode (Home) shows only meetings synced from one of the
+ * viewer's connected mailboxes or where the viewer is on the guest list.
+ * Workspace mode also shares teammate meetings that include an external guest.
+ *
  * @template TModel of Model
  *
  * @implements Scope<TModel>
  */
 final readonly class VisibleMeetingScope implements Scope
 {
-    public function __construct(private User $viewer) {}
+    public function __construct(
+        private User $viewer,
+        private bool $personalCalendarOnly = false,
+    ) {}
+
+    public static function personal(User $viewer): self
+    {
+        return new self($viewer, personalCalendarOnly: true);
+    }
 
     /**
      * @param  Builder<covariant TModel>  $builder
@@ -66,9 +78,11 @@ final readonly class VisibleMeetingScope implements Scope
                         );
                     }
 
-                    $ownerOrShared->orWhere(function (Builder $teammateQuery) use ($teamId): void {
-                        $this->excludeTeammateHiddenMeetings($teammateQuery, $teamId);
-                    });
+                    if (! $this->personalCalendarOnly) {
+                        $ownerOrShared->orWhere(function (Builder $teammateQuery) use ($teamId): void {
+                            $this->excludeTeammateHiddenMeetings($teammateQuery, $teamId);
+                        });
+                    }
                 });
             });
     }
