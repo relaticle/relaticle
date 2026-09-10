@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources\Concerns;
 
+use App\Enums\CustomFieldType;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Schema\McpSchemaCache;
 use App\Models\CustomField;
@@ -64,11 +65,8 @@ trait ResolvesEntitySchema
             ];
 
             $formatHint = $this->fieldFormatHint($field->type);
-
-            if ($formatHint !== null) {
-                $entry['input_format'] = $formatHint['format'];
-                $entry['example'] = $formatHint['example'];
-            }
+            $entry['input_format'] = $formatHint['format'];
+            $entry['example'] = $formatHint['example'];
 
             if (in_array($field->type, self::CHOICE_TYPES, true) && $field->options->isNotEmpty()) {
                 $entry['options'] = $field->options->map(fn (CustomFieldOption $option): array => [
@@ -84,22 +82,28 @@ trait ResolvesEntitySchema
     }
 
     /**
-     * @return array{format: string, example: mixed}|null
+     * @return array{format: string, example: mixed}
      */
-    private function fieldFormatHint(string $type): ?array
+    private function fieldFormatHint(string $type): array
     {
-        return match ($type) {
-            'link' => ['format' => 'array of URL strings', 'example' => ['https://example.com']],
-            'email' => ['format' => 'array of email strings', 'example' => ['user@example.com']],
-            'phone' => ['format' => 'array of phone strings', 'example' => ['+1234567890']],
-            'select', 'radio', 'toggle-buttons' => ['format' => 'option ID string (see options)', 'example' => 'option-id-here'],
-            'multi-select', 'checkbox-list' => ['format' => 'array of option ID strings', 'example' => ['option-id-1', 'option-id-2']],
-            'tags-input' => ['format' => 'array of arbitrary string values', 'example' => ['priority', 'customer']],
-            'toggle' => ['format' => 'boolean', 'example' => true],
-            'date-time' => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],
-            'number' => ['format' => 'numeric value', 'example' => 42],
-            'currency' => ['format' => 'numeric value (amount)', 'example' => 15000.00],
-            default => null,
+        return match (CustomFieldType::from($type)) {
+            CustomFieldType::TEXT, CustomFieldType::TEXTAREA => ['format' => 'string', 'example' => 'Acme renewal'],
+            CustomFieldType::NUMBER => ['format' => 'numeric value', 'example' => 42],
+            CustomFieldType::CURRENCY => ['format' => 'numeric value (amount)', 'example' => 15000.00],
+            CustomFieldType::EMAIL => ['format' => 'array of email strings', 'example' => ['user@example.com']],
+            CustomFieldType::PHONE => ['format' => 'array of phone strings', 'example' => ['+1234567890']],
+            CustomFieldType::LINK => ['format' => 'array of URL strings', 'example' => ['https://example.com']],
+            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => ['format' => 'boolean', 'example' => true],
+            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => ['format' => 'option label or option ID (see options)', 'example' => 'In progress'],
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST => ['format' => 'array of option labels or IDs (see options)', 'example' => ['Enterprise', 'EU']],
+            CustomFieldType::TAGS_INPUT => ['format' => 'array of arbitrary string values', 'example' => ['priority', 'customer']],
+            CustomFieldType::RICH_EDITOR => ['format' => 'markdown, or HTML when the value starts with <; stored and returned as HTML', 'example' => "## Notes\n- first call done"],
+            CustomFieldType::MARKDOWN_EDITOR => ['format' => 'markdown', 'example' => '**Follow up** Friday'],
+            CustomFieldType::COLOR_PICKER => ['format' => 'hex color string', 'example' => '#0A80EA'],
+            CustomFieldType::DATE => ['format' => 'ISO 8601 date', 'example' => '2026-09-10'],
+            CustomFieldType::DATE_TIME => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],
+            CustomFieldType::FILE_UPLOAD => ['format' => 'path returned by the upload-file tool', 'example' => 'uploads/custom-fields/01J.../report.pdf'],
+            CustomFieldType::RECORD => ['format' => 'array of record IDs of the lookup entity; records must belong to this workspace', 'example' => ['01J...']],
         };
     }
 }
