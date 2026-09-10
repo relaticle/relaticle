@@ -39,6 +39,7 @@ use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
 use App\Support\CustomFields\CustomFieldInput;
+use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -130,6 +131,8 @@ final class AppServiceProvider extends ServiceProvider
         // Caches creation-source facts per team for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
+
+        $this->app->scoped(RecordNameResolver::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()

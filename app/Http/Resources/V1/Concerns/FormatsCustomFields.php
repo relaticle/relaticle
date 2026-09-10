@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\V1\Concerns;
 
+use App\Enums\CustomFieldType;
+use App\Support\CustomFields\RecordNameResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomField;
@@ -32,6 +34,10 @@ trait FormatsCustomFields
     {
         $customField = $fieldValue->customField;
         $rawValue = $fieldValue->getValue();
+
+        if ($customField->type === CustomFieldType::RECORD->value) {
+            return $this->resolveRecordValue($customField, $rawValue);
+        }
 
         if (! $customField->typeData->dataType->isChoiceField()) {
             return $rawValue;
@@ -79,6 +85,22 @@ trait FormatsCustomFields
                     'label' => $option !== null ? $option->name : $stringId,
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{id: string, name: ?string}>
+     */
+    private function resolveRecordValue(CustomField $customField, mixed $rawValue): array
+    {
+        $values = $rawValue instanceof Collection ? $rawValue->all() : (array) ($rawValue ?? []);
+        $resolver = resolve(RecordNameResolver::class);
+        $lookupType = (string) $customField->lookup_type;
+
+        return collect($values)
+            ->filter(fn (mixed $id): bool => is_string($id) || is_int($id))
+            ->map(fn (mixed $id): array => ['id' => (string) $id, 'name' => $resolver->name($lookupType, (string) $id)])
             ->values()
             ->all();
     }

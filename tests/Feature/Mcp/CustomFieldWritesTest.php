@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Http\Resources\V1\Concerns\FormatsCustomFields;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseUpdateTool;
 use App\Mcp\Tools\Task\CreateTaskTool;
+use App\Mcp\Tools\Task\GetTaskTool;
+use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -16,8 +19,10 @@ use App\Rules\OwnedLookupRecords;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
+use App\Support\CustomFields\RecordNameResolver;
+use Illuminate\Support\Facades\DB;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -258,4 +263,88 @@ it('rejects a nested value in a record field', function (): void {
         ->tool(CreateTaskTool::class, ['title' => 'Nested record', 'custom_fields' => ['related_company' => [['id' => 'x']]]])
         ->assertHasErrors()
         ->assertSee('array of record IDs');
+});
+
+it('returns record values as id and name pairs', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $company = Company::factory()->create(['team_id' => $this->team->getKey(), 'name' => 'Globex']);
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($field, [$company->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetTaskTool::class, ['id' => $task->getKey()])
+        ->assertOk()
+        ->assertSee('Globex');
+});
+
+it('lists tasks with record names in one query per lookup type', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $companies = Company::factory()->count(5)->create(['team_id' => $this->team->getKey()]);
+    foreach ($companies as $company) {
+        Task::factory()->create(['team_id' => $this->team->getKey()])->saveCustomFieldValue($field, [$company->getKey()]);
+    }
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
+
+    $nameLookups = collect(DB::getQueryLog())->filter(
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'in ('),
+    );
+
+    expect($nameLookups)->toHaveCount(1);
+});
+
+it('resolves a dangling record reference without one query per row', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'related_company',
+        'name' => 'Related Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 91,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $trashed = Company::factory()->create(['team_id' => $this->team->getKey()]);
+    $trashed->delete();
+    foreach (range(1, 3) as $ignored) {
+        Task::factory()->create(['team_id' => $this->team->getKey()])->saveCustomFieldValue($field, [$trashed->getKey()]);
+    }
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
+
+    $nameLookups = collect(DB::getQueryLog())->filter(
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'in ('),
+    );
+
+    expect($nameLookups->count())->toBeLessThanOrEqual(2);
 });
