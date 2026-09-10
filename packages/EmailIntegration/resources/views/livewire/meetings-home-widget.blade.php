@@ -128,11 +128,13 @@
                     data-testid="meeting-card"
                     class="px-2.5 py-2"
                 >
-                    <div
+                    <button
+                        type="button"
                         data-testid="meeting-card-row"
-                        class="flex min-h-9 cursor-pointer items-center gap-2.5"
+                        class="group/row flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default"
                         wire:click="{{ $openTarget }}"
                         wire:loading.attr="disabled"
+                        wire:loading.class="pointer-events-none opacity-60"
                         wire:target="{{ $openTarget }}"
                         aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                     >
@@ -164,8 +166,8 @@
                             />
                         </span>
 
-                        <div
-                            class="group/title relative flex min-w-0 flex-1 items-center gap-1.5"
+                        <span
+                            class="flex min-w-0 flex-1 items-center gap-1.5"
                             data-testid="meeting-card-title"
                         >
                             <span @class([
@@ -176,28 +178,23 @@
                                 {{ $card['title'] }}
                             </span>
 
-                            <button
-                                type="button"
+                            <span
                                 data-testid="meeting-card-open"
-                                wire:click.stop="{{ $openTarget }}"
-                                wire:loading.attr="disabled"
-                                wire:target="{{ $openTarget }}"
-                                x-on:click.stop
                                 @class([
-                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/title:opacity-100',
-                                    'text-success-600 hover:bg-success-50 dark:text-success-400 dark:hover:bg-success-500/10' => $dotColor === 'success',
-                                    'text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-500/10' => $dotColor === 'danger',
-                                    'text-warning-600 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-500/10' => $dotColor === 'warning',
-                                    'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/10' => $dotColor === 'gray',
+                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity group-focus-visible/row:opacity-100 group-hover/row:opacity-100',
+                                    'text-success-600 dark:text-success-400' => $dotColor === 'success',
+                                    'text-danger-600 dark:text-danger-400' => $dotColor === 'danger',
+                                    'text-warning-600 dark:text-warning-400' => $dotColor === 'warning',
+                                    'text-gray-500 dark:text-gray-400' => $dotColor === 'gray',
                                 ])
-                                aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                                aria-hidden="true"
                             >
                                 <x-filament::icon
                                     :icon="\Filament\Support\Icons\Heroicon::OutlinedArrowsPointingOut"
                                     class="size-3.5 shrink-0"
                                 />
-                            </button>
-                        </div>
+                            </span>
+                        </span>
 
                         <time
                             class="inline-flex shrink-0 items-center gap-1.5 text-xs font-normal tabular-nums text-gray-500 dark:text-gray-400"
@@ -214,7 +211,7 @@
                                 </x-filament::badge>
                             @endif
                         </time>
-                    </div>
+                    </button>
                 </div>
             @endforeach
 
