@@ -93,7 +93,7 @@ it('hides emails and meetings relation managers on a person when the feature is 
         ->and($managers)->not->toContain(MeetingsRelationManager::class);
 });
 
-it('registers emails and meetings relation managers on a person when the feature is active', function (): void {
+it('registers the meetings relation manager on a person when the feature is active', function (): void {
     Feature::activate(EmailIntegration::class);
 
     $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
@@ -102,7 +102,7 @@ it('registers emails and meetings relation managers on a person when the feature
         ->instance()
         ->getRelationManagers();
 
-    expect($managers)->toContain(EmailsRelationManager::class)
+    expect($managers)->not->toContain(EmailsRelationManager::class)
         ->and($managers)->toContain(MeetingsRelationManager::class);
 });
 
