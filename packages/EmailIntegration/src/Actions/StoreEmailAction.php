@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
@@ -190,9 +191,15 @@ final readonly class StoreEmailAction
 
     private function bumpInitialImportProgress(ConnectedAccount $connectedAccount): void
     {
-        ConnectedAccount::query()
-            ->whereKey($connectedAccount->getKey())
-            ->whereNull('sync_cursor')
-            ->increment('initial_sync_imported');
+        if ($connectedAccount->sync_cursor === null) {
+            ConnectedAccount::query()
+                ->whereKey($connectedAccount->getKey())
+                ->whereNull('sync_cursor')
+                ->increment('initial_sync_imported');
+        }
+
+        if (MailboxSyncTracker::isEmailSyncing($connectedAccount)) {
+            MailboxSyncTracker::bumpEmailProcessed($connectedAccount);
+        }
     }
 }

@@ -88,19 +88,17 @@ final class MailboxImportStatus extends Component
             }
 
             $incrementalOnly = $account->isIncrementalSyncing();
-            $percent = $incrementalOnly ? null : $account->initialSyncProgressPercent();
-            $incrementalLabel = $account->incrementalSyncStatusLabel();
 
             $rows[] = [
                 'id' => $id,
                 'email' => $account->email_address,
-                'imported' => $account->initial_sync_imported,
-                'meetingsImported' => $account->initial_calendar_sync_imported,
+                'imported' => $account->syncEmailsProcessedCount(),
+                'meetingsImported' => $account->syncMeetingsProcessedCount(),
                 'hasCalendar' => $account->hasCalendar(),
-                'percent' => $percent,
+                'percent' => $account->syncDisplayPercent(),
                 'importing' => $account->showsSyncProgress(),
                 'incrementalOnly' => $incrementalOnly,
-                'incrementalLabel' => $incrementalLabel,
+                'incrementalLabel' => null,
                 'settings_url' => EmailAccountSettingsPage::getUrl(['account' => $id]),
             ];
         }

@@ -57,11 +57,15 @@ final readonly class ListMeetingsForDay
             ->orderByRaw('CASE WHEN meetings.connected_account_id IN (SELECT id FROM connected_accounts WHERE user_id = ?) THEN 0 ELSE 1 END', [$user->getKey()])
             ->orderBy('meetings.id');
 
-        return $query
+        $meetings = $query
             ->whereIn('meetings.id', $copies)
             ->with(['team', 'attendees.contact', 'connectedAccount.user'])
             ->orderBy('starts_at')
             ->orderBy('id')
             ->get();
+
+        resolve(MailboxDisplayNameDirectory::class)->primeFromMeetings($meetings);
+
+        return $meetings;
     }
 }

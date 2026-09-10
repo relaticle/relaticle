@@ -14,11 +14,14 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
             $table->teams();
+            $table->foreignUlid('connected_account_id')
+                ->constrained('connected_accounts')
+                ->cascadeOnDelete();
             $table->string('type', 20);                      // email | domain
             $table->string('value');
             $table->timestamps();
 
-            $table->index(['user_id', 'type', 'value']);
+            $table->index(['connected_account_id', 'type', 'value']);
         });
     }
 };
