@@ -152,29 +152,7 @@ final class MeetingDetailInfolist
         return Action::make($name)
             ->label(__('filament/resources/meeting.actions.link_records.label'))
             ->icon(Heroicon::Plus)
-            ->schema([
-                Select::make('target_type')
-                    ->options([
-                        'People' => __('filament/resources/meeting.linked_record_types.people'),
-                        'Company' => __('filament/resources/meeting.linked_record_types.companies'),
-                        'Opportunity' => __('filament/resources/meeting.linked_record_types.opportunities'),
-                    ])
-                    ->required()
-                    ->live(),
-                Select::make('target_id')
-                    ->options(function (Get $get): array {
-                        $teamId = filament()->getTenant()?->getKey();
-
-                        return match ((string) $get('target_type')) {
-                            'People' => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-                            'Company' => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-                            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
-                            default => [],
-                        };
-                    })
-                    ->searchable()
-                    ->required(),
-            ])
+            ->schema(self::linkRecordFields())
             ->action(function (array $data, Meeting $record): void {
                 $target = self::resolveLinkTarget(
                     (string) $data['target_type'],
@@ -188,6 +166,61 @@ final class MeetingDetailInfolist
                     ->title(__('filament/relation-managers/meetings.notifications.linked.title'))
                     ->send();
             });
+    }
+
+    /**
+     * @return array<int, Select>
+     */
+    public static function linkRecordFields(): array
+    {
+        return [
+            Select::make('target_type')
+                ->label(__('filament/resources/meeting.fields.record_type.label'))
+                ->options(self::linkTargetTypeOptions())
+                ->required()
+                ->live(),
+            Select::make('target_id')
+                ->label(fn (Get $get): string => self::linkTargetLabel((string) $get('target_type')))
+                ->options(fn (Get $get): array => self::linkTargetOptions((string) $get('target_type')))
+                ->searchable()
+                ->required(),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function linkTargetTypeOptions(): array
+    {
+        return [
+            'People' => __('filament/resources/meeting.linked_record_types.people'),
+            'Company' => __('filament/resources/meeting.linked_record_types.companies'),
+            'Opportunity' => __('filament/resources/meeting.linked_record_types.opportunities'),
+        ];
+    }
+
+    private static function linkTargetLabel(string $type): string
+    {
+        return self::linkTargetTypeOptions()[$type] ?? __('filament/resources/meeting.fields.record.label');
+    }
+
+    /**
+     * CRM models carry no global tenant scope, so every query here must be
+     * constrained to the current tenant. Otherwise the option list (and the
+     * resolveLinkTarget lookup below) would expose and link records from other teams.
+     *
+     * @return array<int|string, string>
+     */
+    private static function linkTargetOptions(string $type): array
+    {
+        $teamId = filament()->getTenant()?->getKey();
+
+        return match ($type) {
+            'People' => People::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            'Company' => Company::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            'Opportunity' => Opportunity::query()->where('team_id', $teamId)->pluck('name', 'id')->all(),
+            default => [],
+        };
     }
 
     private static function resolveLinkTarget(string $type, string $id): Model
