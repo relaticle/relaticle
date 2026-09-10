@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Onboarding;
 
 use App\Enums\ActivationStep;
+use App\Features\EmailIntegration;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
+use Laravel\Pennant\Feature;
 use Spatie\Onboard\OnboardingSteps;
 
 /**
- * The four activation steps every consumer reads: the activation checklist,
+ * The activation steps every consumer reads: the activation checklist,
  * the setup-nudge command, and the chat agent's workspace-state block.
  *
  * Titles and descriptions live in lang files and are resolved by the
@@ -45,6 +48,22 @@ final readonly class ActivationSteps
                 'icon' => 'heroicon-o-user-plus',
             ])
             ->completeIf(fn (Team $model): bool => resolve(WorkspaceActivationFacts::class)->hasOwnRecord($model));
+
+        if (Feature::active(EmailIntegration::class)) {
+            $steps->addStep(ActivationStep::SyncEmail->value, Team::class)
+                ->attributes([
+                    'key' => ActivationStep::SyncEmail,
+                    'label_key' => 'filament/pages/dashboard.activation.steps.sync_email.label',
+                    'description_key' => 'filament/pages/dashboard.activation.steps.sync_email.description',
+                    'icon' => 'heroicon-o-envelope',
+                ])
+                ->completeIf(function (Team $model): bool {
+                    $user = auth()->user();
+
+                    return $user instanceof User
+                        && resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($user, $model);
+                });
+        }
 
         $steps->addStep(ActivationStep::AskRela->value, Team::class)
             ->attributes([
