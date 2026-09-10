@@ -111,21 +111,6 @@ final class Email extends Model
         'creation_source' => EmailCreationSource::SYNC,
     ];
 
-    protected $casts = [
-        'sent_at' => 'datetime',
-        'direction' => EmailDirection::class,
-        'folder' => EmailFolder::class,
-        'status' => EmailStatus::class,
-        'privacy_tier' => EmailPrivacyTier::class,
-        'creation_source' => EmailCreationSource::class,
-        'has_attachments' => 'boolean',
-        'is_internal' => 'boolean',
-        'scheduled_for' => 'datetime',
-        'attempts' => 'integer',
-        'linked_at' => 'datetime',
-        'priority' => EmailPriority::class,
-    ];
-
     /**
      * @param  Builder<Email>  $query
      * @return Builder<Email>
@@ -441,5 +426,26 @@ final class Email extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(EmailBatch::class, 'batch_id');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'sent_at' => 'datetime',
+            'direction' => EmailDirection::class,
+            'folder' => EmailFolder::class,
+            'status' => EmailStatus::class,
+            'privacy_tier' => EmailPrivacyTier::class,
+            'creation_source' => EmailCreationSource::class,
+            'has_attachments' => 'boolean',
+            'is_internal' => 'boolean',
+            'scheduled_for' => 'datetime',
+            'attempts' => 'integer',
+            'linked_at' => 'datetime',
+            'priority' => EmailPriority::class,
+        ];
     }
 }

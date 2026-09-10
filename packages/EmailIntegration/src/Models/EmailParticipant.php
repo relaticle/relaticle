@@ -39,10 +39,6 @@ final class EmailParticipant extends Model
         'company_id',
     ];
 
-    protected $casts = [
-        'role' => EmailParticipantRole::class,
-    ];
-
     /**
      * @return BelongsTo<Email, $this>
      */
@@ -65,5 +61,15 @@ final class EmailParticipant extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'role' => EmailParticipantRole::class,
+        ];
     }
 }

@@ -24,7 +24,7 @@ final class EmailBatchFactory extends Factory
             'team_id' => Team::factory(),
             'user_id' => User::factory(),
             'connected_account_id' => ConnectedAccount::factory(),
-            'subject' => $this->faker->sentence(),
+            'subject' => fake()->sentence(),
             'total_recipients' => 0,
             'sent_count' => 0,
             'failed_count' => 0,

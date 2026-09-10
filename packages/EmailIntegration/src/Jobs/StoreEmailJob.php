@@ -5,13 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use Illuminate\Bus\Batchable;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
@@ -23,7 +20,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, ReleasesOnProviderRateLimit, SerializesModels;
+    use Batchable, Queueable, ReleasesOnProviderRateLimit;
 
     public int $tries = 5;
 
