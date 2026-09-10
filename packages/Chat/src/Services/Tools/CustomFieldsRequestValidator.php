@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\MessageBag;
 use Illuminate\Validation\ValidationException;
 
 final readonly class CustomFieldsRequestValidator
@@ -34,14 +35,10 @@ final readonly class CustomFieldsRequestValidator
         try {
             $normalized = $this->input->normalize($teamId, $entityType, $rawCustomFields);
         } catch (ValidationException $exception) {
-            $messages = collect($exception->validator->errors()->messages())
-                ->flatMap(fn (array $errors, string $key): array => array_map(
-                    fn (string $error): string => "{$key}: {$error}",
-                    $errors,
-                ))
-                ->implode('; ');
-
-            return new CustomFieldsValidationResult(cleanFields: [], error: $messages);
+            return new CustomFieldsValidationResult(
+                cleanFields: [],
+                error: $this->keyedMessages($exception->validator->errors()),
+            );
         }
 
         $clean = is_array($normalized) ? $normalized : $rawCustomFields;
@@ -54,10 +51,21 @@ final readonly class CustomFieldsRequestValidator
         if ($validator->fails()) {
             return new CustomFieldsValidationResult(
                 cleanFields: [],
-                error: 'custom_fields validation failed: '.implode('; ', $validator->errors()->all()),
+                error: 'custom_fields validation failed: '.$this->keyedMessages($validator->errors()),
             );
         }
 
         return new CustomFieldsValidationResult(cleanFields: $clean, error: null);
+    }
+
+    // The assistant retries by field code, so the key has to survive into the message.
+    private function keyedMessages(MessageBag $errors): string
+    {
+        return collect($errors->messages())
+            ->flatMap(fn (array $messages, string $key): array => array_map(
+                fn (string $message): string => "{$key}: {$message}",
+                $messages,
+            ))
+            ->implode('; ');
     }
 }
