@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Auth;
 
+use App\Actions\Auth\AuthenticatePassword;
 use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsTeamInvitation;
 use App\Enums\SocialiteProvider;
@@ -12,6 +13,7 @@ use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
 use App\Support\EmailAddress;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Auth\Events\Registered;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
@@ -116,13 +118,57 @@ final class Login extends \Filament\Auth\Pages\Login
             return $this->handleSignup();
         }
 
+        if ($this->authMethod === 'password') {
+            return $this->handlePasswordAuthentication();
+        }
+
         if ($this->authMethod === null) {
             $this->discover();
 
             return null;
         }
 
-        return parent::authenticate();
+        return null;
+    }
+
+    private function handlePasswordAuthentication(): ?LoginResponse
+    {
+        $submittedEmail = EmailAddress::canonicalize((string) ($this->data['email'] ?? ''));
+
+        if ($submittedEmail !== $this->discoveredEmail) {
+            $this->authMethod = null;
+            $this->passkeyUserHasPassword = false;
+            $this->discoveredEmail = null;
+            $this->discover();
+
+            return null;
+        }
+
+        try {
+            $this->rateLimit(5);
+        } catch (TooManyRequestsException $exception) {
+            $this->getRateLimitedNotification($exception)?->send();
+
+            return null;
+        }
+
+        $data = $this->form->getState();
+
+        try {
+            $next = resolve(AuthenticatePassword::class)->execute(
+                (string) $data['email'],
+                (string) $data['password'],
+                (bool) ($data['remember'] ?? false),
+            );
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages([
+                'data.email' => $exception->errors()['email'] ?? [__('auth.failed')],
+            ]);
+        }
+
+        session()->put('url.intended', $next);
+
+        return resolve(LoginResponse::class);
     }
 
     public function usePassword(): void
@@ -373,6 +419,9 @@ final class Login extends \Filament\Auth\Pages\Login
             ->password()
             ->revealable(filament()->arePasswordsRevealable())
             ->autocomplete(fn (): string => $this->authMethod === 'signup' ? 'new-password' : 'current-password')
+            // The document spends its one autofocus on the email field, so the
+            // password field that replaces it has to take focus explicitly.
+            ->extraInputAttributes(['x-init' => '$el.focus()'])
             ->required()
             ->rule(Password::default(), condition: fn (): bool => $this->authMethod === 'signup')
             ->showAllValidationMessages()

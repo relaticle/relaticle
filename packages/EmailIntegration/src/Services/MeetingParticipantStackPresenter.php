@@ -79,9 +79,7 @@ final readonly class MeetingParticipantStackPresenter
             $state = $this->attendeePresenter->present($attendee);
             $key = $state['email'] !== '' ? $state['email'] : $state['name'];
 
-            if (! isset($states[$key])) {
-                $states[$key] = $state;
-            }
+            $states[$key] ??= $state;
         }
 
         return array_values($states);

@@ -31,15 +31,21 @@ final class EmailLabel extends Model
         'created_at',
     ];
 
-    protected $casts = [
-        'created_at' => 'datetime',
-    ];
-
     /**
      * @return BelongsTo<Email, $this>
      */
     public function email(): BelongsTo
     {
         return $this->belongsTo(Email::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'created_at' => 'datetime',
+        ];
     }
 }

@@ -1,8 +1,8 @@
 ---
 title: Manage your profile
-description: Your photo, name, email, timezone, password, passkeys, signed-in browsers, and what happens if you delete your account.
+description: Manage your profile, password, passkeys, two-factor authentication, and browser sessions. Learn how to request account deletion.
 order: 4
-updated: "2026-08-30"
+updated: "2026-09-09"
 related: [help/workspace/manage-members-and-roles, help/tasks-and-notes/work-with-tasks]
 ---
 
@@ -23,8 +23,11 @@ your own local time.
 
 ## Password
 
-**Update Password** needs your current password. If you signed up with a
-social account and never set one, the same section offers **Set Password**.
+Open the **Security** tab for your password, passkeys, two-factor authentication, and browser sessions.
+
+Enter and confirm your new password, then choose **Save**.
+Confirm your identity with a passkey, password, or linked provider.
+Accounts without a password show **Set Password** in the same section.
 
 ## Passkeys
 
@@ -35,8 +38,8 @@ was added, and when it was last used.
 **Add passkey** confirms it's you, then hands over to your browser or
 password manager to create the key. Relaticle names it after the
 authenticator it recognises. Use **Rename** if you'd rather label it by device.
-**Remove** takes a passkey out of your account; that device can no longer
-sign you in, so keep a password or a second passkey if it's your only one.
+**Remove** takes a passkey out of your account; that device can no longer sign you in.
+Relaticle keeps your last sign-in method. Add another passkey or set a password before removing it.
 
 Next time you sign in, type your email and the passkey prompt appears on its
 own. On a device that already holds one, the email field offers it as you
@@ -44,14 +47,22 @@ click into it.
 
 ## Confirming it's you
 
-Adding a passkey, removing one, and deleting your account ask you to prove
-it's you every time: your passkey if you have one, your password otherwise,
-and **Use your password instead** switches between them. Logging out other
-browsers accepts a confirmation you gave in the last 15 minutes.
+Sensitive changes ask you to confirm your identity with a passkey or password.
+A passkey confirms your identity with your fingerprint, face, or device PIN.
+If you use a password and have two-factor authentication enabled, also enter an authenticator code.
 
-If you only ever sign in with Google or Microsoft and have set neither a
-password nor a passkey, there's nothing to type: your session is the only
-proof available, so Relaticle just asks you to confirm the action.
+If you only sign in with Google or Microsoft, confirm through that provider.
+You also enter an authenticator code if you have two-factor authentication enabled.
+
+## Two-factor authentication
+
+In **Security**, choose **Turn on** under **Two-factor authentication**.
+Confirm your identity, scan the code with your authenticator app, and enter its six-digit code.
+Save your recovery codes before closing the setup modal.
+
+Signing in with a passkey satisfies two-factor authentication without an extra authenticator code.
+Signing in with a password, Google, or Microsoft still requires an authenticator code.
+Use a recovery code if you cannot access your authenticator app.
 
 ## Browser sessions
 
@@ -67,12 +78,13 @@ assignment alerts and the daily digest, described in
 
 ## Deleting your account
 
-**Delete Account** schedules your account for deletion **30 days out**, not
-immediately. Type your account email to confirm, and confirm it's you.
-Signing back in during those 30 days shows a single question. **Keep my
-account** cancels the deletion on the spot. After the grace period the
-account and its personal data are removed permanently.
+To request account deletion, email [privacy@relaticle.com](mailto:privacy@relaticle.com) or [contact us](/contact).
+For a self-hosted installation, contact the person who manages it.
 
-If you own workspaces that still have other members, Relaticle asks you to
-transfer their ownership before it will schedule the deletion, so your team's
-data doesn't disappear with you.
+If **Delete Account** is available at the bottom of **Profile**, you can schedule deletion there.
+Type your account email and confirm your identity. Deletion is scheduled **30 days out**.
+Sign in during those 30 days and choose **Keep my account** to cancel.
+After the grace period, your account and personal data are removed permanently.
+Records in shared workspaces remain.
+
+Before scheduling deletion, remove other members from workspaces you own, or delete those workspaces.

@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\Concerns\HasAiSummary;
 use App\Models\Concerns\HasTeam;
+use Carbon\CarbonInterface;
 use Database\Factories\EmailThreadFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property CarbonInterface|null $first_email_at
+ * @property CarbonInterface|null $last_email_at
+ * @property int $email_count
+ * @property int $participant_count
+ */
 final class EmailThread extends Model
 {
     /**
@@ -36,13 +43,6 @@ final class EmailThread extends Model
         'last_email_at',
     ];
 
-    protected $casts = [
-        'first_email_at' => 'datetime',
-        'last_email_at' => 'datetime',
-        'email_count' => 'integer',
-        'participant_count' => 'integer',
-    ];
-
     /**
      * @return BelongsTo<ConnectedAccount, $this>
      */
@@ -58,5 +58,18 @@ final class EmailThread extends Model
     {
         return $this->hasMany(Email::class, 'thread_id', 'thread_id')
             ->where('connected_account_id', $this->connected_account_id);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'first_email_at' => 'datetime',
+            'last_email_at' => 'datetime',
+            'email_count' => 'integer',
+            'participant_count' => 'integer',
+        ];
     }
 }
