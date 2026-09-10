@@ -9,10 +9,12 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -73,9 +75,9 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->label(__('filament/relation-managers/meetings.columns.starts_at.label'))
                     ->dateTime('M j, Y · g:i a')
                     ->sortable(),
-                TextColumn::make('attendees_count')
-                    ->counts('attendees')
-                    ->label(__('filament/relation-managers/meetings.columns.attendees_count.label')),
+                ViewColumn::make('attendees')
+                    ->label(__('filament/relation-managers/meetings.columns.attendees_count.label'))
+                    ->view('email-integration::filament.tables.columns.meeting-participants-stack'),
                 TextColumn::make('status')
                     ->badge(),
                 TextColumn::make('response_status')
@@ -103,35 +105,38 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             ])
             ->recordActions([
                 MeetingDetailInfolist::viewAction(),
-                Action::make('linkToRecord')
-                    ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
-                    ->icon(Heroicon::Link)
-                    ->color('gray')
-                    ->schema(MeetingDetailInfolist::linkRecordFields())
-                    ->action(function (array $data, Meeting $record): void {
-                        resolve(LinkMeetingToRecordAction::class)
-                            ->execute($record, $this->resolveRecord((string) $data['target_type'], (string) $data['target_id']));
 
-                        Notification::make()
-                            ->success()
-                            ->title(__('filament/relation-managers/meetings.notifications.linked.title'))
-                            ->send();
-                    }),
-                Action::make('unlinkFromRecord')
-                    ->label(__('filament/relation-managers/meetings.actions.unlink_from_record.label'))
-                    ->icon(Heroicon::LinkSlash)
-                    ->color('danger')
-                    ->visible(fn (Meeting $record): bool => $record->isLinkedTo($this->getOwnerRecord()))
-                    ->requiresConfirmation()
-                    ->action(function (Meeting $record): void {
-                        resolve(UnlinkMeetingFromRecordAction::class)
-                            ->execute($record, $this->getOwnerRecord());
+                ActionGroup::make([
+                    Action::make('linkToRecord')
+                        ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
+                        ->icon(Heroicon::Link)
+                        ->color('gray')
+                        ->schema(MeetingDetailInfolist::linkRecordFields())
+                        ->action(function (array $data, Meeting $record): void {
+                            resolve(LinkMeetingToRecordAction::class)
+                                ->execute($record, $this->resolveRecord((string) $data['target_type'], (string) $data['target_id']));
 
-                        Notification::make()
-                            ->success()
-                            ->title(__('filament/relation-managers/meetings.notifications.unlinked.title'))
-                            ->send();
-                    }),
+                            Notification::make()
+                                ->success()
+                                ->title(__('filament/relation-managers/meetings.notifications.linked.title'))
+                                ->send();
+                        }),
+                    Action::make('unlinkFromRecord')
+                        ->label(__('filament/relation-managers/meetings.actions.unlink_from_record.label'))
+                        ->icon(Heroicon::LinkSlash)
+                        ->color('danger')
+                        ->visible(fn (Meeting $record): bool => $record->isLinkedTo($this->getOwnerRecord()))
+                        ->requiresConfirmation()
+                        ->action(function (Meeting $record): void {
+                            resolve(UnlinkMeetingFromRecordAction::class)
+                                ->execute($record, $this->getOwnerRecord());
+
+                            Notification::make()
+                                ->success()
+                                ->title(__('filament/relation-managers/meetings.notifications.unlinked.title'))
+                                ->send();
+                        }),
+                ]),
             ]);
     }
 
