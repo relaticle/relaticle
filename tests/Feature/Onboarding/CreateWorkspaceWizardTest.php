@@ -13,6 +13,7 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -129,7 +130,6 @@ it('creates a workspace with onboarding fields', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -164,32 +164,120 @@ it('shows the account menu links inside a workspace', function (): void {
         ->assertSee(__('access-tokens.user_menu'));
 });
 
-it('clears the sub-options when the use case changes, so a switch can never strand the wizard', function (): void {
+it('stores the free text a user gives for the Other use case', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
         ->fillForm([
-            'name' => 'Switcher Co',
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-        ])
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-        ])
-        ->assertFormSet(['onboarding_context' => []])
-        ->fillForm([
-            'onboarding_context' => ['applications'],
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Parish Office',
         ])
         ->call('register')
         ->assertHasNoFormErrors();
 
-    $workspace = Workspace::query()->where('name', 'Switcher Co')->first();
+    $workspace = Workspace::query()->where('name', 'Parish Office')->sole();
 
-    expect($workspace)->not->toBeNull()
-        ->and($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
-        ->and($workspace->onboarding_context)->toBe(['applications']);
+    expect($workspace->onboarding_other_use_case)->toBe('Church donors');
+});
+
+it('caps the Other use case text at 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => str_repeat('a', 121),
+            'name' => 'Long Text Co',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['onboarding_other_use_case' => 'max']);
+});
+
+it('drops the Other text once a named use case is chosen instead', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Switched Co',
+        ])
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Switched Co')->sole();
+
+    expect($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Sales)
+        ->and($workspace->onboarding_other_use_case)->toBeNull();
+});
+
+it('the action rejects Other text over 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    expect(fn () => resolve(CreateWorkspaceAction::class)->create($user, [
+        'name' => 'Tampered Other Co',
+        'slug' => 'tampered-other-co',
+        'onboarding_use_case' => OnboardingUseCase::Other->value,
+        'onboarding_other_use_case' => str_repeat('a', 121),
+    ]))->toThrow(ValidationException::class);
+
+    expect(Workspace::query()->where('name', 'Tampered Other Co')->exists())->toBeFalse();
+});
+
+it('the action drops Other text when a named use case is chosen', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $workspace = resolve(CreateWorkspaceAction::class)->create($user, [
+        'name' => 'Direct Action Co',
+        'slug' => 'direct-action-co',
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_other_use_case' => 'Church donors',
+    ]);
+
+    expect($workspace->onboarding_other_use_case)->toBeNull();
+});
+
+it('no longer asks for use case sub-options', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->assertFormFieldExists('onboarding-use-case.onboarding_other_use_case')
+        ->assertFormFieldDoesNotExist('onboarding-use-case.onboarding_context');
+});
+
+it('shows the free text only for the Other use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->assertFormFieldHidden('onboarding-use-case.onboarding_other_use_case')
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->assertFormFieldVisible('onboarding-use-case.onboarding_other_use_case');
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
@@ -249,7 +337,6 @@ it('creates a workspace with a custom slug', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
             'slug' => 'my-workspace',
         ])
@@ -318,7 +405,6 @@ it('updates the user name when corrected during onboarding', function (): void {
         ->fillForm([
             'user_name' => 'Corrected Name',
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -352,7 +438,6 @@ it('marks first workspace as personal workspace', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'My First Workspace',
         ])
         ->call('register')
@@ -389,7 +474,6 @@ it('redirects first workspace to dashboard with notification', function (): void
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Redirect Workspace',
         ])
         ->call('register')
