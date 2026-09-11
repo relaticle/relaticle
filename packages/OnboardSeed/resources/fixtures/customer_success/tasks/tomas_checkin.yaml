@@ -1,0 +1,8 @@
+title: Book a save call with Intercom
+assigned_people:
+  - tomas
+custom_fields:
+  description: Usage is down 40%. Understand the competing tool and what would keep them.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

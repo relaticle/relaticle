@@ -147,7 +147,7 @@ trait CustomFieldTrait
      *     width: CustomFieldWidth|null,
      *     options: array<int|string, string>|null,
      *     description: string|null,
-     *     optionColors: array<int|string, string>|null,
+     *     optionColors: array<string, string>|null,
      *     hasColorOptions: bool,
      *     allowsMultipleValues: bool
      * } The complete field configuration
