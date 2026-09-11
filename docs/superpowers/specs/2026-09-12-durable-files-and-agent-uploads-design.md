@@ -99,7 +99,7 @@ Render surfaces:
 
 An app URL generator returns the plain disk URL when the disk is public and a temporary signed URL when it is private. Non-image types on a private disk carry `Content-Disposition: attachment`.
 
-Open question for the founder: the `logo` collection feeds every avatar in pickers, lists and search. Pinning it to the public disk with `useDisk()` keeps those URLs plain and cacheable, at the cost of #686's "all of them" wording. Recommendation: pin `logo` public; every collection this PR creates follows `MEDIA_DISK`.
+The `logo` collections on `Company` and `Team` stay on the public disk through `useDisk('public')` in `registerMediaCollections()`. They feed every avatar in pickers, lists and search, and plain cacheable URLs matter more there than the private-disk option. Every collection this PR creates follows `MEDIA_DISK`. Decided 2026-09-12.
 
 ## Agent uploads over MCP
 
