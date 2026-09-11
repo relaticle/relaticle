@@ -41,11 +41,12 @@ it('also queues initial calendar sync when the account has calendar', function (
     Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
 });
 
-it('queues incremental sync when calendar and mailbox cursors already exist', function (): void {
+it('queues an email backfill when a mailbox cursor already exists', function (): void {
     Bus::fake();
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'sync_cursor' => 'mail-cursor',
+        'initial_sync_estimated' => 80,
         'calendar_sync_cursor' => 'calendar-cursor',
         'capabilities' => [
             'email' => true,
@@ -55,10 +56,16 @@ it('queues incremental sync when calendar and mailbox cursors already exist', fu
 
     resolve(StartMailboxHistoryImportAction::class)->execute($account);
 
-    Bus::assertDispatched(IncrementalEmailSyncJob::class, fn (IncrementalEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertNotDispatched(IncrementalEmailSyncJob::class);
     Bus::assertDispatched(fn (IncrementalCalendarSyncJob $job): bool => $job->connectedAccount->is($account) && $job->reconcileAfter);
-    Bus::assertNotDispatched(InitialEmailSyncJob::class);
     Bus::assertNotDispatched(InitialCalendarSyncJob::class);
 
-    expect(MailboxSyncTracker::isCalendarSyncing($account))->toBeTrue();
+    expect($account->fresh())
+        ->sync_cursor->toBeNull()
+        ->initial_sync_estimated->toBeNull()
+        ->calendar_sync_cursor->toBe('calendar-cursor');
+
+    expect(MailboxSyncTracker::isCalendarSyncing($account))->toBeTrue()
+        ->and(MailboxSyncTracker::isEmailSyncing($account))->toBeFalse();
 });
