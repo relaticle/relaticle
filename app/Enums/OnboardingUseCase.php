@@ -70,4 +70,39 @@ enum OnboardingUseCase: string implements HasLabel
             self::Other => 'ri-more-line',
         };
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getSubOptions(): array
+    {
+        return match ($this) {
+            self::Sales => [
+                'outbound' => 'Outbound',
+                'inbound' => 'Inbound',
+                'product_led' => 'Product-led',
+                'partner_led' => 'Partner-led',
+            ],
+            self::CustomerSuccess => [
+                'high_touch' => 'High-touch',
+                'low_touch' => 'Low-touch',
+            ],
+            self::Recruiting => [
+                'applications' => 'Applications',
+                'sourcing' => 'Sourcing',
+            ],
+            self::Marketing => [
+                'content' => 'Content',
+                'demand_gen' => 'Demand gen',
+                'events' => 'Events',
+                'partnerships' => 'Partnerships',
+            ],
+            self::Fundraising, self::Investing => [
+                'early_stage' => 'Early-stage',
+                'growth_stage' => 'Growth-stage',
+                'late_stage' => 'Late-stage',
+            ],
+            self::Other => [],
+        };
+    }
 }
