@@ -277,7 +277,7 @@ return [
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 3,
-            'timeout' => 300,
+            'timeout' => 330,
             'nice' => 5,
         ],
     ],
@@ -372,7 +372,7 @@ return [
                 'balanceCooldown' => 2,
                 'memory' => 256,
                 'tries' => 3,
-                'timeout' => 300,
+                'timeout' => 330,
                 'nice' => 5,
             ],
             'chat-supervisor' => [

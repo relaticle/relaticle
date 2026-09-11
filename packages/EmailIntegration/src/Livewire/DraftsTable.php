@@ -70,6 +70,11 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                     ->limit(60)
                     ->searchable(),
                 TextColumn::make('participants_to')
+                    ->badge()
+                    ->listWithLineBreaks()
+                    ->separator(', ')
+                    ->limitList(5)
+                    ->expandableLimitedList()
                     ->label(__('filament/pages/email-inbox.drafts.columns.recipients'))
                     ->placeholder(__('filament/pages/email-inbox.drafts.columns.no_recipients'))
                     ->state(fn (Email $record): string => $record->participants
