@@ -8,10 +8,12 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
 use Relaticle\EmailIntegration\Enums\CalendarVisibility;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -32,6 +34,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly ?string $pageToken = null,
+        public readonly bool $reconcileAfter = false,
     ) {
         $this->onQueue('emails-sync');
     }
@@ -55,8 +58,10 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
         $eventsToStore = array_values($result->events);
 
+        $reconcileAfter = $this->reconcileAfter;
+
         if ($eventsToStore === []) {
-            self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken);
+            self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken, $reconcileAfter);
 
             return;
         }
@@ -74,8 +79,8 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
             account: $account,
             pageEvents: $pageEvents,
             eventsToStore: $eventsToStore,
-            onPageStored: static function (ConnectedAccount $account) use ($nextPageToken, $nextSyncToken): void {
-                self::continueOrFinish($account, $nextPageToken, $nextSyncToken);
+            onPageStored: static function (ConnectedAccount $account) use ($nextPageToken, $nextSyncToken, $reconcileAfter): void {
+                self::continueOrFinish($account, $nextPageToken, $nextSyncToken, $reconcileAfter);
             },
         );
     }
@@ -99,6 +104,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         ConnectedAccount $account,
         ?string $nextPageToken,
         ?string $nextSyncToken,
+        bool $reconcileAfter,
     ): void {
         $imported = Meeting::query()
             ->where('connected_account_id', $account->getKey())
@@ -106,7 +112,7 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
         if ($nextPageToken !== null && $nextPageToken !== '') {
             $account->update(['initial_calendar_sync_imported' => $imported]);
-            dispatch(new self($account, $nextPageToken));
+            dispatch(new self($account, $nextPageToken, $reconcileAfter));
 
             return;
         }
@@ -123,6 +129,17 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $account->update($update);
+
+        if ($reconcileAfter) {
+            try {
+                resolve(ReconcileCalendarMeetingsAction::class)->execute($account);
+            } catch (ReconcileCalendarMeetingsFailed $exception) {
+                $account->update([
+                    'status' => EmailAccountStatus::ERROR,
+                    'last_error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         MailboxSyncTracker::markCalendarFinished($account);
 
