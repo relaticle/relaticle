@@ -42,11 +42,11 @@ final class RichEditorFieldType extends BaseFieldType
                 ])
                 ->extraAttributes(fn (RichEditor $component): array => [
                     ...SlashMenuPlugin::attributes($component),
-                    ...(self::isDocument($customField) ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
+                    ...($this->isDocument($customField) ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
                 ]));
     }
 
-    private static function isDocument(CustomField $customField): bool
+    private function isDocument(CustomField $customField): bool
     {
         return (self::DOCUMENT_FIELDS[$customField->entity_type] ?? null) === $customField->code;
     }
