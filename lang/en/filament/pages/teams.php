@@ -44,6 +44,8 @@ return [
             ],
             'use_case_label' => 'What will you be using Relaticle for?',
             'use_case_validation_attribute' => 'use case',
+            'use_case_context_label' => 'Pick what applies to you.',
+            'use_case_context_validation_attribute' => 'use case details',
             'other_use_case_label' => 'What will you track?',
             'other_use_case_placeholder' => 'Candidates, donors, wholesale buyers',
             'other_use_case_validation_attribute' => 'what you track',
@@ -57,6 +59,10 @@ return [
                 'title' => 'Workspace limit reached',
                 'body' => 'You already own the maximum number of workspaces. Delete one, or ask to be invited to an existing workspace.',
             ],
+        ],
+        'validation' => [
+            'context_required' => 'Pick at least one option for the selected use case.',
+            'context_invalid' => 'One of the picked options does not belong to the selected use case.',
         ],
     ],
 ];

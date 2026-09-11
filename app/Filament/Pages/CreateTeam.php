@@ -216,7 +216,33 @@ final class CreateTeam extends RegisterTenant
                             ->all()
                     )
                     ->inline()
-                    ->live(),
+                    ->live()
+                    // Stale sub-options from the previous use case are invisible yet
+                    // fail validation, stranding the wizard on this step.
+                    ->afterStateUpdated(function (Set $set): void {
+                        $set('onboarding_context', []);
+                    }),
+
+                ToggleButtons::make('onboarding_context')
+                    ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
+                    ->validationAttribute(__('filament/pages/teams.create_team.form.use_case_context_validation_attribute'))
+                    ->required()
+                    ->options(function (Get $get): array {
+                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
+
+                        if (! $useCase instanceof OnboardingUseCase) {
+                            return [];
+                        }
+
+                        return $useCase->getSubOptions();
+                    })
+                    ->inline()
+                    ->multiple()
+                    ->visible(function (Get $get): bool {
+                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
+
+                        return $useCase instanceof OnboardingUseCase && $useCase->getSubOptions() !== [];
+                    }),
 
                 TextInput::make('onboarding_other_use_case')
                     ->label(__('filament/pages/teams.create_team.form.other_use_case_label'))
@@ -272,6 +298,14 @@ final class CreateTeam extends RegisterTenant
         return new HtmlString($html);
     }
 
+    private function isFirstWorkspace(): bool
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        return ! Filament::getUserDefaultTenant($user) instanceof Team;
+    }
+
     /**
      * @return array<Component>
      */
@@ -284,6 +318,7 @@ final class CreateTeam extends RegisterTenant
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/teams.create_team.form.your_name.placeholder'))
                 ->autofocus()
+                ->visible(fn (): bool => $this->isFirstWorkspace())
                 ->default(function (): string {
                     /** @var User $user */
                     $user = auth('web')->user();

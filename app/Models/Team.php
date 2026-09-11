@@ -49,7 +49,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
  * @property ?string $onboarding_other_use_case
- * @property ?array<string, string> $onboarding_context
+ * @property ?list<string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property ?string $stripe_id
