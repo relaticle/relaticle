@@ -515,8 +515,6 @@ final class AppServiceProvider extends ServiceProvider
         //
         // `date` gets the entry only. A bare date has no time of day, so converting one
         // would move it a day for every viewer west of UTC.
-        //
-        // `rich-editor` swaps only the form component, to add the `/` command menu.
         CustomFieldsType::register([
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
@@ -608,8 +606,7 @@ final class AppServiceProvider extends ServiceProvider
             return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
 
-        // Downloaded only once a rich editor is on the page, so panels without one
-        // pay nothing. Republish with `php artisan filament:assets` after editing it.
+        // The browser loads the published copy: run `php artisan filament:assets` after editing it.
         FilamentAsset::register([
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
                 ->loadedOnRequest(),

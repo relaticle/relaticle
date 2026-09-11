@@ -960,10 +960,8 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     }
 }
 
-/* Rich editor slash menu. The panel is appended to <body> so it escapes the
-   modal's overflow clipping; z-index 40 clears the modal window at 30. Rows are
-   one line so all twelve entries fit without scrolling; the description rides on
-   the row's title attribute. */
+/* The slash menu is appended to <body> to escape the modal's overflow clipping,
+   so z-40 has to clear the modal window at 30. */
 .fi-slash-menu {
     @apply absolute z-40 max-h-[28rem] w-screen overflow-y-auto p-1;
 }
@@ -1013,17 +1011,15 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
         @apply focus-within:ring-0;
     }
 
-    /* The canvas height is measured in JS (see slash-menu.js); this is only the
-       floor it starts from. Content grows past it and the modal scrolls, so no
-       max-height here, which would nest a second scrollbar inside the first. */
+    /* A floor only: slash-menu.js measures the real height. No max-height, which
+       would nest a second scrollbar inside the modal's. */
     .fi-fo-rich-editor-content {
         @apply min-h-40 px-0 py-0 text-[0.9375rem]/[1.65];
     }
 }
 
-/* The editor renders its own placeholder as a decoration, so the trigger character
-   can be a key cap. Filament's `content: attr(data-placeholder)` cannot style part
-   of itself. */
+/* The editor draws its own placeholder so the trigger can be a key cap, which
+   Filament's `content: attr(data-placeholder)` cannot style. */
 .fi-slash-placeholder {
     @apply pointer-events-none absolute inline-flex select-none items-center gap-1 text-gray-400 dark:text-gray-500;
 

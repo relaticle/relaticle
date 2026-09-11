@@ -220,8 +220,6 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
         ->toBe(['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link'])
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
 
-    // Filament's own file and link actions, re-declared so they overlay the form they
-    // were opened from rather than replacing it.
     foreach (['attachFiles', 'link'] as $name) {
         expect($editor->getActions()[$name]->shouldOverlayParentActions())->toBeTrue();
     }
@@ -233,9 +231,6 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
 
     $items = $menu['items'];
 
-    // The whole menu travels in one base64 attribute because Laravel's attribute bag
-    // escapes a `"` as `\"`, which HTML ignores: a quote in any of these strings would
-    // close the attribute and leave debris Alpine reads as a broken binding.
     expect($menu['noResults'])->toContain('"')
         ->and($menu['placeholder'])->toContain(':key')
         ->and(collect($items)->pluck('label')->all())
@@ -243,8 +238,6 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
         ->and(collect($items)->pluck('group')->unique()->values()->all())
         ->toBe(['Text', 'Lists', 'Insert']);
 
-    // Only shortcuts that actually fire are advertised: there is no code-fence rule,
-    // so Code deliberately shows none.
     expect(collect($items)->pluck('shortcut', 'id')->filter()->all())
         ->toBe([
             'h1' => '#',
@@ -256,8 +249,6 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
             'horizontalRule' => '---',
         ]);
 
-    // The menu reuses Filament's own tool handlers, so a name that stops being a tool
-    // would otherwise ship a menu entry that quietly does nothing.
     expect(collect($items)->pluck('action')->filter()->all())->toHaveSameSize($items)
         ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
 });

@@ -17,23 +17,10 @@ use Tiptap\Core\Extension;
 
 use function Filament\Support\generate_icon_html;
 
-/**
- * A `/` command menu for the rich editor, so block formatting needs no toolbar.
- *
- * Every entry is one of Filament's own `RichEditorTool`s. The menu reuses that tool's
- * icon and JS handler rather than restating them, which is what keeps a menu entry and
- * its toolbar equivalent from drifting apart.
- */
 final class SlashMenuPlugin implements RichContentPlugin
 {
-    /**
-     * Filament tool name => its menu entry. `group` buckets it under a heading,
-     * `shortcut` shows the markdown that does the same thing (only ones verified to
-     * fire: there is no code-fence rule), and `icon` overrides the tool's own, which
-     * for the file upload is a paperclip while the entry reads "Image".
-     *
-     * @var array<string, array{group: string, shortcut?: string, icon?: Heroicon}>
-     */
+    // List only shortcuts verified to fire: there is no code-fence input rule.
+    /** @var array<string, array{group: string, shortcut?: string, icon?: Heroicon}> */
     private const array ITEMS = [
         'h1' => ['group' => 'text', 'shortcut' => '#'],
         'h2' => ['group' => 'text', 'shortcut' => '##'],
@@ -54,13 +41,8 @@ final class SlashMenuPlugin implements RichContentPlugin
         return resolve(self::class);
     }
 
-    /**
-     * The menu is delivered as an attribute on the editor's wrapper rather than through
-     * `getEditorTools()`, because a tool only renders when the toolbar lists it and this
-     * editor has no toolbar.
-     *
-     * @return array<string, string>
-     */
+    // Not `getEditorTools()`: a tool renders only when the toolbar lists it, and there is none.
+    /** @return array<string, string> */
     public static function attributes(RichEditor $editor): array
     {
         $tools = $editor->getTools();
@@ -81,13 +63,8 @@ final class SlashMenuPlugin implements RichContentPlugin
             ];
         }
 
-        // Everything travels in one base64 attribute because Laravel's attribute bag
-        // escapes a `"` as `\"`, which means nothing in HTML: the first quote closes the
-        // attribute and the remainder is parsed as markup. A quote in a translated
-        // string is enough to do it, and the debris lands on the editor's wrapper as a
-        // stray `:query` attribute that Alpine then reads as an empty binding.
-        // Encoding keeps default json_encode escaping, so the payload stays ASCII and
-        // `atob` is safe.
+        // Base64, not raw JSON: the attribute bag escapes `"` as `\"`, so a quote in a
+        // translation would close the attribute. Default json_encode keeps it ASCII for `atob`.
         return [
             'data-slash-menu' => base64_encode((string) json_encode([
                 'items' => $items,
@@ -121,13 +98,8 @@ final class SlashMenuPlugin implements RichContentPlugin
         return [];
     }
 
-    /**
-     * Filament's own actions, re-declared so they overlay the form they were opened
-     * from instead of replacing it. `cacheActions()` keys by name and plugin actions
-     * are merged last, so these win.
-     *
-     * @return array<Action>
-     */
+    // Same names as Filament's own so they overlay the parent form: plugin actions merge last and win.
+    /** @return array<Action> */
     public function getEditorActions(): array
     {
         return [

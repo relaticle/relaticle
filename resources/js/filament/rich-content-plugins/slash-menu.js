@@ -1,10 +1,5 @@
-// The document-editor behaviour for Filament's rich editor: a `/` command menu, a
-// styled placeholder, and a guaranteed trailing paragraph.
-//
-// Loaded as an ES module by the editor's `customExtensionUrls`, so it must not import
-// anything: the TipTap and ProseMirror it needs come from the editor's own bundle via
-// window.FilamentRichEditor. A second copy of either would break ProseMirror's
-// instanceof checks and the extension would silently stop interoperating.
+// Never import here: a second TipTap or ProseMirror copy breaks ProseMirror's instanceof
+// checks, so both come from the editor's own bundle via window.FilamentRichEditor.
 
 const { Extension } = window.FilamentRichEditor.tiptap.core
 const { Plugin, PluginKey, TextSelection } = window.FilamentRichEditor.tiptap.pmState
@@ -15,9 +10,8 @@ const PLUGIN_KEY = new PluginKey('slashMenu')
 // Only at the start of a block or after whitespace, so `https://` and `and/or` are quiet.
 const TRIGGER = /(?:^|\s)(\/[a-zA-Z0-9]*)$/
 
-// Blocks the caret cannot leave by typing: Enter adds a newline inside a code block,
-// and a table traps it in the last cell. Anything ending the document in one of these
-// needs a paragraph after it, or the canvas below is unreachable.
+// Blocks the caret cannot type its way out of. A document ending in one needs a
+// paragraph after it, or the canvas below is unreachable.
 const TRAPPING_BLOCKS = ['codeBlock', 'table', 'horizontalRule', 'details', 'grid']
 
 const trailingParagraph = (state) =>
@@ -33,9 +27,7 @@ const config = (view) => {
     return host ? JSON.parse(atob(host.getAttribute('data-slash-menu'))) : EMPTY_CONFIG
 }
 
-// `:key` marks where the trigger character goes, so a translation can move it within
-// the sentence. Built as nodes rather than a CSS `content` string, which cannot style
-// one word of itself.
+// Built as nodes, not a CSS `content` string, so the trigger can render as a key cap.
 const placeholderElement = (template) => {
     const el = document.createElement('span')
     el.className = 'fi-slash-placeholder'
@@ -55,13 +47,8 @@ const placeholderElement = (template) => {
 // overflow the viewport and scroll the page instead.
 const MIN_PANEL_HEIGHT = 160
 
-// The canvas takes up whatever slack the form has left, measured rather than guessed:
-// a viewport fraction that fits a note form overflows a denser one, and pure CSS cannot
-// do it because the schema between the modal and the field is grids sized to content.
-//
-// Slack is read from the whole form rather than from the canvas down, so a field BELOW
-// the editor keeps its room. The note form has none and the canvas reaches the footer;
-// the task form has a due date and the canvas stops short of it.
+// Measured, not CSS: the schema between the modal and the field is content-sized grids.
+// Slack is read from the whole form, so a field below the editor keeps its room.
 const CANVAS_MIN_HEIGHT = 160
 const CANVAS_TOLERANCE = 2
 
@@ -346,9 +333,8 @@ class SlashMenuView {
         const spaceBelow = window.innerHeight - caret.bottom - margin * 2
         const spaceAbove = caret.top - margin * 2
 
-        // Flip up only when below cannot hold the panel and above has more room. The
-        // chosen side then caps the height, so a short viewport scrolls the list
-        // instead of pushing it off-screen.
+        // The chosen side caps the height, so a short viewport scrolls the list instead
+        // of pushing it off-screen.
         this.panel.style.maxHeight = ''
         const placeAbove = this.panel.offsetHeight > spaceBelow && spaceAbove > spaceBelow
         this.panel.style.maxHeight = `${Math.max(placeAbove ? spaceAbove : spaceBelow, MIN_PANEL_HEIGHT)}px`

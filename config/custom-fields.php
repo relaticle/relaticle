@@ -69,9 +69,7 @@ return [
     'field_type_configuration' => FieldTypeConfigurator::configure()
         // Control which field types are available globally
         ->enabled([]) // Empty = all enabled, or specify: ['text', 'email', 'select']
-        // markdown-editor is retired: the rich editor covers it, and two overlapping
-        // rich-text types only made the picker harder to read. Existing fields were
-        // converted by 2026_09_10_000000_convert_markdown_editor_custom_fields_to_rich_editor.
+        // A disabled type no longer resolves, so migrate its existing fields to another type first.
         ->disabled(['file-upload', 'markdown-editor'])
         ->discover(true)
         ->cache(enabled: true, ttl: 3600),
