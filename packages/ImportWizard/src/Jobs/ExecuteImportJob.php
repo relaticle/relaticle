@@ -43,6 +43,7 @@ use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Exceptions\MissingRequiredFieldException;
 use Relaticle\ImportWizard\Exceptions\UnparsableDateException;
 use Relaticle\ImportWizard\Importers\BaseImporter;
+use Relaticle\ImportWizard\Importers\PeopleImporter;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Store\ImportStore;
@@ -155,6 +156,11 @@ final class ExecuteImportJob implements ShouldQueue
                         $this->flushProcessedRows($store);
                     }
                     $this->flushCustomFieldValues();
+
+                    if ($importer instanceof PeopleImporter) {
+                        $importer->linkPendingCompaniesFromEmails();
+                    }
+
                     $this->flushTagOptions();
                     $this->flushFailedRows($import);
                     $this->persistResults($import, $results);

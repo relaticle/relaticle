@@ -11,17 +11,16 @@ use App\Models\Team;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
+use Relaticle\EmailIntegration\Support\PublicDomainList;
 
 final readonly class LinkEmailAction
 {
@@ -32,6 +31,7 @@ final readonly class LinkEmailAction
         private AutomatedSenderMatcher $automatedSender,
         private EmailVisibilityService $visibility,
         private RecordCommunicationMetrics $metrics,
+        private PublicDomainList $publicDomainList,
     ) {}
 
     /**
@@ -94,7 +94,7 @@ final readonly class LinkEmailAction
         $participants = $email->participants()->with('contact', 'company')->get();
         $teamId = $email->team_id;
         $connectedAccount = $email->connectedAccount;
-        $skippedDomains = $this->buildSkippedDomains($teamId);
+        $skippedDomains = $this->publicDomainList->forTeam($teamId);
 
         $team = $email->team;
 
@@ -249,23 +249,6 @@ final readonly class LinkEmailAction
                 fn (Builder $participantQuery) => $participantQuery->where('email_address', $emailAddress),
             )
             ->exists();
-    }
-
-    /**
-     * Merge config/email-integration.php default list with team-specific public_email_domains table.
-     *
-     * @return Collection<int, lowercase-string>
-     */
-    private function buildSkippedDomains(string $teamId): Collection
-    {
-        $configDomains = collect((array) config('email-integration.public_domains', []))
-            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
-
-        $teamDomains = PublicEmailDomain::query()->where('team_id', $teamId)
-            ->pluck('domain')
-            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
-
-        return $configDomains->merge($teamDomains)->unique()->values();
     }
 
     private function extractDomain(string $email): ?string
