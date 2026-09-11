@@ -2,7 +2,7 @@
 title: Field types you can add
 description: Every field type available for your records, from plain text to currency, rich editors, and record links.
 order: 1
-updated: "2026-08-13"
+updated: "2026-09-12"
 related: [help/custom-fields/add-and-manage-fields, help/custom-fields/edit-the-options-in-a-select-field]
 ---
 
@@ -16,8 +16,7 @@ type is locked once it's created.
 |------|----------|
 | Text | Short one-line values: a job title, a region |
 | Textarea | A few sentences without formatting |
-| Rich Editor | Formatted content: headings, lists, bold |
-| Markdown Editor | The same, written as Markdown |
+| Rich Editor | Formatted content: headings, lists, tables, images. Type / to insert a block |
 | Number | Plain numerics: headcount, a score |
 | Currency | Money: deal amounts, contract values |
 

@@ -43,7 +43,7 @@ final class CreateCustomFieldTool implements Tool
                 ->description('The display name for the field (e.g. "Industry", "Priority"). Max 50 characters, and must not match an existing field on the same entity.')
                 ->required(),
             'type' => $schema->string()
-                ->description("The field type. Allowed: {$allowedTypes}. NOT allowed: file-upload, record, rich-editor, markdown-editor, currency.")
+                ->description("The field type. Allowed: {$allowedTypes}. NOT allowed: file-upload, record, rich-editor, currency.")
                 ->required(),
             'code' => $schema->string()
                 ->description('Optional machine-readable code (snake_case). Auto-generated from name if omitted.'),

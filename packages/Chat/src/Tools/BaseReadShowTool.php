@@ -52,7 +52,6 @@ abstract class BaseReadShowTool implements Tool
      */
     private const array FREE_TEXT_FIELD_TYPES = [
         CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::MARKDOWN_EDITOR->value,
         CustomFieldType::TEXTAREA->value,
     ];
 

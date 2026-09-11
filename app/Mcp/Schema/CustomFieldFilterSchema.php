@@ -21,7 +21,6 @@ final readonly class CustomFieldFilterSchema
         CustomFieldType::RECORD->value,
         CustomFieldType::TEXTAREA->value,
         CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::MARKDOWN_EDITOR->value,
     ];
 
     /** @var array<int, string> */

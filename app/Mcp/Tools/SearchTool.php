@@ -38,7 +38,6 @@ final class SearchTool extends Tool
         'checkbox-list',
         'tags-input',
         'rich-editor',
-        'markdown-editor',
     ];
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}

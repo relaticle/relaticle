@@ -20,7 +20,6 @@ enum CustomFieldType: string
     case CHECKBOX_LIST = 'checkbox-list';
     case RADIO = 'radio';
     case RICH_EDITOR = 'rich-editor';
-    case MARKDOWN_EDITOR = 'markdown-editor';
     case TAGS_INPUT = 'tags-input';
     case COLOR_PICKER = 'color-picker';
     case TOGGLE = 'toggle';
