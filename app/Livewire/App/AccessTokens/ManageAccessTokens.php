@@ -33,6 +33,8 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
         $user = $this->authUser();
 
         return $table
+            ->heading(__('access-tokens.sections.manage.title'))
+            ->description(__('access-tokens.sections.manage.description'))
             ->query(
                 fn (): Builder => PersonalAccessToken::query()
                     ->with('team')

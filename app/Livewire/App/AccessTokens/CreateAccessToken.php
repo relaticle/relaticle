@@ -27,12 +27,23 @@ final class CreateAccessToken extends BaseLivewireComponent
 
     public ?string $plainTextToken = null;
 
+    private const string DEFAULT_EXPIRATION_DAYS = '180';
+
     public function mount(): void
     {
-        $this->form->fill([
+        $this->form->fill($this->initialFormState());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function initialFormState(): array
+    {
+        return [
             'team_id' => $this->authUser()->currentTeam?->getKey(),
             'permissions' => Jetstream::$defaultPermissions,
-        ]);
+            'expiration' => self::DEFAULT_EXPIRATION_DAYS,
+        ];
     }
 
     public function form(Schema $schema): Schema
@@ -40,7 +51,6 @@ final class CreateAccessToken extends BaseLivewireComponent
         return $schema
             ->schema([
                 Section::make(__('access-tokens.sections.create.title'))
-                    ->aside()
                     ->description(
                         __('access-tokens.sections.create.description'),
                     )
@@ -161,10 +171,7 @@ final class CreateAccessToken extends BaseLivewireComponent
 
         $this->plainTextToken = explode('|', $token->plainTextToken, 2)[1];
 
-        $this->form->fill([
-            'team_id' => $user->currentTeam?->getKey(),
-            'permissions' => Jetstream::$defaultPermissions,
-        ]);
+        $this->form->fill($this->initialFormState());
 
         $this->dispatch('tokenCreated');
 

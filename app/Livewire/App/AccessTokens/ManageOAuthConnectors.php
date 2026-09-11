@@ -33,6 +33,8 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
         $userId = $this->authUser()->getKey();
 
         return $table
+            ->heading(__('access-tokens.connectors.title'))
+            ->description(__('access-tokens.connectors.description'))
             ->query(fn (): Builder => Passport::client()->newQuery()
                 ->whereIn('id', fn (QueryBuilder $query) => $query
                     ->select('client_id')

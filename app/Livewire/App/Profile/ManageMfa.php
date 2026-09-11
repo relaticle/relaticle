@@ -54,7 +54,6 @@ final class ManageMfa extends BaseLivewireComponent
             ->schema([
                 Section::make(__('profile.sections.mfa.title'))
                     ->description(__('profile.sections.mfa.description'))
-                    ->aside()
                     ->schema([
                         ViewField::make('mfa')
                             ->hiddenLabel()

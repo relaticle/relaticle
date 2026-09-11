@@ -9,7 +9,7 @@ return [
         ],
         'team_slug' => [
             'label' => 'Workspace Slug',
-            'helper_text' => 'Only lowercase letters, numbers, and hyphens. This appears in your workspace URL.',
+            'helper_text' => 'Only lowercase letters, numbers, and hyphens.',
         ],
         'emails' => [
             'label' => 'Send invite to',
@@ -19,12 +19,19 @@ return [
         'invite_as' => [
             'label' => 'Invite as',
         ],
+        'team_logo' => [
+            'label' => 'Workspace logo',
+        ],
     ],
 
     'sections' => [
         'update_team_name' => [
             'title' => 'Workspace Name',
             'description' => 'The workspace\'s name and owner information.',
+        ],
+        'update_team_logo' => [
+            'title' => 'Workspace Logo',
+            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
         ],
         'add_team_member' => [
             'title' => 'Invite people',
