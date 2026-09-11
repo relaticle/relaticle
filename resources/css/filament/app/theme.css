@@ -472,14 +472,6 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply rounded-xl;
 }
 
-/* asmit/resized-column sets overflow-x: auto on the same node Filament marks
-   as the fixed positioning context. CSS then computes overflow-y to auto as
-   well, which is the same clipping ancestor as above. Keep horizontal scroll
-   on .fi-ta-table-wrapper only. */
-.fi-ta-content-ctn.fi-fixed-positioning-context {
-    overflow: visible;
-}
-
 .fi-ta-table thead {
     @apply bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900;
 }
