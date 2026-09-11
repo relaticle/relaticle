@@ -5,6 +5,13 @@ paths:
 
 # Email integration
 
+## Vanished provider messages must not fail the mailbox
+
+A listed Gmail or Graph id can be permanently deleted before `StoreEmailJob`
+fetches it. That 404 is skippable: returning from the job keeps the store batch
+successful so later mail still imports. Retrying until failure marks the mailbox
+`ERROR`, which excludes it from scheduled incremental syncs.
+
 ## Never import provider drafts
 
 Gmail drafts carry the `DRAFT` label and not `SENT`, so `fetchMessage()` classifies

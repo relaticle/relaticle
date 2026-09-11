@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\ProviderRateLimit;
+use Throwable;
 
 mutates(StoreEmailJob::class, ProviderRateLimit::class, ReleasesOnProviderRateLimit::class);
 
@@ -99,6 +100,28 @@ it('does not call the mailbox for other messages while that account is cooling d
 
     runStoreEmailJobWithQueue($account, 'msg-second', $quietFactory, $secondQueue);
 });
+
+it('skips storing when the provider reports the message as gone', function (Throwable $exception): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchMessage')
+        ->once()
+        ->andThrow($exception);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    $queueJob = Mockery::mock(QueueJob::class);
+    $queueJob->shouldReceive('release')->never();
+
+    runStoreEmailJobWithQueue($account, 'msg-gone', $factory, $queueJob);
+
+    expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(0);
+})->with([
+    'Gmail 404' => fn (): GoogleServiceException => new GoogleServiceException('Requested entity was not found.', 404),
+    'Microsoft Graph 404' => fn (): RequestException => new RequestException(new Response(new Psr7Response(404, [], '{}'))),
+]);
 
 it('still fails when the provider error is not a rate limit', function (): void {
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
