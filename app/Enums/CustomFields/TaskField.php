@@ -128,7 +128,7 @@ enum TaskField: string
      * emotional resonance and semantic meaning. Based on latest color trends including
      * Digital Lavender, Mocha Mousse sophistication, and retro-futuristic aesthetics.
      *
-     * @return array<int|string, string>|null Array of option => color mappings or null if not applicable
+     * @return array<string, string>|null Array of option => color mappings or null if not applicable
      */
     public function getOptionColors(): ?array
     {
