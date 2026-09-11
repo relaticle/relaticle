@@ -245,7 +245,7 @@ final readonly class EmailTemplateRenderService
             $value = $value->all();
         }
 
-        if ($value === null || $value === '' || $value === []) {
+        if (in_array($value, [null, '', []], true)) {
             return '';
         }
 
