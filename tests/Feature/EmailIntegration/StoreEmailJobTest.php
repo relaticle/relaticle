@@ -15,7 +15,6 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\ProviderRateLimit;
-use Throwable;
 
 mutates(StoreEmailJob::class, ProviderRateLimit::class, ReleasesOnProviderRateLimit::class);
 
@@ -101,7 +100,7 @@ it('does not call the mailbox for other messages while that account is cooling d
     runStoreEmailJobWithQueue($account, 'msg-second', $quietFactory, $secondQueue);
 });
 
-it('skips storing when the provider reports the message as gone', function (Throwable $exception): void {
+it('skips storing when the provider reports the message as gone', function (GoogleServiceException|RequestException $exception): void {
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
 
     $service = Mockery::mock(MailServiceInterface::class);
