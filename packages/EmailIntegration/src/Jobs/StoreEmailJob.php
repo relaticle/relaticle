@@ -8,6 +8,7 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -71,6 +72,12 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            // Permanently deleted between list and fetch. Retrying a 404 fails
+            // the batch and parks the mailbox as ERROR, stopping later imports.
+            if ($this->isMissingProviderMessage($exception)) {
+                return;
+            }
+
             throw $exception;
         }
 
@@ -102,5 +109,26 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             ->where('connected_account_id', $this->connectedAccount->getKey())
             ->where('provider_message_id', $this->messageId)
             ->exists();
+    }
+
+    private function isMissingProviderMessage(Throwable $exception): bool
+    {
+        $current = $exception;
+
+        while ($current instanceof Throwable) {
+            if ($current instanceof RequestException) {
+                return $current->response->status() === 404;
+            }
+
+            $code = $current->getCode();
+
+            if (is_int($code) && $code === 404) {
+                return true;
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return false;
     }
 }
