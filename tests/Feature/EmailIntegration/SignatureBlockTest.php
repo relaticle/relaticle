@@ -60,3 +60,57 @@ it('expands the signature block into signature html when rendered for sending', 
         ->toContain('Best, Jane')
         ->not->toContain('data-type="customBlock"');
 });
+
+it('does not expand a signature block referencing another users signature', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $otherUser->currentTeam->id,
+        'user_id' => $otherUser->id,
+    ]));
+    $foreignSignature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $otherAccount->id,
+        'content_html' => '<p>Secret signature</p>',
+    ]));
+
+    $configAttr = htmlspecialchars(
+        (string) json_encode(['signature_id' => $foreignSignature->getKey()]),
+        ENT_QUOTES,
+        'UTF-8',
+    );
+
+    $body = '<p>Hello</p><div data-type="customBlock"'
+        .' data-id="'.SignatureBlock::ID.'"'
+        .' data-config="'.$configAttr.'"></div>';
+
+    $sent = $this->service->renderForSending($body);
+
+    expect($sent)->toContain('Hello')
+        ->not->toContain('Secret signature');
+});
+
+it('does not expand a signature block from another workspace', function (): void {
+    $otherTeam = User::factory()->withTeam()->create()->currentTeam;
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'team_id' => $otherTeam->id,
+        'user_id' => $this->user->id,
+    ]));
+    $foreignSignature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $otherAccount->id,
+        'content_html' => '<p>Other workspace signature</p>',
+    ]));
+
+    $configAttr = htmlspecialchars(
+        (string) json_encode(['signature_id' => $foreignSignature->getKey()]),
+        ENT_QUOTES,
+        'UTF-8',
+    );
+
+    $body = '<p>Hello</p><div data-type="customBlock"'
+        .' data-id="'.SignatureBlock::ID.'"'
+        .' data-config="'.$configAttr.'"></div>';
+
+    $sent = $this->service->renderForSending($body);
+
+    expect($sent)->toContain('Hello')
+        ->not->toContain('Other workspace signature');
+});
