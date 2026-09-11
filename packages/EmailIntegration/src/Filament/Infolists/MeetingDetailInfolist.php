@@ -22,6 +22,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -42,7 +43,7 @@ final class MeetingDetailInfolist
         return ViewAction::make()
             ->slideOver(false)
             ->modalHeading(__('filament/resources/meeting.view.heading'))
-            ->modalWidth(Width::SevenExtraLarge)
+            ->modalWidth(Width::FiveExtraLarge)
             ->modalCancelAction(false)
             ->schema(fn (Schema $schema): Schema => self::configure($schema))
             ->registerModalActions([
@@ -161,12 +162,12 @@ final class MeetingDetailInfolist
                                     ->description(__('filament/resources/meeting.sections.linked_records.empty.description'))
                                     ->icon(Heroicon::OutlinedLink)
                                     ->contained(false)
-
                                     ->footer([
-                                        self::linkRecordsAction('linkRecords', asButton: true),
+                                        self::linkRecordsAction('linkRecords')->button()->size(Size::ExtraSmall),
                                     ])
                                     ->visible(fn (Meeting $record): bool => self::linkedCount($record) === 0),
                             ])
+                            ->compact(true)
                             ->columnSpan(2),
                     ]),
                 Section::make(__('filament/resources/meeting.sections.description.heading'))
@@ -234,7 +235,7 @@ final class MeetingDetailInfolist
         ];
     }
 
-    public static function linkRecordsAction(string $name, bool $asButton = false): Action
+    public static function linkRecordsAction(string $name): Action
     {
         $action = Action::make($name)
             ->label(__('filament/resources/meeting.actions.link_records.label'))
@@ -253,10 +254,6 @@ final class MeetingDetailInfolist
                     ->title(__('filament/relation-managers/meetings.notifications.linked.title'))
                     ->send();
             });
-
-        if ($asButton) {
-            return $action->button();
-        }
 
         return $action->link();
     }
