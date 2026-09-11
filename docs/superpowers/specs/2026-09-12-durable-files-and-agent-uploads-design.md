@@ -36,7 +36,7 @@ Verified 2026-09-12 in this checkout and in production.
 
 ## Prerequisites and merge order
 
-1. #695 (document-style rich editor) creates `app/Filament/CustomFields/RichEditorFieldType.php`, the class this PR extends, and edits the `->disabled([...])` line this PR edits. #695 merges first; this branch rebases on `main` after that.
+1. #695 (document-style rich editor) creates `app/Filament/CustomFields/RichEditorFieldType.php`, the class this PR extends, and edits the `->disabled([...])` line this PR edits. It is mergeable against `main` and merges cleanly into this branch (checked 2026-09-12 at `0c4e8e38d`). #695 merges first; this branch rebases on `main` after that.
 2. #606 (team branding) is reworked to a `logo` collection on `Team` with `Team implements HasMedia`. That branch owns the `HasMedia` change on `Team`; this PR adds collections to it. #606 merges before this PR.
 3. #699 still targets `feat/custom-fields-agent-friendly-writes`, merged as #698. Retarget to `main` needs the founder's say-so.
 
@@ -77,7 +77,9 @@ Table column and infolist entry render the file name as a link to the Media URL.
 
 ## Rich editor attachments
 
-`App\Support\Media\RichContentAttachments` implements Filament's `FileAttachmentProvider` once. The app `RichEditorFieldType` (from #695) wires its methods into `saveUploadedFileAttachmentUsing` and `getFileAttachmentUrlUsing`. `data-id` is the Media `uuid`.
+The editor is the app's own `RichEditorFieldType` from #695: no toolbar, a `/` menu built from Filament's `RichEditorTool` registry, `->fileAttachments(true)`, and `AttachFilesAction` reachable from the menu. Pasting and the attach modal both end in `saveUploadedFileAttachment`, so one wiring point covers both.
+
+`App\Support\Media\RichContentAttachments` implements Filament's `FileAttachmentProvider` once. `RichEditorFieldType` wires its methods into `saveUploadedFileAttachmentUsing` and `getFileAttachmentUrlUsing`, sets `fileAttachmentsMaxSize(10240)` so the editor's 12 MB default cannot pass a file medialibrary's 10 MB ceiling rejects, and keeps the image-only accepted types. `data-id` is the Media `uuid`.
 
 `getFileAttachmentUrl(id)` treats the id as untrusted client input. It resolves a uuid only when the row belongs to the current tenant, in `pending-uploads` or on a record the tenant owns. Anything else returns null.
 
