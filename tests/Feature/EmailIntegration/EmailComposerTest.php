@@ -253,6 +253,29 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->and($email->scheduled_for)->not->toBeNull();
 });
 
+it('persists rich editor inline images when sending from the composer', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $uploadId = 'a2b7d3cd-2222-4ac2-b3aa-6a12efe24763';
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Inline editor image')
+        ->set('bodyHtml', '<p><img data-id="'.$uploadId.'" width="100" height="100"></p><p>Inline image body</p>')
+        ->set('componentFileAttachments.bodyHtml.'.$uploadId, UploadedFile::fake()->image('inline.jpg', 100, 100))
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Inline editor image')->sole();
+
+    expect($email->attachments)->toHaveCount(1)
+        ->and($email->attachments->first()->is_inline)->toBeTrue()
+        ->and($email->body?->body_html)->toContain('cid:')
+        ->and($email->body?->body_html)->not->toContain($uploadId);
+});
+
 it('links a queued send to the record the composer was opened from', function (): void {
     $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
 

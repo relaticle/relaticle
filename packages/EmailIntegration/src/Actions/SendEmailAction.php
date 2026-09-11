@@ -26,10 +26,15 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use RuntimeException;
 
 final readonly class SendEmailAction
 {
+    public function __construct(
+        private EmailInlineImageEmbedder $inlineImageEmbedder,
+    ) {}
+
     /**
      * Persist a queued Email row. The scheduled dispatcher releases it later.
      *
@@ -71,16 +76,28 @@ final readonly class SendEmailAction
 
         $scheduledFor = $this->resolveScheduledFor($data, $priority);
 
+        $embedded = $this->inlineImageEmbedder->embed(
+            (string) $data['body_html'],
+            array_values($data['attachments'] ?? []),
+            $data['attachment_file_names'] ?? [],
+            $data['attachment_attributes'] ?? [],
+        );
+
+        $data['body_html'] = $embedded['body_html'];
+
         /** @var array<int, string> $attachmentPaths */
-        $attachmentPaths = array_values($data['attachments'] ?? []);
+        $attachmentPaths = $embedded['attachments'];
 
         /** @var array<string, array{is_inline?: bool, content_id?: ?string}> $attachmentAttributes */
-        $attachmentAttributes = $data['attachment_attributes'] ?? [];
+        $attachmentAttributes = $embedded['attachment_attributes'];
+
+        /** @var array<string, string> $attachmentFileNames */
+        $attachmentFileNames = $embedded['attachment_file_names'];
 
         $hasDownloadableAttachments = collect($attachmentPaths)
             ->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true);
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $hasDownloadableAttachments): Email {
+        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
             // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives
             // from a client-controlled hidden field and Email has no team global scope,
             // so an unscoped lookup would let a user thread their outbound mail onto
@@ -152,7 +169,7 @@ final readonly class SendEmailAction
                 }
             }
 
-            $this->storeAttachments($email, $attachmentPaths, $data['attachment_file_names'] ?? [], $attachmentAttributes);
+            $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
             if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
                 $linked = $linkToType::query()->whereKey($linkToId)->first();
