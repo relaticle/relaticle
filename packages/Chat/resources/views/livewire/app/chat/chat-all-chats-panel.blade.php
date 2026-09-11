@@ -4,6 +4,13 @@
             open: @entangle('isOpen'),
             viewportWidth: window.innerWidth,
             init() {
+                {{-- Open at init only when Livewire restored this page from its
+                     back/forward cache; forward navigation always lands closed. --}}
+                if (this.open) {
+                    this.open = false;
+                    $wire.close();
+                }
+
                 this.keydownHandler = (e) => {
                     if (e.key === 'Escape' && this.open) {
                         e.preventDefault();
