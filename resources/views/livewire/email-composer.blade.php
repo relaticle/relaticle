@@ -169,8 +169,8 @@
                         @if ($isMassSend)
                             <x-emails.composer-mass-send-to-summary :count="count($massRecipients)" />
                         @else
-                            <div class="min-w-0 flex-1">
-                                <x-emails.recipient-chips wire:model="to" :autofocus="true" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" />
+                            <div class="flex min-w-0 flex-1 items-center self-stretch">
+                                <x-emails.recipient-chips wire:model="to" :autofocus="true" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" />
                             </div>
                             <span class="shrink-0 space-x-2 text-xs font-medium text-gray-400">
                                 <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
@@ -189,14 +189,14 @@
 
                     @if ($showCc && ! $isMassSend)
                         <x-emails.composer-field :label="__('filament/emails/composer.fields.cc')">
-                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" /></div>
+                            <div class="flex min-w-0 flex-1 items-center self-stretch"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" /></div>
                         </x-emails.composer-field>
                         <x-emails.composer-error field="cc.*" />
                     @endif
 
                     @if ($showBcc && ! $isMassSend)
                         <x-emails.composer-field :label="__('filament/emails/composer.fields.bcc')">
-                            <div class="min-w-0 flex-1"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" /></div>
+                            <div class="flex min-w-0 flex-1 items-center self-stretch"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" /></div>
                         </x-emails.composer-field>
                         <x-emails.composer-error field="bcc.*" />
                     @endif

@@ -225,7 +225,7 @@
         x-init="$nextTick(() => $refs.input.focus())"
     @endif
     @if ($wireModel) wire:ignore @endif
-    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-[1.75rem] min-w-0 flex-wrap items-center gap-1']) }}
+    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-9 min-w-0 flex-wrap items-center gap-1']) }}
 >
     <template x-for="value in values" :key="value">
         <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 py-0.5 pl-2 pr-1 text-xs font-medium text-primary-700 ring-1 ring-primary-600/10 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/20">

@@ -2,7 +2,7 @@
      `for` renders the row as a <label> so the caption focuses the control. --}}
 @props(['label', 'for' => false])
 
-<{{ $for ? 'label' : 'div' }} {{ $attributes->class(['flex items-center gap-3 py-2']) }}>
-    <span class="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-gray-400">{{ $label }}</span>
+<{{ $for ? 'label' : 'div' }} {{ $attributes->class(['flex min-h-10 items-center gap-3 py-2']) }}>
+    <span class="w-14 shrink-0 self-center text-xs font-medium uppercase tracking-wide text-gray-400">{{ $label }}</span>
     {{ $slot }}
 </{{ $for ? 'label' : 'div' }}>
