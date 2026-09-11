@@ -6,9 +6,11 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\AiSummary;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailThread;
@@ -22,7 +24,7 @@ final readonly class EmailThreadSummaryService
 
     /**
      * Get or generate an AI summary for an email thread.
-     * Only includes email bodies the viewer has access to.
+     * Only includes messages and fields the viewer can see.
      */
     public function getSummary(EmailThread $thread, User $viewer, bool $regenerate = false): AiSummary
     {
@@ -46,54 +48,109 @@ final readonly class EmailThreadSummaryService
             ->oldest('sent_at')
             ->get();
 
-        $lines = [];
-        $lines[] = "Email thread: \"{$thread->subject}\"";
-        $lines[] = "{$thread->email_count} emails, {$thread->participant_count} participants";
-        $lines[] = 'Date range: '.($thread->first_email_at?->toDateString() ?? '—').' to '.($thread->last_email_at?->toDateString() ?? '—');
-        $lines[] = '';
+        /** @var list<array{email: Email, tier: EmailPrivacyTier}> $entries */
+        $entries = [];
 
-        foreach ($emails as $index => $email) {
-            $n = $index + 1;
-            // `from` is eager-loaded above to avoid an N+1 across the thread's emails.
-            // A malformed/draft message can carry no `from` participant, so the collection
-            // may be empty, so default rather than dereference a missing row.
-            $firstFrom = $email->from->first();
-            $from = $firstFrom instanceof EmailParticipant
-                ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
-                : 'Unknown';
-            $date = $email->sent_at?->toDateTimeString() ?? '—';
-            $dir = $email->direction->getLabel();
-
-            $lines[] = "--- Email {$n} ({$dir}) ---";
-            $lines[] = "From: {$from}  |  Date: {$date}";
-
-            // Single source of truth for visibility: PrivacyService::effectiveTier() also
-            // honours per-email shares, internal-email and protected-recipient hiding, which
-            // a raw privacy_tier read would leak into the AI prompt + cached summary.
+        foreach ($emails as $email) {
+            // Shares, internal mail, and protected recipients all resolve here.
+            // A raw privacy_tier read would leak those rows into the prompt.
             $tier = $this->privacy->effectiveTier($email, $viewer);
 
-            if ($tier === EmailPrivacyTier::FULL) {
-                $body = data_get($email, 'body.body_text', $email->snippet ?? '(no body)');
-                $lines[] = 'Body: '.mb_substr((string) $body, 0, 500);
-            } elseif ($tier === EmailPrivacyTier::SUBJECT) {
-                $lines[] = "Subject: {$email->subject}  (body hidden)";
-            } elseif ($tier === EmailPrivacyTier::METADATA_ONLY) {
-                $lines[] = '(metadata only)';
-            } else {
-                // null tier: fully hidden from this viewer
-                $lines[] = '(restricted)';
+            if (! $tier instanceof EmailPrivacyTier) {
+                continue;
             }
 
-            $category = $email->categoryLabel();
+            $entries[] = ['email' => $email, 'tier' => $tier];
+        }
 
-            if ($category instanceof EmailLabel) {
-                $lines[] = "Labels: {$category->label}";
-            }
+        $lines = $this->headerLines($entries);
 
-            $lines[] = '';
+        foreach ($entries as $index => $entry) {
+            $lines = [...$lines, ...$this->emailLines($index + 1, $entry['email'], $entry['tier'])];
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param  list<array{email: Email, tier: EmailPrivacyTier}>  $entries
+     * @return list<string>
+     */
+    private function headerLines(array $entries): array
+    {
+        $subject = null;
+        $earliest = null;
+        $latest = null;
+        $participantAddresses = [];
+
+        foreach ($entries as $entry) {
+            $email = $entry['email'];
+
+            if ($subject === null && in_array($entry['tier'], [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::FULL], true)) {
+                $subject = $email->subject;
+            }
+
+            $sentAt = $email->sent_at;
+
+            if ($sentAt instanceof CarbonInterface) {
+                if (! $earliest instanceof CarbonInterface || $sentAt->lt($earliest)) {
+                    $earliest = $sentAt;
+                }
+
+                if (! $latest instanceof CarbonInterface || $sentAt->gt($latest)) {
+                    $latest = $sentAt;
+                }
+            }
+
+            foreach ($email->participants as $participant) {
+                $participantAddresses[] = $participant->email_address;
+            }
+        }
+
+        $lines = [];
+        $lines[] = $subject === null ? 'Email thread' : "Email thread: \"{$subject}\"";
+        $lines[] = count($entries).' emails, '.count(array_unique($participantAddresses)).' participants';
+        $lines[] = 'Date range: '.($earliest?->toDateString() ?? '—').' to '.($latest?->toDateString() ?? '—');
+        $lines[] = '';
+
+        return $lines;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function emailLines(int $n, Email $email, EmailPrivacyTier $tier): array
+    {
+        $firstFrom = $email->from->first();
+        $from = $firstFrom instanceof EmailParticipant
+            ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
+            : 'Unknown';
+        $date = $email->sent_at?->toDateTimeString() ?? '—';
+        $dir = $email->direction->getLabel();
+
+        $lines = [
+            "--- Email {$n} ({$dir}) ---",
+            "From: {$from}  |  Date: {$date}",
+        ];
+
+        if ($tier === EmailPrivacyTier::FULL) {
+            $body = data_get($email, 'body.body_text', $email->snippet ?? '(no body)');
+            $lines[] = 'Body: '.mb_substr((string) $body, 0, 500);
+        } elseif ($tier === EmailPrivacyTier::SUBJECT) {
+            $lines[] = "Subject: {$email->subject}  (body hidden)";
+        } else {
+            $lines[] = '(metadata only)';
+        }
+
+        $category = $email->categoryLabel();
+
+        if ($category instanceof EmailLabel) {
+            $lines[] = "Labels: {$category->label}";
+        }
+
+        $lines[] = '';
+
+        return $lines;
     }
 
     private function generateAndCache(EmailThread $thread, string $prompt, string $inputHash): AiSummary
