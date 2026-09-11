@@ -141,6 +141,7 @@ return [
         'general' => 'General',
         'members' => 'Members',
         'custom_fields' => 'Custom Fields',
+        'email' => 'Email and Calendar',
         'import_history' => 'Import History',
         'activity' => 'Activity',
         'billing' => 'Billing',

@@ -6,7 +6,9 @@ namespace App\Services;
 
 use App\Enums\CreationSource;
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 /**
  * Request-scoped answers to "what has this workspace done so far".
@@ -66,6 +68,11 @@ final class WorkspaceActivationFacts
     public function hasTeammate(Team $team): bool
     {
         return $team->users()->exists() || $team->teamInvitations()->exists();
+    }
+
+    public function hasConnectedMailbox(User $user, Team $team): bool
+    {
+        return ConnectedAccount::hasConnectedFor($user, $team);
     }
 
     public function hasUserChatMessage(Team $team): bool

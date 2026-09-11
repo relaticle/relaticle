@@ -21,6 +21,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewOpportunity extends ViewRecord
 {
@@ -29,6 +31,9 @@ final class ViewOpportunity extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewRecordEmailsAction::make()
+                ->label(__('filament/resources/opportunity.pages.view.actions.view_emails.label'))
+                ->url(fn (): string => OpportunityResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()
                 ->icon('heroicon-o-pencil-square')
                 ->label(__('filament/resources/opportunity.pages.view.actions.edit.label'))
@@ -93,8 +98,9 @@ final class ViewOpportunity extends ViewRecord
                         ->grow(false),
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
-            ])
-                ->columnSpanFull(),
+            ])->columnSpanFull(),
+
+            CommunicationIntelligenceInfolist::section(),
         ]);
     }
 }

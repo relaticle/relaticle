@@ -65,11 +65,14 @@ return [
             'after_commit' => false,
         ],
 
+        // Must exceed the longest worker timeout on this connection (the imports and
+        // emails-sync supervisors both run 300s), or a slow job is handed to a second
+        // worker while the first still holds it.
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 360),
             'block_for' => null,
             'after_commit' => false,
         ],

@@ -12,6 +12,7 @@
 /vendor
 .env
 .env.backup
+.env.bak*
 .env.production
 .phpactor.json
 .phpunit.result.cache
@@ -52,6 +53,8 @@ api.json
 /storage/app/scribe
 /tests/Feature/Scribe
 .context
+/bin/setup-preview.sh
+/packages/filament
 .gstack/
 test-results.xml
 

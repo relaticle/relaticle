@@ -57,6 +57,9 @@ return [
                 'edit' => [
                     'label' => 'Edit',
                 ],
+                'view_emails' => [
+                    'label' => 'Emails',
+                ],
                 'copy_page_url' => [
                     'label' => 'Copy page URL',
                 ],
@@ -82,6 +85,9 @@ return [
                         'label' => 'Last Updated',
                     ],
                 ],
+            ],
+            'activity_log' => [
+                'description' => 'All activity for this company, grouped by week.',
             ],
         ],
     ],

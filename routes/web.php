@@ -21,6 +21,7 @@ use App\Http\Controllers\Auth\VerifyEmailChallengeController;
 use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\Dev\MailPreviewController;
+use App\Http\Controllers\EmailAttachmentController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\Mail\UnsubscribeController;
@@ -162,6 +163,14 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
         ->name('team-invitations.token.accept');
 
+    Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
+        ->middleware(['auth', 'verified', AuthenticateSession::class])
+        ->name('email-attachments.download');
+
+    Route::get('/email-attachments/{attachment}/inline', EmailAttachmentController::class)
+        ->middleware(['auth', 'verified', AuthenticateSession::class])
+        ->name('email-attachments.inline');
+
     Route::post('/invitations/{token}', [AcceptTeamInvitationController::class, 'store'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
@@ -187,6 +196,14 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
             ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-confirm')
             ->name('teams.join.confirm');
     });
+
+Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
+    ->middleware(['auth', 'verified', AuthenticateSession::class])
+    ->name('email-attachments.download');
+
+Route::get('/email-attachments/{attachment}/inline', EmailAttachmentController::class)
+    ->middleware(['auth', 'verified', AuthenticateSession::class])
+    ->name('email-attachments.inline');
 
 // Legacy documentation redirects. Two indexed generations point here: the
 // original /documentation/* URLs and the /docs/* generation retired 2026-08-13

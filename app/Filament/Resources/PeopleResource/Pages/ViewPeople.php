@@ -19,6 +19,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewPeople extends ViewRecord
 {
@@ -27,6 +29,9 @@ final class ViewPeople extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewRecordEmailsAction::make()
+                ->label(__('filament/resources/person.pages.view.actions.view_emails.label'))
+                ->url(fn (): string => PeopleResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
@@ -79,6 +84,8 @@ final class ViewPeople extends ViewRecord
                 ]),
                 CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
             ])->columnSpanFull(),
+
+            CommunicationIntelligenceInfolist::section(),
         ]);
     }
 }

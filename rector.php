@@ -73,6 +73,7 @@ return RectorConfig::configure()
             // so a private hook on a final page is a fatal error at runtime.
             __DIR__.'/app/Filament/Imports/*',
             __DIR__.'/app/Filament/Pages/*',
+            __DIR__.'/packages/EmailIntegration/src/Filament/Pages/*',
         ],
         ArrayToFirstClassCallableRector::class => [
             // class_exists has optional bool param that conflicts with Collection::first signature

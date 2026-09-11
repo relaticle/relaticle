@@ -16,6 +16,10 @@ return [
         'tasks' => 'Tasks',
     ],
 
+    'tenant_menu' => [
+        'email_settings' => 'Email Settings',
+    ],
+
     'selects' => [
         'member_self' => ':name (You)',
     ],

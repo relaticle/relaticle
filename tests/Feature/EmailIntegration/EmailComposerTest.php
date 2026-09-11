@@ -1,0 +1,1774 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\CustomFields\PeopleField;
+use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
+use App\Models\People;
+use App\Models\Team;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Factories\Sequence;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\AllowedRecipientService;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
+use Tests\Helpers\AllowedComposerRecipient;
+
+use function Pest\Laravel\actingAs;
+
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class);
+
+beforeEach(function (): void {
+    $this->user = User::factory()->withTeam()->create();
+    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+    actingAs($this->user);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($this->user->currentTeam);
+
+    AllowedComposerRecipient::seedMany($this->user, [
+        'lead@example.com',
+        'a@example.com',
+        'x@example.com',
+        'd@example.com',
+        'draft@example.com',
+        'victim@example.com',
+        'recipient@example.com',
+        'existing@example.com',
+        'forward-to@example.com',
+    ]);
+});
+
+it('opens via the composer:open event with the default account preselected', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->assertSet('isOpen', false)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id);
+});
+
+it('puts merge tags last on the message toolbar instead of the footer', function (): void {
+    $html = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->html();
+
+    expect($html)
+        ->toContain("togglePanel('mergeTags')")
+        ->not->toContain(__('filament/emails/composer.actions.variable'));
+
+    expect(strpos($html, "togglePanel('mergeTags')"))
+        ->toBeGreaterThan(strpos($html, 'redo().run()'));
+});
+
+it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.grant_send.description'))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'))
+        ->assertDontSee(__('filament/emails/composer.fields.subject_placeholder'));
+});
+
+it('opens the composer when a sync-error mailbox cannot send', function (): void {
+    $this->account->update([
+        'status' => EmailAccountStatus::ERROR,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]));
+});
+
+it('opens the grant permission empty state when a sync-error mailbox still has send', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $this->account->id)
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
+        ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
+        ->assertDontSee(__('filament/emails/composer.actions.send'));
+});
+
+it('redirects to oauth when grant permission is clicked on a mailbox that needs reconnect', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('does not queue mail from send when the mailbox has a sync error', function (): void {
+    $this->account->update(
+        ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    );
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
+it('redirects to oauth when grant permission is clicked', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->callAction('grantSendPermission')
+        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+});
+
+it('opens from a sendable mailbox when another connected account cannot send', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+        'capabilities' => [
+            'email' => true,
+            'send' => true,
+            'calendar' => false,
+        ],
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
+it('opens from a sendable mailbox when the default mailbox has a sync error', function (): void {
+    $this->account->update([
+        'is_default' => true,
+        ...ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
+    ]);
+
+    $sendable = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+        'is_default' => false,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('accountId', $sendable->id);
+});
+
+it('does not queue mail from send when the mailbox cannot send', function (): void {
+    $this->account->update([
+        'capabilities' => [
+            'email' => true,
+            'send' => false,
+            'calendar' => false,
+        ],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not send')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Should not send')->exists())->toBeFalse();
+});
+
+it('queues an email through SendEmailAction on send with the persisted body and undo-send window', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Quarterly sync')
+        ->set('bodyHtml', '<p>Hello there</p>')
+        ->call('send')
+        ->assertSet('isOpen', false)
+        ->assertDispatched('outbox:changed');
+
+    $email = Email::query()->where('subject', 'Quarterly sync')->sole();
+    expect($email->status)->toBe(EmailStatus::QUEUED)
+        ->and($email->connected_account_id)->toBe($this->account->id)
+        ->and($email->body->body_html)->toContain('Hello there')
+        // Interactive sends must keep the priority queue's undo-send window
+        // (EmailPriority::PRIORITY), not fall back to the bulk default.
+        ->and($email->scheduled_for)->not->toBeNull();
+});
+
+it('resolves merge tags from the primary To recipient when compose was not opened from a record', function (): void {
+    $person = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Laravel Projects',
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $person->team_id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+
+    $person->saveCustomFieldValue($emailsField, ['crm@example.com'], $person->team);
+
+    AllowedComposerRecipient::seed($this->user, 'crm@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['crm@example.com'])
+        ->set('subject', 'Hi {{ full name }}')
+        ->set('bodyHtml', '<p>Hello <span data-type="mergeTag" data-id="name">Full name</span></p>')
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Hi Laravel Projects')->sole();
+
+    expect($email->body?->body_html)->toContain('Hello Laravel Projects');
+});
+
+it('persists rich editor inline images when sending from the composer', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $uploadId = 'a2b7d3cd-2222-4ac2-b3aa-6a12efe24763';
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Inline editor image')
+        ->set('bodyHtml', '<p><img data-id="'.$uploadId.'" width="100" height="100"></p><p>Inline image body</p>')
+        ->set('componentFileAttachments.bodyHtml.'.$uploadId, UploadedFile::fake()->image('inline.jpg', 100, 100))
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Inline editor image')->sole();
+
+    expect($email->attachments)->toHaveCount(1)
+        ->and($email->attachments->first()->is_inline)->toBeTrue()
+        ->and($email->body?->body_html)->toContain('cid:')
+        ->and($email->body?->body_html)->not->toContain($uploadId);
+});
+
+it('links a queued send to the record the composer was opened from', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
+
+    Livewire::test(EmailComposer::class)
+        ->call('open', [
+            'linkRecordType' => People::class,
+            'linkRecordId' => $person->getKey(),
+        ])
+        ->assertSet('linkRecordType', People::class)
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Linked to person')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send')
+        ->assertDispatched('composer:sent');
+
+    $email = Email::query()->where('subject', 'Linked to person')->sole();
+
+    expect($person->emails()->whereKey($email->getKey())->exists())->toBeTrue();
+});
+
+it('does not link a queued send to a record from another workspace', function (): void {
+    $foreign = User::factory()->withTeam()->create();
+    $person = People::factory()->recycle([$foreign, $foreign->currentTeam])->create();
+
+    Livewire::test(EmailComposer::class)
+        ->call('open', [
+            'linkRecordType' => People::class,
+            'linkRecordId' => $person->getKey(),
+        ])
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Should not link')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Should not link')->sole();
+
+    expect($person->emails()->whereKey($email->getKey())->exists())->toBeFalse();
+});
+
+it('offers undo on the queued toast for the undo window', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Undo me')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Undo me')->sole();
+    $notification = collect(session('filament.claimed_notifications'))
+        ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
+
+    expect($notification)->not->toBeNull()
+        ->and($notification['duration'])->toBe(5_000)
+        ->and(collect($notification['actions'])->pluck('name')->all())->toContain('undo');
+
+    expect(collect($notification['actions'])->firstWhere('name', 'undo'))
+        ->toMatchArray([
+            'label' => __('filament/concerns/email-compose.actions.undo.label'),
+            'event' => 'undo-queued-send',
+            'eventData' => ['emailId' => (string) $email->getKey()],
+            'dispatchToComponent' => EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+        ]);
+});
+
+it('includes the default signature content in the sent body_html', function (): void {
+    EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>Best, Test Sender</p>',
+        'is_default' => true,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Signature roundtrip')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Signature roundtrip')->sole();
+
+    expect($email->body->body_html)->toContain('Best, Test Sender');
+});
+
+it('swaps the visible signature when the sending account changes', function (): void {
+    EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>Best, Account A</p>',
+        'is_default' => true,
+    ]));
+    $secondAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+    EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $secondAccount->id,
+        'content_html' => '<p>Best, Account B</p>',
+        'is_default' => true,
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', $secondAccount->id)
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Signature after account switch')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Signature after account switch')->sole();
+
+    expect($email->connected_account_id)->toBe($secondAccount->id)
+        ->and($email->body->body_html)->toContain('Best, Account B')
+        ->and($email->body->body_html)->not->toContain('Best, Account A');
+});
+
+it('shows validation errors instead of sending when recipients are missing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'No recipients')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasErrors(['to'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'No recipients')->exists())->toBeFalse();
+});
+
+it('surfaces a validation error for a malformed recipient and sends nothing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['not-an-email'])
+        ->set('subject', 'Malformed recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasErrors(['to.0'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Malformed recipient')->exists())->toBeFalse();
+});
+
+it('rejects a recipient that is not on a record or in suggestions and sends nothing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['random@example.com'])
+        ->set('subject', 'Random recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasErrors(['to.0'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeFalse();
+});
+
+it('includes CRM addresses outside the autocomplete cap in the allowed recipient list', function (): void {
+    $seedEmail = function (People $person, string $email): void {
+        $emailsField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $person->team_id)
+            ->where('entity_type', 'people')
+            ->where('code', PeopleField::EMAILS->value)
+            ->firstOrFail();
+
+        $person->saveCustomFieldValue($emailsField, [$email], $person->team);
+    };
+
+    foreach (range(1, 300) as $i) {
+        $person = People::factory()->for($this->user->currentTeam)->create([
+            'name' => sprintf('Person %03d', $i),
+            'creator_id' => $this->user->getKey(),
+        ]);
+
+        $seedEmail($person, "cap{$i}@example.com");
+    }
+
+    $overflow = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Z Overflow Contact',
+        'creator_id' => $this->user->getKey(),
+    ]);
+    $seedEmail($overflow, 'overflow@example.com');
+
+    $component = Livewire::test(EmailComposer::class)->dispatch('composer:open');
+
+    expect($component->instance()->allowedRecipientAddresses())
+        ->toContain('overflow@example.com');
+
+    $optionEmails = collect($component->instance()->recipientOptions())
+        ->pluck('email')
+        ->filter()
+        ->all();
+
+    expect($optionEmails)->not->toContain('overflow@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['overflow@example.com'])
+        ->set('subject', 'Overflow recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    expect(Email::query()->where('subject', 'Overflow recipient')->exists())->toBeTrue();
+});
+
+it('rejects an empty body with no signature block and sends nothing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Empty body')
+        ->call('send')
+        ->assertHasErrors(['bodyHtml'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Empty body')->exists())->toBeFalse();
+});
+
+it('passes uploaded attachments through to the send action', function (): void {
+    Storage::fake('local');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['a@example.com'])
+        ->set('subject', 'With attachment')
+        ->set('bodyHtml', '<p>see attached</p>')
+        ->set('attachments', [UploadedFile::fake()->create('quote.pdf', 12)])
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'With attachment')->sole();
+
+    expect($email->has_attachments)->toBeTrue()
+        ->and($email->attachments()->count())->toBe(1)
+        ->and($email->attachments()->first()->filename)->toBe('quote.pdf');
+});
+
+it('does not render for users without an active connected account', function (): void {
+    $this->account->update(['status' => EmailAccountStatus::DISCONNECTED]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', false);
+});
+
+it('restores an already-open composer instead of resetting it when composer:open fires again', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'In progress')
+        ->call('minimize')
+        ->assertSet('isMinimized', true)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('isMinimized', false)
+        ->assertSet('subject', 'In progress');
+});
+
+it('does not leak another team\'s signature content via a foreign signatureId', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+    $otherSignature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $otherAccount->id,
+        'content_html' => '<p>Confidential other-team signature</p>',
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['victim@example.com'])
+        ->set('subject', 'IDOR probe')
+        ->set('bodyHtml', '<p>hello</p>')
+        ->set('signatureId', $otherSignature->id)
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'IDOR probe')->sole();
+
+    expect($email->body->body_html)->not->toContain('Confidential other-team signature');
+});
+
+it('rejects a client-posted accountId that does not belong to the user', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', $otherAccount->id)
+        ->assertSet('accountId', null);
+});
+
+it('saves a draft when minimized and reopens it with state intact', function (): void {
+    $component = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['draft@example.com'])
+        ->set('subject', 'Half-written')
+        ->set('bodyHtml', '<p>wip</p>')
+        ->call('minimize')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'));
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    expect($draft->subject)->toBe('Half-written')
+        ->and($draft->user_id)->toBe($this->user->id);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('subject', 'Half-written')
+        ->assertSet('to', ['draft@example.com'])
+        ->assertSet('draftId', $draft->id);
+});
+
+it('notifies when a draft is saved on close', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['draft@example.com'])
+        ->set('subject', 'Parked draft')
+        ->set('bodyHtml', '<p>Come back later</p>')
+        ->call('close')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Parked draft')->exists())->toBeTrue();
+});
+
+it('does not notify when closing an empty composer', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('close')
+        ->assertNotNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+});
+
+it('notifies when an inline reply draft is saved on dismiss', function (): void {
+    $email = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->dispatch('composer:reply', emailId: $email->id, mode: 'reply')
+        ->set('to', ['recipient@example.com'])
+        ->set('subject', 'Inline draft')
+        ->set('bodyHtml', '<p>Reply in progress</p>')
+        ->dispatch('composer:dismiss-inline')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
+});
+
+it('deletes the draft after a successful send', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'From draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send');
+
+    // Email uses SoftDeletes — assert the row is actually gone (forceDelete()),
+    // not merely soft-deleted, which a plain ->whereKey()->exists() would miss.
+    expect(Email::query()->withTrashed()->whereKey($draft->id)->exists())->toBeFalse()
+        ->and(Email::query()->where('subject', 'From draft')->where('status', EmailStatus::QUEUED)->exists())->toBeTrue();
+});
+
+it('does not save empty drafts on close', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('close');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+});
+
+it('never lists drafts in the mail panes', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['d@example.com'])
+        ->set('subject', 'Hidden draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    Livewire::test(EmailInboxPage::class)
+        ->call('setFolder', 'all')
+        ->assertDontSee('Hidden draft');
+});
+
+it('does not load another user\'s draft into the composer', function (): void {
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+
+    actingAs($otherUser);
+    Filament::setTenant($otherUser->currentTeam);
+
+    $foreignDraft = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['victim@example.com'])
+        ->set('subject', 'Confidential draft')
+        ->set('bodyHtml', '<p>secret</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Confidential draft')->sole();
+    expect($draft->connected_account_id)->toBe($otherAccount->id);
+
+    actingAs($this->user);
+    Filament::setTenant($this->user->currentTeam);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', null)
+        ->assertSet('subject', null)
+        ->assertSet('to', []);
+});
+
+it('closes and queues exactly once even when the draft row was already deleted before send completes', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Racing draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $reopened = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', $draft->id);
+
+    // Simulate a second tab on the same draft (or a retried request) having
+    // already cleaned it up by the time this instance's send() runs.
+    Email::query()->whereKey($draft->id)->forceDelete();
+
+    $reopened->call('send')
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->where('subject', 'Racing draft')->count())->toBe(1);
+});
+
+it('does not load a draft that belongs to a different team of the same user', function (): void {
+    $otherTeam = Team::factory()->create(['user_id' => $this->user->getKey()]);
+    $this->user->teams()->attach($otherTeam, ['role' => 'admin']);
+
+    $otherTeamAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $otherTeam->id,
+        'status' => 'active',
+    ]));
+
+    $draft = Email::factory()->create([
+        'team_id' => $otherTeam->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $otherTeamAccount->id,
+        'status' => EmailStatus::DRAFT,
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Drafts,
+        'sent_at' => null,
+        'subject' => 'Other-team draft',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', null)
+        ->assertSet('subject', null)
+        ->assertSet('to', []);
+});
+
+it('excludes a teammate\'s unsent draft recipients from recipient suggestions', function (): void {
+    $teammate = User::factory()->create(['current_team_id' => $this->user->current_team_id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+
+    resolve(SaveEmailDraftAction::class)->execute(
+        user: $teammate,
+        data: [
+            'connected_account_id' => $teammateAccount->id,
+            'subject' => 'Teammate secret draft',
+            'body_html' => '<p>hi</p>',
+            'to' => ['hidden-recipient@example.com'],
+            'cc' => [],
+            'bcc' => [],
+        ],
+    );
+
+    $suggestions = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientSuggestions();
+
+    expect($suggestions)->not->toContain('hidden-recipient@example.com');
+});
+
+it('excludes a teammate\'s private mail recipients from recipient suggestions', function (): void {
+    $address = 'private-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::PRIVATE, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes protected-recipient addresses from recipient suggestions', function (): void {
+    $address = 'vip@protected.example';
+
+    TeamEmailBlocklist::factory()->protected()->email($address)->create([
+        'team_id' => $this->user->current_team_id,
+        'created_by' => $this->user->id,
+    ]);
+
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes a teammate\'s BCC addresses from recipient suggestions', function (): void {
+    $bcc = 'secret-bcc@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $bcc, EmailParticipantRole::BCC);
+
+    expect(composerRecipientSuggestions())->not->toContain($bcc);
+});
+
+it('excludes a teammate\'s internal mail recipients from recipient suggestions', function (): void {
+    $address = 'internal-only@example.com';
+    teammateSentEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO, isInternal: true);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('includes recipients from a teammate\'s workspace-visible mail in recipient suggestions', function (): void {
+    $address = 'shared-to@acme.test';
+    teammateSentEmail($this->user, EmailPrivacyTier::METADATA_ONLY, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->toContain($address);
+});
+
+it('includes the owner\'s own private and BCC addresses in recipient suggestions', function (): void {
+    $to = 'own-private@example.com';
+    $bcc = 'own-bcc@example.com';
+
+    $email = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'is_internal' => false,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $to,
+        'role' => EmailParticipantRole::TO,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $bcc,
+        'role' => EmailParticipantRole::BCC,
+    ]);
+
+    $suggestions = composerRecipientSuggestions();
+
+    expect($suggestions)->toContain($to)
+        ->and($suggestions)->toContain($bcc);
+});
+
+it('adds every company team member primary email to recipients', function (): void {
+    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Basepoint']);
+
+    $people = People::factory()
+        ->count(2)
+        ->for($this->user->currentTeam)
+        ->for($company)
+        ->sequence(
+            ['name' => 'Natalie Hughes'],
+            ['name' => 'Asha Gupta'],
+        )
+        ->create();
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->user->current_team_id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->sole();
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $people[0]->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['natalie@example.com', 'natalie.personal@example.com'],
+    ]);
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $people[1]->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['asha@example.com'],
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['existing@example.com'])
+        ->call('addCompanyTeamRecipients', $company->id)
+        ->assertSet('to', [
+            'existing@example.com',
+            'natalie@example.com',
+            'asha@example.com',
+        ]);
+});
+
+it('includes company team recipient options outside the first person option page', function (): void {
+    $earlyCompany = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Alpha']);
+    $targetCompany = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Zephyr']);
+
+    People::factory()
+        ->count(300)
+        ->for($this->user->currentTeam)
+        ->for($earlyCompany)
+        ->sequence(fn (Sequence $sequence): array => [
+            'name' => sprintf('A Contact %03d', $sequence->index),
+        ])
+        ->create();
+
+    $person = People::factory()
+        ->for($this->user->currentTeam)
+        ->for($targetCompany)
+        ->create(['name' => 'Zoe Late']);
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->user->current_team_id)
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->sole();
+
+    CustomFieldValue::query()->create([
+        'custom_field_id' => $emailField->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->user->current_team_id,
+        'json_value' => ['zoe@example.com'],
+    ]);
+
+    $options = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientOptions();
+
+    expect(collect($options)
+        ->first(fn (array $option): bool => $option['type'] === 'company_team' && $option['label'] === 'Zephyr'))
+        ->toMatchArray([
+            'count' => 1,
+            'emails' => ['zoe@example.com'],
+        ]);
+});
+
+it('saves pending attachments onto the draft when the composer is closed', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Has an attachment')
+        ->set('bodyHtml', '<p>b</p>')
+        ->set('attachments', [UploadedFile::fake()->create('quote.pdf', 12)])
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Has an attachment')->sole();
+
+    expect($draft->has_attachments)->toBeTrue()
+        ->and($draft->attachments)->toHaveCount(1)
+        ->and($draft->attachments->first()->filename)->toBe('quote.pdf');
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $draft->attachments->first()->storage_path);
+});
+
+it('reopens a draft with its saved attachments listed', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Reopen me')
+        ->set('attachments', [UploadedFile::fake()->create('brief.pdf', 20)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Reopen me')->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $draft->attachments->first()->getKey(),
+            'filename' => 'brief.pdf',
+            'size' => (int) $draft->attachments->first()->size,
+        ]])
+        ->assertSee('brief.pdf');
+});
+
+it('does not attach a saved draft file twice when the draft is saved again', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Saved twice')
+        ->set('attachments', [UploadedFile::fake()->create('once.pdf', 10)])
+        ->call('minimize')
+        ->call('minimize')
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Saved twice')->sole();
+
+    expect($draft->attachments)->toHaveCount(1);
+});
+
+it('removes a saved attachment from the draft and from disk', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Drop the file')
+        ->set('attachments', [UploadedFile::fake()->create('oops.pdf', 10)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Drop the file')->sole();
+    $attachment = $draft->attachments->first();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->call('removeSavedAttachment', (string) $attachment->getKey())
+        ->assertSet('savedAttachments', []);
+
+    Storage::disk(EmailAttachment::DISK)->assertMissing((string) $attachment->storage_path);
+    expect($draft->refresh()->attachments)->toHaveCount(0)
+        ->and($draft->has_attachments)->toBeFalse();
+});
+
+it('sends a reopened draft with its saved attachments and leaves no orphaned files', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Send with attachment')
+        ->set('attachments', [UploadedFile::fake()->create('contract.pdf', 30)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Send with attachment')->sole();
+    $draftPath = (string) $draft->attachments->first()->storage_path;
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->set('to', ['lead@example.com'])
+        ->set('bodyHtml', '<p>Signed copy attached</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $sent = Email::query()->where('subject', 'Send with attachment')->where('status', EmailStatus::QUEUED)->sole();
+    $sentAttachment = $sent->attachments->sole();
+
+    expect($sentAttachment->filename)->toBe('contract.pdf')
+        // The queued email holds its own copy: deleting the draft (which send()
+        // does straight after) must not strip the bytes out from under it.
+        ->and($sentAttachment->storage_path)->not->toBe($draftPath);
+
+    Storage::disk(EmailAttachment::DISK)->assertExists((string) $sentAttachment->storage_path);
+    Storage::disk(EmailAttachment::DISK)->assertMissing($draftPath);
+    expect(Email::query()->whereKey($draft->getKey())->exists())->toBeFalse();
+});
+
+it('does not copy another user\'s saved draft attachment from client-controlled state', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+    $foreignDraft = Email::factory()->create([
+        'team_id' => $otherUser->current_team_id,
+        'user_id' => $otherUser->id,
+        'connected_account_id' => $otherAccount->id,
+        'status' => EmailStatus::DRAFT,
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Drafts,
+        'subject' => 'Foreign draft',
+    ]);
+
+    Storage::disk(EmailAttachment::DISK)->put('email-attachments/secret.pdf', 'secret');
+
+    $foreignAttachment = EmailAttachment::factory()->create([
+        'email_id' => $foreignDraft->getKey(),
+        'filename' => 'secret.pdf',
+        'storage_path' => 'email-attachments/secret.pdf',
+        'size' => 6,
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Forged saved attachment')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('draftId', (string) $foreignDraft->getKey())
+        ->set('savedAttachments', [[
+            'id' => (string) $foreignAttachment->getKey(),
+            'filename' => 'secret.pdf',
+            'size' => 6,
+        ]])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Forged saved attachment')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments)->toHaveCount(0);
+});
+
+it('does not copy another email\'s attachments from client-controlled forward state', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $otherUser = User::factory()->withTeam()->create();
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $otherUser->id,
+        'team_id' => $otherUser->current_team_id,
+        'status' => 'active',
+    ]));
+    $foreignEmail = Email::factory()->create([
+        'team_id' => $otherUser->current_team_id,
+        'user_id' => $otherUser->id,
+        'connected_account_id' => $otherAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    Storage::disk(EmailAttachment::DISK)->put('email-attachments/secret.pdf', 'secret');
+
+    $foreignAttachment = EmailAttachment::factory()->create([
+        'email_id' => $foreignEmail->getKey(),
+        'filename' => 'secret.pdf',
+        'storage_path' => 'email-attachments/secret.pdf',
+        'size' => 6,
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Forged forward attachment')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('replyMode', 'forward')
+        ->set('sourceEmailId', (string) $foreignEmail->getKey())
+        ->set('savedAttachments', [[
+            'id' => (string) $foreignAttachment->getKey(),
+            'filename' => 'secret.pdf',
+            'size' => 6,
+        ]])
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Forged forward attachment')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments)->toHaveCount(0);
+});
+
+it('downloads a provider-stored attachment when forwarding', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $attachment = EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andReturn('gmail-contract-bytes');
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 18,
+        ]])
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentPath = (string) $forward->attachments->sole()->storage_path;
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+    Storage::disk(EmailAttachment::DISK)->assertExists($sentPath);
+    expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
+});
+
+it('does not queue a forward when a provider attachment cannot be downloaded', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $attachment = EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andThrow(new RuntimeException('provider unavailable'));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertSet('isOpen', true)
+        ->assertSet('savedAttachments', [[
+            'id' => (string) $attachment->getKey(),
+            'filename' => 'contract.pdf',
+            'size' => 18,
+        ]])
+        ->assertNotified(__('filament/emails/composer.notifications.send_attachment_unavailable.title'));
+
+    expect(Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->exists())->toBeFalse();
+});
+
+it('keeps an undownloadable forwarded attachment on a saved draft', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->once()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andThrow(new RuntimeException('provider unavailable'));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close')
+        ->assertNotified(__('filament/emails/composer.notifications.attachment_unavailable.title'));
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    $draftAttachment = $draft->attachments->sole();
+
+    expect($draft->has_attachments)->toBeTrue()
+        ->and($draftAttachment->filename)->toBe('contract.pdf')
+        ->and($draftAttachment->storage_path)->toBeNull()
+        ->and($draftAttachment->provider_attachment_id)->toBe('provider-att-1');
+});
+
+it('does not send a reopened forward when a saved attachment is still unavailable', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->twice()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andThrow(new RuntimeException('provider unavailable'));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->twice()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSee('contract.pdf')
+        ->call('send')
+        ->assertSet('isOpen', true)
+        ->assertNotified(__('filament/emails/composer.notifications.send_attachment_unavailable.title'));
+
+    expect(Email::query()
+        ->where('status', EmailStatus::QUEUED)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->exists())->toBeFalse();
+});
+
+it('sends a reopened forward once an unavailable attachment can be downloaded', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $this->account->update(['email_address' => 'me@example.com']);
+
+    $inbound = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'provider_message_id' => 'provider-msg-1',
+        'rfc_message_id' => '<original@example.com>',
+        'subject' => 'Has a contract',
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailAttachment::factory()->create([
+        'email_id' => $inbound->getKey(),
+        'filename' => 'contract.pdf',
+        'storage_path' => null,
+        'provider_attachment_id' => 'provider-att-1',
+        'size' => 18,
+        'is_inline' => false,
+    ]);
+
+    $mail = Mockery::mock(MailServiceInterface::class);
+    $mail->shouldReceive('downloadAttachment')
+        ->twice()
+        ->with('provider-msg-1', 'provider-att-1')
+        ->andReturnUsing(function (): string {
+            static $attempt = 0;
+            $attempt++;
+
+            throw_if($attempt === 1, RuntimeException::class, 'provider unavailable');
+
+            return 'gmail-contract-bytes';
+        });
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->twice()->andReturn($mail);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>Passing this on</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+    $sentPath = (string) $forward->attachments->sole()->storage_path;
+
+    expect($forward->attachments->sole()->filename)->toBe('contract.pdf');
+    Storage::disk(EmailAttachment::DISK)->assertExists($sentPath);
+    expect(Storage::disk(EmailAttachment::DISK)->get($sentPath))->toBe('gmail-contract-bytes');
+});
+
+it('deletes a draft\'s attachment files when the draft is deleted', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Delete me')
+        ->set('attachments', [UploadedFile::fake()->create('gone.pdf', 10)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Delete me')->sole();
+    $path = (string) $draft->attachments->first()->storage_path;
+
+    resolve(DeleteEmailDraftAction::class)->execute($this->user, (string) $draft->getKey());
+
+    Storage::disk(EmailAttachment::DISK)->assertMissing($path);
+    expect(EmailAttachment::query()->where('email_id', $draft->getKey())->exists())->toBeFalse();
+});
+
+it('falls back to the default account and warns when a draft\'s connected account is no longer active', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Stale account draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('minimize');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    $fallbackAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'team_id' => $this->user->current_team_id,
+        'status' => 'active',
+    ]));
+
+    $this->account->update(['status' => EmailAccountStatus::DISCONNECTED]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('draftId', $draft->id)
+        ->assertSet('subject', 'Stale account draft')
+        ->assertSet('accountId', $fallbackAccount->id)
+        ->assertNotified('Original account no longer connected');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->whereKey($draft->id)->value('connected_account_id'))
+        ->toBe($this->account->id);
+});
+
+it('fills subject and body from a template and keeps the signature below it', function (): void {
+    $signature = EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>— Ada</p>',
+    ]);
+
+    $template = EmailTemplate::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'created_by' => $this->user->id,
+        'is_shared' => true,
+        'subject' => 'Renewal options',
+        'body_html' => '<p>Here are your options.</p>',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('signatureId', $signature->id)
+        ->call('applyTemplate', $template->id)
+        ->assertSet('subject', 'Renewal options')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Renewal options')->sole();
+    expect($email->body->body_html)->toContain('Here are your options.')
+        ->and($email->body->body_html)->toContain('Ada');
+});
+
+it('saves the current message as a template from the composer', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Renewal outreach')
+        ->set('bodyHtml', '<p>Here are your options.</p>')
+        ->callAction('createTemplate', [
+            'name' => 'Renewal outreach',
+            'subject' => 'Renewal outreach',
+            'body_html' => '<p>Here are your options.</p>',
+            'is_shared' => true,
+        ])
+        ->assertHasNoActionErrors();
+
+    $template = EmailTemplate::query()->where('name', 'Renewal outreach')->sole();
+    expect($template->team_id)->toBe($this->user->current_team_id)
+        ->and($template->created_by)->toBe($this->user->id)
+        ->and($template->is_shared)->toBeTrue()
+        ->and($template->body_html)->toContain('Here are your options.');
+});
+
+it('creates a signature from the composer and applies it to the message', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Signature on the fly')
+        ->set('bodyHtml', '<p>Hello there</p>')
+        ->callAction('createSignature', [
+            'name' => 'Work',
+            'content_html' => '<p>— Ada, CEO</p>',
+            'is_default' => true,
+        ])
+        ->assertHasNoActionErrors()
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $signature = EmailSignature::query()->where('name', 'Work')->sole();
+    expect($signature->connected_account_id)->toBe($this->account->id)
+        ->and($signature->is_default)->toBeTrue();
+
+    $email = Email::query()->where('subject', 'Signature on the fly')->sole();
+    expect($email->body->body_html)->toContain('Ada, CEO');
+});
+
+it('ignores a template belonging to another team', function (): void {
+    $foreign = EmailTemplate::factory()->create([
+        'team_id' => Team::factory()->create()->id,
+        'is_shared' => true,
+        'subject' => 'Not yours',
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('applyTemplate', $foreign->id)
+        ->assertSet('subject', null);
+});
+
+it('rejects attachments over the per-file and total size caps', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Too heavy')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [
+            UploadedFile::fake()->create('small.pdf', 100),
+            // Over the 10 MB per-file cap.
+            UploadedFile::fake()->create('huge.pdf', 11 * 1024),
+            // Fits on its own, but pushes the message past the 15 MB total.
+            UploadedFile::fake()->create('big-a.pdf', 9 * 1024),
+            UploadedFile::fake()->create('big-b.pdf', 9 * 1024),
+        ])
+        ->assertSee('small.pdf')
+        ->assertSee('big-a.pdf')
+        ->assertDontSee('huge.pdf')
+        ->assertDontSee('big-b.pdf')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()->where('subject', 'Too heavy')->sole();
+    expect($email->attachments->pluck('filename')->all())->toEqualCanonicalizing(['small.pdf', 'big-a.pdf']);
+});
+
+it('counts saved draft attachments against the total size cap', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Saved plus pending')
+        ->set('attachments', [UploadedFile::fake()->create('saved.pdf', 9 * 1024)])
+        ->call('close');
+
+    $draft = Email::query()->where('subject', 'Saved plus pending')->sole();
+    $draft->attachments()->firstOrFail()->update(['size' => 9 * 1024 * 1024]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->set('to', ['lead@example.com'])
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [UploadedFile::fake()->create('too-much.pdf', 9 * 1024)])
+        ->assertSee('saved.pdf')
+        ->assertDontSee('too-much.pdf')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $email = Email::query()
+        ->where('subject', 'Saved plus pending')
+        ->where('status', EmailStatus::QUEUED)
+        ->sole();
+
+    expect($email->attachments->pluck('filename')->all())->toBe(['saved.pdf']);
+});
+
+it('drops a pending attachment when it is removed before sending', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'No attachment after all')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->set('attachments', [
+            UploadedFile::fake()->create('keep.pdf', 12),
+            UploadedFile::fake()->create('drop.pdf', 12),
+        ])
+        // Each pending attachment is listed with its name and human-readable size.
+        ->assertSee('keep.pdf')
+        ->assertSee('drop.pdf')
+        ->assertSee('12 KB')
+        ->call('removeAttachment', 1)
+        ->assertSee('keep.pdf')
+        ->assertDontSee('drop.pdf')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'No attachment after all')->sole();
+    expect($email->attachments()->pluck('filename')->all())->toBe(['keep.pdf']);
+});
+
+/**
+ * @return list<string>
+ */
+function composerRecipientSuggestions(): array
+{
+    return Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->instance()
+        ->recipientSuggestions();
+}
+
+function teammateSentEmail(
+    User $viewer,
+    EmailPrivacyTier $privacyTier,
+    string $address,
+    EmailParticipantRole $role,
+    bool $isInternal = false,
+): void {
+    $teammate = User::factory()->create(['current_team_id' => $viewer->current_team_id]);
+
+    $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $teammate->id,
+        'team_id' => $viewer->current_team_id,
+        'status' => 'active',
+    ]));
+
+    $email = Email::factory()->create([
+        'team_id' => $viewer->current_team_id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => $privacyTier,
+        'is_internal' => $isInternal,
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => $address,
+        'role' => $role,
+    ]);
+}

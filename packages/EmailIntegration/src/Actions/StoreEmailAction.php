@@ -1,0 +1,205 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\EmailIntegration\Actions;
+
+use App\Models\Team;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailLabel;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailRead;
+use Relaticle\EmailIntegration\Services\EmailClassifier;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+use Symfony\Component\Mime\MimeTypes;
+use Throwable;
+
+final readonly class StoreEmailAction
+{
+    /**
+     * Persist a pre-fetched message to the database.
+     * The caller is responsible for deduplication and CRM linking (via LinkEmailJob).
+     *
+     * @throws Throwable
+     */
+    public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
+    {
+        $storedInlinePaths = [];
+
+        try {
+            $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
+                $email = Email::query()->create([
+                    'team_id' => $connectedAccount->team_id,
+                    'user_id' => $connectedAccount->user_id,
+                    'connected_account_id' => $connectedAccount->getKey(),
+                    'rfc_message_id' => $data->rfcMessageId,
+                    'provider_message_id' => $data->providerMessageId,
+                    'thread_id' => $data->threadId,
+                    'in_reply_to' => $data->inReplyTo,
+                    'subject' => $data->subject,
+                    'snippet' => $data->snippet,
+                    'sent_at' => $data->sentAt,
+                    'direction' => $data->direction,
+                    'folder' => $data->folder,
+                    'has_attachments' => $data->hasAttachments,
+                ]);
+
+                // Read state is per-viewer; the provider's "already read" flag reflects
+                // the owner's mailbox, so seed only the owner's read row.
+                if ($data->isRead) {
+                    EmailRead::query()->create([
+                        'email_id' => $email->getKey(),
+                        'user_id' => $connectedAccount->user_id,
+                        'read_at' => $data->sentAt,
+                    ]);
+                }
+
+                $email->body()->create([
+                    'body_text' => $data->bodyText,
+                    'body_html' => $data->bodyHtml,
+                ]);
+
+                foreach ($data->participants as $participant) {
+                    EmailParticipant::query()->create([
+                        'email_id' => $email->getKey(),
+                        'email_address' => $participant['email_address'],
+                        'name' => $participant['name'] ?? null,
+                        'role' => $participant['role'],
+                    ]);
+                }
+
+                foreach ($data->attachments as $attachment) {
+                    EmailAttachment::query()->create([
+                        'email_id' => $email->getKey(),
+                        'filename' => $this->persistableAttachmentFilename($attachment),
+                        'mime_type' => $attachment['mime_type'],
+                        'size' => $attachment['size'],
+                        'content_id' => $attachment['content_id'],
+                        'is_inline' => $attachment['is_inline'] ?? false,
+                        'provider_attachment_id' => $attachment['attachment_id'],
+                        'storage_path' => $this->storeInlineData($email, $attachment, $storedInlinePaths),
+                    ]);
+                }
+
+                // "Internal" means every participant is a member of this workspace.
+                // Membership lives in the team_user pivot (plus the owner), NOT in
+                // users.current_team_id, which only reflects a user's *active* team and
+                // would misclassify members whose active team is elsewhere.
+                $team = Team::query()->find($connectedAccount->team_id);
+
+                $teamUserEmails = ($team?->allUsers() ?? collect())
+                    ->pluck('email')
+                    ->map(fn (string $e): string => strtolower($e));
+
+                $participantAddresses = $email->participants()
+                    ->pluck('email_address')
+                    ->map(fn (string $e): string => strtolower($e));
+
+                $isInternal = $participantAddresses->isNotEmpty() && $participantAddresses->every(
+                    fn (string $address): bool => $teamUserEmails->contains($address)
+                );
+
+                $email->updateQuietly(['is_internal' => $isInternal]);
+
+                // Deterministic, rule-based categorisation using cheap string heuristics,
+                // no LLM call. Runs inline now that participants/attachments/internal
+                // state are all known.
+                EmailLabel::query()->create([
+                    'email_id' => $email->getKey(),
+                    'label' => resolve(EmailClassifier::class)->classify($data, $isInternal)->value,
+                    'source' => 'system',
+                    'created_at' => now(),
+                ]);
+
+                resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
+
+                resolve(LinkEmailAction::class)->execute($email);
+
+                return $email;
+            });
+
+            $this->bumpInitialImportProgress($connectedAccount);
+
+            return $email;
+        } catch (Throwable $exception) {
+            Storage::disk(EmailAttachment::DISK)->delete($storedInlinePaths);
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * Providers often omit a filename on CID inline images. The column is not
+     * nullable, so invent a stable name from the part's mime type.
+     *
+     * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     */
+    private function persistableAttachmentFilename(array $attachment): string
+    {
+        if (filled($attachment['filename'])) {
+            return (string) $attachment['filename'];
+        }
+
+        $stem = ($attachment['is_inline'] ?? false) ? 'inline' : 'attachment';
+
+        return "{$stem}.{$this->extensionFromMimeType($attachment['mime_type'])}";
+    }
+
+    private function extensionFromMimeType(?string $mimeType): string
+    {
+        if (blank($mimeType)) {
+            return 'bin';
+        }
+
+        $extensions = MimeTypes::getDefault()->getExtensions($mimeType);
+
+        return $extensions[0] ?? 'bin';
+    }
+
+    /**
+     * Persist Gmail-inlined bytes. Small parts (<25 KB) arrive as body data with
+     * no attachment ID, including ordinary files, so downloads 404 unless we store them.
+     *
+     * @param  array{filename: string|null, mime_type: string|null, size: int, content_id: string|null, attachment_id: string|null, inline_data: string|null, is_inline?: bool}  $attachment
+     * @param  list<string>  $storedInlinePaths
+     */
+    private function storeInlineData(Email $email, array $attachment, array &$storedInlinePaths): ?string
+    {
+        if (blank($attachment['inline_data'])) {
+            return null;
+        }
+
+        $binary = base64_decode(strtr((string) $attachment['inline_data'], '-_', '+/'), true);
+
+        if ($binary === false) {
+            return null;
+        }
+
+        $path = "email-inline-attachments/{$email->getKey()}/".Str::ulid();
+
+        Storage::disk(EmailAttachment::DISK)->put($path, $binary);
+        $storedInlinePaths[] = $path;
+
+        return $path;
+    }
+
+    private function bumpInitialImportProgress(ConnectedAccount $connectedAccount): void
+    {
+        if ($connectedAccount->sync_cursor === null) {
+            ConnectedAccount::query()
+                ->whereKey($connectedAccount->getKey())
+                ->whereNull('sync_cursor')
+                ->increment('initial_sync_imported');
+        }
+
+        if (MailboxSyncTracker::isEmailSyncing($connectedAccount)) {
+            MailboxSyncTracker::bumpEmailProcessed($connectedAccount);
+        }
+    }
+}

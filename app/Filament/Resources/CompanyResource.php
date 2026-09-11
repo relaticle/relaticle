@@ -10,8 +10,10 @@ use App\Filament\Components\Forms\TeamMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\CompanyExporter;
+use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -35,7 +37,9 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class CompanyResource extends Resource
 {
@@ -123,6 +127,7 @@ final class CompanyResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    MassSendBulkAction::forCompanies(),
                     ExportBulkAction::make()
                         ->exporter(CompanyExporter::class),
                     DeleteBulkAction::make(),
@@ -132,11 +137,20 @@ final class CompanyResource extends Resource
             ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            ActivityLogRelationManager::class,
+            MeetingsRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => ListCompanies::route('/'),
             'view' => ViewCompany::route('/{record}'),
+            'emails' => CompanyEmailsPage::route('/{record}/emails'),
         ];
     }
 

@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
@@ -23,6 +24,8 @@ use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewCompany extends ViewRecord
 {
@@ -31,6 +34,9 @@ final class ViewCompany extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewRecordEmailsAction::make()
+                ->label(__('filament/resources/company.pages.view.actions.view_emails.label'))
+                ->url(fn (): string => CompanyResource::getUrl('emails', ['record' => $this->getRecord()])),
             EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
             ActionGroup::make([
                 ActionGroup::make([
@@ -99,6 +105,9 @@ final class ViewCompany extends ViewRecord
                             ->dateTime(),
                     ])->grow(false),
                 ])->columnSpan('full'),
+
+                CommunicationIntelligenceInfolist::section(),
+
             ]);
     }
 
@@ -108,6 +117,7 @@ final class ViewCompany extends ViewRecord
             PeopleRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
+            MeetingsRelationManager::class,
             ActivityLogRelationManager::class,
         ];
     }
