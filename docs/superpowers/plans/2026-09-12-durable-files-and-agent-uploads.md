@@ -2598,7 +2598,7 @@ In `routes/ai.php`, add the import `use App\Http\Controllers\Mcp\ReceiveUploadCo
 
 ```php
 $uploadPath = rtrim($mcpPath, '/').'/uploads/{upload}';
-$registerUploadRoute = static fn () => Route::put($uploadPath, ReceiveUploadController::class)
+$registerUploadRoute = static fn (): \Illuminate\Routing\Route => Route::put($uploadPath, ReceiveUploadController::class)
     ->middleware(['signed', 'throttle:60,1'])
     ->name('mcp.uploads.receive');
 ```
