@@ -41,6 +41,8 @@ final class CompanyDomainMatcher
      * Lowercase host with a single leading www. stripped. The create lock and
      * stored domain both use this so www.cap.so and cap.so collide, while
      * send.cap.so does not.
+     *
+     * @return lowercase-string
      */
     public function host(string $domain): string
     {
