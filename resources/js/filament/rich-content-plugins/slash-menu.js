@@ -259,8 +259,9 @@ class SlashMenuView {
             return
         }
 
+        this.itemElements[this.activeIndex]?.setAttribute('aria-selected', 'false')
+        this.itemElements[index]?.setAttribute('aria-selected', 'true')
         this.activeIndex = index
-        this.render()
     }
 
     handleKeyDown(event) {
@@ -395,7 +396,7 @@ export default Extension.create({
                         }
 
                         return DecorationSet.create(doc, [
-                            Decoration.widget(1, placeholderElement(getSettings().placeholder), { side: 1 }),
+                            Decoration.widget(1, () => placeholderElement(getSettings().placeholder), { side: 1, key: 'slash-placeholder' }),
                         ])
                     },
                 },
