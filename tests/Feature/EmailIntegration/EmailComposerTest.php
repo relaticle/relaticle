@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -32,14 +33,16 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
+use Tests\Helpers\AllowedComposerRecipient;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -51,6 +54,18 @@ beforeEach(function (): void {
     actingAs($this->user);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->user->currentTeam);
+
+    AllowedComposerRecipient::seedMany($this->user, [
+        'lead@example.com',
+        'a@example.com',
+        'x@example.com',
+        'd@example.com',
+        'draft@example.com',
+        'victim@example.com',
+        'recipient@example.com',
+        'existing@example.com',
+        'forward-to@example.com',
+    ]);
 });
 
 it('opens via the composer:open event with the default account preselected', function (): void {
@@ -253,6 +268,37 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->and($email->scheduled_for)->not->toBeNull();
 });
 
+it('resolves merge tags from the primary To recipient when compose was not opened from a record', function (): void {
+    $person = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Laravel Projects',
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $person->team_id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+
+    $person->saveCustomFieldValue($emailsField, ['crm@example.com'], $person->team);
+
+    AllowedComposerRecipient::seed($this->user, 'crm@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['crm@example.com'])
+        ->set('subject', 'Hi {{ full name }}')
+        ->set('bodyHtml', '<p>Hello <span data-type="mergeTag" data-id="name">Full name</span></p>')
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Hi Laravel Projects')->sole();
+
+    expect($email->body?->body_html)->toContain('Hello Laravel Projects');
+});
+
 it('persists rich editor inline images when sending from the composer', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
@@ -413,6 +459,69 @@ it('surfaces a validation error for a malformed recipient and sends nothing', fu
         ->assertSet('isOpen', true);
 
     expect(Email::query()->where('subject', 'Malformed recipient')->exists())->toBeFalse();
+});
+
+it('rejects a recipient that is not on a record or in suggestions and sends nothing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['random@example.com'])
+        ->set('subject', 'Random recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasErrors(['to.0'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeFalse();
+});
+
+it('includes CRM addresses outside the autocomplete cap in the allowed recipient list', function (): void {
+    $seedEmail = function (People $person, string $email): void {
+        $emailsField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $person->team_id)
+            ->where('entity_type', 'people')
+            ->where('code', PeopleField::EMAILS->value)
+            ->firstOrFail();
+
+        $person->saveCustomFieldValue($emailsField, [$email], $person->team);
+    };
+
+    foreach (range(1, 300) as $i) {
+        $person = People::factory()->for($this->user->currentTeam)->create([
+            'name' => sprintf('Person %03d', $i),
+            'creator_id' => $this->user->getKey(),
+        ]);
+
+        $seedEmail($person, "cap{$i}@example.com");
+    }
+
+    $overflow = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Z Overflow Contact',
+        'creator_id' => $this->user->getKey(),
+    ]);
+    $seedEmail($overflow, 'overflow@example.com');
+
+    $component = Livewire::test(EmailComposer::class)->dispatch('composer:open');
+
+    expect($component->instance()->allowedRecipientAddresses())
+        ->toContain('overflow@example.com');
+
+    $optionEmails = collect($component->instance()->recipientOptions())
+        ->pluck('email')
+        ->filter()
+        ->all();
+
+    expect($optionEmails)->not->toContain('overflow@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['overflow@example.com'])
+        ->set('subject', 'Overflow recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    expect(Email::query()->where('subject', 'Overflow recipient')->exists())->toBeTrue();
 });
 
 it('rejects an empty body with no signature block and sends nothing', function (): void {

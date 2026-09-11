@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
+use Tests\Helpers\AllowedComposerRecipient;
 
 mutates(EmailsRelationManager::class, EmailInboxPage::class, EmailComposer::class, Email::class, HasEmailComposeActions::class, RedirectsToGrantSend::class, ConnectedAccount::class, QueuedSendNotifier::class, SendEmailAction::class, SaveEmailDraftAction::class);
 
@@ -83,6 +84,8 @@ beforeEach(function (): void {
         'name' => 'CC Person',
         'role' => EmailParticipantRole::CC,
     ]);
+
+    AllowedComposerRecipient::seed($this->user, 'forward-to@example.com');
 });
 
 it('reply persists a queued Email with REPLY creation_source', function (): void {

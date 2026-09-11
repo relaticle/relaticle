@@ -40,8 +40,8 @@ final class EmailTemplateFactory extends Factory
     {
         return $this->state(fn (): array => [
             'subject' => 'Hello {name}',
-            'body_html' => '<p>Hi {first_name}, from {company}</p>',
-            'variables' => ['name', 'first_name', 'company'],
+            'body_html' => '<p>Hi {name}, from {company}</p>',
+            'variables' => ['name', 'company'],
         ]);
     }
 }

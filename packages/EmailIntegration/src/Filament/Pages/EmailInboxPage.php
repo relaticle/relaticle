@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Concerns\AssertsAllowedEmailRecipients;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Filament\Concerns\RedirectsToGrantSend;
@@ -52,6 +53,7 @@ use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 final class EmailInboxPage extends Page
 {
+    use AssertsAllowedEmailRecipients;
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
     use RedirectsToGrantSend;
@@ -492,6 +494,24 @@ final class EmailInboxPage extends Page
         if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
             $this->redirectToGrantSend($account);
 
+            return;
+        }
+
+        $threadSource = in_array($mode, ['reply', 'reply_all'], true)
+            ? $this->resolveTeamEmail($data['in_reply_to_email_id'] ?? null, 'view')
+            : null;
+
+        if ($threadSource instanceof Email) {
+            $threadSource->loadMissing('participants');
+        }
+
+        if (! $this->assertAllowedEmailRecipients(
+            $this->authUser(),
+            $data['to'] ?? [],
+            $data['cc'] ?? [],
+            $data['bcc'] ?? [],
+            $threadSource,
+        )) {
             return;
         }
 

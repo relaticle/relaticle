@@ -1,6 +1,7 @@
 @props([
     'options' => [],
     'suggestions' => [],
+    'allowedAddresses' => [],
     'autofocus' => false,
 ])
 
@@ -29,6 +30,7 @@
         activeIndex: 0,
         popoverStyle: {},
         options: @js([...$options, ...$manualOptions]),
+        allowedAddresses: @js($allowedAddresses),
         removeLabel: @js($removeLabel),
         companyTeamLabel: @js($companyTeamLabel),
 
@@ -63,10 +65,56 @@
             };
         },
 
-        commit(raw = null) {
+        allowedEmail(raw = null) {
             const value = (raw ?? this.newValue).trim().replace(/,$/, '');
 
             if (! value) {
+                return null;
+            }
+
+            const normalized = value.toLowerCase();
+
+            return this.allowedAddresses.find((email) => email.toLowerCase() === normalized) ?? null;
+        },
+
+        resolveEmail(raw = null) {
+            return this.resolveEmailFromOptions(raw) ?? this.allowedEmail(raw);
+        },
+
+        resolveEmailFromOptions(raw = null) {
+            const value = (raw ?? this.newValue).trim().replace(/,$/, '');
+
+            if (! value) {
+                return null;
+            }
+
+            const normalized = value.toLowerCase();
+
+            const option = this.options.find((candidate) => {
+                if (candidate.type === 'company_team') {
+                    return (candidate.emails ?? []).some((email) => email.toLowerCase() === normalized);
+                }
+
+                return (candidate.email ?? '').toLowerCase() === normalized;
+            });
+
+            if (! option) {
+                return null;
+            }
+
+            if (option.type === 'company_team') {
+                return (option.emails ?? []).find((email) => email.toLowerCase() === normalized) ?? null;
+            }
+
+            return option.email;
+        },
+
+        commit(raw = null) {
+            const value = this.resolveEmail(raw);
+
+            if (! value) {
+                this.newValue = '';
+
                 return;
             }
 
@@ -177,7 +225,7 @@
         x-init="$nextTick(() => $refs.input.focus())"
     @endif
     @if ($wireModel) wire:ignore @endif
-    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-[1.75rem] min-w-0 flex-wrap items-center gap-1']) }}
+    {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-9 min-w-0 flex-wrap items-center gap-1']) }}
 >
     <template x-for="value in values" :key="value">
         <span class="inline-flex max-w-full items-center gap-1 rounded-full bg-primary-50 py-0.5 pl-2 pr-1 text-xs font-medium text-primary-700 ring-1 ring-primary-600/10 dark:bg-primary-400/10 dark:text-primary-300 dark:ring-primary-400/20">

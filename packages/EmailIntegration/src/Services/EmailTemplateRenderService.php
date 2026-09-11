@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -24,8 +27,10 @@ final readonly class EmailTemplateRenderService
      */
     public const array MERGE_TAGS = [
         'name' => 'Full name',
-        'first_name' => 'First name',
         'company' => 'Company',
+        'phone_number' => 'Phone number',
+        'job_title' => 'Job title',
+        'linkedin' => 'LinkedIn',
         'today' => "Today's date",
     ];
 
@@ -96,13 +101,27 @@ final readonly class EmailTemplateRenderService
      */
     public function renderForSending(string $bodyHtml, ?Model $record = null): string
     {
+        $variables = $this->buildVariables($record);
+
         $html = RichContentRenderer::make($bodyHtml)
+            ->mergeTags($variables)
             ->customBlocks([SignatureBlock::class])
             ->fileAttachmentsDisk(EmailAttachment::DISK)
             ->fileAttachmentsVisibility('private')
             ->toHtml();
 
-        return $this->renderContent($html, $record);
+        return $this->renderContent($this->unwrapMergeTagSpans($html), $record);
+    }
+
+    /**
+     * RichEditor merge tags render as {@code span} nodes; once resolved, unwrap them
+     * so outbound HTML and the email preview sanitizer do not leave empty spans behind.
+     */
+    private function unwrapMergeTagSpans(string $html): string
+    {
+        $pattern = '#<span\b[^>]*\bdata-type="mergeTag"[^>]*>(.*?)</span>#is';
+
+        return preg_replace($pattern, '$1', $html) ?? $html;
     }
 
     /**
@@ -161,23 +180,97 @@ final readonly class EmailTemplateRenderService
         $recordVariables = match (true) {
             $record instanceof People => [
                 'name' => (string) $record->name,
-                'first_name' => explode(' ', trim((string) $record->name))[0],
                 'company' => $record->company !== null ? (string) $record->company->name : '',
+                ...$this->peopleCustomFieldValues($record),
             ],
             $record instanceof Company => [
                 'name' => (string) $record->name,
-                'first_name' => (string) $record->name,
                 'company' => (string) $record->name,
+                ...$this->emptyPeopleCustomFieldValues(),
             ],
             $record instanceof Opportunity => [
                 'name' => (string) $record->name,
-                'first_name' => explode(' ', trim((string) $record->name))[0],
                 'company' => $record->company !== null ? (string) $record->company->name : '',
+                ...$this->emptyPeopleCustomFieldValues(),
             ],
             default => [],
         };
 
         return [...$baseVariables, ...$recordVariables];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function peopleCustomFieldValues(People $person): array
+    {
+        $codes = [
+            'phone_number' => PeopleField::PHONE_NUMBER->value,
+            'job_title' => PeopleField::JOB_TITLE->value,
+            'linkedin' => PeopleField::LINKEDIN->value,
+        ];
+
+        $fields = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $person->team_id)
+            ->where('entity_type', 'people')
+            ->whereIn('code', array_values($codes))
+            ->get()
+            ->keyBy('code');
+
+        $person->loadMissing(['customFieldValues.customField']);
+
+        $values = [];
+
+        foreach ($codes as $key => $code) {
+            $field = $fields->get($code);
+
+            if (! $field instanceof CustomField) {
+                $values[$key] = '';
+
+                continue;
+            }
+
+            $value = $person->getCustomFieldValue($field);
+
+            $values[$key] = $this->customFieldMergeValue($value);
+        }
+
+        return $values;
+    }
+
+    private function customFieldMergeValue(mixed $value): string
+    {
+        if ($value instanceof Collection) {
+            $value = $value->all();
+        }
+
+        if (in_array($value, [null, '', []], true)) {
+            return '';
+        }
+
+        if (is_array($value)) {
+            $strings = array_values(array_filter(
+                array_map(static fn (mixed $item): string => (string) $item, $value),
+                static fn (string $item): bool => $item !== '',
+            ));
+
+            return implode(', ', $strings);
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function emptyPeopleCustomFieldValues(): array
+    {
+        return [
+            'phone_number' => '',
+            'job_title' => '',
+            'linkedin' => '',
+        ];
     }
 
     /**
@@ -201,20 +294,69 @@ final readonly class EmailTemplateRenderService
             : $value;
 
         $content = preg_replace_callback(
-            '/\{\{\s*(\w+)\s*\}\}/',
-            fn (array $matches): string => isset($variables[$matches[1]])
-                ? $resolve($variables[$matches[1]])
-                : $matches[0],
+            '/\{\{\s*([^}]+?)\s*\}\}/',
+            function (array $matches) use ($variables, $resolve): string {
+                $tagKey = $this->resolveMergeTagKey($matches[1]);
+
+                if ($tagKey === null || ! array_key_exists($tagKey, $variables)) {
+                    return $matches[0];
+                }
+
+                return $resolve($variables[$tagKey]);
+            },
             $content
         ) ?? $content;
 
         $legacyPairs = [];
         foreach ($variables as $key => $value) {
             $legacyPairs['{'.$key.'}'] = $resolve($value);
+
+            $label = self::MERGE_TAGS[$key] ?? null;
+
+            if ($label !== null) {
+                $legacyPairs['{'.$label.'}'] = $resolve($value);
+            }
         }
 
         // strtr replaces the longest keys first and never re-scans replacements,
         // so a value containing another `{tag}` is not recursively substituted.
         return strtr($content, $legacyPairs);
+    }
+
+    private function resolveMergeTagKey(string $raw): ?string
+    {
+        $normalized = strtolower(trim($raw));
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
+
+        return $this->mergeTagKeyAliases()[$normalized] ?? null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function mergeTagKeyAliases(): array
+    {
+        static $aliases = null;
+
+        if (is_array($aliases)) {
+            return $aliases;
+        }
+
+        $aliases = [
+            'name' => 'name',
+            'full name' => 'name',
+            'full_name' => 'name',
+            'company' => 'company',
+            'today' => 'today',
+            "today's date" => 'today',
+            'todays date' => 'today',
+        ];
+
+        foreach (self::MERGE_TAGS as $key => $label) {
+            $aliases[strtolower($label)] = $key;
+            $aliases[str_replace(' ', '_', strtolower($label))] = $key;
+        }
+
+        return $aliases;
     }
 }
