@@ -19,7 +19,7 @@ RUN composer install \
 ###########################################
 # Stage 2: Build frontend assets
 ###########################################
-FROM node:22-alpine AS frontend
+FROM node:26-alpine AS frontend
 
 WORKDIR /app
 
