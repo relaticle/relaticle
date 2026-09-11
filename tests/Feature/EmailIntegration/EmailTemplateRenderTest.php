@@ -75,6 +75,18 @@ it('HTML-escapes merge values in the body but not the plain-text subject', funct
     expect($result['subject'])->toBe('Hello <img src=x onerror=alert(1)> & Co');
 });
 
+it('substitutes merge tags in plain text without HTML-escaping', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Smith & Sons',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $rendered = app(EmailTemplateRenderService::class)->renderPlainText('Hello {name}', $person);
+
+    expect($rendered)->toBe('Hello Smith & Sons');
+});
+
 it('renders {name} for a Company record', function (): void {
     $company = Company::create([
         'team_id' => $this->team->id,
