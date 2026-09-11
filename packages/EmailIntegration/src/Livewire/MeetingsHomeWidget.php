@@ -31,6 +31,7 @@ use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
+use Relaticle\EmailIntegration\Services\MeetingTemporalState;
 
 /**
  * @property-read Collection<int, Meeting> $meetings
@@ -346,8 +347,8 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             'all_day' => $meeting->all_day,
             'response_status' => $this->viewerResponseStatus($meeting),
             'time' => $this->meetingTime($meeting),
-            'happening_now' => $this->isHappeningNow($meeting),
-            'is_past' => $this->isPast($meeting),
+            'happening_now' => resolve(MeetingTemporalState::class)->isHappeningNow($meeting, $this->viewerTimezone()),
+            'is_past' => resolve(MeetingTemporalState::class)->isPast($meeting, $this->viewerTimezone()),
         ];
     }
 
@@ -385,30 +386,6 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
                 ]),
             'datetime' => $start->toIso8601String(),
         ];
-    }
-
-    private function isHappeningNow(Meeting $meeting): bool
-    {
-        if ($meeting->all_day) {
-            return false;
-        }
-
-        $now = Date::now($this->viewerTimezone());
-        $start = $meeting->starts_at->timezone($this->viewerTimezone());
-        $end = $meeting->ends_at->timezone($this->viewerTimezone());
-
-        return $now->gte($start) && $now->lt($end);
-    }
-
-    private function isPast(Meeting $meeting): bool
-    {
-        $now = Date::now($this->viewerTimezone());
-
-        if ($meeting->all_day) {
-            return $now->toDateString() > $meeting->ends_at->utc()->toDateString();
-        }
-
-        return $now->gte($meeting->ends_at->timezone($this->viewerTimezone()));
     }
 
     /** The viewer's own RSVP status, used for the home-list status dot color. */
