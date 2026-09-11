@@ -19,7 +19,24 @@ const trailingParagraph = (state) =>
 
 const endsInTrappingBlock = (doc) => TRAPPING_BLOCKS.includes(doc.lastChild?.type.name)
 
-const EMPTY_CONFIG = { items: [], noResults: '', placeholder: '' }
+const EMPTY_CONFIG = { items: [], noResults: '', placeholder: '', limitReached: '' }
+
+// Livewire rejects a request body over its payload cap (config/livewire.php) before any
+// validation runs, so the only place a document can be held in bounds is here.
+const MAX_DOC_SIZE = 200000
+
+let limitNoticeAt = 0
+
+// A notification, not an inline message: the canvas grows with the document, so an
+// element under it can sit thousands of pixels below the viewport.
+const limitNotice = (message) => {
+    if (Date.now() - limitNoticeAt < 4000 || ! window.FilamentNotification) {
+        return
+    }
+
+    limitNoticeAt = Date.now()
+    new window.FilamentNotification().title(message).danger().send()
+}
 
 const config = (view) => {
     const host = view.dom.closest('[data-slash-menu]')
@@ -382,6 +399,23 @@ export default Extension.create({
             // announces a single-line field and reads Enter as submit.
             new Plugin({
                 props: { attributes: { 'aria-multiline': 'true' } },
+            }),
+
+            new Plugin({
+                filterTransaction(tr, state) {
+                    if (! tr.docChanged || tr.doc.content.size <= MAX_DOC_SIZE) {
+                        return true
+                    }
+
+                    // Never block a shrinking document: the way out of the limit is deleting.
+                    if (tr.doc.content.size <= state.doc.content.size) {
+                        return true
+                    }
+
+                    limitNotice(getSettings().limitReached)
+
+                    return false
+                },
             }),
 
             new Plugin({

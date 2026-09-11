@@ -70,6 +70,7 @@ final class SlashMenuPlugin implements RichContentPlugin
                 'items' => $items,
                 'noResults' => __('filament/rich-editor.slash_menu.no_results'),
                 'placeholder' => __('filament/rich-editor.placeholder'),
+                'limitReached' => __('filament/rich-editor.limit_reached'),
             ])),
         ];
     }

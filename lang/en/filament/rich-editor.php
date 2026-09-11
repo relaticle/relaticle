@@ -6,6 +6,8 @@ return [
     // `:key` is replaced with the trigger character, rendered as a key cap.
     'placeholder' => 'Type :key to insert a heading, a list, or an image',
 
+    'limit_reached' => 'This field is full. Delete some content to keep writing.',
+
     'slash_menu' => [
         'no_results' => 'No blocks match ":query"',
 
