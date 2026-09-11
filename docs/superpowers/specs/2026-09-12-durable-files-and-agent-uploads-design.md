@@ -49,8 +49,7 @@ Verified 2026-09-12 in this checkout and in production.
 | `Company` | `logo` | unchanged |
 | `Team` | `logo` | from #606 |
 | `Team` | `pending-uploads` | every upload before a saved value claims it |
-| record (`Company`, `People`, `Opportunity`, `Task`, `Note`) | `custom-field-{code}` | the file behind a `file-upload` value |
-| record | `attachments` | inline images in rich-editor values |
+| record (`Company`, `People`, `Opportunity`, `Task`, `Note`) | `custom-field-{code}` | the file behind a `file-upload` value, or the inline images of a rich-editor value |
 
 `Team` and the five CRM models implement `HasMedia`. `Company` already does.
 
@@ -63,9 +62,9 @@ The stored `file-upload` value is the Media path relative to the media disk, `up
 ### Lifecycle
 
 1. Upload. Any entry point (panel `FileUpload`, panel rich editor, MCP `upload-file`) creates a Media row in the caller's `Team` `pending-uploads` collection with custom properties `uploaded_by`, `source` (`panel`, `url`, `base64`, `signed_put`), and `original_name`. medialibrary `max_file_size` (10 MB) is the final size gate on every source.
-2. Claim. When a custom-field value is saved, an observer on the app `CustomFieldValue` model claims what the value references. For `file-upload` it looks up one pending Media by path; for `rich-editor` it collects every `data-id`. Each pending row owned by the same team is reassigned in place: `model_type`, `model_id`, `collection_name` change, `uuid` and file do not. Media already on the record stays.
+2. Claim. When a custom-field value is saved, an observer on the app `CustomFieldValue` model claims what the value references. For `file-upload` it looks up one pending Media by path; for `rich-editor` it collects every `data-id`. Each pending row owned by the same team is reassigned in place into the field's own `custom-field-{code}` collection: `model_type`, `model_id`, `collection_name` change, `uuid` and file do not. Media already on the record stays. One collection per field keeps a release on one rich-editor field from touching images another field on the same record still references.
 3. Release. The same observer deletes record-owned media the new value no longer references: the replaced file on a `file-upload` field, images removed from a rich-editor body. Deleting the record deletes its media through `InteractsWithMedia`.
-4. Purge. `app:purge-pending-uploads` deletes `pending-uploads` rows older than 24 hours and signed-PUT temp files under `tmp/`. Hourly, `withoutOverlapping()->onOneServer()`. Pending rows are never deleted by content scanning; two users drafting in one team would delete each other's images.
+4. Purge. `app:purge-pending-uploads` deletes `pending-uploads` rows older than 24 hours and signed-PUT temp files under `tmp/` on the media disk. Hourly, `withoutOverlapping()->onOneServer()`. Pending rows are never deleted by content scanning; two users drafting in one team would delete each other's images.
 
 Claiming is a write after validation. It lives in the observer, not in actions, so panel, API, MCP and chat approval all get it without touching any action class.
 
@@ -87,17 +86,17 @@ Render surfaces:
 
 | Surface | Today | After |
 |---|---|---|
-| Panel infolist and table | package `HtmlEntry` / `RichTextColumn`, raw HTML | app entry and column rendering through `RichContentRenderer::fileAttachmentProvider()` |
+| Panel infolist | package `HtmlEntry`, raw HTML | app `RichContentEntry` rendering through `RichContentRenderer::fileAttachmentProvider()`; the table column strips tags and needs no change |
 | REST API and MCP read tools | stored HTML | stored HTML with `src` rewritten by the same provider at read time |
 | Chat | `strip_tags` | unchanged |
 
-`media:backfill-rich-editor-attachments` migrates the 15 legacy values: create a Media row in `attachments` on the owning record from the public file, rewrite `data-id` to the uuid and `src` to the Media URL. Idempotent, dry-run by default.
+`media:backfill-rich-editor-attachments` migrates the 15 legacy values: create a Media row in the field's `custom-field-{code}` collection on the owning record from the public file, rewrite `data-id` to the uuid and `src` to the Media URL. Idempotent, dry-run by default.
 
 ## One switch to a private disk
 
-`config/filesystems.php` gains a `media` disk whose driver, root, and visibility come from env, with `serve => true` on the local driver so temporary URLs work. `config/media-library.php` `disk_name` reads `MEDIA_DISK`, default `public`; `.env.example` documents it.
+`config/filesystems.php` gains a `media` disk whose driver, root, and visibility come from env. `config/media-library.php` `disk_name` reads `MEDIA_DISK`, default `public`; `.env.example` documents it.
 
-An app URL generator returns the plain disk URL when the disk is public and a temporary signed URL when it is private. Non-image types on a private disk carry `Content-Disposition: attachment`.
+An app URL generator returns the plain disk URL when the disk is public and a 30-minute signed link to `GET /media/{uuid}` when it is private. That route streams through medialibrary on any driver: images inline, every other type with `Content-Disposition: attachment`.
 
 The `logo` collections on `Company` and `Team` stay on the public disk through `useDisk('public')` in `registerMediaCollections()`. They feed every avatar in pickers, lists and search, and plain cacheable URLs matter more there than the private-disk option. Every collection this PR creates follows `MEDIA_DISK`. Decided 2026-09-12.
 
