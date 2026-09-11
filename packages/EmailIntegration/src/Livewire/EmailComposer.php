@@ -464,7 +464,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $email = resolve(SendEmailAction::class)->execute(
             data: [
                 'connected_account_id' => (string) $this->accountId,
-                'subject' => $renderer->renderContent((string) $this->subject),
+                'subject' => $renderer->renderPlainText((string) $this->subject),
                 'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml)),
                 'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
                 'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
