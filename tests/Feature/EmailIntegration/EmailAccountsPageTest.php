@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
 use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
+use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -224,12 +225,15 @@ it('lists the default account first', function (): void {
 it('queues mailbox history import from the account menu', function (): void {
     Bus::fake();
 
+    $this->account->update(['sync_cursor' => 'mail-cursor']);
+
     livewire(EmailAccountsPage::class)
         ->callAction('reimportHistory', arguments: ['account_id' => $this->account->id])
         ->assertNotified();
 
     Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($this->account));
     Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($this->account));
+    Bus::assertNotDispatched(IncrementalEmailSyncJob::class);
 });
 
 it('does not re-import another user\'s account', function (): void {
