@@ -627,6 +627,32 @@ it('expands signatures and resolves merge tags per recipient on mass send', func
         ->and($aliceEmail->body->body_html)->not->toContain('data-id="signature"');
 });
 
+it('resolves RichEditor merge tag nodes per recipient on mass send', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'alice@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => massRecipientPayload($person, 'alice@example.com'),
+        ])
+        ->set('subject', 'Hi {name}')
+        ->set('bodyHtml', '<p>Hello <span data-type="mergeTag" data-id="name">Full name</span></p>')
+        ->call('send');
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+    $email = Email::where('batch_id', $batch->id)->firstOrFail();
+
+    expect($email->subject)->toBe('Hi Alice')
+        ->and($email->body->body_html)->toContain('Alice')
+        ->and($email->body->body_html)->not->toContain('data-type="mergeTag"');
+});
+
 it('ignores a tampered mass recipient email and sends to the CRM address', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,

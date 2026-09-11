@@ -268,6 +268,37 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->and($email->scheduled_for)->not->toBeNull();
 });
 
+it('resolves merge tags from the primary To recipient when compose was not opened from a record', function (): void {
+    $person = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Laravel Projects',
+        'creator_id' => $this->user->getKey(),
+    ]);
+
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $person->team_id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+
+    $person->saveCustomFieldValue($emailsField, ['crm@example.com'], $person->team);
+
+    AllowedComposerRecipient::seed($this->user, 'crm@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['crm@example.com'])
+        ->set('subject', 'Hi {{ full name }}')
+        ->set('bodyHtml', '<p>Hello <span data-type="mergeTag" data-id="name">Full name</span></p>')
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Hi Laravel Projects')->sole();
+
+    expect($email->body?->body_html)->toContain('Hello Laravel Projects');
+});
+
 it('persists rich editor inline images when sending from the composer', function (): void {
     Storage::fake(EmailAttachment::DISK);
 

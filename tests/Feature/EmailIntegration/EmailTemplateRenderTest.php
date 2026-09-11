@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
@@ -85,6 +88,74 @@ it('substitutes merge tags in plain text without HTML-escaping', function (): vo
     $rendered = app(EmailTemplateRenderService::class)->renderPlainText('Hello {name}', $person);
 
     expect($rendered)->toBe('Hello Smith & Sons');
+});
+
+it('resolves RichEditor merge tag nodes when rendering for send', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Jane Doe',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $bodyHtml = '<p>Hello <span data-type="mergeTag" data-id="name">Full name</span></p>';
+
+    $rendered = app(EmailTemplateRenderService::class)->renderForSending($bodyHtml, $person);
+
+    expect($rendered)->toContain('Jane Doe')
+        ->and($rendered)->not->toContain('data-type="mergeTag"');
+});
+
+it('substitutes human-readable merge tag labels in plain text', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Jane Doe',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $rendered = app(EmailTemplateRenderService::class)->renderPlainText(
+        'Hi {{ full name }}, see you {{ today\'s date }}',
+        $person,
+    );
+
+    expect($rendered)
+        ->toContain('Hi Jane Doe,')
+        ->toContain('see you '.Date::now()->toFormattedDateString());
+});
+
+it('renders people custom field merge tags for phone number job title and linkedin', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Jane Doe',
+        'creator_id' => $this->user->id,
+    ]);
+
+    foreach ([
+        [PeopleField::PHONE_NUMBER, '+1 555 0100'],
+        [PeopleField::JOB_TITLE, 'Account Executive'],
+        [PeopleField::LINKEDIN, ['https://linkedin.com/in/jane-doe']],
+    ] as [$fieldCode, $value]) {
+        $customField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $person->team_id)
+            ->where('entity_type', 'people')
+            ->where('code', $fieldCode->value)
+            ->firstOrFail();
+
+        $person->saveCustomFieldValue($customField, $value, $person->team);
+    }
+
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'People Fields Template',
+        'subject' => '{job_title} at {company}',
+        'body_html' => '<p>{name} | {phone_number} | {linkedin}</p>',
+    ]);
+
+    $result = app(EmailTemplateRenderService::class)->render($template, $person);
+
+    expect($result['subject'])->toBe('Account Executive at ')
+        ->and($result['body_html'])->toBe('<p>Jane Doe | +1 555 0100 | https://linkedin.com/in/jane-doe</p>');
 });
 
 it('renders {name} for a Company record', function (): void {

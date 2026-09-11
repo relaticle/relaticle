@@ -513,13 +513,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $attachmentNames = [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames];
         $attachmentAttributes = [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes];
 
+        $mergeTagRecord = $this->mergeTagRecord();
         $linkRecord = $this->linkRecord();
 
         $email = resolve(SendEmailAction::class)->execute(
             data: [
                 'connected_account_id' => (string) $this->accountId,
-                'subject' => $renderer->renderPlainText((string) $this->subject),
-                'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml)),
+                'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
+                'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
                 'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
                 'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
                 'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
@@ -949,7 +950,50 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->whereHas('customFieldValues', fn (Builder $valueQuery): Builder => $valueQuery
                 ->where('custom_field_id', $emailField->getKey())
                 ->whereJsonContains('json_value', $emailAddress))
-            ->first(['id', 'name']);
+            ->first(['id', 'name', 'company_id']);
+    }
+
+    private function mergeTagRecord(): Company|Opportunity|People|null
+    {
+        $record = $this->linkRecord();
+
+        if ($record instanceof People) {
+            $record->loadMissing('company');
+
+            return $record;
+        }
+
+        if ($record instanceof Opportunity) {
+            $record->loadMissing('company');
+
+            return $record;
+        }
+
+        if ($record instanceof Company) {
+            return $record;
+        }
+
+        $firstTo = $this->to[0] ?? null;
+
+        if (! is_string($firstTo)) {
+            return null;
+        }
+
+        $email = PersonRecipientFormatter::primaryEmailFromValue($firstTo);
+
+        if ($email === null) {
+            return null;
+        }
+
+        $person = $this->personForEmail($email, (string) $this->authUser()->current_team_id);
+
+        if (! $person instanceof People) {
+            return null;
+        }
+
+        $person->loadMissing('company');
+
+        return $person;
     }
 
     /**
