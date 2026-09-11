@@ -1,0 +1,8 @@
+title: Send Loom the renewal proposal
+assigned_people:
+  - priya
+custom_fields:
+  description: Include the reporting module and the annual pricing Priya asked for.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

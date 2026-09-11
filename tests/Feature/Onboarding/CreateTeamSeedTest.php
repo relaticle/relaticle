@@ -19,7 +19,7 @@ use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
-mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class, OnboardingUseCase::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.
@@ -289,7 +289,7 @@ it('provides one axis of sub-options for each use case', function (): void {
 
 it('maps use case to correct fixture set', function (): void {
     expect(OnboardingUseCase::Sales->getFixtureSet())->toBe('sales')
-        ->and(OnboardingUseCase::CustomerSuccess->getFixtureSet())->toBe('sales')
+        ->and(OnboardingUseCase::CustomerSuccess->getFixtureSet())->toBe('customer_success')
         ->and(OnboardingUseCase::Recruiting->getFixtureSet())->toBe('recruiting')
         ->and(OnboardingUseCase::Marketing->getFixtureSet())->toBe('marketing')
         ->and(OnboardingUseCase::Fundraising->getFixtureSet())->toBe('fundraising')
@@ -442,3 +442,72 @@ it('colours the preset stages', function (): void {
 
     expect($hired->settings->color)->toBe('#059669');
 });
+
+it('seeds customer success demo data for the customer success use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::CustomerSuccess->value,
+            'onboarding_context' => ['high_touch'],
+            'name' => 'Success Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $companies = Company::where('team_id', $team->id)->pluck('name')->sort()->values();
+
+    expect($companies)->toHaveCount(4)
+        ->and($companies->all())->toBe(['Calendly', 'Intercom', 'Loom', 'Zapier']);
+});
+
+it('seeds every demo opportunity at a stage that exists in the preset', function (OnboardingUseCase $useCase): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $formData = [
+        'onboarding_use_case' => $useCase->value,
+        'name' => "Stages {$useCase->value}",
+    ];
+
+    $context = array_key_first($useCase->getSubOptions());
+
+    if ($context !== null) {
+        $formData['onboarding_context'] = [$context];
+    }
+
+    livewire(CreateTeam::class)
+        ->fillForm($formData)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $optionIds = $stageField->options()->withoutGlobalScopes()->pluck('id');
+
+    $stageValues = CustomFieldValue::withoutGlobalScopes()
+        ->where('custom_field_id', $stageField->id)
+        ->pluck($stageField->getValueColumn());
+
+    expect($stageValues)->toHaveCount(4)
+        ->and($stageValues->every(fn (mixed $value): bool => $optionIds->contains($value)))->toBeTrue();
+})->with([
+    'sales' => OnboardingUseCase::Sales,
+    'recruiting' => OnboardingUseCase::Recruiting,
+    'marketing' => OnboardingUseCase::Marketing,
+    'customer_success' => OnboardingUseCase::CustomerSuccess,
+    'fundraising' => OnboardingUseCase::Fundraising,
+    'investing' => OnboardingUseCase::Investing,
+    'other' => OnboardingUseCase::Other,
+]);

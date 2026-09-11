@@ -3,4 +3,4 @@ company: benchmark
 custom_fields:
   amount: 2000000
   close_date: '{{ +3w }}'
-  stage: Needs Analysis
+  stage: Intro

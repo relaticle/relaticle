@@ -33,7 +33,8 @@ enum OnboardingUseCase: string implements HasLabel
     public function getFixtureSet(): string
     {
         return match ($this) {
-            self::Sales, self::CustomerSuccess => 'sales',
+            self::Sales => 'sales',
+            self::CustomerSuccess => 'customer_success',
             self::Recruiting => 'recruiting',
             self::Marketing => 'marketing',
             self::Fundraising, self::Investing => 'fundraising',
