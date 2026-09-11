@@ -42,6 +42,7 @@ use Relaticle\EmailIntegration\Actions\DeleteDraftAttachmentAction;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
+use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
@@ -55,10 +56,12 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Throwable;
 
@@ -146,6 +149,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     /** @var list<string> */
     public array $bcc = [];
 
+    public bool $isMassSend = false;
+
+    /**
+     * @var list<array{personId: string, email: string, name: string}>
+     */
+    public array $massRecipients = [];
+
     public bool $showCc = false;
 
     public bool $showBcc = false;
@@ -194,7 +204,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * A same-named `$payload['draftId']` entry is never populated by either
      * caller; only a literal `draftId` parameter is.
      *
-     * @param  array{to?: list<string>, linkRecordType?: class-string, linkRecordId?: string}  $payload
+     * @param  array{
+     *     to?: list<string>,
+     *     massSend?: bool,
+     *     recipients?: list<array{personId: string, email: string, name: string}>,
+     *     linkRecordType?: class-string,
+     *     linkRecordId?: string,
+     * }  $payload
      */
     #[On('composer:open')]
     public function open(array $payload = [], ?string $draftId = null): void
@@ -222,7 +238,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->resetComposerState();
 
         $this->accountId = (string) $account->getKey();
-        $this->to = $payload['to'] ?? [];
+        $this->isMassSend = (bool) ($payload['massSend'] ?? false);
+        $this->massRecipients = $this->isMassSend
+            ? ($payload['recipients'] ?? [])
+            : [];
+        $this->to = $this->isMassSend ? [] : ($payload['to'] ?? []);
         $this->linkRecordType = $payload['linkRecordType'] ?? null;
         $this->linkRecordId = $payload['linkRecordId'] ?? null;
         $this->privacyTier = resolve(PrivacyService::class)
@@ -417,6 +437,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
+        if ($this->isMassSend) {
+            $this->sendMass();
+
+            return;
+        }
+
         $this->validate([
             'accountId' => ['required'],
             'to' => ['required', 'array', 'min:1'],
@@ -425,6 +451,24 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'bcc.*' => ['email'],
             'subject' => ['required', 'string', 'max:255'],
         ]);
+
+        $recipientErrors = resolve(AllowedRecipientService::class)->validationErrors(
+            $this->authUser(),
+            $this->to,
+            $this->cc,
+            $this->bcc,
+            $this->threadRecipientAllowlist(),
+        );
+
+        foreach ($recipientErrors as $key => $messages) {
+            foreach ($messages as $message) {
+                $this->addError($key, $message);
+            }
+        }
+
+        if ($recipientErrors !== []) {
+            return;
+        }
 
         $bodyHtml = $this->bodyHtmlForPersistence();
 
@@ -507,14 +551,166 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->dispatch('outbox:changed');
     }
 
+    private function sendMass(): void
+    {
+        $this->validate([
+            'accountId' => ['required'],
+            'subject' => ['required', 'string', 'max:255'],
+        ]);
+
+        if ($this->massRecipients === []) {
+            $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
+
+            return;
+        }
+
+        $bodyHtml = $this->bodyHtmlForPersistence();
+
+        if (
+            trim(strip_tags($bodyHtml)) === ''
+            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
+            && ! str_contains($bodyHtml, '<img')
+        ) {
+            $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
+
+            return;
+        }
+
+        [$attachmentPaths, $attachmentNames, $attachmentAttributes, $unavailable] = $this->collectOutgoingAttachments();
+
+        if ($unavailable !== []) {
+            return;
+        }
+
+        /** @var list<array{person: People, email: string}> $recipients */
+        $recipients = [];
+        $peopleById = People::query()
+            ->with('company')
+            ->where('team_id', $this->authUser()->current_team_id)
+            ->whereKey(array_column($this->massRecipients, 'personId'))
+            ->get()
+            ->keyBy(fn (People $person): string => (string) $person->getKey());
+
+        foreach ($this->massRecipients as $massRecipient) {
+            $person = $peopleById->get($massRecipient['personId']);
+
+            if (! $person instanceof People) {
+                continue;
+            }
+
+            $recipients[] = [
+                'person' => $person,
+                'email' => $massRecipient['email'],
+            ];
+        }
+
+        if ($recipients === []) {
+            $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
+
+            return;
+        }
+
+        resolve(SendEmailBatchAction::class)->execute(
+            user: $this->authUser(),
+            recipients: $recipients,
+            payload: [
+                'connected_account_id' => (string) $this->accountId,
+                'subject' => (string) $this->subject,
+                'body_html' => $bodyHtml,
+                'attachments' => $attachmentPaths,
+                'attachment_file_names' => $attachmentNames,
+                'attachment_attributes' => $attachmentAttributes,
+            ],
+        );
+
+        Notification::make()
+            ->success()
+            ->title(__('filament/emails/composer.notifications.mass_queued.title'))
+            ->body(__('filament/emails/composer.notifications.mass_queued.body', [
+                'count' => count($recipients),
+            ]))
+            ->send();
+
+        $this->closeComposer();
+        $this->dispatch('outbox:changed');
+    }
+
+    /**
+     * @return array{
+     *     0: list<string>,
+     *     1: array<string, string>,
+     *     2: array<string, array{is_inline?: bool, content_id?: ?string}>,
+     *     3: list<EmailAttachment>,
+     * }
+     */
+    private function collectOutgoingAttachments(): array
+    {
+        [$copiedPaths, $copiedNames, $copiedAttributes, $copiedUnavailable] = $this->copySavedAttachments();
+        [$forwardedPaths, $forwardedNames, $forwardedAttributes, $unavailable] = $this->copyForwardedSourceAttachments();
+        [$inlinePaths, $inlineNames, $inlineAttributes, $inlineUnavailable] = $this->copyForwardedInlineAttachments();
+
+        $unavailable = [...$copiedUnavailable, ...$unavailable, ...$inlineUnavailable];
+
+        if ($unavailable !== []) {
+            $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: true);
+            $this->deleteCopiedAttachmentFiles([...$copiedPaths, ...$forwardedPaths, ...$inlinePaths]);
+
+            return [[], [], [], $unavailable];
+        }
+
+        [$pendingPaths, $pendingNames, $pendingAttributes] = $this->storeAttachments();
+
+        return [
+            [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths],
+            [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames],
+            [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes],
+            [],
+        ];
+    }
+
     private function creationSource(): EmailCreationSource
     {
+        if ($this->isMassSend) {
+            return EmailCreationSource::MASS_SEND;
+        }
+
         return match ($this->replyMode) {
             'reply' => EmailCreationSource::REPLY,
             'reply_all' => EmailCreationSource::REPLY_ALL,
             'forward' => EmailCreationSource::FORWARD,
             default => EmailCreationSource::COMPOSE,
         };
+    }
+
+    /**
+     * Reply and reply-all pre-fill thread participants that may not yet appear in
+     * CRM records or autocomplete. Forwards and net-new compose do not get extras.
+     *
+     * @return list<string>
+     */
+    private function threadRecipientAllowlist(): array
+    {
+        if (! in_array($this->replyMode, ['reply', 'reply_all'], true)) {
+            return [];
+        }
+
+        $emailId = $this->sourceEmailId ?? $this->inReplyToEmailId;
+
+        if ($emailId === null) {
+            return [];
+        }
+
+        $email = $this->replyableEmail($emailId);
+
+        if (! $email instanceof Email) {
+            return [];
+        }
+
+        return $email->participants
+            ->pluck('email_address')
+            ->filter(fn (?string $address): bool => filled($address))
+            ->map(fn (string $address): string => $address)
+            ->all();
     }
 
     /**
@@ -581,6 +777,178 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->closeComposer();
+    }
+
+    public function updatedIsMassSend(bool $value): void
+    {
+        if ($value) {
+            $this->syncMassRecipientsFromTo();
+            $this->to = [];
+            $this->cc = [];
+            $this->bcc = [];
+            $this->showCc = false;
+            $this->showBcc = false;
+
+            return;
+        }
+
+        $this->to = $this->massRecipientEmails();
+    }
+
+    public function removeMassRecipient(string $personId): void
+    {
+        $this->massRecipients = array_values(array_filter(
+            $this->massRecipients,
+            fn (array $recipient): bool => $recipient['personId'] !== $personId,
+        ));
+    }
+
+    public function addMassRecipient(string $personId): void
+    {
+        foreach ($this->massRecipients as $recipient) {
+            if ($recipient['personId'] === $personId) {
+                return;
+            }
+        }
+
+        $teamId = (string) $this->authUser()->current_team_id;
+
+        $person = People::query()
+            ->where('team_id', $teamId)
+            ->whereKey($personId)
+            ->first(['id', 'name']);
+
+        if (! $person instanceof People) {
+            return;
+        }
+
+        $entries = $this->primaryEmailEntriesForPeople([(string) $person->getKey()], $teamId);
+        $email = $this->primaryEmailForPersonId($entries, (string) $person->getKey());
+
+        if ($email === null) {
+            return;
+        }
+
+        $this->massRecipients[] = [
+            'personId' => (string) $person->getKey(),
+            'email' => $email,
+            'name' => PersonRecipientFormatter::displayName($person, $email),
+        ];
+    }
+
+    public function addMassCompanyTeamRecipients(string $companyId): void
+    {
+        $teamId = (string) $this->authUser()->current_team_id;
+
+        $people = People::query()
+            ->where('team_id', $teamId)
+            ->where('company_id', $companyId)
+            ->get(['id', 'name']);
+
+        if ($people->isEmpty()) {
+            return;
+        }
+
+        /** @var list<string> $peopleIds */
+        $peopleIds = [];
+
+        foreach ($people as $person) {
+            $peopleIds[] = (string) $person->getKey();
+        }
+
+        $entries = $this->primaryEmailEntriesForPeople($peopleIds, $teamId);
+        $existingPersonIds = array_column($this->massRecipients, 'personId');
+
+        foreach ($people as $person) {
+            $personId = (string) $person->getKey();
+
+            if (in_array($personId, $existingPersonIds, true)) {
+                continue;
+            }
+
+            $email = $this->primaryEmailForPersonId($entries, $personId);
+
+            if ($email === null) {
+                continue;
+            }
+
+            $existingPersonIds[] = $personId;
+            $this->massRecipients[] = [
+                'personId' => $personId,
+                'email' => $email,
+                'name' => PersonRecipientFormatter::displayName($person, $email),
+            ];
+        }
+    }
+
+    private function syncMassRecipientsFromTo(): void
+    {
+        if ($this->to === []) {
+            return;
+        }
+
+        $teamId = (string) $this->authUser()->current_team_id;
+        $existingPersonIds = array_column($this->massRecipients, 'personId');
+
+        foreach ($this->to as $address) {
+            $email = PersonRecipientFormatter::primaryEmailFromValue($address);
+
+            if ($email === null) {
+                continue;
+            }
+
+            $person = $this->personForEmail($email, $teamId);
+
+            if (! $person instanceof People) {
+                continue;
+            }
+
+            $personId = (string) $person->getKey();
+
+            if (in_array($personId, $existingPersonIds, true)) {
+                continue;
+            }
+
+            $existingPersonIds[] = $personId;
+            $this->massRecipients[] = [
+                'personId' => $personId,
+                'email' => $email,
+                'name' => PersonRecipientFormatter::displayName($person, $email),
+            ];
+        }
+    }
+
+    private function personForEmail(string $emailAddress, string $teamId): ?People
+    {
+        $emailField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $teamId)
+            ->where('entity_type', 'people')
+            ->where('code', 'emails')
+            ->first();
+
+        if (! $emailField instanceof CustomField) {
+            return null;
+        }
+
+        return People::query()
+            ->where('team_id', $teamId)
+            ->whereHas('customFieldValues', fn (Builder $valueQuery): Builder => $valueQuery
+                ->where('custom_field_id', $emailField->getKey())
+                ->whereJsonContains('json_value', $emailAddress))
+            ->first(['id', 'name']);
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function massRecipientEmails(): array
+    {
+        return array_map(
+            fn (array $recipient): string => $recipient['email'],
+            $this->massRecipients,
+        );
     }
 
     public function toggleCc(): void
@@ -752,7 +1120,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             $options[] = [
                 'type' => 'person',
                 'id' => $personId,
-                'label' => $person->name,
+                'label' => PersonRecipientFormatter::displayName($person, $email),
                 'description' => $email,
                 'email' => $email,
             ];
@@ -983,15 +1351,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function primaryEmailFromValue(mixed $value): ?string
     {
-        $emails = $value instanceof Collection
-            ? $value
-            : collect(is_array($value) ? $value : []);
-
-        $email = $emails
-            ->filter(fn (mixed $item): bool => is_string($item) && trim($item) !== '')
-            ->first();
-
-        return is_string($email) ? $email : null;
+        return PersonRecipientFormatter::primaryEmailFromValue($value);
     }
 
     /**
@@ -1633,6 +1993,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function persistDraft(): bool
     {
+        if ($this->isMassSend) {
+            return false;
+        }
+
         if ($this->isDraftEmpty()) {
             return false;
         }
@@ -1722,6 +2086,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             && $this->to === []
             && $this->cc === []
             && $this->bcc === []
+            && $this->massRecipients === []
             && $this->attachments === []
             && $this->savedAttachments === [];
     }
@@ -1855,7 +2220,27 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function resetComposerState(): void
     {
-        $this->reset(['draftId', 'to', 'cc', 'bcc', 'showCc', 'showBcc', 'subject', 'bodyHtml', 'signatureId', 'attachments', 'savedAttachments', 'replyMode', 'sourceEmailId', 'inReplyToEmailId', 'quotedBodyHtml', 'linkRecordType', 'linkRecordId']);
+        $this->reset([
+            'draftId',
+            'to',
+            'cc',
+            'bcc',
+            'isMassSend',
+            'massRecipients',
+            'showCc',
+            'showBcc',
+            'subject',
+            'bodyHtml',
+            'signatureId',
+            'attachments',
+            'savedAttachments',
+            'replyMode',
+            'sourceEmailId',
+            'inReplyToEmailId',
+            'quotedBodyHtml',
+            'linkRecordType',
+            'linkRecordId',
+        ]);
         $this->resetErrorBag();
     }
 

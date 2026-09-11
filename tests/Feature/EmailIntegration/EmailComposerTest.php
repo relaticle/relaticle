@@ -32,14 +32,16 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
+use Tests\Helpers\AllowedComposerRecipient;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -51,6 +53,18 @@ beforeEach(function (): void {
     actingAs($this->user);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->user->currentTeam);
+
+    AllowedComposerRecipient::seedMany($this->user, [
+        'lead@example.com',
+        'a@example.com',
+        'x@example.com',
+        'd@example.com',
+        'draft@example.com',
+        'victim@example.com',
+        'recipient@example.com',
+        'existing@example.com',
+        'forward-to@example.com',
+    ]);
 });
 
 it('opens via the composer:open event with the default account preselected', function (): void {
@@ -413,6 +427,19 @@ it('surfaces a validation error for a malformed recipient and sends nothing', fu
         ->assertSet('isOpen', true);
 
     expect(Email::query()->where('subject', 'Malformed recipient')->exists())->toBeFalse();
+});
+
+it('rejects a recipient that is not on a record or in suggestions and sends nothing', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['random@example.com'])
+        ->set('subject', 'Random recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasErrors(['to.0'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeFalse();
 });
 
 it('rejects an empty body with no signature block and sends nothing', function (): void {

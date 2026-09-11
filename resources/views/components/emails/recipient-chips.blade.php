@@ -63,10 +63,40 @@
             };
         },
 
-        commit(raw = null) {
+        resolveEmail(raw = null) {
             const value = (raw ?? this.newValue).trim().replace(/,$/, '');
 
             if (! value) {
+                return null;
+            }
+
+            const normalized = value.toLowerCase();
+
+            const option = this.options.find((candidate) => {
+                if (candidate.type === 'company_team') {
+                    return (candidate.emails ?? []).some((email) => email.toLowerCase() === normalized);
+                }
+
+                return (candidate.email ?? '').toLowerCase() === normalized;
+            });
+
+            if (! option) {
+                return null;
+            }
+
+            if (option.type === 'company_team') {
+                return (option.emails ?? []).find((email) => email.toLowerCase() === normalized) ?? null;
+            }
+
+            return option.email;
+        },
+
+        commit(raw = null) {
+            const value = this.resolveEmail(raw);
+
+            if (! value) {
+                this.newValue = '';
+
                 return;
             }
 

@@ -32,6 +32,15 @@ return [
         'alignment' => 'Alignment',
     ],
 
+    'mass_send' => [
+        'summary' => 'Sending individual emails to :count recipients',
+        'toggle' => 'Mass sending',
+        'send_button' => 'Send emails (:count)',
+        'add_recipients' => 'Add recipients',
+        'outbox_hint' => 'Delivery time will depend on items in your outbox.',
+        'view_outbox' => 'View outbox',
+        'no_recipients' => 'Add at least one recipient before sending.',
+    ],
     'actions' => [
         'send' => 'Send email',
         'attach' => 'Attach files',
@@ -60,6 +69,10 @@ return [
         'description' => 'Please grant permission to enable email sending.',
     ],
     'notifications' => [
+        'mass_queued' => [
+            'title' => 'Mass email queued',
+            'body' => 'Sending to :count recipient(s).',
+        ],
         'queued' => ['title' => 'Email queued for sending'],
         'signature_created' => ['title' => 'Signature created'],
         'template_created' => ['title' => 'Template saved'],
@@ -85,5 +98,6 @@ return [
     ],
     'validation' => [
         'body_required' => 'Write a message before sending.',
+        'recipient_not_allowed' => 'Choose a recipient from your workspace records or suggested addresses.',
     ],
 ];

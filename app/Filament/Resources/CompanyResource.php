@@ -39,6 +39,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 
 final class CompanyResource extends Resource
 {
@@ -126,6 +127,7 @@ final class CompanyResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    MassSendBulkAction::forCompanies(),
                     ExportBulkAction::make()
                         ->exporter(CompanyExporter::class),
                     DeleteBulkAction::make(),

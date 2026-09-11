@@ -36,6 +36,7 @@ use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 trait HasEmailComposeActions
 {
+    use AssertsAllowedEmailRecipients;
     use RedirectsToGrantSend;
 
     /**
@@ -188,6 +189,20 @@ trait HasEmailComposeActions
         if (! $account instanceof ConnectedAccount || ! $account->isSendable()) {
             $this->redirectToGrantSend($account);
 
+            return;
+        }
+
+        $threadSource = in_array($mode, ['reply', 'reply_all'], true)
+            ? $this->resolveComposableEmail($data['in_reply_to_email_id'] ?? null)
+            : null;
+
+        if (! $this->assertAllowedEmailRecipients(
+            $this->getAuthenticatedUser(),
+            $data['to'] ?? [],
+            $data['cc'] ?? [],
+            $data['bcc'] ?? [],
+            $threadSource,
+        )) {
             return;
         }
 

@@ -32,7 +32,14 @@ final readonly class SendEmailBatchAction
      * all of it back, leaving no orphaned batch.
      *
      * @param  list<array{person: People, email: string}>  $recipients
-     * @param  array{connected_account_id: string, subject: string, body_html: string}  $payload
+     * @param  array{
+     *     connected_account_id: string,
+     *     subject: string,
+     *     body_html: string,
+     *     attachments?: array<int, string>,
+     *     attachment_file_names?: array<string, string>,
+     *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
+     * }  $payload
      */
     public function execute(User $user, array $recipients, array $payload): EmailBatch
     {
@@ -71,6 +78,9 @@ final readonly class SendEmailBatchAction
                         'creation_source' => EmailCreationSource::MASS_SEND,
                         'privacy_tier' => EmailPrivacyTier::FULL,
                         'batch_id' => $batch->getKey(),
+                        'attachments' => $payload['attachments'] ?? [],
+                        'attachment_file_names' => $payload['attachment_file_names'] ?? [],
+                        'attachment_attributes' => $payload['attachment_attributes'] ?? [],
                     ],
                     linkToType: People::class,
                     linkToId: $person->getKey(),
