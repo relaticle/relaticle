@@ -20,10 +20,12 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class);
+mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -526,4 +528,39 @@ it('persists inline cid attachments and includes them in the provider payload', 
         ->and($captured['attachments'][0]['is_inline'])->toBeTrue()
         ->and($captured['attachments'][0]['content_id'])->toBe('logo@example.test')
         ->and($captured['attachments'][0]['content'])->toBe('png-bytes');
+});
+
+it('embeds rich editor inline images from data-id paths when queuing send', function (): void {
+    Storage::fake('local');
+    Storage::fake('public');
+
+    $editorPath = 'email-attachments/editor-image.png';
+    Storage::disk('local')->put($editorPath, 'png-bytes');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Inline image',
+        'body_html' => '<p>See below</p><img data-id="'.$editorPath.'" src="">',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    $attachment = $email->attachments()->first();
+
+    expect($email->attachments)->toHaveCount(1)
+        ->and($attachment->is_inline)->toBeTrue()
+        ->and($attachment->content_id)->not->toBeEmpty()
+        ->and($email->body?->body_html)->toContain('cid:'.$attachment->content_id)
+        ->and($email->body?->body_html)->not->toContain('data-id');
+
+    $sanitized = EmailHtmlSanitizer::sanitize($email->body?->body_html, $email->inlineAttachments());
+
+    expect($sanitized)
+        ->toContain(route('email-attachments.inline', ['attachment' => $attachment->getKey()]))
+        ->not->toContain('cid:'.$attachment->content_id);
 });

@@ -426,13 +426,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'subject' => ['required', 'string', 'max:255'],
         ]);
 
-        $bodyHtml = $this->bodyHtmlValue();
+        $bodyHtml = $this->bodyHtmlForPersistence();
 
         // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
         // holds a structural `<p></p>` doc), so `required` can never catch a blank
         // message. Check the dehydrated text instead. A signature-only email (no
         // free text, just the signature block) is legitimate and must still send.
-        if (trim(strip_tags($bodyHtml)) === '' && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')) {
+        if (
+            trim(strip_tags($bodyHtml)) === ''
+            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
+            && ! str_contains($bodyHtml, '<img')
+        ) {
             $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
 
             return;
@@ -670,6 +674,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             RichEditor::make('bodyHtml')
                 ->hiddenLabel()
                 ->resizableImages()
+                ->fileAttachmentsDisk(EmailAttachment::DISK)
+                ->fileAttachmentsDirectory('email-attachments')
+                ->fileAttachmentsVisibility('private')
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
@@ -1226,6 +1233,19 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return is_string($state) ? $state : '';
     }
 
+    /**
+     * Dehydrate the composer body for persistence or send. RichEditor keeps inline
+     * images as Livewire upload ids until {@see RichEditor::saveFileAttachments()}
+     * runs; Filament forms do that automatically on submit, but this composer sends
+     * through a custom Livewire action instead.
+     */
+    private function bodyHtmlForPersistence(): string
+    {
+        $this->bodyField()->saveFileAttachments();
+
+        return $this->bodyHtmlValue();
+    }
+
     private function bodyField(): RichEditor
     {
         $component = $this->getSchema('bodySchema')?->getComponent('bodyHtml');
@@ -1632,7 +1652,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             data: [
                 'connected_account_id' => $accountId,
                 'subject' => $this->subject,
-                'body_html' => $this->bodyHtmlValue(),
+                'body_html' => $this->bodyHtmlForPersistence(),
                 'to' => $this->to,
                 'cc' => $this->cc,
                 'bcc' => $this->bcc,
