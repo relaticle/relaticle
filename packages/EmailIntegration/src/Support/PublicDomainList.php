@@ -17,11 +17,11 @@ final readonly class PublicDomainList
     public function forTeam(string $teamId): Collection
     {
         $configDomains = collect((array) config('email-integration.public_domains', []))
-            ->map(fn (mixed $d): lowercase-string => $this->domainMatcher->host((string) $d));
+            ->map(fn (mixed $d): string => $this->domainMatcher->host((string) $d));
 
         $teamDomains = PublicEmailDomain::query()->where('team_id', $teamId)
             ->pluck('domain')
-            ->map(fn (mixed $d): lowercase-string => $this->domainMatcher->host((string) $d));
+            ->map(fn (mixed $d): string => $this->domainMatcher->host((string) $d));
 
         return $configDomains->merge($teamDomains)->unique()->values();
     }
