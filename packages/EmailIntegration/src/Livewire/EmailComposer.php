@@ -535,7 +535,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public function minimize(): void
     {
-        $this->persistDraft();
+        if ($this->persistDraft()) {
+            $this->notifyDraftSaved();
+        }
+
         $this->isMinimized = true;
     }
 
@@ -557,7 +560,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     public function close(): void
     {
-        $this->persistDraft();
+        if ($this->persistDraft()) {
+            $this->notifyDraftSaved();
+        }
+
         $this->closeComposer();
     }
 
@@ -1625,16 +1631,16 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * rather than wiping it: {@see SaveEmailDraftAction} never runs in that
      * case, so there is nothing to reconcile.
      */
-    private function persistDraft(): void
+    private function persistDraft(): bool
     {
         if ($this->isDraftEmpty()) {
-            return;
+            return false;
         }
 
         $accountId = $this->ownedAccountId();
 
         if ($accountId === null) {
-            return;
+            return false;
         }
 
         [$attachmentPaths, $attachmentNames, $attachmentAttributes] = $this->storeAttachments();
@@ -1681,6 +1687,16 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // The drafts tab and its badge are rendered by other components; without
         // this they only pick the new draft up on a full page load.
         $this->dispatch('drafts:changed');
+
+        return true;
+    }
+
+    private function notifyDraftSaved(): void
+    {
+        Notification::make()
+            ->success()
+            ->title(__('filament/emails/composer.notifications.draft_saved.title'))
+            ->send();
     }
 
     /**
