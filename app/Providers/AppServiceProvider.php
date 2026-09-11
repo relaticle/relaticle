@@ -610,7 +610,10 @@ final class AppServiceProvider extends ServiceProvider
         FilamentAsset::register([
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
                 ->loadedOnRequest(),
+            Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
         ]);
+
+        FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
 
         // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
         FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
