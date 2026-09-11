@@ -373,3 +373,72 @@ it('assigns seeded demo tasks to the workspace owner so the dashboard is not emp
         expect($task->assignees()->whereKey($user->getKey())->exists())->toBeTrue();
     });
 });
+
+it('creates the stage preset for the chosen use case', function (OnboardingUseCase $useCase, array $expectedStages): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $formData = [
+        'onboarding_use_case' => $useCase->value,
+        'name' => "Preset {$useCase->value}",
+    ];
+
+    $context = array_key_first($useCase->getSubOptions());
+
+    if ($context !== null) {
+        $formData['onboarding_context'] = [$context];
+    }
+
+    livewire(CreateTeam::class)
+        ->fillForm($formData)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $stages = $stageField->options()->withoutGlobalScopes()->orderBy('id')->pluck('name')->all();
+
+    expect($stages)->toBe($expectedStages);
+})->with([
+    'sales keeps the default list' => [OnboardingUseCase::Sales, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'marketing shares the sales list' => [OnboardingUseCase::Marketing, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'other shares the sales list' => [OnboardingUseCase::Other, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'customer success' => [OnboardingUseCase::CustomerSuccess, ['Onboarding', 'Active', 'Renewal due', 'At risk', 'Renewed', 'Churned']],
+    'recruiting' => [OnboardingUseCase::Recruiting, ['Sourced', 'Applied', 'Screen', 'Interview', 'Offer', 'Hired', 'Declined']],
+    'fundraising' => [OnboardingUseCase::Fundraising, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
+    'investing shares the fundraising list' => [OnboardingUseCase::Investing, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
+]);
+
+it('colours the preset stages', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+            'onboarding_context' => ['sourcing'],
+            'name' => 'Coloured Hiring',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $hired = $stageField->options()->withoutGlobalScopes()->where('name', 'Hired')->sole();
+
+    expect($hired->settings->color)->toBe('#059669');
+});

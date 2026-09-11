@@ -89,7 +89,7 @@ trait CustomFieldTrait
     /**
      * Get color mapping for select field options
      *
-     * @return array<int|string, string>|null Array of option => color mappings or null if not applicable
+     * @return array<string, string>|null Array of option => color mappings or null if not applicable
      */
     public function getOptionColors(): ?array
     {

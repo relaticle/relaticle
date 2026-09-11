@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\CustomFields\OpportunityField;
 use Filament\Support\Contracts\HasLabel;
 
 enum OnboardingUseCase: string implements HasLabel
@@ -37,6 +38,42 @@ enum OnboardingUseCase: string implements HasLabel
             self::Marketing => 'marketing',
             self::Fundraising, self::Investing => 'fundraising',
             self::Other => 'general',
+        };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function stagePreset(): array
+    {
+        return match ($this) {
+            self::CustomerSuccess => [
+                'Onboarding' => '#a5b4fc',
+                'Active' => '#059669',
+                'Renewal due' => '#eab308',
+                'At risk' => '#f97316',
+                'Renewed' => '#0d9488',
+                'Churned' => '#6b7280',
+            ],
+            self::Recruiting => [
+                'Sourced' => '#a5b4fc',
+                'Applied' => '#1e40af',
+                'Screen' => '#0d9488',
+                'Interview' => '#eab308',
+                'Offer' => '#7c3aed',
+                'Hired' => '#059669',
+                'Declined' => '#6b7280',
+            ],
+            self::Fundraising, self::Investing => [
+                'Target' => '#a5b4fc',
+                'Intro' => '#1e40af',
+                'First meeting' => '#0d9488',
+                'Partner meeting' => '#eab308',
+                'Term sheet' => '#7c3aed',
+                'Closed' => '#059669',
+                'Passed' => '#6b7280',
+            ],
+            self::Sales, self::Marketing, self::Other => OpportunityField::STAGE->getOptionColors() ?? [],
         };
     }
 

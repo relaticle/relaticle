@@ -67,7 +67,7 @@ enum OpportunityField: string
      * building energy, trust, and momentum from first contact to final outcome.
      * Based on latest color psychology and 2024 design sophistication trends.
      *
-     * @return array<int|string, string>|null Array of option => color mappings or null if not applicable
+     * @return array<string, string>|null Array of option => color mappings or null if not applicable
      */
     public function getOptionColors(): ?array
     {

@@ -52,10 +52,16 @@ final readonly class CreateTeamCustomFields
 
         $this->migrator->setTenantId($team->id);
 
-        DB::transaction(function (): void {
+        $stagePreset = $team->onboarding_use_case instanceof OnboardingUseCase
+            ? $team->onboarding_use_case->stagePreset()
+            : null;
+
+        DB::transaction(function () use ($stagePreset): void {
             foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
                 foreach ($enumClass::cases() as $enum) {
-                    $this->createCustomField($modelClass, $enum);
+                    $optionColors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
+
+                    $this->createCustomField($modelClass, $enum, $optionColors);
                 }
             }
         });
@@ -74,8 +80,11 @@ final readonly class CreateTeamCustomFields
         }
     }
 
-    /** @param class-string $model */
-    private function createCustomField(string $model, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
+    /**
+     * @param  class-string  $model
+     * @param  array<string, string>|null  $optionColors
+     */
+    private function createCustomField(string $model, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum, ?array $optionColors = null): void
     {
         $fieldData = new CustomFieldData(
             name: $enum->getDisplayName(),
@@ -102,19 +111,22 @@ final readonly class CreateTeamCustomFields
             fieldData: $fieldData
         );
 
-        $options = $enum->getOptions();
+        $options = $optionColors !== null ? array_keys($optionColors) : $enum->getOptions();
+
         if ($options !== null) {
             $migrator->options($options);
         }
 
         $customField = $migrator->create();
 
-        $this->applyColorsToOptions($customField, $enum);
+        $this->applyColorsToOptions($customField, $optionColors ?? $enum->getOptionColors());
     }
 
-    private function applyColorsToOptions(CustomField $customField, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum): void
+    /**
+     * @param  array<string, string>|null  $colorMapping
+     */
+    private function applyColorsToOptions(CustomField $customField, ?array $colorMapping): void
     {
-        $colorMapping = $enum->getOptionColors();
         if ($colorMapping === null) {
             return;
         }
