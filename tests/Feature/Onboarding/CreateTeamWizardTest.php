@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateTeam as CreateTeamAction;
 use App\Actions\User\UpdateUserName;
+use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
@@ -35,12 +36,62 @@ it('renders the create team page with wizard for teamless users', function (): v
         ->assertSee('Create your workspace');
 });
 
+it('shows a step indicator and a back affordance in the wizard', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/teams.create_team.actions.back'))
+        ->assertSee('Step :current of :total');
+});
+
+it('flags the workspace created event when the wizard finishes', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Tracked Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(session()->get('fathom.track_workspace_created'))->toBeTrue();
+});
+
+/**
+ * A second workspace is expansion, not acquisition. Its Fathom referrer is
+ * whatever brought the user back that day, so crediting a channel with it
+ * would be wrong, and counting it alongside first workspaces would push the
+ * signup-to-workspace rate past 100%.
+ */
+it('does not flag the workspace created event for an additional workspace', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Second Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Team::query()->where('name', 'Second Corp')->exists())->toBeTrue()
+        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+});
+
 it('resolves every wizard heading from translations', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
-    // Every step's placeholders are in the DOM at once, so one render covers all four.
+    // Every step's placeholders are in the DOM at once, so one render covers all three.
     // A mistyped key would surface here as the raw dotted key instead of the copy.
     livewire(CreateTeam::class)
         ->assertSuccessful()
@@ -50,15 +101,10 @@ it('resolves every wizard heading from translations', function (): void {
         ->assertSee(__('filament/pages/teams.create_team.headings.use_case'))
         ->assertSee(__('filament/pages/teams.create_team.headings.use_case_description'))
         ->assertSee(__('filament/pages/teams.create_team.headings.use_case_hint'))
-        ->assertSee(__('filament/pages/teams.create_team.headings.invite'))
-        ->assertSee(__('filament/pages/teams.create_team.headings.invite_description'))
-        ->assertSee(__('filament/pages/teams.create_team.headings.invite_subheading'))
         ->assertDontSee('filament/pages/teams.create_team.headings')
         ->assertDontSee('Workspace heading')
         ->assertDontSee('Attribution heading')
         ->assertDontSee('Use case heading')
-        ->assertDontSee('Invite heading')
-        ->assertDontSee('Invite subheading')
         ->assertDontSee('Onboarding referral source');
 });
 
@@ -73,8 +119,6 @@ it('resolves every wizard form label from translations', function (): void {
         ->assertSee(__('filament/pages/teams.create_team.form.workspace_name.label'))
         ->assertSee(__('filament/pages/teams.create_team.form.workspace_handle.label'))
         ->assertSee(__('filament/pages/teams.create_team.form.use_case_label'))
-        ->assertSee(__('filament/pages/teams.create_team.form.invite_email_label'))
-        ->assertSee(__('filament/pages/teams.create_team.form.invite_role_label'))
         ->assertDontSee('filament/pages/teams.create_team.form');
 });
 
@@ -140,6 +184,57 @@ it('creates a team with onboarding fields', function (): void {
     expect($team)->not->toBeNull()
         ->and($team->slug)->toBe('acme-corp')
         ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Sales);
+});
+
+it('subsequent teams can skip optional referral source', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Second Team',
+            'slug' => 'second-team',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->ownedTeams()->where('name', 'Second Team')->first();
+
+    expect($team)->not->toBeNull()
+        ->and($team->onboarding_referral_source)->toBeNull();
+});
+
+it('stores referral source', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_referral_source' => OnboardingReferralSource::Google->value,
+            'name' => 'Referral Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = Team::query()->where('name', 'Referral Team')->first();
+
+    expect($team->onboarding_referral_source)->toBe(OnboardingReferralSource::Google);
+});
+
+it('has exactly three steps', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertSuccessful()
+        ->assertSeeHtml('aria-valuemax="3"')
+        ->assertDontSee('Collaborate with your team')
+        ->assertDontSee('Copy invite link');
 });
 
 it('hides the account menu links while no workspace is bound, instead of sending them to the dashboard', function (): void {

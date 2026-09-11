@@ -6,13 +6,6 @@
     $steps = $getChildSchema()->getComponents();
     $isHeaderHidden = $isHeaderHidden();
 
-    // Filament prefixes a step's key with its schema path at runtime
-    // ("onboarding-use-case" becomes "form.onboarding-use-case"), so the key must be
-    // read back off the live step rather than written as a literal here.
-    $requiredStepKey = collect($steps)
-        ->map(static fn (\Filament\Schemas\Components\Wizard\Step $step): ?string => $step->getKey())
-        ->first(static fn (?string $stepKey): bool => $stepKey !== null && str_ends_with($stepKey, 'onboarding-use-case'));
-
     $stepCount = collect($steps)
         ->filter(static fn (\Filament\Schemas\Components\Wizard\Step $step): bool => $step->isVisible())
         ->count();
@@ -238,27 +231,17 @@
             {{ $getSubmitAction() }}
         </div>
 
-        {{-- Reads Livewire state rather than a server-rendered literal: Alpine compiles
-             an x-show expression once, so a baked-in value would never update as the
-             invite fields are filled in. --}}
-        <div
-            x-cloak
-            class="mt-3 text-center"
-            x-data="{
-                hasPendingInvite() {
-                    return Object.values($wire.get('data.invites') || {}).some(
-                        (invite) => ((invite || {}).email || '').trim() !== ''
-                    )
-                },
-            }"
-        >
+        {{-- Only the attribution step is optional: the first step and the last
+             (use case) are required. --}}
+        <div x-cloak class="mt-3 text-center">
             <button
-                x-show="! isFirstStep() && step !== @js($requiredStepKey) && (! isLastStep() || hasPendingInvite())"
+                x-show="! isFirstStep() && ! isLastStep()"
                 type="button"
-                x-on:click="isLastStep() ? $wire.skipInvites() : goToNextStep()"
+                x-on:click="goToNextStep()"
                 class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                x-text="isLastStep() ? @js(__('filament/pages/teams.create_team.actions.skip_for_now')) : @js(__('filament/pages/teams.create_team.actions.skip'))"
-            ></button>
+            >
+                {{ __('filament/pages/teams.create_team.actions.skip') }}
+            </button>
         </div>
     </div>
 </div>
