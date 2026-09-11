@@ -133,27 +133,21 @@ final readonly class CustomFieldInput
      */
     private function resolveOption(CustomField $field, string $value, array $entry): string
     {
-        $knownIds = array_map(strval(...), $field->options->modelKeys());
+        $id = $this->optionMap->idFor($entry, $value);
 
-        if (in_array($value, $knownIds, true)) {
-            return $value;
+        if ($id !== null) {
+            return $id;
         }
 
         if ($this->optionMap->isAmbiguous($entry, $value)) {
             $this->fail($field, __('validation.custom_field.ambiguous_option', ['field' => $field->name, 'value' => $value]));
         }
 
-        $id = $this->optionMap->idFor($entry, $value);
-
-        if ($id === null) {
-            $this->fail($field, __('validation.custom_field.unknown_option', [
-                'field' => $field->name,
-                'value' => $value,
-                'labels' => implode(', ', $entry['labels']),
-            ]));
-        }
-
-        return $id;
+        $this->fail($field, __('validation.custom_field.unknown_option', [
+            'field' => $field->name,
+            'value' => $value,
+            'labels' => implode(', ', $entry['labels']),
+        ]));
     }
 
     private function richText(mixed $value): mixed

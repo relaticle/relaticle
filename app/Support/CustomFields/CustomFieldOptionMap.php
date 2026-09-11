@@ -36,9 +36,13 @@ final readonly class CustomFieldOptionMap
     /**
      * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
-    public function idFor(array $entry, string $label): ?string
+    public function idFor(array $entry, string $value): ?string
     {
-        $matches = $entry['ids'][mb_strtolower(trim($label))] ?? [];
+        if (in_array($value, array_merge(...array_values($entry['ids'])), true)) {
+            return $value;
+        }
+
+        $matches = $entry['ids'][mb_strtolower(trim($value))] ?? [];
 
         return count($matches) === 1 ? $matches[0] : null;
     }

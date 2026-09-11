@@ -103,9 +103,10 @@ final readonly class CustomFieldsFilterTranslator
     private function optionId(string $code, array $entry, mixed $label): string
     {
         $value = (string) $label;
+        $id = $this->optionMap->idFor($entry, $value);
 
-        if (in_array($value, array_merge(...array_values($entry['ids'])), true)) {
-            return $value;
+        if ($id !== null) {
+            return $id;
         }
 
         if ($this->optionMap->isAmbiguous($entry, $value)) {
@@ -114,16 +115,10 @@ final readonly class CustomFieldsFilterTranslator
             ]);
         }
 
-        $id = $this->optionMap->idFor($entry, $value);
-
-        if ($id === null) {
-            throw ValidationException::withMessages([
-                'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
-                    implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
-            ]);
-        }
-
-        return $id;
+        throw ValidationException::withMessages([
+            'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
+                implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
+        ]);
     }
 
     /**
