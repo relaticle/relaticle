@@ -1002,10 +1002,10 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply shrink-0 rounded border border-gray-200 bg-gray-50 px-1 font-sans text-[0.6875rem] text-gray-400 dark:border-white/10 dark:bg-white/5 dark:text-gray-500;
 }
 
-/* Rich editor without the input chrome: the field label and placeholder carry the
-   affordance, so the box would only box in what should read as a document. */
+/* A page rather than an input: the fill marks the writing area without a border or
+   ring, which a form of bordered fields would otherwise swallow. */
 .fi-fo-rich-editor-seamless {
-    @apply rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
+    @apply rounded-xl bg-[var(--surface-input-bg)] shadow-none ring-0;
 
     &:not(.fi-disabled):not(:has(.fi-ac-action:focus)) {
         @apply focus-within:ring-0;
@@ -1014,7 +1014,7 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     /* A floor only: slash-menu.js measures the real height. No max-height, which
        would nest a second scrollbar inside the modal's. */
     .fi-fo-rich-editor-content {
-        @apply min-h-40 px-0 py-0 text-[0.9375rem]/[1.65];
+        @apply min-h-40 px-4 py-3.5 text-[0.9375rem]/[1.65];
     }
 }
 
