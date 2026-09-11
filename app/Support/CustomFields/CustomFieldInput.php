@@ -14,10 +14,14 @@ final readonly class CustomFieldInput
 {
     public function __construct(private CustomFieldOptionMap $optionMap, private MarkdownRenderer $markdown) {}
 
-    public function normalize(string $teamId, string $entityType, mixed $customFields): mixed
+    /**
+     * @param  array<array-key, mixed>  $customFields
+     * @return array<array-key, mixed>
+     */
+    public function normalize(string $teamId, string $entityType, array $customFields): array
     {
-        if (! is_array($customFields) || $customFields === []) {
-            return $customFields;
+        if ($customFields === []) {
+            return [];
         }
 
         $fields = CustomField::query()

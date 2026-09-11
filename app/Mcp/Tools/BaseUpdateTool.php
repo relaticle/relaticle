@@ -81,13 +81,10 @@ abstract class BaseUpdateTool extends Tool
         // reported by the `id` rule below rather than blowing up on the typed parameter.
         $entityId = $request->get('id');
 
-        $customFields = resolve(CustomFieldInput::class)->normalize(
-            $user->currentTeam->getKey(),
-            $this->entityType(),
-            $request->get('custom_fields'),
-        );
+        $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentTeam->getKey(), $this->entityType(), $customFields);
             $request->merge(['custom_fields' => $customFields]);
         }
 

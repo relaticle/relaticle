@@ -69,13 +69,10 @@ abstract class BaseCreateTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $customFields = resolve(CustomFieldInput::class)->normalize(
-            $user->currentTeam->getKey(),
-            $this->entityType(),
-            $request->get('custom_fields'),
-        );
+        $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentTeam->getKey(), $this->entityType(), $customFields);
             $request->merge(['custom_fields' => $customFields]);
         }
 

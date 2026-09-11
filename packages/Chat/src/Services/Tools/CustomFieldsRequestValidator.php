@@ -33,15 +33,13 @@ final readonly class CustomFieldsRequestValidator
         $teamId = $user->currentTeam->getKey();
 
         try {
-            $normalized = $this->input->normalize($teamId, $entityType, $rawCustomFields);
+            $clean = $this->input->normalize($teamId, $entityType, $rawCustomFields);
         } catch (ValidationException $exception) {
             return new CustomFieldsValidationResult(
                 cleanFields: [],
                 error: $this->keyedMessages($exception->validator->errors()),
             );
         }
-
-        $clean = is_array($normalized) ? $normalized : $rawCustomFields;
 
         $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
             ->toRules($clean);

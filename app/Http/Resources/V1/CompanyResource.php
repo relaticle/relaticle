@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Resources\V1;
 
 use App\Http\Resources\V1\Concerns\FormatsCustomFields;
-use App\Http\Resources\V1\Concerns\PrimesRecordNames;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\JsonApi\JsonApiResource;
@@ -16,7 +15,6 @@ use Illuminate\Http\Resources\JsonApi\JsonApiResource;
 final class CompanyResource extends JsonApiResource
 {
     use FormatsCustomFields;
-    use PrimesRecordNames;
 
     /**
      * @return array<string, mixed>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\CustomFields;
 
 use App\Models\CustomField;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 
 final readonly class CustomFieldOptionMap
@@ -38,7 +39,7 @@ final readonly class CustomFieldOptionMap
      */
     public function idFor(array $entry, string $value): ?string
     {
-        if (in_array($value, array_merge(...array_values($entry['ids'])), true)) {
+        if (in_array($value, Arr::flatten($entry['ids']), true)) {
             return $value;
         }
 

@@ -38,7 +38,9 @@ abstract class BaseCrmEntityRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if (! $this->has('custom_fields')) {
+        $customFields = $this->input('custom_fields');
+
+        if (! is_array($customFields)) {
             return;
         }
 
@@ -46,7 +48,7 @@ abstract class BaseCrmEntityRequest extends FormRequest
             'custom_fields' => resolve(CustomFieldInput::class)->normalize(
                 $this->authenticatedUser()->currentTeam->getKey(),
                 $this->entity()->value,
-                $this->input('custom_fields'),
+                $customFields,
             ),
         ]);
     }

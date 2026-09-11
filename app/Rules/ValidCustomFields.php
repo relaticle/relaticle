@@ -63,10 +63,7 @@ final readonly class ValidCustomFields implements ValidationRule
                 $this->addChoiceFieldOptionRules($customField, $rules);
 
                 if ($customField->type === CustomFieldType::RECORD->value) {
-                    $ruleKey = "custom_fields.{$customField->code}";
-                    $rules[$ruleKey] = array_merge($rules[$ruleKey] ?? [], [
-                        new OwnedLookupRecords($this->tenantId, (string) $customField->lookup_type, $customField->name),
-                    ]);
+                    $rules["custom_fields.{$customField->code}"][] = new OwnedLookupRecords($this->tenantId, (string) $customField->lookup_type, $customField->name);
                 }
             }
         }

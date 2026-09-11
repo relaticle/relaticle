@@ -6,10 +6,10 @@ namespace App\Support\CustomFields;
 
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Models\CustomFieldValue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class RecordNameResolver

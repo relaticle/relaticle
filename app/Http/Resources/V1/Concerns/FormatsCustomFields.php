@@ -6,13 +6,22 @@ namespace App\Http\Resources\V1\Concerns;
 
 use App\Enums\CustomFieldType;
 use App\Support\CustomFields\RecordNameResolver;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 
 trait FormatsCustomFields
 {
+    public static function collection(mixed $resource): AnonymousResourceCollection
+    {
+        resolve(RecordNameResolver::class)->prime($resource instanceof Paginator ? $resource->items() : $resource);
+
+        return parent::collection($resource);
+    }
+
     protected function formatCustomFields(Model $record): \stdClass
     {
         if (! $record->relationLoaded('customFieldValues')) {
