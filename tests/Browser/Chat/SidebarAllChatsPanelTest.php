@@ -82,3 +82,37 @@ it('navigates to a chat when clicked from the panel', function (): void {
     $page->click('[data-chat-all-chats-panel] a[href*="cnav1"]')
         ->assertPathIs("/app/{$team->slug}/chats/cnav1");
 });
+
+it('does not restore an open flyout when the browser goes back', function (): void {
+    $user = User::factory()->withTeam()->create();
+    $team = $user->ownedTeams()->first();
+
+    $rows = [];
+    for ($i = 1; $i <= 8; $i++) {
+        $rows[] = [
+            'id' => "cback{$i}",
+            'participant_type' => 'user',
+            'participant_id' => $user->getKey(),
+            'team_id' => $team->getKey(),
+            'title' => "Filler {$i}",
+            'created_at' => now()->subMinutes(20 - $i),
+            'updated_at' => now()->subMinutes(20 - $i),
+        ];
+    }
+    DB::table('agent_conversations')->insert($rows);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$team->slug}")
+        ->click('button[aria-label="Open all chats"]')
+        ->wait(0.5)
+        ->assertVisible('[data-chat-all-chats-panel]');
+
+    $page->script("window.Livewire.navigate('/app/{$team->slug}/people')");
+
+    $page->waitForText('No people')
+        ->back()
+        ->waitForText('Get started')
+        ->wait(0.5);
+
+    $page->assertMissing('[data-chat-all-chats-panel]');
+});

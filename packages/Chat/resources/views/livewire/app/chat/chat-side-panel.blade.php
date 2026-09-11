@@ -2,7 +2,7 @@
     {{-- Side Panel --}}
     <div
         x-data="{
-            open: @entangle('isOpen'),
+            open: @entangle('isOpen').live,
             {{-- try/catch: storage access throws in Safari private mode, and an
                  exception here would kill the whole component's init. --}}
             width: (() => {
@@ -30,6 +30,12 @@
             copied: false,
 
             init() {
+                {{-- Open at init only when Livewire restored this page from its
+                     back/forward cache; forward navigation always lands closed. --}}
+                if (this.open) {
+                    this.open = false;
+                }
+
                 this.$watch('open', (newValue) => {
                     if (newValue === true) {
                         this.$nextTick(() => {
