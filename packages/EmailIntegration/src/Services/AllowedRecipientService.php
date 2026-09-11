@@ -49,7 +49,7 @@ final readonly class AllowedRecipientService
 
         foreach (['to' => $to, 'cc' => $cc, 'bcc' => $bcc] as $field => $addresses) {
             foreach ($addresses as $index => $address) {
-                if (! is_string($address) || ! $this->isAllowed($user, $address, $extraAddresses)) {
+                if (! $this->isAllowed($user, $address, $extraAddresses)) {
                     $errors["{$field}.{$index}"] = [$message];
                 }
             }

@@ -52,10 +52,10 @@ trait AssertsAllowedEmailRecipients
             return [];
         }
 
-        return $email->participants
+        return array_values($email->participants
             ->pluck('email_address')
             ->filter(fn (?string $address): bool => filled($address))
             ->map(fn (string $address): string => $address)
-            ->all();
+            ->all());
     }
 }

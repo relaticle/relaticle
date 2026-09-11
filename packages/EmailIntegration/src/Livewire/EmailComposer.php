@@ -59,6 +59,7 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
@@ -582,27 +583,29 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        /** @var list<array{person: People, email: string}> $recipients */
-        $recipients = [];
-        $peopleById = People::query()
+        /** @var list<string> $personIds */
+        $personIds = array_values(array_unique(array_column($this->massRecipients, 'personId')));
+
+        if ($personIds === []) {
+            $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
+
+            return;
+        }
+
+        $people = People::query()
             ->with('company')
             ->where('team_id', $this->authUser()->current_team_id)
-            ->whereKey(array_column($this->massRecipients, 'personId'))
-            ->get()
-            ->keyBy(fn (People $person): string => (string) $person->getKey());
+            ->whereKey($personIds)
+            ->get();
 
-        foreach ($this->massRecipients as $massRecipient) {
-            $person = $peopleById->get($massRecipient['personId']);
+        $order = array_flip($personIds);
 
-            if (! $person instanceof People) {
-                continue;
-            }
+        $orderedPeople = $people
+            ->sortBy(fn (People $person): int => $order[(string) $person->getKey()] ?? PHP_INT_MAX)
+            ->values();
 
-            $recipients[] = [
-                'person' => $person,
-                'email' => $massRecipient['email'],
-            ];
-        }
+        $result = resolve(MassSendRecipientResolver::class)->resolveFromPeople($orderedPeople);
+        $recipients = $result->recipients;
 
         if ($recipients === []) {
             $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
@@ -706,11 +709,11 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return [];
         }
 
-        return $email->participants
+        return array_values($email->participants
             ->pluck('email_address')
             ->filter(fn (?string $address): bool => filled($address))
             ->map(fn (string $address): string => $address)
-            ->all();
+            ->all());
     }
 
     /**
@@ -884,11 +887,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     private function syncMassRecipientsFromTo(): void
     {
         if ($this->to === []) {
+            $this->massRecipients = [];
+
             return;
         }
 
         $teamId = (string) $this->authUser()->current_team_id;
-        $existingPersonIds = array_column($this->massRecipients, 'personId');
+        $existingPersonIds = [];
+        $nextRecipients = [];
 
         foreach ($this->to as $address) {
             $email = PersonRecipientFormatter::primaryEmailFromValue($address);
@@ -910,12 +916,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             }
 
             $existingPersonIds[] = $personId;
-            $this->massRecipients[] = [
+            $nextRecipients[] = [
                 'personId' => $personId,
                 'email' => $email,
                 'name' => PersonRecipientFormatter::displayName($person, $email),
             ];
         }
+
+        $this->massRecipients = $nextRecipients;
     }
 
     private function personForEmail(string $emailAddress, string $teamId): ?People

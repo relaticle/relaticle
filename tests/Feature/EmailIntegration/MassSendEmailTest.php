@@ -21,7 +21,9 @@ use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBatch;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\OpenMassSendComposer;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
@@ -544,4 +546,139 @@ it('uses the email address when a person name looks like an empty json array', f
             ]],
         ])
         ->assertSet('massRecipients.0.name', 'broken-name@example.com');
+});
+
+it('expands signatures and resolves merge tags per recipient on mass send', function (): void {
+    $signature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
+        'connected_account_id' => $this->account->id,
+        'content_html' => '<p>Best regards</p>',
+        'is_default' => true,
+    ]));
+
+    $personA = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $personB = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Bob',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($personA, 'alice@example.com');
+    setPersonEmail($personB, 'bob@example.com');
+
+    $bodyHtml = resolve(EmailTemplateRenderService::class)
+        ->applySignatureBlock('<p>Hello {name}</p>', $signature);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => [
+                ...massRecipientPayload($personA, 'alice@example.com'),
+                ...massRecipientPayload($personB, 'bob@example.com'),
+            ],
+        ])
+        ->set('subject', 'Hi {name}')
+        ->set('bodyHtml', $bodyHtml)
+        ->call('send');
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+    $emails = Email::query()->where('batch_id', $batch->id)->with('body')->get();
+
+    $aliceEmail = $emails->first(fn (Email $email): bool => $email->subject === 'Hi Alice');
+    $bobEmail = $emails->first(fn (Email $email): bool => $email->subject === 'Hi Bob');
+
+    expect($emails)->toHaveCount(2)
+        ->and($aliceEmail)->not->toBeNull()
+        ->and($bobEmail)->not->toBeNull()
+        ->and($aliceEmail->body->body_html)->toContain('Hello Alice')
+        ->and($aliceEmail->body->body_html)->toContain('Best regards')
+        ->and($bobEmail->body->body_html)->toContain('Hello Bob')
+        ->and($bobEmail->body->body_html)->toContain('Best regards')
+        ->and($aliceEmail->body->body_html)->not->toContain('data-id="signature"');
+});
+
+it('ignores a tampered mass recipient email and sends to the CRM address', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Trusted Person',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'real@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => [[
+                'personId' => (string) $person->getKey(),
+                'email' => 'attacker@evil.com',
+                'name' => (string) $person->name,
+            ]],
+        ])
+        ->set('subject', 'Tampered address')
+        ->set('bodyHtml', '<p>Hi</p>')
+        ->call('send');
+
+    $email = Email::query()->where('subject', 'Tampered address')->firstOrFail();
+
+    $this->assertDatabaseHas('email_participants', [
+        'email_id' => $email->getKey(),
+        'email_address' => 'real@example.com',
+        'role' => 'to',
+    ]);
+
+    $this->assertDatabaseMissing('email_participants', [
+        'email_id' => $email->getKey(),
+        'email_address' => 'attacker@evil.com',
+    ]);
+});
+
+it('drops recipients removed from To when mass sending is toggled off and back on', function (): void {
+    $personA = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $personB = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Bob',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $personC = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Carol',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($personA, 'alice@example.com');
+    setPersonEmail($personB, 'bob@example.com');
+    setPersonEmail($personC, 'carol@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => [
+                ...massRecipientPayload($personA, 'alice@example.com'),
+                ...massRecipientPayload($personB, 'bob@example.com'),
+                ...massRecipientPayload($personC, 'carol@example.com'),
+            ],
+        ])
+        ->set('isMassSend', false)
+        ->set('to', ['alice@example.com'])
+        ->set('isMassSend', true)
+        ->assertCount('massRecipients', 1)
+        ->assertSet('massRecipients.0.personId', (string) $personA->getKey())
+        ->set('subject', 'Subset send')
+        ->set('bodyHtml', '<p>Hi</p>')
+        ->call('send');
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+
+    expect($batch->total_recipients)->toBe(1);
 });

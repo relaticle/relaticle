@@ -70,7 +70,7 @@ final readonly class SendEmailBatchAction
                     data: [
                         'connected_account_id' => $accountId,
                         'subject' => $this->renderService->renderPlainText($payload['subject'], $person),
-                        'body_html' => $this->renderService->renderContent($payload['body_html'], $person),
+                        'body_html' => $this->renderService->renderForSending($payload['body_html'], $person),
                         'to' => [['email' => $recipient['email'], 'name' => $person->name]],
                         'cc' => [],
                         'bcc' => [],
