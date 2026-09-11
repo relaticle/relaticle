@@ -12,7 +12,6 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailBatch;
-use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
 final readonly class SendEmailBatchAction
@@ -35,7 +34,7 @@ final readonly class SendEmailBatchAction
      * @param  list<array{person: People, email: string}>  $recipients
      * @param  array{connected_account_id: string, subject: string, body_html: string}  $payload
      */
-    public function execute(User $user, array $recipients, array $payload, ?EmailTemplate $template = null): EmailBatch
+    public function execute(User $user, array $recipients, array $payload): EmailBatch
     {
         $accountId = $payload['connected_account_id'];
 
@@ -47,7 +46,7 @@ final readonly class SendEmailBatchAction
             ->whereKey($accountId)
             ->firstOrFail();
 
-        return DB::transaction(function () use ($user, $recipients, $payload, $template, $accountId): EmailBatch {
+        return DB::transaction(function () use ($user, $recipients, $payload, $accountId): EmailBatch {
             $batch = EmailBatch::query()->create([
                 'team_id' => $user->currentTeam?->getKey(),
                 'user_id' => $user->getKey(),
@@ -60,18 +59,11 @@ final readonly class SendEmailBatchAction
             foreach ($recipients as $recipient) {
                 $person = $recipient['person'];
 
-                $rendered = $template instanceof EmailTemplate
-                    ? $this->renderService->render($template, $person)
-                    : [
-                        'subject' => $this->renderService->renderPlainText($payload['subject'], $person),
-                        'body_html' => $this->renderService->renderContent($payload['body_html'], $person),
-                    ];
-
                 $this->sendEmail->execute(
                     data: [
                         'connected_account_id' => $accountId,
-                        'subject' => $rendered['subject'],
-                        'body_html' => $rendered['body_html'],
+                        'subject' => $this->renderService->renderPlainText($payload['subject'], $person),
+                        'body_html' => $this->renderService->renderContent($payload['body_html'], $person),
                         'to' => [['email' => $recipient['email'], 'name' => $person->name]],
                         'cc' => [],
                         'bcc' => [],

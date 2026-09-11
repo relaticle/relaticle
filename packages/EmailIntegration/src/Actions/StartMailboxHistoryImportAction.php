@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
-use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
@@ -19,11 +18,13 @@ final readonly class StartMailboxHistoryImportAction
         dispatch(new RelinkMailboxHistoryJob($connectedAccount))->afterCommit();
 
         if ($connectedAccount->sync_cursor !== null) {
-            MailboxSyncTracker::markEmailStarted($connectedAccount);
-            dispatch(new IncrementalEmailSyncJob($connectedAccount))->afterCommit();
-        } else {
-            dispatch(new InitialEmailSyncJob($connectedAccount))->afterCommit();
+            $connectedAccount->update([
+                'sync_cursor' => null,
+                'initial_sync_estimated' => null,
+            ]);
         }
+
+        dispatch(new InitialEmailSyncJob($connectedAccount))->afterCommit();
 
         if (! $connectedAccount->hasCalendar()) {
             return;

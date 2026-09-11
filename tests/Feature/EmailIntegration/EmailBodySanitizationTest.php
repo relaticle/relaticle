@@ -56,6 +56,26 @@ function makeEmailWithBody(string $html): Email
     return $email->fresh(['body', 'participants', 'labels', 'attachments']);
 }
 
+function makeEmailWithPlainText(string $text): Email
+{
+    /** @var Email $email */
+    $email = Email::factory()->create([
+        'team_id' => test()->team->id,
+        'user_id' => test()->owner->id,
+        'connected_account_id' => test()->account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    $email->body()->create([
+        'body_text' => $text,
+        'body_html' => null,
+    ]);
+
+    test()->person->emails()->attach($email);
+
+    return $email->fresh(['body', 'participants', 'labels', 'attachments']);
+}
+
 /**
  * Render the email reader through the relation-manager overlay, the same
  * `x-emails.email-view` used on company and people Emails tabs.
@@ -196,6 +216,24 @@ it('splits inline attachments and sanitizes body html from the email model', fun
         ->not->toContain('cid:logo@example.test');
 });
 
+it('renders a plain-text-only body in the email view without an iframe', function (): void {
+    $email = makeEmailWithPlainText('Please review the invoice by Friday.');
+
+    mountEmailView($email)
+        ->assertSee('Please review the invoice by Friday.')
+        ->assertDontSeeHtml('<iframe');
+});
+
+it('renders a plain-text-only body in the threaded view without an iframe', function (): void {
+    $email = makeEmailWithPlainText('Please review the invoice by Friday.');
+
+    $html = view('filament.emails.email-thread', ['emails' => collect([$email])])->render();
+
+    expect($html)
+        ->toContain('Please review the invoice by Friday.')
+        ->not->toContain('<iframe');
+});
+
 it('renders the email view iframe without scripts and with same-origin height measurement', function (): void {
     $email = makeEmailWithBody('<p>body</p>');
 
@@ -203,6 +241,7 @@ it('renders the email view iframe without scripts and with same-origin height me
         ->assertSeeHtml('<iframe')
         ->assertSeeHtml('sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"')
         ->assertSeeHtml('referrerpolicy="no-referrer"')
+        ->assertSeeHtml('px-6 py-6 sm:px-8 lg:px-10')
         ->assertSeeHtml('dark:bg-neutral-950 dark:[color-scheme:dark]')
         ->assertSeeHtml('dark:bg-gray-950')
         ->assertDontSeeHtml('allow-scripts');
@@ -226,6 +265,7 @@ it('sandboxes the threaded iframe without same-origin access', function (): void
 
     expect($html)
         ->toContain('sandbox="allow-popups allow-popups-to-escape-sandbox"')
+        ->toContain('px-6 py-6 sm:px-8 lg:px-10')
         ->toContain('dark:bg-neutral-900 dark:[color-scheme:dark]')
         ->toContain('dark:bg-gray-950')
         ->not->toContain('allow-scripts')

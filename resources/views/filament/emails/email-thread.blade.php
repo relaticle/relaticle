@@ -164,17 +164,19 @@
                 <div class="bg-gray-50 px-6 pb-5 dark:bg-gray-950">
                     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xs dark:border-white/25 dark:bg-neutral-900">
                         @if ($safeHtml)
-                            <iframe
-                                srcdoc="{{ $safeHtml }}"
-                                sandbox="allow-popups allow-popups-to-escape-sandbox"
-                                referrerpolicy="no-referrer"
-                                class="w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
-                                style="min-height: 200px; height: 60vh"
-                            ></iframe>
+                            <div class="px-6 py-6 sm:px-8 lg:px-10">
+                                <iframe
+                                    srcdoc="{{ $safeHtml }}"
+                                    sandbox="allow-popups allow-popups-to-escape-sandbox"
+                                    referrerpolicy="no-referrer"
+                                    class="w-full border-0 bg-white [color-scheme:light] dark:bg-neutral-900 dark:[color-scheme:dark]"
+                                    style="min-height: 200px; height: 60vh"
+                                ></iframe>
+                            </div>
                         @elseif ($email->body?->body_text)
-                            <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $email->body->body_text }}</pre>
+                            <pre class="max-w-prose whitespace-pre-wrap px-6 py-6 font-sans text-sm leading-relaxed text-gray-700 sm:px-8 lg:px-10 dark:text-gray-300">{{ $email->body->body_text }}</pre>
                         @else
-                            <p class="text-sm italic text-gray-400">(no message body)</p>
+                            <p class="px-6 py-6 text-sm italic text-gray-400 sm:px-8 lg:px-10">(no message body)</p>
                         @endif
                     </div>
                 </div>
