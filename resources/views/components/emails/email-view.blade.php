@@ -325,7 +325,7 @@
             >
                 <div
                     x-bind:class="ready ? '' : 'min-h-0 flex-1'"
-                    class="relative w-full overflow-hidden border-y border-gray-100 bg-white dark:border-gray-800 dark:bg-neutral-950"
+                    class="relative w-full overflow-hidden border-y border-gray-100 bg-white px-6 py-6 sm:px-8 lg:px-10 dark:border-gray-800 dark:bg-neutral-950"
                 >
                     <div
                         x-show="! ready"
@@ -350,9 +350,9 @@
                 </div>
             </div>
         @else
-            <div class="shrink-0 px-6 py-5">
+            <div class="shrink-0 px-6 py-6 sm:px-8 lg:px-10">
                 @if ($record->body?->body_text)
-                    <pre class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
+                    <pre class="max-w-prose whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
                 @else
                     <p class="text-sm italic text-gray-400 dark:text-gray-500">(no message body)</p>
                 @endif
