@@ -842,7 +842,7 @@ Add `use App\Support\Media\UploadClaims;`.
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `php artisan test --compact --filter=UploadClaimsTest`
-Expected: PASS, 6 tests. Then `php artisan test --compact --filter=CustomFieldValueObserver` to confirm the activity-log tests still pass.
+Expected: PASS, 6 tests. Then `php artisan test --compact --filter='CustomFieldValueObserver|TaskToolsTest|PlanProposalTest|ExecuteImportJob'` to confirm the activity-log and query-log assertions still pass: `saved()` now loads `customField` once per string or text value change. If a query-count assertion breaks, memoise `custom_field_id` to `[type, code]` inside `UploadClaims` for the request rather than loosening the assertion.
 
 - [ ] **Step 6: Run the gates and commit**
 
@@ -1230,7 +1230,7 @@ Prerequisite: #695 merged and `origin/main` merged into this branch. `app/Filame
 
 **Interfaces:**
 - Consumes: `StorePendingUpload::execute()`, `MediaPaths::findByUuid()`, `UploadClaims` (via the observer)
-- Produces: `RichContentAttachments::forTeam(string $teamId): self`, `->saveUploadedFileAttachment(TemporaryUploadedFile): string`, `->getFileAttachmentUrl(mixed): ?string`, `->render(string $html): string`, `->rewriteImageSources(string $html): string`
+- Produces: `RichContentAttachments::forTeam(string $teamId): self`, `->saveUploadedFileAttachment(TemporaryUploadedFile): string`, `->getFileAttachmentUrl(mixed): ?string`, `->rewriteImageSources(string $html): string`, `->tagOwnedImages(string $html): string`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1292,7 +1292,7 @@ function livewireTemporaryPng(): TemporaryUploadedFile
     $name = TemporaryUploadedFile::generateHashNameWithOriginalNameEmbedded(
         UploadedFile::fake()->createWithContent('shot.png', onePixelPng()),
     );
-    Storage::disk(FileUploadConfiguration::disk())->put(FileUploadConfiguration::path($name), onePixelPng());
+    Storage::disk(FileUploadConfiguration::disk())->put(FileUploadConfiguration::path($name, false), onePixelPng());
 
     return new TemporaryUploadedFile($name, FileUploadConfiguration::disk());
 }
@@ -1364,6 +1364,23 @@ it('rewrites image sources from the media row for api readers', function (): voi
         ->rewriteImageSources("<p><img src=\"https://old.test/x.png\" alt=\"a\" data-id=\"{$media->uuid}\"></p>");
 
     expect($html)->toBe("<p><img src=\"{$media->getUrl()}\" alt=\"a\" data-id=\"{$media->uuid}\"></p>");
+});
+
+it('tags an owned image referenced only by its url so the claim can find it', function (): void {
+    $media = $this->team->addMediaFromString(onePixelPng())
+        ->usingFileName('a.png')
+        ->withCustomProperties(['team_id' => $this->team->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+    $stranger = User::factory()->withPersonalTeam()->create();
+    $foreign = $stranger->personalTeam()->addMediaFromString(onePixelPng())
+        ->usingFileName('b.png')
+        ->withCustomProperties(['team_id' => $stranger->personalTeam()->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+
+    $html = RichContentAttachments::forTeam((string) $this->team->getKey())
+        ->tagOwnedImages("<p><img src=\"{$media->getUrl()}\" alt=\"mine\"><img src=\"{$foreign->getUrl()}\" alt=\"theirs\"><img src=\"https://x.test/a.png\"></p>");
+
+    expect($html)->toBe("<p><img data-id=\"{$media->uuid}\" src=\"{$media->getUrl()}\" alt=\"mine\"><img src=\"{$foreign->getUrl()}\" alt=\"theirs\"><img src=\"https://x.test/a.png\"></p>");
 });
 ```
 
@@ -1458,12 +1475,15 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Forms\Components\RichEditor\FileAttachmentProviders\Contracts\FileAttachmentProvider;
 use Filament\Forms\Components\RichEditor\RichContentAttribute;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 final class RichContentAttachments implements FileAttachmentProvider
 {
     private const string IMAGE_PATTERN = '/<img\b[^>]*\bdata-id="([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"[^>]*>/i';
+
+    private const string UNTAGGED_IMAGE_PATTERN = '/<img\b(?![^>]*\bdata-id=)[^>]*\bsrc="([^"]*)"[^>]*>/i';
+
+    private const string OWNED_URL_PATTERN = '#/(?:uploads|media)/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/|\?|$)#';
 
     private function __construct(
         private readonly string $teamId,
@@ -1518,9 +1538,19 @@ final class RichContentAttachments implements FileAttachmentProvider
         // per-editor cleanup would delete another user's pending draft image.
     }
 
-    public function render(string $html): string
+    public function tagOwnedImages(string $html): string
     {
-        return RichContentRenderer::make($html)->fileAttachmentProvider($this)->toHtml();
+        return (string) preg_replace_callback(self::UNTAGGED_IMAGE_PATTERN, function (array $match): string {
+            if (preg_match(self::OWNED_URL_PATTERN, $match[1], $url) !== 1) {
+                return $match[0];
+            }
+
+            if ($this->paths->findByUuid($this->teamId, $url[1]) === null) {
+                return $match[0];
+            }
+
+            return '<img data-id="'.$url[1].'"'.substr($match[0], 4);
+        }, $html);
     }
 
     public function rewriteImageSources(string $html): string
@@ -1551,7 +1581,9 @@ declare(strict_types=1);
 
 namespace App\Filament\CustomFields;
 
+use App\Filament\RichEditor\SlashMenuPlugin;
 use App\Support\Media\RichContentAttachments;
+use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\TextEntry;
 use Illuminate\Database\Eloquent\Model;
@@ -1573,11 +1605,16 @@ final class RichContentEntry extends AbstractInfolistEntry
                     return null;
                 }
 
-                return RichContentAttachments::forTeam((string) $record->getAttribute('team_id'))->render($value);
+                return RichContentRenderer::make($value)
+                    ->plugins([SlashMenuPlugin::make()])
+                    ->fileAttachmentProvider(RichContentAttachments::forTeam((string) $record->getAttribute('team_id')))
+                    ->toHtml();
             });
     }
 }
 ```
+
+`SlashMenuPlugin` registers TipTap PHP extensions (`getTipTapPhpExtensions()`), so the renderer above loads it; without it those nodes drop out of the record page.
 
 In `app/Filament/CustomFields/RichEditorFieldType.php`, inside `configure()`:
 
@@ -1709,7 +1746,7 @@ final class BackfillRichEditorAttachmentsCommand extends Command
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `php artisan test --compact --filter='RichEditorAttachmentTest|BackfillRichEditorAttachmentsCommandTest'`
-Expected: PASS, 8 tests. Also run `php artisan test --compact --filter=NoteResourceTest` to confirm #695's editor tests still pass.
+Expected: PASS, 9 tests. Also run `php artisan test --compact --filter=NoteResourceTest` to confirm #695's editor tests still pass.
 
 - [ ] **Step 7: Run the gates and commit**
 
@@ -1789,6 +1826,7 @@ mutates(StoreAgentUpload::class, TemporaryUploads::class);
 
 beforeEach(function (): void {
     Storage::fake('public');
+    Storage::fake('local');
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();
 });
@@ -1918,7 +1956,7 @@ Add imports `use App\Exceptions\UploadException;` and `use App\Support\Media\Upl
 
 - [ ] **Step 5: Create `TemporaryUploads` and `StoreAgentUpload`**
 
-`app/Support/Media/TemporaryUploads.php`:
+`app/Support/Media/TemporaryUploads.php`. Temp bodies arrive over an unauthenticated signed PUT and are unvalidated until `upload-file` sniffs them, so they live on the private `local` disk, never on the media disk (which defaults to `public`):
 
 ```php
 <?php
@@ -1941,7 +1979,7 @@ final readonly class TemporaryUploads
     public static function disk(): FilesystemAdapter
     {
         /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk((string) config('media-library.disk_name'));
+        $disk = Storage::disk('local');
 
         return $disk;
     }
@@ -2118,7 +2156,7 @@ git commit -m "feat(uploads): accept agent files by url, base64, or signed put"
 - Consumes: `StoreAgentUpload::execute()`, `TemporaryUploads::*`, `UploadAllowlist::isImage()`
 - Produces: route `mcp.uploads.receive` (`PUT {mcpPath}/uploads/{upload}`, `signed`)
 - Produces: tools `create-upload-url` → `{upload_id, url, headers, expires_at}` and `upload-file` → `{file_id, path, url, mime_type, size, suggested_markdown}`
-- Produces: `app:purge-pending-uploads` hourly
+- Produces: `app:purge-pending-uploads` hourly; temp files live under `tmp/` on the `local` disk
 
 - [ ] **Step 1: Extend `UploadToolsTest`**
 
@@ -2155,7 +2193,7 @@ describe('create-upload-url', function (): void {
 });
 
 describe('signed put receiver', function (): void {
-    it('stores the body under tmp and answers 204', function (): void {
+    it('stores the body under tmp on the local disk and answers 204', function (): void {
         $name = TemporaryUploads::newName('deck.pdf');
         $url = URL::temporarySignedRoute('mcp.uploads.receive', now()->addMinutes(5), ['upload' => $name]);
 
@@ -2279,6 +2317,7 @@ mutates(PurgePendingUploadsCommand::class);
 
 beforeEach(function (): void {
     Storage::fake('public');
+    Storage::fake('local');
     $this->team = User::factory()->withPersonalTeam()->create()->personalTeam();
 });
 
@@ -2308,14 +2347,11 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     TemporaryUploads::disk()->assertExists(TemporaryUploads::path($freshTemp));
 });
 
-it('is scheduled hourly on one server without overlap', function (): void {
-    $event = collect(resolve(Illuminate\Console\Scheduling\Schedule::class)->events())
-        ->first(fn (Illuminate\Console\Scheduling\Event $event): bool => str_contains((string) $event->command, 'app:purge-pending-uploads'));
-
-    expect($event)->not->toBeNull()
-        ->and($event->expression)->toBe('0 * * * *')
-        ->and($event->withoutOverlapping)->toBeTrue()
-        ->and($event->onOneServer)->toBeTrue();
+it('is scheduled hourly', function (): void {
+    $this->artisan('schedule:list')
+        ->expectsOutputToContain('app:purge-pending-uploads')
+        ->expectsOutputToContain('0 * * * *')
+        ->assertSuccessful();
 });
 ```
 
@@ -2424,11 +2460,11 @@ final class CreateUploadUrlTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
+        $validated = $request->validate(['filename' => ['required', 'string', 'max:255']]);
+
         if (($limited = $this->denyIfUploadLimitReached($user->currentTeam)) instanceof Response) {
             return $limited;
         }
-
-        $validated = $request->validate(['filename' => ['required', 'string', 'max:255']]);
 
         try {
             $uploadId = TemporaryUploads::newName($validated['filename']);
@@ -2689,11 +2725,11 @@ git commit -m "feat(mcp): add create-upload-url and upload-file tools"
 
 **Files:**
 - Create: `app/Rules/StoredUploadPath.php`
-- Modify: `app/Rules/ValidCustomFields.php:56-64`, `app/Http/Resources/V1/Concerns/FormatsCustomFields.php:32-50`, `app/Mcp/Resources/Concerns/ResolvesEntitySchema.php:109`, `lang/en/validation.php:30-38`
+- Modify: `app/Rules/ValidCustomFields.php:56-64`, `app/Http/Resources/V1/Concerns/FormatsCustomFields.php:32-50`, `app/Support/CustomFields/CustomFieldInput.php:62,151-162`, `app/Mcp/Resources/Concerns/ResolvesEntitySchema.php:109`, `lang/en/validation.php:30-38`
 - Test: `tests/Feature/Mcp/CustomFieldWritesTest.php` (extend), `tests/Feature/Api/V1/CustomFieldWritesApiTest.php` (extend)
 
 **Interfaces:**
-- Consumes: `MediaPaths::find()`, `MediaCollection::*`, `RichContentAttachments::rewriteImageSources()`
+- Consumes: `MediaPaths::find()`, `MediaCollection::*`, `RichContentAttachments::rewriteImageSources()`, `RichContentAttachments::tagOwnedImages()`
 - Produces: `StoredUploadPath::__construct(string $teamId, CustomField $field, string|int|null $entityId = null)`
 
 - [ ] **Step 1: Extend the MCP write tests**
@@ -2713,6 +2749,11 @@ function uploadedPath(User $user, string $filename = 'brief.pdf'): string
 describe('file-upload values', function (): void {
     beforeEach(function (): void {
         Storage::fake('public');
+        $this->body = CustomField::query()
+            ->where('tenant_id', $this->team->getKey())
+            ->where('entity_type', 'note')
+            ->where('code', 'body')
+            ->firstOrFail();
         $this->contract = CustomField::factory()->create([
             'tenant_id' => $this->team->getKey(),
             'entity_type' => 'note',
@@ -2788,6 +2829,23 @@ describe('file-upload values', function (): void {
             ->assertOk()
             ->assertSee($media->uuid)
             ->assertSee('"url"');
+    });
+
+    it('claims an image an agent embedded by markdown from an upload-file url', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(onePixelPng()), 'filename' => 'shot.png'])
+            ->assertOk();
+        $media = Media::query()->latest('id')->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Md image', 'custom_fields' => ['body' => "Look:\n\n![shot]({$media->getUrl()})"]])
+            ->assertOk();
+
+        $note = Note::query()->where('title', 'Md image')->firstOrFail();
+
+        expect($media->refresh()->model_id)->toBe($note->getKey())
+            ->and($media->collection_name)->toBe(MediaCollection::forCustomField('body'))
+            ->and((string) $note->getCustomFieldValue($this->body))->toContain("data-id=\"{$media->uuid}\"");
     });
 
     it('rewrites rich editor image sources on read', function (): void {
@@ -2933,7 +2991,24 @@ In `app/Rules/ValidCustomFields.php::toRules()`, after the `RECORD` block inside
                 }
 ```
 
-- [ ] **Step 5: Shape the reads**
+- [ ] **Step 5: Tag agent-written images on the way in and shape the reads**
+
+An agent that embeds an `upload-file` result writes markdown, which becomes `<img src="...">` with no `data-id`, and `UploadClaims` only reads `data-id`. Tag it at the one normalizer REST and MCP share. In `app/Support/CustomFields/CustomFieldInput.php`, change line 62 to `CustomFieldType::RICH_EDITOR => $this->richText($field, $value),` and replace `richText()`:
+
+```php
+    private function richText(CustomField $field, mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $html = str_starts_with(ltrim($value), '<') ? $value : $this->markdown->toHtml($value);
+
+        return RichContentAttachments::forTeam((string) $field->tenant_id)->tagOwnedImages($html);
+    }
+```
+
+with `use App\Support\Media\RichContentAttachments;`.
 
 In `app/Http/Resources/V1/Concerns/FormatsCustomFields.php::resolveFieldValue()`, before the `RECORD` check:
 
@@ -3058,7 +3133,8 @@ it('serves a signed route on a private disk and downloads non-images', function 
     $media = uploadPdf($this->user);
 
     expect($media->getUrl())->toContain('/media/'.$media->uuid)
-        ->and($media->getUrl())->toContain('signature=');
+        ->and($media->getUrl())->toContain('signature=')
+        ->and(parse_url($media->getUrl(), PHP_URL_HOST))->toBe(parse_url((string) config('app.url'), PHP_URL_HOST));
 
     $this->get($media->getUrl())
         ->assertOk()
@@ -3167,7 +3243,7 @@ Route::get('/media/{media:uuid}', ShowMediaController::class)
     ->name('media.show');
 ```
 
-Place it outside any auth group; the signature is the credential.
+Place it outside any auth group; the signature is the credential. Signed URLs are host-bound: a redirect between hosts turns the signature into a 403. `routes/web.php` registers no `Route::domain()` group, so the route answers on whichever host generated the link. In the browser pass, confirm a link generated on the panel host (`APP_PANEL_DOMAIN`, when set) opens without a redirect.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 

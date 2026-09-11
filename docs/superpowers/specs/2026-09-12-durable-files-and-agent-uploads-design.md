@@ -64,7 +64,7 @@ The stored `file-upload` value is the Media path relative to the media disk, `up
 1. Upload. Any entry point (panel `FileUpload`, panel rich editor, MCP `upload-file`) creates a Media row in the caller's `Team` `pending-uploads` collection with custom properties `uploaded_by`, `source` (`panel`, `url`, `base64`, `signed_put`), and `original_name`. medialibrary `max_file_size` (10 MB) is the final size gate on every source.
 2. Claim. When a custom-field value is saved, an observer on the app `CustomFieldValue` model claims what the value references. For `file-upload` it looks up one pending Media by path; for `rich-editor` it collects every `data-id`. Each pending row owned by the same team is reassigned in place into the field's own `custom-field-{code}` collection: `model_type`, `model_id`, `collection_name` change, `uuid` and file do not. Media already on the record stays. One collection per field keeps a release on one rich-editor field from touching images another field on the same record still references.
 3. Release. The same observer deletes record-owned media the new value no longer references: the replaced file on a `file-upload` field, images removed from a rich-editor body. Deleting the record deletes its media through `InteractsWithMedia`.
-4. Purge. `app:purge-pending-uploads` deletes `pending-uploads` rows older than 24 hours and signed-PUT temp files under `tmp/` on the media disk. Hourly, `withoutOverlapping()->onOneServer()`. Pending rows are never deleted by content scanning; two users drafting in one team would delete each other's images.
+4. Purge. `app:purge-pending-uploads` deletes `pending-uploads` rows older than 24 hours and signed-PUT temp files under `tmp/` on the private `local` disk. Hourly, `withoutOverlapping()->onOneServer()`. Pending rows are never deleted by content scanning; two users drafting in one team would delete each other's images.
 
 Claiming is a write after validation. It lives in the observer, not in actions, so panel, API, MCP and chat approval all get it without touching any action class.
 
@@ -80,13 +80,15 @@ The editor is the app's own `RichEditorFieldType` from #695: no toolbar, a `/` m
 
 `App\Support\Media\RichContentAttachments` implements Filament's `FileAttachmentProvider` once. `RichEditorFieldType` wires its methods into `saveUploadedFileAttachmentUsing` and `getFileAttachmentUrlUsing`, sets `fileAttachmentsMaxSize(10240)` so the editor's 12 MB default cannot pass a file medialibrary's 10 MB ceiling rejects, and keeps the image-only accepted types. `data-id` is the Media `uuid`.
 
+An agent that embeds an `upload-file` result writes markdown, which becomes `<img src="...">` with no `data-id`. `CustomFieldInput::richText()`, the normalizer REST and MCP share, adds `data-id="{uuid}"` to any untagged `<img>` whose `src` names a `/uploads/{uuid}/` or `/media/{uuid}` path the team owns, so the claim finds it.
+
 `getFileAttachmentUrl(id)` treats the id as untrusted client input. It resolves a uuid only when the row belongs to the current tenant, in `pending-uploads` or on a record the tenant owns. Anything else returns null.
 
 Render surfaces:
 
 | Surface | Today | After |
 |---|---|---|
-| Panel infolist | package `HtmlEntry`, raw HTML | app `RichContentEntry` rendering through `RichContentRenderer::fileAttachmentProvider()`; the table column strips tags and needs no change |
+| Panel infolist | package `HtmlEntry`, raw HTML | app `RichContentEntry` rendering through `RichContentRenderer` with the slash-menu plugin's TipTap extensions and `fileAttachmentProvider()`; the table column strips tags and needs no change |
 | REST API and MCP read tools | stored HTML | stored HTML with `src` rewritten by the same provider at read time |
 | Chat | `strip_tags` | unchanged |
 
@@ -104,7 +106,7 @@ The `logo` collections on `Company` and `Team` stay on the public disk through `
 
 ### Tools
 
-`create-upload-url` takes `filename` and returns `{upload_id, url, headers, expires_at}`. The URL is a 5-minute `temporarySignedRoute` to `PUT /mcp/uploads/{upload}` in `routes/ai.php`. The receive controller rejects a missing or over-10 MB `Content-Length` before reading the body, streams to `tmp/{ulid}.{ext}` on the media disk, and returns 204.
+`create-upload-url` takes `filename` and returns `{upload_id, url, headers, expires_at}`. The URL is a 5-minute `temporarySignedRoute` to `PUT /mcp/uploads/{upload}` in `routes/ai.php`. The receive controller rejects a missing or over-10 MB `Content-Length` before reading the body, streams to `tmp/{ulid}.{ext}` on the private `local` disk (the body is unauthenticated and unvalidated until `upload-file` sniffs it), and returns 204.
 
 `upload-file` takes exactly one of `source_url`, `base64` plus `filename`, or `upload_id`, and returns `{file_id, path, url, mime_type, size, suggested_markdown}`. `path` is the value to put in a `file-upload` field.
 
