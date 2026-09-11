@@ -35,6 +35,9 @@ final class RichEditorFieldType extends BaseFieldType
             ->formComponent(fn (CustomField $customField): RichEditor => RichEditor::make($customField->getFieldName())
                 ->plugins([SlashMenuPlugin::make()])
                 ->toolbarButtons([])
+                // Filament decides attachments by whether `attachFiles` sits in the toolbar,
+                // and there is no toolbar: without this, an uploaded image saves as null.
+                ->fileAttachments(true)
                 // The defaults carry the table controls, unreachable otherwise without a toolbar.
                 ->floatingToolbars(fn (RichEditor $component): array => [
                     'paragraph' => self::FLOATING_TOOLBAR,

@@ -259,3 +259,14 @@ it('versions the slash menu script by its published file so an edit changes the 
 
     expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$published}");
 });
+
+it('keeps file attachments enabled on a toolbarless note body', function (): void {
+    $page = livewire(ManageNotes::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    expect($editor->hasFileAttachments())->toBeTrue();
+});
