@@ -87,6 +87,7 @@ final class MassSendBulkAction extends BulkAction
                         }
 
                         $set('subject', $template->subject ?? '');
+                        $set('body_html', $template->body_html ?? '');
                     }),
 
                 TextInput::make('subject')
@@ -149,12 +150,6 @@ final class MassSendBulkAction extends BulkAction
                     return;
                 }
 
-                /** @var EmailTemplate|null $template */
-                $template = isset($data['template_id']) ? EmailTemplate::query()
-                    ->where('team_id', filament()->getTenant()?->getKey())
-                    ->whereKey($data['template_id'])
-                    ->first() : null;
-
                 resolve(SendEmailBatchAction::class)->execute(
                     user: $user,
                     recipients: $recipients,
@@ -163,7 +158,6 @@ final class MassSendBulkAction extends BulkAction
                         'subject' => (string) $data['subject'],
                         'body_html' => (string) $data['body_html'],
                     ],
-                    template: $template,
                 );
 
                 Notification::make()
