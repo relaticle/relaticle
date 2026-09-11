@@ -24,9 +24,10 @@ use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
+use Relaticle\EmailIntegration\Services\MeetingTemporalState;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
-mutates(MeetingsHomeWidget::class, ListMeetingsForDay::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, MailboxDisplayNameDirectory::class, Dashboard::class, HasConnectMailboxActions::class);
+mutates(MeetingsHomeWidget::class, ListMeetingsForDay::class, MeetingAttendeePresenter::class, MeetingTemporalState::class, TeamMemberDirectory::class, MailboxDisplayNameDirectory::class, Dashboard::class, HasConnectMailboxActions::class);
 
 beforeEach(function (): void {
     $this->travelTo(Date::parse('2026-09-09 15:00:00'));
@@ -943,6 +944,62 @@ it('strikes through the title when a meeting is in the past', function (): void 
         ->not->toMatch('/Afternoon review.*line-through/s');
 });
 
+it('applies a hover background to meeting list rows', function (): void {
+    Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Call',
+        'starts_at' => Date::parse('2026-09-09 16:00:00'),
+        'ends_at' => Date::parse('2026-09-09 17:00:00'),
+    ]);
+
+    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
+
+    expect($html)
+        ->toContain('hover:bg-gray-50')
+        ->toContain('dark:hover:bg-white/5')
+        ->toContain('py-3 pr-4');
+});
+
+it('renders load more outside the meeting list card', function (): void {
+    foreach (range(1, 5) as $index) {
+        Meeting::factory()->create([
+            'team_id' => $this->team->id,
+            'connected_account_id' => $this->account->id,
+            'title' => "Meeting {$index}",
+            'starts_at' => Date::parse('2026-09-09 10:00:00')->addHours($index),
+            'ends_at' => Date::parse('2026-09-09 10:30:00')->addHours($index),
+        ]);
+    }
+
+    $html = html_entity_decode(livewire(MeetingsHomeWidget::class)->html());
+
+    expect($html)
+        ->toContain('data-testid="meetings-load-more"')
+        ->toMatch('/<\/ul>[\s\S]*data-testid="meetings-load-more"/')
+        ->not->toMatch('/data-testid="meetings-load-more"[^>]*hover:bg-gray-50/s');
+});
+
+it('strikes through the modal title when a meeting is in the past', function (): void {
+    $meeting = Meeting::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Morning sync',
+        'starts_at' => Date::parse('2026-09-09 10:00:00'),
+        'ends_at' => Date::parse('2026-09-09 10:30:00'),
+    ]);
+
+    $html = html_entity_decode(
+        livewire(MeetingsHomeWidget::class)
+            ->call('openMeeting', $meeting->id)
+            ->html()
+    );
+
+    expect($html)
+        ->toContain('Morning sync')
+        ->toMatch('/Morning sync.*line-through/s');
+});
+
 it('does not mark a later meeting as happening now', function (): void {
     Meeting::factory()->create([
         'team_id' => $this->team->id,
@@ -958,7 +1015,7 @@ it('does not mark a later meeting as happening now', function (): void {
         ->assertDontSee(__('filament/pages/dashboard.meetings.happening_now'));
 });
 
-it('opens the meeting slideover from the title expand control', function (): void {
+it('opens the meeting modal from the row', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -974,7 +1031,7 @@ it('opens the meeting slideover from the title expand control', function (): voi
         ->assertMountedActionModalSee(__('filament/resources/meeting.view.heading'));
 });
 
-it('opens the meeting modal from the row and title expand control', function (): void {
+it('opens the meeting modal when the row is clicked', function (): void {
     $meeting = Meeting::factory()->create([
         'team_id' => $this->team->id,
         'connected_account_id' => $this->account->id,
@@ -987,14 +1044,13 @@ it('opens the meeting modal from the row and title expand control', function ():
 
     expect($html)
         ->toContain('data-testid="meeting-card-title"')
-        ->toContain('data-testid="meeting-card-open"')
         ->toContain('data-testid="meeting-card-row"')
         ->toContain('type="button"')
         ->toContain("openMeeting('{$meeting->id}')")
-        ->toContain('group-hover/row:opacity-100')
         ->toContain('wire:loading.remove')
         ->toContain('wire:loading.class="pointer-events-none opacity-60"')
         ->toContain('fi-loading-indicator')
+        ->not->toContain('data-testid="meeting-card-open"')
         ->not->toContain('data-testid="meeting-card-participants"')
         ->not->toContain('cursor-wait')
         ->not->toContain('aria-expanded=');

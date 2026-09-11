@@ -79,6 +79,9 @@ return [
             'title' => 'Original account no longer connected',
             'body' => 'The account this draft was written from isn\'t connected anymore, so it\'s been switched to your default account. Double-check the sender before sending.',
         ],
+        'draft_saved' => [
+            'title' => 'Draft saved',
+        ],
     ],
     'validation' => [
         'body_required' => 'Write a message before sending.',

@@ -109,7 +109,7 @@
             @endif
         </div>
     @else
-        <div class="flex flex-col divide-y divide-[var(--surface-block-border)]">
+        <ul class="divide-y divide-[var(--surface-block-border)] overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
             @foreach (array_slice($this->meetingCards, 0, $this->visibleCount) as $card)
                 @php
                     $responseStatus = $card['response_status'];
@@ -123,110 +123,92 @@
                         ? \Filament\Support\Icons\Heroicon::OutlinedCalendarDays
                         : \Filament\Support\Icons\Heroicon::OutlinedClock;
                 @endphp
-                <div
+                <li
                     wire:key="meeting-home-{{ $meetingKey }}"
                     data-testid="meeting-card"
-                    class="px-2.5 py-2"
                 >
-                    <button
-                        type="button"
-                        data-testid="meeting-card-row"
-                        class="group/row flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default"
-                        wire:click="{{ $openTarget }}"
-                        wire:loading.attr="disabled"
-                        wire:loading.class="pointer-events-none opacity-60"
-                        wire:target="{{ $openTarget }}"
-                        aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
-                    >
-                        <span class="inline-flex size-3.5 shrink-0 items-center justify-center">
-                            <span
-                                wire:loading.remove
-                                wire:target="{{ $openTarget }}"
-                                @class([
-                                    'size-1.5 rounded-full',
-                                    'bg-success-500' => $dotColor === 'success',
-                                    'bg-danger-500' => $dotColor === 'danger',
-                                    'bg-warning-500' => $dotColor === 'warning',
-                                    'bg-gray-400' => $dotColor === 'gray',
-                                ])
-                                aria-hidden="true"
-                            ></span>
-                            <x-filament::loading-indicator
-                                wire:loading
-                                wire:target="{{ $openTarget }}"
-                                @class([
-                                    'size-3.5',
-                                    'text-success-500' => $dotColor === 'success',
-                                    'text-danger-500' => $dotColor === 'danger',
-                                    'text-warning-500' => $dotColor === 'warning',
-                                    'text-gray-400' => $dotColor === 'gray',
-                                ])
-                                role="status"
-                                aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
-                            />
-                        </span>
-
-                        <span
-                            class="flex min-w-0 flex-1 items-center gap-1.5"
-                            data-testid="meeting-card-title"
+                    <div class="flex items-center gap-3 overflow-hidden pl-4 transition hover:bg-gray-50 dark:hover:bg-white/5">
+                        <button
+                            type="button"
+                            data-testid="meeting-card-row"
+                            class="flex flex-1 cursor-pointer items-center gap-3 py-3 pr-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-default"
+                            wire:click="{{ $openTarget }}"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="pointer-events-none opacity-60"
+                            wire:target="{{ $openTarget }}"
+                            aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
                         >
-                            <span @class([
-                                'min-w-0 truncate text-sm font-medium',
-                                'text-gray-400 line-through dark:text-gray-500' => $isPast,
-                                'text-gray-950 dark:text-white' => ! $isPast,
-                            ])>
+                            <span class="inline-flex size-4 shrink-0 items-center justify-center">
+                                <span
+                                    wire:loading.remove
+                                    wire:target="{{ $openTarget }}"
+                                    @class([
+                                        'size-1.5 rounded-full',
+                                        'bg-success-500' => $dotColor === 'success',
+                                        'bg-danger-500' => $dotColor === 'danger',
+                                        'bg-warning-500' => $dotColor === 'warning',
+                                        'bg-gray-400' => $dotColor === 'gray',
+                                    ])
+                                    aria-hidden="true"
+                                ></span>
+                                <x-filament::loading-indicator
+                                    wire:loading
+                                    wire:target="{{ $openTarget }}"
+                                    @class([
+                                        'size-4',
+                                        'text-success-500' => $dotColor === 'success',
+                                        'text-danger-500' => $dotColor === 'danger',
+                                        'text-warning-500' => $dotColor === 'warning',
+                                        'text-gray-400' => $dotColor === 'gray',
+                                    ])
+                                    role="status"
+                                    aria-label="{{ __('filament/pages/dashboard.meetings.open_named', ['title' => $card['title']]) }}"
+                                />
+                            </span>
+
+                            <span
+                                class="min-w-0 flex-1 truncate text-sm"
+                                data-testid="meeting-card-title"
+                                @class([
+                                    'text-gray-400 line-through dark:text-gray-500' => $isPast,
+                                    'text-gray-900 dark:text-white' => ! $isPast,
+                                ])
+                            >
                                 {{ $card['title'] }}
                             </span>
 
-                            <span
-                                data-testid="meeting-card-open"
-                                @class([
-                                    'inline-flex shrink-0 items-center justify-center rounded-md p-0.5 opacity-0 transition-opacity group-focus-visible/row:opacity-100 group-hover/row:opacity-100',
-                                    'text-success-600 dark:text-success-400' => $dotColor === 'success',
-                                    'text-danger-600 dark:text-danger-400' => $dotColor === 'danger',
-                                    'text-warning-600 dark:text-warning-400' => $dotColor === 'warning',
-                                    'text-gray-500 dark:text-gray-400' => $dotColor === 'gray',
-                                ])
-                                aria-hidden="true"
+                            <time
+                                class="inline-flex shrink-0 items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
+                                datetime="{{ $time['datetime'] }}"
                             >
                                 <x-filament::icon
-                                    :icon="\Filament\Support\Icons\Heroicon::OutlinedArrowsPointingOut"
-                                    class="size-3.5 shrink-0"
+                                    :icon="$timeIcon"
+                                    class="size-3.5 shrink-0 text-gray-400 dark:text-gray-500"
                                 />
-                            </span>
-                        </span>
-
-                        <time
-                            class="inline-flex shrink-0 items-center gap-1.5 text-xs font-normal tabular-nums text-gray-500 dark:text-gray-400"
-                            datetime="{{ $time['datetime'] }}"
-                        >
-                            <x-filament::icon
-                                :icon="$timeIcon"
-                                class="size-3.5 shrink-0 text-gray-400 dark:text-gray-500"
-                            />
-                            <span class="whitespace-nowrap">{{ $time['range'] }}</span>
-                            @if ($happeningNow)
-                                <x-filament::badge color="primary" size="sm">
-                                    {{ __('filament/pages/dashboard.meetings.happening_now') }}
-                                </x-filament::badge>
-                            @endif
-                        </time>
-                    </button>
-                </div>
+                                <span class="whitespace-nowrap tabular-nums">{{ $time['range'] }}</span>
+                                @if ($happeningNow)
+                                    <x-filament::badge color="primary" size="sm">
+                                        {{ __('filament/pages/dashboard.meetings.happening_now') }}
+                                    </x-filament::badge>
+                                @endif
+                            </time>
+                        </button>
+                    </div>
+                </li>
             @endforeach
+        </ul>
 
-            @if ($this->hasMoreMeetings())
-                <button
-                    type="button"
-                    data-testid="meetings-load-more"
-                    wire:click="loadMore"
-                    wire:loading.attr="disabled"
-                    class="w-full rounded-sm py-2 text-center text-xs text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait dark:text-gray-400 dark:hover:text-white"
-                >
-                    {{ __('filament/pages/dashboard.meetings.load_more') }}
-                </button>
-            @endif
-        </div>
+        @if ($this->hasMoreMeetings())
+            <button
+                type="button"
+                data-testid="meetings-load-more"
+                wire:click="loadMore"
+                wire:loading.attr="disabled"
+                class="mt-1 w-full rounded-sm py-2 text-center text-xs text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-wait dark:text-gray-400 dark:hover:text-white"
+            >
+                {{ __('filament/pages/dashboard.meetings.load_more') }}
+            </button>
+        @endif
     @endif
 
     <x-filament-actions::modals />

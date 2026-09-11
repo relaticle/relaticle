@@ -510,7 +510,8 @@ it('saves a draft when minimized and reopens it with state intact', function ():
         ->set('to', ['draft@example.com'])
         ->set('subject', 'Half-written')
         ->set('bodyHtml', '<p>wip</p>')
-        ->call('minimize');
+        ->call('minimize')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'));
 
     $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
     expect($draft->subject)->toBe('Half-written')
@@ -521,6 +522,47 @@ it('saves a draft when minimized and reopens it with state intact', function ():
         ->assertSet('subject', 'Half-written')
         ->assertSet('to', ['draft@example.com'])
         ->assertSet('draftId', $draft->id);
+});
+
+it('notifies when a draft is saved on close', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['draft@example.com'])
+        ->set('subject', 'Parked draft')
+        ->set('bodyHtml', '<p>Come back later</p>')
+        ->call('close')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->where('subject', 'Parked draft')->exists())->toBeTrue();
+});
+
+it('does not notify when closing an empty composer', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('close')
+        ->assertNotNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+});
+
+it('notifies when an inline reply draft is saved on dismiss', function (): void {
+    $email = Email::factory()->create([
+        'team_id' => $this->user->current_team_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+    ]);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->dispatch('composer:reply', emailId: $email->id, mode: 'reply')
+        ->set('to', ['recipient@example.com'])
+        ->set('subject', 'Inline draft')
+        ->set('bodyHtml', '<p>Reply in progress</p>')
+        ->dispatch('composer:dismiss-inline')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'))
+        ->assertSet('isOpen', false);
 });
 
 it('deletes the draft after a successful send', function (): void {
