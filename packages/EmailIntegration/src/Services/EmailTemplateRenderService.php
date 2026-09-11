@@ -126,6 +126,14 @@ final readonly class EmailTemplateRenderService
     }
 
     /**
+     * Substitute merge-tag placeholders in a plain-text string.
+     */
+    public function renderPlainText(string $content, ?Model $record = null): string
+    {
+        return $this->substitute($content, $this->buildVariables($record));
+    }
+
+    /**
      * Substitute merge-tag placeholders in a content string.
      */
     public function renderContent(string $content, ?Model $record = null): string

@@ -329,7 +329,7 @@ trait HasEmailComposeActions
 
         return [
             'connected_account_id' => $data['connected_account_id'],
-            'subject' => $renderer->renderContent((string) $data['subject'], $record),
+            'subject' => $renderer->renderPlainText((string) $data['subject'], $record),
             'body_html' => $bodyHtml,
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),

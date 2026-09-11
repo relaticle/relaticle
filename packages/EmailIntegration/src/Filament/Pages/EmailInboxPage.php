@@ -644,7 +644,7 @@ final class EmailInboxPage extends Page
 
         return [
             'connected_account_id' => $data['connected_account_id'],
-            'subject' => $renderer->renderContent((string) $data['subject']),
+            'subject' => $renderer->renderPlainText((string) $data['subject']),
             'body_html' => $bodyHtml,
             'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['to'] ?? []),
             'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $data['cc'] ?? []),

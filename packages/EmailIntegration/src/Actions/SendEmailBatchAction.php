@@ -63,7 +63,7 @@ final readonly class SendEmailBatchAction
                 $rendered = $template instanceof EmailTemplate
                     ? $this->renderService->render($template, $person)
                     : [
-                        'subject' => $this->renderService->renderContent($payload['subject'], $person),
+                        'subject' => $this->renderService->renderPlainText($payload['subject'], $person),
                         'body_html' => $this->renderService->renderContent($payload['body_html'], $person),
                     ];
 

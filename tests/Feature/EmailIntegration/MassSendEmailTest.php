@@ -210,6 +210,34 @@ it('shows warning notification when no valid recipients exist', function (): voi
     expect(EmailBatch::count())->toBe(0);
 });
 
+it('sends a personalized subject as plain text when no template is saved', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Smith & Sons',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'smith@example.com');
+
+    livewire(ListPeople::class)
+        ->callTableBulkAction(
+            'massSend',
+            records: [$person],
+            data: [
+                'connected_account_id' => $this->account->id,
+                'subject' => 'Hello {name}',
+                'body_html' => '<p>Hi {name}</p>',
+            ],
+        )
+        ->assertNotified();
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+    $email = Email::where('batch_id', $batch->id)->firstOrFail();
+
+    expect($email->subject)->toBe('Hello Smith & Sons');
+    expect($email->body->body_html)->toBe('<p>Hi Smith &amp; Sons</p>');
+});
+
 it('applies template variables per recipient', function (): void {
     $personA = People::create([
         'team_id' => $this->team->id,
