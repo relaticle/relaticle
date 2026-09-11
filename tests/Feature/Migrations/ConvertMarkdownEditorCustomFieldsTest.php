@@ -6,13 +6,14 @@ use App\Models\CustomField;
 use App\Models\User;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 $markdown = "# Meeting notes\n\n- first point\n- second point";
 
-$migration = fn () => (require base_path('database/migrations/2026_09_10_000000_convert_markdown_editor_custom_fields_to_rich_editor.php'))->up();
+$migration = fn (): mixed => (require base_path('database/migrations/2026_09_10_000000_convert_markdown_editor_custom_fields_to_rich_editor.php'))->up();
 
 $markdownField = function (string $code, bool $encrypted): CustomField {
     $settings = new CustomFieldSettingsData;
@@ -31,7 +32,7 @@ $markdownField = function (string $code, bool $encrypted): CustomField {
     ]);
 };
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
     $this->team = $this->user->currentTeam;
     TenantContextService::setTenantId($this->team->id);
@@ -60,9 +61,31 @@ it('moves markdown fields to the rich editor and converts their content', functi
     expect(DB::table('custom_fields')->whereIn('id', [$plain->id, $encrypted->id])->pluck('type')->unique()->all())
         ->toBe(['rich-editor'])
         ->and($value($plain))->toContain('<h1>Meeting notes</h1>', '<li>first point</li>')
-        // Encryption is per field, so the converted value has to go back encrypted or
-        // the read path would hand raw ciphertext to the editor.
         ->and(Crypt::decryptString($value($encrypted)))->toContain('<h1>Meeting notes</h1>');
+});
+
+it('converts every value when a blank value empties out mid-run', function () use ($markdown, $migration, $markdownField): void {
+    $field = $markdownField('md_many', encrypted: false);
+
+    $ids = collect(range(1, 1001))->map(fn (): string => (string) Str::ulid())->sort()->values();
+
+    DB::table('custom_field_values')->insert($ids->map(fn (string $id, int $index): array => [
+        'id' => $id,
+        'custom_field_id' => $field->id,
+        'entity_id' => (string) Str::ulid(),
+        'entity_type' => 'note',
+        'tenant_id' => $this->team->id,
+        'text_value' => $index === 0 ? '   ' : $markdown,
+    ])->all());
+
+    $migration();
+
+    $unconverted = DB::table('custom_field_values')
+        ->where('custom_field_id', $field->id)
+        ->where('text_value', $markdown)
+        ->count();
+
+    expect($unconverted)->toBe(0);
 });
 
 it('leaves a markdown field without a value alone', function () use ($migration, $markdownField): void {
