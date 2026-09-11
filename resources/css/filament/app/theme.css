@@ -1014,7 +1014,13 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     /* A floor only: slash-menu.js measures the real height. No max-height, which
        would nest a second scrollbar inside the modal's. */
     .fi-fo-rich-editor-content {
-        @apply min-h-40 px-4 py-3.5 text-[0.9375rem]/[1.65];
+        @apply flex min-h-40 flex-col px-4 py-3.5 text-[0.9375rem]/[1.65];
+
+        /* The editable element fills the fill, so a click anywhere in the page,
+           including the empty space under the last block, lands in the document. */
+        .ProseMirror {
+            @apply flex-1;
+        }
     }
 }
 
