@@ -52,7 +52,7 @@ final class CompanyDomainMatcher
             return $domain;
         }
 
-        return Str::after($domain, '.');
+        return Str::lower(Str::after($domain, '.'));
     }
 
     /**
