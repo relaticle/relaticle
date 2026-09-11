@@ -23,10 +23,11 @@ FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
-# Copy package files and install (corepack reads the pinned pnpm version
-# from package.json's packageManager field)
+# Corepack is gone from Node 25+, and letting pnpm fetch its own pinned version
+# needs glibc, so install the exact version package.json already pins.
 COPY package.json pnpm-lock.yaml ./
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
+RUN npm install -g "$(node -p 'require("./package.json").packageManager')" \
+    && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source files needed for build
 COPY vite.config.js ./
