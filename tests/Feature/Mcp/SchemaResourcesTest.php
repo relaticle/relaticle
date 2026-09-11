@@ -404,7 +404,6 @@ function customFieldHintRows(): array
         ['checkbox-list', 'array of option labels or IDs (see options)'],
         ['tags-input', 'array of arbitrary string values'],
         ['rich-editor', 'markdown, or HTML when the value starts with'],
-        ['markdown-editor', '"input_format": "markdown"'],
         ['color-picker', 'hex color string'],
         ['date', 'ISO 8601 date"'],
         ['date-time', 'ISO 8601 datetime string'],

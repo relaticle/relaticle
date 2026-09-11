@@ -71,7 +71,6 @@ final readonly class CustomFieldInput
             CustomFieldType::LINK,
             CustomFieldType::TEXTAREA,
             CustomFieldType::CHECKBOX,
-            CustomFieldType::MARKDOWN_EDITOR,
             CustomFieldType::TAGS_INPUT,
             CustomFieldType::COLOR_PICKER,
             CustomFieldType::TOGGLE,
