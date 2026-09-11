@@ -88,6 +88,10 @@ final readonly class CustomFieldInput
             return $value;
         }
 
+        if ($this->isBlankString($value)) {
+            return null;
+        }
+
         if (! is_string($value) && ! is_int($value)) {
             $this->fail($field, __('validation.custom_field.single_option', ['field' => $field->name]));
         }
@@ -102,6 +106,10 @@ final readonly class CustomFieldInput
     {
         if ($this->skipsOptionTranslation($field)) {
             return $value;
+        }
+
+        if ($this->isBlankString($value)) {
+            return null;
         }
 
         if (! is_array($value)) {
@@ -159,6 +167,11 @@ final readonly class CustomFieldInput
         }
 
         return $this->markdown->toHtml($value);
+    }
+
+    private function isBlankString(mixed $value): bool
+    {
+        return is_string($value) && blank($value);
     }
 
     private function skipsOptionTranslation(CustomField $field): bool

@@ -151,6 +151,40 @@ it('clears a select field with null', function (): void {
     expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($this->status))->toBeNull();
 });
 
+it('clears a select field sent a blank string', function (string $blank): void {
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($this->status, statusOptionId($this->status, 'Done'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['status' => $blank]])
+        ->assertOk();
+
+    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($this->status))->toBeNull();
+})->with(['empty' => '', 'whitespace' => '  ']);
+
+it('clears a multi-select field sent an empty string', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'task',
+        'code' => 'markets',
+        'name' => 'Markets',
+        'type' => 'multi-select',
+        'sort_order' => 50,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
+    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task->saveCustomFieldValue($field, [(string) $eu->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['markets' => '']])
+        ->assertOk();
+
+    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field))->toBeNull();
+});
+
 it('stores markdown for a rich editor field as html', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Md', 'custom_fields' => ['description' => "## Plan\n\n- call **Ada**"]])

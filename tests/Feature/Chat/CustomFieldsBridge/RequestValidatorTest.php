@@ -142,6 +142,16 @@ it('passes null through for a single-choice field so the value can be cleared', 
         ->and($result->cleanFields)->toBe(['priority' => null]);
 });
 
+it('clears a single-choice field sent a blank string', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', ['priority' => '']);
+
+    expect($result->error)->toBeNull()
+        ->and($result->cleanFields)->toBe(['priority' => null]);
+});
+
 it('passes null through for a multi-choice field so the value can be cleared', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
