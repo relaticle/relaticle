@@ -47,7 +47,7 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         if (! $account->calendar_sync_cursor) {
-            dispatch(new InitialCalendarSyncJob($account));
+            dispatch(new InitialCalendarSyncJob($account, reconcileAfter: $this->reconcileAfter));
 
             return;
         }
@@ -61,7 +61,9 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         } catch (CalendarSyncTokenExpired) {
             MailboxSyncTracker::markCalendarFinished($account);
             $account->update(['calendar_sync_cursor' => null]);
-            dispatch(new InitialCalendarSyncJob($account));
+            // Expired deltas omit cancelled events. Rebuild from a full list, then
+            // delete local meetings the provider no longer returns.
+            dispatch(new InitialCalendarSyncJob($account, reconcileAfter: true));
 
             return;
         }

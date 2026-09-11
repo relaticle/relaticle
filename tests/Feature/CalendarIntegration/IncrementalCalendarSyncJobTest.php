@@ -39,7 +39,29 @@ it('resets cursor and dispatches initial sync on 410', function (): void {
     (new IncrementalCalendarSyncJob($account))->handle($factory);
 
     expect($account->fresh()?->calendar_sync_cursor)->toBeNull();
-    Bus::assertDispatched(InitialCalendarSyncJob::class);
+    Bus::assertDispatched(
+        InitialCalendarSyncJob::class,
+        fn (InitialCalendarSyncJob $job): bool => $job->reconcileAfter,
+    );
+});
+
+it('forwards requested reconciliation when delegating to initial sync without a cursor', function (): void {
+    Bus::fake([InitialCalendarSyncJob::class]);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'calendar_sync_cursor' => null,
+    ]));
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+
+    (new IncrementalCalendarSyncJob($account, reconcileAfter: true))->handle($factory);
+
+    Bus::assertDispatched(
+        InitialCalendarSyncJob::class,
+        fn (InitialCalendarSyncJob $job): bool => $job->reconcileAfter,
+    );
 });
 
 it('batches a StoreMeetingJob per delta event and does not advance the cursor until the page stores', function (): void {

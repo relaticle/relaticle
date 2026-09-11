@@ -280,6 +280,43 @@ it('applies template variables per recipient', function (): void {
         ->and(Email::where('batch_id', $batch->id)->where('subject', 'Hi Bob')->exists())->toBeTrue();
 });
 
+it('sends the edited subject and body when a template is selected', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'alice@example.com');
+
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $this->user->id,
+        'name' => 'Saved template',
+        'subject' => 'Saved subject for {name}',
+        'body_html' => '<p>Saved body for {name}</p>',
+    ]);
+
+    livewire(ListPeople::class)
+        ->callTableBulkAction(
+            'massSend',
+            records: [$person],
+            data: [
+                'connected_account_id' => $this->account->id,
+                'template_id' => $template->id,
+                'subject' => 'Edited hello {name}',
+                'body_html' => '<p>Edited body for {name}</p>',
+            ],
+        )
+        ->assertNotified();
+
+    $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
+    $email = Email::where('batch_id', $batch->id)->firstOrFail();
+
+    expect($email->subject)->toBe('Edited hello Alice')
+        ->and($email->body->body_html)->toBe('<p>Edited body for Alice</p>');
+});
+
 it('scopes the template dropdown to the current team', function (): void {
     $person = People::create([
         'team_id' => $this->team->id,
