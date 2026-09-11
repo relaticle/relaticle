@@ -611,6 +611,9 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
                 ->loadedOnRequest(),
         ]);
+
+        // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
+        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
     }
 
     /**

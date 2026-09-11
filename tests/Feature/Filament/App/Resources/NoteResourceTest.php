@@ -11,6 +11,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Components\Component;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Model;
 
 mutates(NoteResource::class);
@@ -251,4 +252,10 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
 
     expect(collect($items)->pluck('action')->filter()->all())->toHaveSameSize($items)
         ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
+});
+
+it('versions the slash menu script by its published file so an edit changes the url', function (): void {
+    $published = filemtime(public_path('js/app/rich-editor-slash-menu.js'));
+
+    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$published}");
 });
