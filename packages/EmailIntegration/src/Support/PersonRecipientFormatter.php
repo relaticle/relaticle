@@ -62,11 +62,7 @@ final class PersonRecipientFormatter
             return false;
         }
 
-        if (str_starts_with($name, '[') && str_ends_with($name, ']')) {
-            return false;
-        }
-
-        return true;
+        return ! str_starts_with($name, '[') || ! str_ends_with($name, ']');
     }
 
     private static function validEmail(string $candidate): ?string

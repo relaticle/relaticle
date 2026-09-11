@@ -36,7 +36,7 @@ trait AssertsAllowedEmailRecipients
         }
 
         Notification::make()
-            ->title($errors[array_key_first($errors)][0])
+            ->title(array_first($errors)[0])
             ->danger()
             ->send();
 
