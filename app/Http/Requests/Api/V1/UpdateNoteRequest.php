@@ -5,17 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\CrmEntity;
-use App\Http\Concerns\NormalizesCustomFields;
-use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
-use App\Rules\ValidCustomFields;
-use Illuminate\Foundation\Http\FormRequest;
 
-final class UpdateNoteRequest extends FormRequest
+final class UpdateNoteRequest extends BaseCrmEntityRequest
 {
-    use NormalizesCustomFields;
-
     protected function entity(): CrmEntity
     {
         return CrmEntity::Note;
@@ -24,13 +18,11 @@ final class UpdateNoteRequest extends FormRequest
     /**
      * @return array<string, array<int, mixed>>
      */
-    public function rules(): array
+    protected function entityRules(User $user): array
     {
-        /** @var User $user */
-        $user = $this->user();
         $teamId = $user->currentTeam->getKey();
 
-        return array_merge([
+        return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
@@ -38,6 +30,6 @@ final class UpdateNoteRequest extends FormRequest
             'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
             'opportunity_ids' => ['nullable', 'array'],
             'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
-        ], new ValidCustomFields($teamId, $this->entity()->value, isUpdate: true, ignoreEntityId: ($record = $this->route('note')) instanceof Note ? $record->getKey() : null)->toRules($this->input('custom_fields')));
+        ];
     }
 }

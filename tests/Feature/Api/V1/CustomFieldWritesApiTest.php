@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Http\Concerns\NormalizesCustomFields;
+use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -12,7 +12,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
-mutates(NormalizesCustomFields::class);
+mutates(BaseCrmEntityRequest::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
