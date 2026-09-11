@@ -98,23 +98,6 @@ trait FormatsCustomFields
             return null;
         }
 
-        $values = $rawValue instanceof Collection ? $rawValue->all() : (array) $rawValue;
-        $lookupType = (string) $customField->lookup_type;
-
-        $ids = collect($values)
-            ->filter(fn (mixed $id): bool => (is_string($id) || is_int($id)) && (string) $id !== '')
-            ->map(fn (mixed $id): string => (string) $id)
-            ->values()
-            ->all();
-
-        if ($ids === []) {
-            return [];
-        }
-
-        $names = resolve(RecordNameResolver::class)->names($lookupType, $ids);
-
-        return collect($ids)
-            ->map(fn (string $id): array => ['id' => $id, 'name' => $names[$id] ?? null])
-            ->all();
+        return resolve(RecordNameResolver::class)->resolve((string) $customField->lookup_type, $rawValue);
     }
 }

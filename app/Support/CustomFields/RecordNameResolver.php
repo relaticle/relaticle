@@ -7,6 +7,7 @@ namespace App\Support\CustomFields;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -53,21 +54,17 @@ final readonly class RecordNameResolver
         }
     }
 
-    /**
-     * @param  array<int, string>  $ids
-     * @return array<string, ?string>
-     */
-    public function names(string $lookupType, array $ids): array
+    /** @return list<array{id: string, name: ?string}> */
+    public function resolve(string $lookupType, mixed $value): array
     {
+        $ids = $this->ids($value);
+
         $this->warm($lookupType, $ids);
 
-        $result = [];
-
-        foreach ($ids as $id) {
-            $result[$id] = $this->names->get($this->key($lookupType, $id));
-        }
-
-        return $result;
+        return array_map(
+            fn (string $id): array => ['id' => $id, 'name' => $this->names->get($this->key($lookupType, $id))],
+            $ids,
+        );
     }
 
     /** @param  array<int, string>  $ids */
@@ -75,7 +72,7 @@ final readonly class RecordNameResolver
     {
         $missing = array_values(array_unique(array_filter(
             $ids,
-            fn (string $id): bool => $id !== '' && ! $this->names->has($this->key($lookupType, $id)),
+            fn (string $id): bool => ! $this->names->has($this->key($lookupType, $id)),
         )));
 
         if ($missing === []) {
@@ -111,13 +108,16 @@ final readonly class RecordNameResolver
     }
 
     /** @return list<string> */
-    private function ids(mixed $raw): array
+    private function ids(mixed $value): array
     {
-        $values = $raw instanceof Collection ? $raw->all() : (array) ($raw ?? []);
+        $ids = [];
 
-        return array_values(array_map(
-            fn (mixed $id): string => (string) $id,
-            array_filter($values, fn (mixed $id): bool => is_string($id) || is_int($id)),
-        ));
+        foreach (Arr::wrap($value instanceof Collection ? $value->all() : $value) as $id) {
+            if ((is_string($id) || is_int($id)) && (string) $id !== '') {
+                $ids[] = (string) $id;
+            }
+        }
+
+        return $ids;
     }
 }

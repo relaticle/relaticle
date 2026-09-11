@@ -250,29 +250,13 @@ final readonly class CustomFieldsDisplayFormatter
         return implode(', ', $this->recordNames($field, $value));
     }
 
-    /**
-     * A card that shows a bare ULID hides the record being approved, which is the
-     * one thing the approver has to check.
-     *
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function recordNames(CustomField $field, mixed $value): array
     {
-        $ids = array_values(array_map(
-            strval(...),
-            array_filter(
-                $value instanceof Collection ? $value->all() : (array) $value,
-                fn (mixed $id): bool => (is_string($id) || is_int($id)) && (string) $id !== '',
-            ),
-        ));
-
-        if ($ids === []) {
-            return [];
-        }
-
-        $names = resolve(RecordNameResolver::class)->names((string) $field->lookup_type, $ids);
-
-        return array_map(fn (string $id): string => $names[$id] ?? $id, $ids);
+        return array_map(
+            fn (array $record): string => $record['name'] ?? $record['id'],
+            resolve(RecordNameResolver::class)->resolve((string) $field->lookup_type, $value),
+        );
     }
 
     private function renderMultiChoice(CustomField $field, mixed $value): string
