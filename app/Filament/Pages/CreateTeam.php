@@ -268,33 +268,14 @@ final class CreateTeam extends RegisterTenant
                             ->all()
                     )
                     ->inline()
-                    ->live()
-                    // Stale sub-options from the previous use case are invisible yet
-                    // fail validation silently, stranding the wizard on this step.
-                    ->afterStateUpdated(function (Set $set): void {
-                        $set('onboarding_context', []);
-                    }),
+                    ->live(),
 
-                ToggleButtons::make('onboarding_context')
-                    ->label(__('filament/pages/teams.create_team.form.use_case_context_label'))
-                    ->validationAttribute(__('filament/pages/teams.create_team.form.use_case_context_validation_attribute'))
-                    ->required()
-                    ->options(function (Get $get): array {
-                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
-
-                        if (! $useCase) {
-                            return [];
-                        }
-
-                        return $useCase->getSubOptions();
-                    })
-                    ->inline()
-                    ->multiple()
-                    ->visible(function (Get $get): bool {
-                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
-
-                        return $useCase !== null && $useCase->getSubOptions() !== [];
-                    }),
+                TextInput::make('onboarding_other_use_case')
+                    ->label(__('filament/pages/teams.create_team.form.other_use_case_label'))
+                    ->placeholder(__('filament/pages/teams.create_team.form.other_use_case_placeholder'))
+                    ->validationAttribute(__('filament/pages/teams.create_team.form.other_use_case_validation_attribute'))
+                    ->maxLength(120)
+                    ->visible(fn (Get $get): bool => $get('onboarding_use_case') === OnboardingUseCase::Other->value),
             ]);
     }
 

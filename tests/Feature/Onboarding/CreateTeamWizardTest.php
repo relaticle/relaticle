@@ -13,6 +13,7 @@ use App\Filament\Pages\CreateTeam;
 use App\Filament\Pages\Dashboard;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -129,7 +130,6 @@ it('creates a team with onboarding fields', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -164,32 +164,120 @@ it('shows the account menu links inside a workspace', function (): void {
         ->assertSee(__('access-tokens.user_menu'));
 });
 
-it('clears the sub-options when the use case changes, so a switch can never strand the wizard', function (): void {
+it('stores the free text a user gives for the Other use case', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
         ->fillForm([
-            'name' => 'Switcher Co',
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-        ])
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-        ])
-        ->assertFormSet(['onboarding_context' => []])
-        ->fillForm([
-            'onboarding_context' => ['applications'],
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Parish Office',
         ])
         ->call('register')
         ->assertHasNoFormErrors();
 
-    $team = Team::query()->where('name', 'Switcher Co')->first();
+    $team = Team::query()->where('name', 'Parish Office')->sole();
 
-    expect($team)->not->toBeNull()
-        ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
-        ->and($team->onboarding_context)->toBe(['applications']);
+    expect($team->onboarding_other_use_case)->toBe('Church donors');
+});
+
+it('caps the Other use case text at 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => str_repeat('a', 121),
+            'name' => 'Long Text Co',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['onboarding_other_use_case' => 'max']);
+});
+
+it('drops the Other text once a named use case is chosen instead', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Switched Co',
+        ])
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = Team::query()->where('name', 'Switched Co')->sole();
+
+    expect($team->onboarding_use_case)->toBe(OnboardingUseCase::Sales)
+        ->and($team->onboarding_other_use_case)->toBeNull();
+});
+
+it('the action rejects Other text over 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    expect(fn () => resolve(CreateTeamAction::class)->create($user, [
+        'name' => 'Tampered Other Co',
+        'slug' => 'tampered-other-co',
+        'onboarding_use_case' => OnboardingUseCase::Other->value,
+        'onboarding_other_use_case' => str_repeat('a', 121),
+    ]))->toThrow(ValidationException::class);
+
+    expect(Team::query()->where('name', 'Tampered Other Co')->exists())->toBeFalse();
+});
+
+it('the action drops Other text when a named use case is chosen', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $team = resolve(CreateTeamAction::class)->create($user, [
+        'name' => 'Direct Action Co',
+        'slug' => 'direct-action-co',
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_other_use_case' => 'Church donors',
+    ]);
+
+    expect($team->onboarding_other_use_case)->toBeNull();
+});
+
+it('no longer asks for use case sub-options', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->assertFormFieldExists('onboarding-use-case.onboarding_other_use_case')
+        ->assertFormFieldDoesNotExist('onboarding-use-case.onboarding_context');
+});
+
+it('shows the free text only for the Other use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->assertFormFieldHidden('onboarding-use-case.onboarding_other_use_case')
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->assertFormFieldVisible('onboarding-use-case.onboarding_other_use_case');
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
@@ -249,7 +337,6 @@ it('creates a team with a custom slug', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
             'slug' => 'my-workspace',
         ])
@@ -318,7 +405,6 @@ it('updates the user name when corrected during onboarding', function (): void {
         ->fillForm([
             'user_name' => 'Corrected Name',
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -352,7 +438,6 @@ it('marks first team as personal team', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'My First Team',
         ])
         ->call('register')
@@ -389,7 +474,6 @@ it('redirects first team to dashboard with notification', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Redirect Team',
         ])
         ->call('register')

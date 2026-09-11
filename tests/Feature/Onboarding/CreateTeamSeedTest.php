@@ -35,7 +35,6 @@ it('seeds sales demo data for sales use case', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Sales Team',
         ])
         ->call('register')
@@ -59,7 +58,6 @@ it('seeds recruiting demo data for recruiting use case', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['applications'],
             'name' => 'Hiring Team',
         ])
         ->call('register')
@@ -83,7 +81,6 @@ it('seeds marketing demo data for marketing use case', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Marketing->value,
-            'onboarding_context' => ['content'],
             'name' => 'Marketing Team',
         ])
         ->call('register')
@@ -126,7 +123,6 @@ it('seeds fundraising demo data for fundraising use case', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Fundraising->value,
-            'onboarding_context' => ['early_stage'],
             'name' => 'Fundraising Team',
         ])
         ->call('register')
@@ -148,7 +144,6 @@ it('creates all custom fields for the first team', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Custom Fields Team',
         ])
         ->call('register')
@@ -176,7 +171,6 @@ it('seeds people linked to their correct companies for sales', function (): void
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Link Test Team',
         ])
         ->call('register');
@@ -206,7 +200,6 @@ it('seeds tasks and opportunities with board positions', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Board Test Team',
         ])
         ->call('register');
@@ -234,7 +227,6 @@ it('seeds custom field values correctly for sales', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Values Test Team',
         ])
         ->call('register');
@@ -272,16 +264,6 @@ it('subsequent teams still require use case selection', function (): void {
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
-it('provides sub-options for each use case', function (): void {
-    expect(OnboardingUseCase::Sales->getSubOptions())->toHaveCount(7)
-        ->and(OnboardingUseCase::CustomerSuccess->getSubOptions())->toHaveCount(5)
-        ->and(OnboardingUseCase::Recruiting->getSubOptions())->toHaveCount(2)
-        ->and(OnboardingUseCase::Marketing->getSubOptions())->toHaveCount(4)
-        ->and(OnboardingUseCase::Fundraising->getSubOptions())->toHaveCount(3)
-        ->and(OnboardingUseCase::Investing->getSubOptions())->toHaveCount(3)
-        ->and(OnboardingUseCase::Other->getSubOptions())->toBe([]);
-});
-
 it('maps use case to correct fixture set', function (): void {
     expect(OnboardingUseCase::Sales->getFixtureSet())->toBe('sales')
         ->and(OnboardingUseCase::CustomerSuccess->getFixtureSet())->toBe('sales')
@@ -292,22 +274,16 @@ it('maps use case to correct fixture set', function (): void {
         ->and(OnboardingUseCase::Other->getFixtureSet())->toBe('general');
 });
 
-it('seeds all entity types for each fixture set', function (OnboardingUseCase $useCase, ?array $context): void {
+it('seeds all entity types for each fixture set', function (OnboardingUseCase $useCase): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
-    $formData = [
-        'onboarding_use_case' => $useCase->value,
-        'name' => "Team {$useCase->value}",
-    ];
-
-    if ($context !== null) {
-        $formData['onboarding_context'] = $context;
-    }
-
     livewire(CreateTeam::class)
-        ->fillForm($formData)
+        ->fillForm([
+            'onboarding_use_case' => $useCase->value,
+            'name' => "Team {$useCase->value}",
+        ])
         ->call('register')
         ->assertHasNoFormErrors();
 
@@ -319,13 +295,13 @@ it('seeds all entity types for each fixture set', function (OnboardingUseCase $u
         ->and(Task::where('team_id', $team->id)->count())->toBe(4)
         ->and(Note::where('team_id', $team->id)->count())->toBe(5);
 })->with([
-    'sales' => [OnboardingUseCase::Sales, ['product_led']],
-    'recruiting' => [OnboardingUseCase::Recruiting, ['applications']],
-    'marketing' => [OnboardingUseCase::Marketing, ['content']],
-    'customer_success' => [OnboardingUseCase::CustomerSuccess, ['low_touch']],
-    'fundraising' => [OnboardingUseCase::Fundraising, ['early_stage']],
-    'investing' => [OnboardingUseCase::Investing, ['early_stage']],
-    'other' => [OnboardingUseCase::Other, null],
+    'sales' => OnboardingUseCase::Sales,
+    'recruiting' => OnboardingUseCase::Recruiting,
+    'marketing' => OnboardingUseCase::Marketing,
+    'customer_success' => OnboardingUseCase::CustomerSuccess,
+    'fundraising' => OnboardingUseCase::Fundraising,
+    'investing' => OnboardingUseCase::Investing,
+    'other' => OnboardingUseCase::Other,
 ]);
 
 it('generates a fallback handle for names that transliterate to nothing', function (): void {
@@ -350,7 +326,6 @@ it('assigns seeded demo tasks to the workspace owner so the dashboard is not emp
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'name' => 'Assigned Tasks Team',
         ])
         ->call('register')

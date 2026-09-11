@@ -15,7 +15,6 @@ use App\Rules\ValidTeamSlug;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator as ValidatorInstance;
 use Laravel\Jetstream\Contracts\CreatesTeams;
 use Laravel\Jetstream\Events\AddingTeam;
 use Laravel\Jetstream\Jetstream;
@@ -40,48 +39,11 @@ final readonly class CreateTeam implements CreatesTeams
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
             'onboarding_use_case' => ['required', 'string', Rule::enum(OnboardingUseCase::class)],
-            'onboarding_context' => ['nullable', 'array'],
-            'onboarding_context.*' => ['string'],
+            'onboarding_other_use_case' => ['nullable', 'string', 'max:120'],
             'onboarding_referral_source' => ['nullable', 'string', Rule::enum(OnboardingReferralSource::class)],
-        ])
-            ->after(function (ValidatorInstance $validator) use ($input): void {
-                $useCase = OnboardingUseCase::tryFrom((string) ($input['onboarding_use_case'] ?? ''));
+        ])->validateWithBag('createTeam');
 
-                if (! $useCase instanceof OnboardingUseCase) {
-                    return;
-                }
-
-                $subOptions = $useCase->getSubOptions();
-
-                if ($subOptions === []) {
-                    return;
-                }
-
-                $context = $input['onboarding_context'] ?? null;
-
-                if (! is_array($context) || $context === []) {
-                    $validator->errors()->add(
-                        'onboarding_context',
-                        'The onboarding context field is required for the selected use case.',
-                    );
-
-                    return;
-                }
-
-                $allowedKeys = array_keys($subOptions);
-
-                foreach ($context as $value) {
-                    if (! is_string($value) || ! in_array($value, $allowedKeys, true)) {
-                        $validator->errors()->add(
-                            'onboarding_context',
-                            'The selected onboarding context is invalid for the chosen use case.',
-                        );
-
-                        return;
-                    }
-                }
-            })
-            ->validateWithBag('createTeam');
+        $useCase = OnboardingUseCase::from((string) $input['onboarding_use_case']);
 
         event(new AddingTeam($user));
 
@@ -89,8 +51,10 @@ final readonly class CreateTeam implements CreatesTeams
             'name' => $input['name'],
             'slug' => $input['slug'],
             'personal_team' => $isFirstTeam,
-            'onboarding_use_case' => $input['onboarding_use_case'] ?? null,
-            'onboarding_context' => $input['onboarding_context'] ?? null,
+            'onboarding_use_case' => $useCase,
+            'onboarding_other_use_case' => $useCase === OnboardingUseCase::Other
+                ? ($input['onboarding_other_use_case'] ?? null)
+                : null,
             'onboarding_referral_source' => $input['onboarding_referral_source'] ?? null,
         ]);
         $team->plan = Plan::default();

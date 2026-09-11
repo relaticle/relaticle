@@ -12,7 +12,6 @@ use App\Models\Team;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -56,7 +55,6 @@ it('stores referral source', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'onboarding_referral_source' => OnboardingReferralSource::Google->value,
             'name' => 'Referral Team',
         ])
@@ -66,25 +64,6 @@ it('stores referral source', function (): void {
     $team = Team::query()->where('name', 'Referral Team')->first();
 
     expect($team->onboarding_referral_source)->toBe(OnboardingReferralSource::Google);
-});
-
-it('stores onboarding context', function (): void {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    livewire(CreateTeam::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led', 'enterprise'],
-            'name' => 'Context Team',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
-
-    $team = Team::query()->where('name', 'Context Team')->first();
-
-    expect($team->onboarding_context)->toBe(['product_led', 'enterprise']);
 });
 
 it('sends team invitations when invite emails are provided', function (): void {
@@ -98,7 +77,6 @@ it('sends team invitations when invite emails are provided', function (): void {
         ->fillForm([
             'name' => 'Invite Test Team',
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'invites' => [
                 ['email' => 'alice@example.com', 'role' => 'editor'],
                 ['email' => 'bob@example.com', 'role' => 'editor'],
@@ -125,7 +103,6 @@ it('sends invitations with correct roles', function (): void {
         ->fillForm([
             'name' => 'Role Test Team',
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
             'invites' => [
                 ['email' => 'member@example.com', 'role' => 'editor'],
                 ['email' => 'admin@example.com', 'role' => 'admin'],
@@ -185,51 +162,6 @@ it('creates team without invitations when no emails are provided', function (): 
     $team = Team::query()->where('name', 'No Invite Team')->first();
 
     expect($team->teamInvitations)->toBeEmpty();
-});
-
-it('rejects empty onboarding context for use cases that have sub-options', function (): void {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    expect(fn () => resolve(CreateTeamAction::class)->create($user, [
-        'name' => 'Tampered Team',
-        'slug' => 'tampered-team',
-        'onboarding_use_case' => OnboardingUseCase::Sales->value,
-        'onboarding_context' => [],
-    ]))->toThrow(ValidationException::class);
-
-    expect(Team::where('slug', 'tampered-team')->exists())->toBeFalse();
-});
-
-it('rejects unknown onboarding context values for the chosen use case', function (): void {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    expect(fn () => resolve(CreateTeamAction::class)->create($user, [
-        'name' => 'Tampered Team',
-        'slug' => 'tampered-team',
-        'onboarding_use_case' => OnboardingUseCase::Sales->value,
-        'onboarding_context' => ['not_a_real_option'],
-    ]))->toThrow(ValidationException::class);
-
-    expect(Team::where('slug', 'tampered-team')->exists())->toBeFalse();
-});
-
-it('allows empty onboarding context for use cases without sub-options', function (): void {
-    $user = User::factory()->create();
-
-    $this->actingAs($user);
-
-    $team = resolve(CreateTeamAction::class)->create($user, [
-        'name' => 'Other Use Case',
-        'slug' => 'other-use-case',
-        'onboarding_use_case' => OnboardingUseCase::Other->value,
-    ]);
-
-    expect($team->slug)->toBe('other-use-case')
-        ->and($team->onboarding_use_case)->toBe(OnboardingUseCase::Other);
 });
 
 it('warns about invites the form accepted but that are not deliverable', function (): void {

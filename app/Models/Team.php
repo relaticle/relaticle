@@ -48,6 +48,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?string $invite_link_token
  * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
+ * @property ?string $onboarding_other_use_case
  * @property ?array<string, string> $onboarding_context
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property CarbonImmutable|null $scheduled_deletion_at
@@ -66,6 +67,7 @@ use Spatie\Sluggable\SlugOptions;
     'slug',
     'personal_team',
     'onboarding_use_case',
+    'onboarding_other_use_case',
     'onboarding_context',
     'onboarding_referral_source',
     'invite_link_default_role',
