@@ -30,6 +30,7 @@ return [
     'toolbar' => [
         'paragraph' => 'Paragraph',
         'alignment' => 'Alignment',
+        'lists' => 'Lists',
     ],
 
     'mass_send' => [

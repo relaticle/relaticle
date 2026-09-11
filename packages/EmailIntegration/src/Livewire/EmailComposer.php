@@ -1116,7 +1116,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     ['bold', 'italic', 'underline', 'strike', 'attachFiles'],
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.paragraph'), ['paragraph', 'h1', 'h2', 'h3'])],
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
-                    ['blockquote', 'codeBlock', 'bulletList', 'orderedList'],
+                    ['blockquote', 'codeBlock'],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.lists'), ['bulletList', 'orderedList'])],
                     ['undo', 'redo'],
                     ['mergeTags'],
                 ])
@@ -2065,10 +2066,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function persistDraft(): bool
     {
-        if ($this->isMassSend) {
-            return false;
-        }
-
         if ($this->isDraftEmpty()) {
             return false;
         }
@@ -2095,9 +2092,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'connected_account_id' => $accountId,
                 'subject' => $this->subject,
                 'body_html' => $this->bodyHtmlForPersistence(),
-                'to' => $this->to,
-                'cc' => $this->cc,
-                'bcc' => $this->bcc,
+                'to' => $this->isMassSend ? $this->massRecipientEmails() : $this->to,
+                'cc' => $this->isMassSend ? [] : $this->cc,
+                'bcc' => $this->isMassSend ? [] : $this->bcc,
                 // Without these a reply parked as a draft comes back as a plain new
                 // message: no original to show, and no threading when it is sent.
                 'source_email_id' => $this->sourceEmailId,
@@ -2228,8 +2225,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->cc = $this->participantAddresses($draft, EmailParticipantRole::CC);
         $this->bcc = $this->participantAddresses($draft, EmailParticipantRole::BCC);
 
-        $this->showCc = $this->cc !== [];
-        $this->showBcc = $this->bcc !== [];
+        if ($draft->creation_source === EmailCreationSource::MASS_SEND) {
+            $this->isMassSend = true;
+            $this->syncMassRecipientsFromTo();
+            $this->to = [];
+            $this->cc = [];
+            $this->bcc = [];
+            $this->showCc = false;
+            $this->showBcc = false;
+        } else {
+            $this->showCc = $this->cc !== [];
+            $this->showBcc = $this->bcc !== [];
+        }
 
         $this->restoreReplyContext($draft);
 

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
@@ -733,4 +734,36 @@ it('drops recipients removed from To when mass sending is toggled off and back o
     $batch = EmailBatch::where('team_id', $this->team->id)->firstOrFail();
 
     expect($batch->total_recipients)->toBe(1);
+});
+
+it('saves a mass send draft when the composer is closed', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'alice@example.com');
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('isMassSend', true)
+        ->call('addMassRecipient', (string) $person->getKey())
+        ->set('subject', 'Mass draft')
+        ->call('close')
+        ->assertNotified(__('filament/emails/composer.notifications.draft_saved.title'));
+
+    $draft = Email::query()
+        ->where('status', EmailStatus::DRAFT)
+        ->where('subject', 'Mass draft')
+        ->sole();
+
+    expect($draft->creation_source)->toBe(EmailCreationSource::MASS_SEND);
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('isMassSend', true)
+        ->assertSet('subject', 'Mass draft')
+        ->assertCount('massRecipients', 1)
+        ->assertSet('massRecipients.0.email', 'alice@example.com');
 });

@@ -167,9 +167,9 @@
                             </span>
 
                             <span
-                                class="min-w-0 flex-1 truncate text-sm"
                                 data-testid="meeting-card-title"
                                 @class([
+                                    'min-w-0 flex-1 truncate text-sm',
                                     'text-gray-400 line-through dark:text-gray-500' => $isPast,
                                     'text-gray-900 dark:text-white' => ! $isPast,
                                 ])

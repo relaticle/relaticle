@@ -940,8 +940,9 @@ it('strikes through the title when a meeting is in the past', function (): void 
     expect($html)
         ->toContain('Morning sync')
         ->toContain('Afternoon review')
-        ->toMatch('/Morning sync.*line-through/s')
-        ->not->toMatch('/Afternoon review.*line-through/s');
+        ->toMatch('/data-testid="meeting-card-title"[\s\S]*?class="[^"]*line-through[^"]*"[\s\S]*?>\s*Morning sync/s')
+        ->toMatch('/data-testid="meeting-card-title"[\s\S]*?class="[^"]*text-gray-900[^"]*"[\s\S]*?>\s*Afternoon review/s')
+        ->not->toMatch('/data-testid="meeting-card-title"[^>]*class="[^"]*"[^>]*class="/s');
 });
 
 it('applies a hover background to meeting list rows', function (): void {

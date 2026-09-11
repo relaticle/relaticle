@@ -143,77 +143,19 @@
                 @endif
 
                 {{-- Field rows --}}
-                <div class="{{ $gutter }} shrink-0 divide-y divide-gray-100 text-sm dark:divide-white/5">
-                    <x-emails.composer-field :label="__('filament/emails/composer.fields.from')" for>
-                        <span class="flex min-w-0 flex-1 items-center gap-2">
-                            <x-filament::avatar
-                                :src="$this->fromAvatarUrl"
-                                :alt="$this->fromAccount?->label ?? ''"
-                                size="h-6 w-6"
-                                class="shrink-0"
-                            />
-                            @if (count($this->accountOptions) > 1)
-                                <select wire:model.live="accountId" class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 focus:ring-0 dark:text-gray-100">
-                                    @foreach ($this->accountOptions as $id => $label)
-                                        <option value="{{ $id }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            @else
-                                <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{ $this->fromAccount?->label }}</span>
-                            @endif
-                        </span>
-                    </x-emails.composer-field>
-                    <x-emails.composer-error field="accountId" />
-
-                    <x-emails.composer-field :label="__('filament/emails/composer.fields.to')">
-                        @if ($isMassSend)
-                            <x-emails.composer-mass-send-to-summary :count="count($massRecipients)" />
-                        @else
-                            <div class="flex min-w-0 flex-1 items-center self-stretch">
-                                <x-emails.recipient-chips wire:model="to" :autofocus="true" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" />
-                            </div>
-                            <span class="shrink-0 space-x-2 text-xs font-medium text-gray-400">
-                                <button type="button" wire:click="toggleCc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showCc])>{{ __('filament/emails/composer.fields.cc') }}</button>
-                                <button type="button" wire:click="toggleBcc" @class(['transition hover:text-gray-700 dark:hover:text-gray-200', 'text-primary-600 dark:text-primary-400' => $showBcc])>{{ __('filament/emails/composer.fields.bcc') }}</button>
-                            </span>
-                        @endif
-                    </x-emails.composer-field>
-                    @unless ($isMassSend)
-                    <x-emails.composer-error field="to" />
-                    {{-- The `to.*` => email rule keys its errors per array index (to.0,
-                         to.1, ...), not the bare `to` key, so it needs its own line. --}}
-                    <x-emails.composer-error field="to.*" />
-                    @else
-                    <x-emails.composer-error field="massRecipients" />
-                    @endunless
-
-                    @if ($showCc && ! $isMassSend)
-                        <x-emails.composer-field :label="__('filament/emails/composer.fields.cc')">
-                            <div class="flex min-w-0 flex-1 items-center self-stretch"><x-emails.recipient-chips wire:model="cc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" /></div>
-                        </x-emails.composer-field>
-                        <x-emails.composer-error field="cc.*" />
-                    @endif
-
-                    @if ($showBcc && ! $isMassSend)
-                        <x-emails.composer-field :label="__('filament/emails/composer.fields.bcc')">
-                            <div class="flex min-w-0 flex-1 items-center self-stretch"><x-emails.recipient-chips wire:model="bcc" :suggestions="$this->recipientSuggestions" :options="$this->recipientOptions" :allowed-addresses="$this->allowedRecipientAddresses" class="w-full" /></div>
-                        </x-emails.composer-field>
-                        <x-emails.composer-error field="bcc.*" />
-                    @endif
-
-                    <div class="border-b border-gray-100 dark:border-white/5">
-                        <x-emails.composer-field :label="__('filament/emails/composer.fields.subject')" for>
-                            <input
-                                id="email-composer-subject"
-                                type="text"
-                                wire:model="subject"
-                                placeholder="{{ __('filament/emails/composer.fields.subject_placeholder') }}"
-                                class="w-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-900 shadow-none placeholder:text-gray-400 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 dark:text-gray-100"
-                            />
-                        </x-emails.composer-field>
-                        <x-emails.composer-error field="subject" />
-                    </div>
-                </div>
+                <x-emails.composer-header
+                    class="{{ $gutter }}"
+                    :is-mass-send="$isMassSend"
+                    :mass-recipients="$massRecipients"
+                    :show-cc="$showCc"
+                    :show-bcc="$showBcc"
+                    :from-avatar-url="$this->fromAvatarUrl"
+                    :account-options="$this->accountOptions"
+                    :from-account="$this->fromAccount"
+                    :recipient-suggestions="$this->recipientSuggestions"
+                    :recipient-options="$this->recipientOptions"
+                    :allowed-recipient-addresses="$this->allowedRecipientAddresses"
+                />
 
                 {{-- Body: Filament RichEditor with floating toolbar only --}}
                 <p class="{{ $gutter }} shrink-0 pt-3 text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -226,7 +168,9 @@
                 ]) @if ($dock === 'inline') data-composer-dock="inline" @endif wire:ignore>
                     {{ $this->getSchema('bodySchema') }}
                 </div>
-                <x-emails.composer-error field="bodyHtml" class="px-4" />
+                @error('bodyHtml')
+                    <p class="px-4 pb-1 text-xs text-danger-600 dark:text-danger-400">{{ $message }}</p>
+                @enderror
 
                 <x-emails.composer-attachments :saved="$savedAttachments" :pending="$attachments" />
 
