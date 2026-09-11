@@ -538,6 +538,46 @@ it('carries choice option names as a values list so the card renders chips', fun
         ->and(blockFieldValues($card, $stage->name))->toBe([$option->name]);
 });
 
+it('names record custom fields in a list table with one lookup per page, not per row', function (int $rows): void {
+    $user = $this->user;
+    $teamId = $user->currentTeam->getKey();
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $teamId,
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 60,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $field->settings = CustomFieldSettingsData::from(['visible_in_list' => true, 'list_toggleable_hidden' => false, 'visible_in_view' => true]);
+    $field->save();
+
+    TenantContextService::setTenantId($teamId);
+
+    foreach (range(1, $rows) as $index) {
+        $company = Company::factory()->for($user->currentTeam)->create(['name' => "Linked {$index}"]);
+        Task::factory()->for($user->currentTeam)->create()->saveCustomFieldValue($field, [$company->getKey()]);
+    }
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $block = displayBlockOf(app(ListTasksTool::class)->handle(new Request(['per_page' => 25])));
+
+    $companyLookups = collect(DB::getQueryLog())->filter(
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], '"team_id"'),
+    );
+
+    expect(collect($block['rows'])->pluck('cells.linked_company')->filter()->sort()->values()->all())
+        ->toBe(collect(range(1, $rows))->map(fn (int $index): string => "Linked {$index}")->sort()->values()->all())
+        ->and($companyLookups)->toHaveCount(1);
+})->with([3, 12]);
+
 // --- (c) blocks are re-derived from persisted tool_results on reload ---
 
 it('derives display_blocks from persisted tool_results on reload', function (): void {
