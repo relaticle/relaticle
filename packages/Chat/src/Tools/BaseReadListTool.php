@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Tools;
 use App\Models\CustomField;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\CustomFields\RecordNameResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -535,6 +536,8 @@ abstract class BaseReadListTool implements Tool
         $resolver = resolve(RecordReferenceResolver::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
         $citationType = $this->citationType();
+
+        resolve(RecordNameResolver::class)->prime($records);
 
         $rows = [];
 

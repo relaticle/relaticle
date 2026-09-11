@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\UpdateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -18,9 +19,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Update an existing note in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class UpdateNoteTool extends BaseUpdateTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Note::class;
+        return CrmEntity::Note;
     }
 
     protected function actionClass(): string
@@ -31,16 +34,6 @@ final class UpdateNoteTool extends BaseUpdateTool
     protected function resourceClass(): string
     {
         return NoteResource::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'note';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'note';
     }
 
     protected function entitySchema(JsonSchema $schema): array

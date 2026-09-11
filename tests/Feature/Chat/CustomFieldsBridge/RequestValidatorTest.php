@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
@@ -12,14 +14,14 @@ beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 });
 
-it('returns the clean payload unchanged for simple string fields', function (): void {
+it('renders markdown into html for a rich editor field', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['description' => 'Hello']);
 
     expect($result->error)->toBeNull()
-        ->and($result->cleanFields)->toBe(['description' => 'Hello']);
+        ->and($result->cleanFields)->toBe(['description' => "<p>Hello</p>\n"]);
 });
 
 it('translates single-choice labels into option IDs', function (): void {
@@ -99,7 +101,8 @@ it('returns a descriptive error for an unknown single-choice label', function ()
         ->validate($user, 'task', ['status' => 'Bananas']);
 
     expect($result->error)
-        ->toContain('status')
+        ->toContain('custom_fields.status')
+        ->toContain('Status')
         ->toContain('Bananas');
 });
 
@@ -134,6 +137,16 @@ it('passes null through for a single-choice field so the value can be cleared', 
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['priority' => null]);
+
+    expect($result->error)->toBeNull()
+        ->and($result->cleanFields)->toBe(['priority' => null]);
+});
+
+it('clears a single-choice field sent a blank string', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', ['priority' => '']);
 
     expect($result->error)->toBeNull()
         ->and($result->cleanFields)->toBe(['priority' => null]);
@@ -174,6 +187,40 @@ it('rejects clearing a required choice field with a truthful validation error', 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['priority' => null]);
 
-    expect($result->error)->toContain('custom_fields validation failed')
-        ->and($result->error)->not->toContain('option label string');
+    expect($result->error)->toContain('custom_fields validation failed');
+});
+
+it('names the field code in a rule validation error, not only the field label', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $foreign = Company::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Links',
+        'code' => 'links',
+        'type' => 'section',
+        'sort_order' => 99,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $result = resolve(CustomFieldsRequestValidator::class)
+        ->validate($user, 'task', [$field->code => [$foreign->getKey()]]);
+
+    expect($result->error)
+        ->toContain("custom_fields.{$field->code}")
+        ->toContain($foreign->getKey());
 });

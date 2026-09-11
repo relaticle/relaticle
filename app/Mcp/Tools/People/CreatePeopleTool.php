@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\People;
 
 use App\Actions\People\CreatePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\PeopleResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
@@ -17,6 +19,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Create a new person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class CreatePeopleTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreatePeople::class;
@@ -27,9 +31,9 @@ final class CreatePeopleTool extends BaseCreateTool
         return PeopleResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'people';
+        return CrmEntity::People;
     }
 
     protected function entitySchema(JsonSchema $schema): array

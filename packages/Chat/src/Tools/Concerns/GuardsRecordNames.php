@@ -11,13 +11,7 @@ namespace Relaticle\Chat\Tools\Concerns;
  */
 trait GuardsRecordNames
 {
-    /**
-     * The attribute that names a record of this entity.
-     */
-    protected function nameAttribute(): string
-    {
-        return 'name';
-    }
+    abstract protected function nameAttribute(): string;
 
     /**
      * @param  array<string, mixed>  $record

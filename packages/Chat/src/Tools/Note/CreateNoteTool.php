@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Note;
 
 use App\Actions\Note\CreateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -16,6 +18,7 @@ use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 final class CreateNoteTool extends BaseWriteCreateTool
 {
     use NormalizesToolInput;
+    use OperatesOnCrmEntity;
 
     public function description(): string
     {
@@ -27,9 +30,9 @@ final class CreateNoteTool extends BaseWriteCreateTool
         return CreateNote::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'note';
+        return CrmEntity::Note;
     }
 
     protected function ownedForeignKeyLists(): array
@@ -39,11 +42,6 @@ final class CreateNoteTool extends BaseWriteCreateTool
             'people_ids' => People::class,
             'opportunity_ids' => Opportunity::class,
         ];
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 
     protected function entitySchema(JsonSchema $schema): array

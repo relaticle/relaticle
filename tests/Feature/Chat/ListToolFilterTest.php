@@ -7,6 +7,7 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
@@ -121,6 +122,68 @@ it('filters tasks by a choice custom field using the option label', function ():
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['attributes']['title'])->toBe('Finished');
+});
+
+it('filters tasks by a choice custom field using the option id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    TenantContextService::setTenantId($team->getKey());
+
+    $statusField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail();
+
+    $open = Task::factory()->for($team)->create(['title' => 'Open one']);
+    $done = Task::factory()->for($team)->create(['title' => 'Finished']);
+    $doneId = taskCustomFieldOptionId($team->getKey(), 'status', 'Done');
+
+    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($team->getKey(), 'status', 'To do'));
+    $done->saveCustomFieldValue($statusField, $doneId);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request([
+        'custom_fields' => ['status' => ['eq' => $doneId]],
+    ])));
+
+    TenantContextService::setTenantId(null);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['attributes']['title'])->toBe('Finished');
+});
+
+it('rejects a label shared by two options and asks for the id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    TenantContextService::setTenantId($team->getKey());
+
+    $statusField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $team->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail();
+
+    CustomFieldOption::query()->create([
+        'tenant_id' => $team->getKey(),
+        'custom_field_id' => $statusField->getKey(),
+        'name' => 'DONE',
+        'sort_order' => 99,
+    ]);
+
+    $result = json_decode((new ListTasksTool)->handle(new Request([
+        'custom_fields' => ['status' => ['eq' => 'Done']],
+    ])), true);
+
+    TenantContextService::setTenantId(null);
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('ambiguous');
 });
 
 it('rejects an unknown custom field code instead of silently returning everything', function (): void {

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\DetachNoteRelationships;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseDetachTool;
-use App\Models\Note;
 use App\Models\User;
 use App\Rules\ArrayExistsForTeam;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -18,14 +19,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Detach a note from companies, people, or opportunities. Removes specified links.')]
 final class DetachNoteFromEntitiesTool extends BaseDetachTool
 {
-    protected function modelClass(): string
-    {
-        return Note::class;
-    }
+    use OperatesOnCrmEntity;
 
-    protected function entityLabel(): string
+    protected function entity(): CrmEntity
     {
-        return 'Note';
+        return CrmEntity::Note;
     }
 
     protected function resourceClass(): string

@@ -5,10 +5,14 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
+use Relaticle\CustomFields\Services\TenantContextService;
+
+mutates(CustomFieldsDisplayFormatter::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -111,4 +115,92 @@ it('returns an empty array when no custom_fields are submitted', function (): vo
         ->format($user, 'task', cleanFields: [], oldModel: null);
 
     expect($rows)->toBe([]);
+});
+
+it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $company = Company::factory()->create(['team_id' => $user->currentTeam->getKey(), 'name' => 'Globex']);
+
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Links',
+        'code' => 'links',
+        'type' => 'section',
+        'sort_order' => 98,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    TenantContextService::setTenantId($user->currentTeam->getKey());
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)
+            ->format($user, 'task', [$field->code => [$company->getKey()]], null);
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['new'])->toBe('Globex')
+        ->and($rows[0]['values'])->toBe(['Globex']);
+});
+
+it('names the record on a stored record card, not its id', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $company = Company::factory()->create(['team_id' => $user->currentTeam->getKey(), 'name' => 'Initech']);
+
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Links',
+        'code' => 'links',
+        'type' => 'section',
+        'sort_order' => 97,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $user->currentTeam->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $task = Task::factory()->create(['team_id' => $user->currentTeam->getKey()]);
+    $task->saveCustomFieldValue($field, [$company->getKey()]);
+
+    TenantContextService::setTenantId($user->currentTeam->getKey());
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
+            $task->fresh('customFieldValues.customField.options'),
+            [$field->fresh('options')],
+            200,
+        );
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['value'])->toBe('Initech')
+        ->and($rows[0]['values'])->toBe(['Initech']);
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
@@ -60,6 +61,10 @@ final readonly class ValidCustomFields implements ValidationRule
                 }
 
                 $this->addChoiceFieldOptionRules($customField, $rules);
+
+                if ($customField->type === CustomFieldType::RECORD->value) {
+                    $rules["custom_fields.{$customField->code}"][] = new OwnedLookupRecords($this->tenantId, (string) $customField->lookup_type, $customField->name);
+                }
             }
         }
 

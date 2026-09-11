@@ -71,3 +71,32 @@ it('lists a deactivated field separately from the settable codes', function (): 
     expect($settablePart)->not->toContain('priority')
         ->and($inactivePart)->toContain('priority');
 });
+
+it('describes a record field as record ids and a multi-choice field as option labels or ids', function (): void {
+    $user = User::factory()->withPersonalTeam()->create();
+    $teamId = $user->currentTeam->getKey();
+
+    foreach ([['linked_company', 'Linked Company', 'record', 'company'], ['markets', 'Markets', 'multi-select', null]] as [$code, $name, $type, $lookup]) {
+        CustomField::query()->create([
+            'tenant_id' => $teamId,
+            'entity_type' => 'task',
+            'code' => $code,
+            'name' => $name,
+            'type' => $type,
+            'lookup_type' => $lookup,
+            'sort_order' => 60,
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+    }
+
+    $lines = collect(explode("\n", resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, 'task')));
+
+    expect($lines->first(fn (string $line): bool => str_contains($line, 'linked_company')))
+        ->toContain('linked_company (record')
+        ->toContain('array of record IDs of the lookup entity; records must belong to this workspace')
+        ->and($lines->first(fn (string $line): bool => str_contains($line, 'markets')))
+        ->toContain('markets (multi-choice')
+        ->toContain('array of option labels or IDs');
+});

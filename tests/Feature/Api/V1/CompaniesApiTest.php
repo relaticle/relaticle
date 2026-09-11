@@ -565,7 +565,7 @@ describe('custom fields', function (): void {
             ],
         ])
             ->assertUnprocessable()
-            ->assertInvalid(['custom_fields.categories.1']);
+            ->assertInvalid(['custom_fields.categories' => 'invalid-id']);
     });
 
     it('accepts valid option IDs for multi-select custom field', function (): void {

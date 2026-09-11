@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Company;
 
 use App\Actions\Company\UpdateCompany;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -15,29 +17,21 @@ use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 
 final class UpdateCompanyTool extends BaseWriteUpdateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose updating an existing company (name, account owner, custom fields). Returns a proposal for user approval.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Company::class;
+        return CrmEntity::Company;
     }
 
     protected function actionClass(): string
     {
         return UpdateCompany::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'company';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Company';
     }
 
     protected function entitySchema(JsonSchema $schema): array

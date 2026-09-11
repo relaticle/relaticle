@@ -123,7 +123,7 @@ it('returns actionable MCP errors without successful structured content', functi
         ->assertOk()
         ->assertJsonPath('result.isError', true)
         ->assertJsonPath('result.content.0.type', 'text')
-        ->assertJsonPath('result.content.0.text', 'company with ID [01K00000000000000000000000] not found.')
+        ->assertJsonPath('result.content.0.text', 'Company with ID [01K00000000000000000000000] not found.')
         ->assertJsonMissingPath('result.structuredContent');
 });
 

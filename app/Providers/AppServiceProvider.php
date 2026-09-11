@@ -38,6 +38,8 @@ use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\CustomFields\CustomFieldInput;
+use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -73,6 +75,7 @@ use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
+use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
@@ -86,6 +89,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
+use Spatie\LaravelMarkdown\MarkdownRenderer;
 use Spatie\Onboard\OnboardingSteps;
 
 final class AppServiceProvider extends ServiceProvider
@@ -127,6 +131,8 @@ final class AppServiceProvider extends ServiceProvider
         // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
 
+        $this->app->scoped(RecordNameResolver::class);
+
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()
         // memoizes through once(), keyed on that shared object rather than the
@@ -152,6 +158,18 @@ final class AppServiceProvider extends ServiceProvider
                 config('markdown-response.driver_options.league.options', []),
             ),
         );
+
+        // The shared MarkdownRenderer always loads HeadingPermalinkExtension, which
+        // stamps a docs-site anchor onto every heading regardless of add_anchors_to_headings.
+        $this->app->when(CustomFieldInput::class)
+            ->needs(MarkdownRenderer::class)
+            ->give(fn (): MarkdownRenderer => new MarkdownRenderer(
+                commonmarkOptions: (array) config('markdown.commonmark_options'),
+                highlightCode: false,
+                cacheStoreName: false,
+                renderAnchors: false,
+                extensions: [TableExtension::class],
+            ));
     }
 
     /**

@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFields\CustomFieldOptionMap;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -81,7 +82,7 @@ final readonly class CustomFieldsFilterTranslator
     /**
      * Choice fields match on option IDs; a field with no options passes through as sent.
      *
-     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
     private function translateOperand(string $code, array $entry, mixed $operand): mixed
     {
@@ -97,27 +98,32 @@ final readonly class CustomFieldsFilterTranslator
     }
 
     /**
-     * @param  array{ids: array<string, string>, labels: list<string>}  $entry
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
     private function optionId(string $code, array $entry, mixed $label): string
     {
-        $id = $this->optionMap->idFor($entry, (string) $label);
+        $value = (string) $label;
+        $id = $this->optionMap->idFor($entry, $value);
 
-        if ($id === null) {
-            // The stored casing, not the lowercased match keys. This string is read
-            // by the assistant and echoed to the user.
+        if ($id !== null) {
+            return $id;
+        }
+
+        if ($this->optionMap->isAmbiguous($entry, $value)) {
             throw ValidationException::withMessages([
-                'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
-                    implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
+                'custom_fields' => __('validation.custom_field.ambiguous_option', ['field' => $code, 'value' => $value]),
             ]);
         }
 
-        return $id;
+        throw ValidationException::withMessages([
+            'custom_fields' => "\"{$label}\" is not one of the options for \"{$code}\". Available: ".
+                implode(', ', $entry['labels'] === [] ? ['none'] : $entry['labels']).'.',
+        ]);
     }
 
     /**
      * @param  list<string>  $codes
-     * @return array<string, array{ids: array<string, string>, labels: list<string>}>
+     * @return array<string, array{ids: array<string, list<string>>, labels: list<string>}>
      */
     private function optionsByCode(User $user, string $entityType, array $codes): array
     {

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\DeleteTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\BaseDeleteTool;
-use App\Models\Task;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
@@ -14,23 +15,15 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Delete a task from the CRM (soft delete).')]
 final class DeleteTaskTool extends BaseDeleteTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Task::class;
+        return CrmEntity::Task;
     }
 
     protected function actionClass(): string
     {
         return DeleteTask::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Task';
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 }

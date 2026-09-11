@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\V1\Concerns;
 
+use App\Enums\CustomFieldType;
+use App\Support\CustomFields\RecordNameResolver;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 
 trait FormatsCustomFields
 {
+    public static function collection(mixed $resource): AnonymousResourceCollection
+    {
+        resolve(RecordNameResolver::class)->prime($resource instanceof Paginator ? $resource->items() : $resource);
+
+        return parent::collection($resource);
+    }
+
     protected function formatCustomFields(Model $record): \stdClass
     {
         if (! $record->relationLoaded('customFieldValues')) {
@@ -32,6 +43,10 @@ trait FormatsCustomFields
     {
         $customField = $fieldValue->customField;
         $rawValue = $fieldValue->getValue();
+
+        if ($customField->type === CustomFieldType::RECORD->value) {
+            return $this->resolveRecordValue($customField, $rawValue);
+        }
 
         if (! $customField->typeData->dataType->isChoiceField()) {
             return $rawValue;
@@ -81,5 +96,17 @@ trait FormatsCustomFields
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array<int, array{id: string, name: ?string}>|null
+     */
+    private function resolveRecordValue(CustomField $customField, mixed $rawValue): ?array
+    {
+        if ($rawValue === null) {
+            return null;
+        }
+
+        return resolve(RecordNameResolver::class)->resolve((string) $customField->lookup_type, $rawValue);
     }
 }

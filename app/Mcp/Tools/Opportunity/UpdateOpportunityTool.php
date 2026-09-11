@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Opportunity;
 
 use App\Actions\Opportunity\UpdateOpportunity;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\OpportunityResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
@@ -18,9 +19,11 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Update an existing opportunity (deal) in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class UpdateOpportunityTool extends BaseUpdateTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Opportunity::class;
+        return CrmEntity::Opportunity;
     }
 
     protected function actionClass(): string
@@ -31,16 +34,6 @@ final class UpdateOpportunityTool extends BaseUpdateTool
     protected function resourceClass(): string
     {
         return OpportunityResource::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'opportunity';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'opportunity';
     }
 
     protected function entitySchema(JsonSchema $schema): array

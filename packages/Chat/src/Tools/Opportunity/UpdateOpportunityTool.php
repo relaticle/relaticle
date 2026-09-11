@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Opportunity;
 
 use App\Actions\Opportunity\UpdateOpportunity;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
-use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -16,29 +17,21 @@ use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 
 final class UpdateOpportunityTool extends BaseWriteUpdateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose updating an existing opportunity/deal, including its linked company and primary contact.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Opportunity::class;
+        return CrmEntity::Opportunity;
     }
 
     protected function actionClass(): string
     {
         return UpdateOpportunity::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'opportunity';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Opportunity';
     }
 
     protected function ownedForeignKeys(): array

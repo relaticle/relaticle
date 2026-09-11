@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Company;
 
 use App\Actions\Company\CreateCompany;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Relaticle\Chat\Support\TeamMembersContext;
@@ -12,6 +14,8 @@ use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class CreateCompanyTool extends BaseWriteCreateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose creating a new company in the CRM. Returns a proposal for user approval.';
@@ -22,9 +26,9 @@ final class CreateCompanyTool extends BaseWriteCreateTool
         return CreateCompany::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'company';
+        return CrmEntity::Company;
     }
 
     protected function entitySchema(JsonSchema $schema): array

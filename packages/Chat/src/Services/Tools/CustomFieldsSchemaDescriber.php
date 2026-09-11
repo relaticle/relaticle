@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\Team;
 use Relaticle\Chat\Support\PromptText;
@@ -109,7 +110,7 @@ final readonly class CustomFieldsSchemaDescriber
             FieldDataType::DATE_TIME => 'date-time',
             FieldDataType::BOOLEAN => 'boolean',
             FieldDataType::SINGLE_CHOICE => 'single-choice',
-            FieldDataType::MULTI_CHOICE => 'multi-choice',
+            FieldDataType::MULTI_CHOICE => $rawType === CustomFieldType::RECORD->value ? 'record' : 'multi-choice',
             FieldDataType::FILE => 'file (read-only via chat)',
             null => $rawType,
         };
@@ -120,8 +121,14 @@ final readonly class CustomFieldsSchemaDescriber
         return match ($dataType) {
             FieldDataType::DATE => 'YYYY-MM-DD',
             FieldDataType::DATE_TIME => 'ISO 8601, e.g. "2026-05-20T14:00:00Z"',
-            FieldDataType::TEXT => 'plain text is fine, will be wrapped as HTML on save',
-            FieldDataType::MULTI_CHOICE => 'array of label strings',
+            FieldDataType::TEXT => match ($rawType) {
+                'rich-editor' => 'markdown, or HTML when the value starts with <; stored as HTML',
+                'markdown-editor' => 'markdown',
+                default => null,
+            },
+            FieldDataType::MULTI_CHOICE => $rawType === CustomFieldType::RECORD->value
+                ? 'array of record IDs of the lookup entity; records must belong to this workspace'
+                : 'array of option labels or IDs',
             default => match ($rawType) {
                 'email' => 'array of email strings',
                 'phone' => 'array of phone strings',

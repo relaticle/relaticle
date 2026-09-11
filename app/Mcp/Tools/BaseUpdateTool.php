@@ -8,6 +8,7 @@ use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
+use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -80,6 +81,13 @@ abstract class BaseUpdateTool extends Tool
         // reported by the `id` rule below rather than blowing up on the typed parameter.
         $entityId = $request->get('id');
 
+        $customFields = $request->get('custom_fields');
+
+        if (is_array($customFields)) {
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentTeam->getKey(), $this->entityType(), $customFields);
+            $request->merge(['custom_fields' => $customFields]);
+        }
+
         $rules = array_merge(
             ['id' => ['required', 'string']],
             $this->entityRules($user),
@@ -88,7 +96,7 @@ abstract class BaseUpdateTool extends Tool
                 $this->entityType(),
                 isUpdate: true,
                 ignoreEntityId: is_string($entityId) || is_int($entityId) ? $entityId : null,
-            )->toRules($request->get('custom_fields')),
+            )->toRules($customFields),
         );
 
         $validated = $request->validate($rules);

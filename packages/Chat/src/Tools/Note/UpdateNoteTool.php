@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Note;
 
 use App\Actions\Note\UpdateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -19,35 +21,21 @@ use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 final class UpdateNoteTool extends BaseWriteUpdateTool
 {
     use NormalizesToolInput;
+    use OperatesOnCrmEntity;
 
     public function description(): string
     {
         return 'Propose updating an existing note. Returns a proposal for user approval.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Note::class;
+        return CrmEntity::Note;
     }
 
     protected function actionClass(): string
     {
         return UpdateNote::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'note';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Note';
-    }
-
-    protected function nameAttribute(): string
-    {
-        return 'title';
     }
 
     protected function ownedForeignKeyLists(): array

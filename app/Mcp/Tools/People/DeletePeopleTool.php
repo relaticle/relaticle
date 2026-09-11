@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\People;
 
 use App\Actions\People\DeletePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\BaseDeleteTool;
-use App\Models\People;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
@@ -14,18 +15,15 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Delete a person (contact) from the CRM (soft delete).')]
 final class DeletePeopleTool extends BaseDeleteTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return People::class;
+        return CrmEntity::People;
     }
 
     protected function actionClass(): string
     {
         return DeletePeople::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Person';
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
 use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Models\PersonalAccessToken;
@@ -21,6 +22,11 @@ use Laravel\Mcp\Server\Resource;
 final class OpportunitySchemaResource extends Resource implements ProvidesEntitySchema
 {
     use ResolvesEntitySchema;
+
+    protected function entity(): CrmEntity
+    {
+        return CrmEntity::Opportunity;
+    }
 
     public function shouldRegister(): bool
     {
@@ -47,15 +53,15 @@ final class OpportunitySchemaResource extends Resource implements ProvidesEntity
     public function toSchema(User $user): array
     {
         return [
-            'entity' => 'opportunity',
+            'entity' => $this->entity()->value,
             'description' => 'Sales deals or business opportunities.',
             'fields' => [
                 'name' => ['type' => 'string', 'required' => true],
                 'company_id' => ['type' => 'string', 'required' => false],
                 'contact_id' => ['type' => 'string', 'required' => false, 'description' => 'Links to a person'],
             ],
-            'custom_fields' => $this->resolveCustomFields($user, 'opportunity'),
-            'filterable_fields' => $this->resolveFilterableFields($user, 'opportunity'),
+            'custom_fields' => $this->resolveCustomFields($user),
+            'filterable_fields' => $this->resolveFilterableFields($user),
             'relationships' => ['creator', 'company', 'contact', 'tasks', 'notes'],
             'aggregate_includes' => [
                 'tasksCount' => 'Count of related tasks',

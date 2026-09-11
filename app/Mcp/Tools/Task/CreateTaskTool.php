@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\CreateTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\Team;
@@ -19,6 +21,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('Create a new task in the CRM. Use the crm-schema resource to discover available custom fields.')]
 final class CreateTaskTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function openWorldHint(): bool
     {
         return true;
@@ -34,9 +38,9 @@ final class CreateTaskTool extends BaseCreateTool
         return TaskResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'task';
+        return CrmEntity::Task;
     }
 
     protected function entitySchema(JsonSchema $schema): array

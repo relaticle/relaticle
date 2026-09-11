@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\People;
 
 use App\Actions\People\UpdatePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
-use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -15,29 +16,21 @@ use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 
 final class UpdatePersonTool extends BaseWriteUpdateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose updating an existing person/contact. Returns a proposal for user approval.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return People::class;
+        return CrmEntity::People;
     }
 
     protected function actionClass(): string
     {
         return UpdatePeople::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'people';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Person';
     }
 
     protected function ownedForeignKeys(): array

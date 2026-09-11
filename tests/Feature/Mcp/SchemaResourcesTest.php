@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFieldType;
 use App\Mcp\Resources\CompanySchemaResource;
 use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
 use App\Mcp\Resources\NoteSchemaResource;
@@ -241,8 +242,8 @@ it('describes hyphenated choice and datetime field types correctly', function ()
     RelaticleServer::actingAs($this->user)
         ->resource(CompanySchemaResource::class)
         ->assertOk()
-        ->assertSee('array of option ID strings')
-        ->assertSee('option ID string (see options)')
+        ->assertSee('array of option labels or IDs (see options)')
+        ->assertSee('option label or option ID (see options)')
         ->assertSee('ISO 8601 datetime string')
         ->assertSee('Enterprise')
         ->assertSee('High');
@@ -351,4 +352,74 @@ it('invalidates the entity schema cache when an option changes', function (): vo
         ->resource(CompanySchemaResource::class)
         ->assertOk()
         ->assertSee('Enterprise Segment');
+});
+
+it('publishes an input format for every custom field type', function (string $type, string $expectedFormat): void {
+    $team = $this->user->personalTeam();
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $team->id,
+        'entity_type' => 'company',
+        'name' => 'Types',
+        'code' => 'types',
+        'type' => 'section',
+        'sort_order' => 1,
+        'active' => true,
+    ]);
+    CustomField::query()->create([
+        'tenant_id' => $team->id,
+        'custom_field_section_id' => $section->id,
+        'entity_type' => 'company',
+        'code' => 'probe',
+        'name' => 'Probe',
+        'type' => $type,
+        'lookup_type' => $type === 'record' ? 'company' : null,
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->resource(CompanySchemaResource::class)
+        ->assertOk()
+        ->assertSee($expectedFormat);
+})->with(customFieldHintRows());
+
+/** @return list<array{0: string, 1: string}> */
+function customFieldHintRows(): array
+{
+    return [
+        ['text', '"input_format": "string"'],
+        ['textarea', '"input_format": "string"'],
+        ['number', 'numeric value'],
+        ['currency', 'numeric value (amount)'],
+        ['email', 'array of email strings'],
+        ['phone', 'array of phone strings'],
+        ['link', 'array of URL strings'],
+        ['checkbox', '"input_format": "boolean"'],
+        ['toggle', '"input_format": "boolean"'],
+        ['select', 'option label or option ID (see options)'],
+        ['radio', 'option label or option ID (see options)'],
+        ['toggle-buttons', 'option label or option ID (see options)'],
+        ['multi-select', 'array of option labels or IDs (see options)'],
+        ['checkbox-list', 'array of option labels or IDs (see options)'],
+        ['tags-input', 'array of arbitrary string values'],
+        ['rich-editor', 'markdown, or HTML when the value starts with'],
+        ['markdown-editor', '"input_format": "markdown"'],
+        ['color-picker', 'hex color string'],
+        ['date', 'ISO 8601 date"'],
+        ['date-time', 'ISO 8601 datetime string'],
+        ['record', 'array of record IDs of the lookup entity'],
+    ];
+}
+
+it('exercises the hint of every custom field type a tenant can create', function (): void {
+    $exercised = array_column(customFieldHintRows(), 0);
+
+    $creatable = array_values(array_diff(
+        array_map(fn (CustomFieldType $case): string => $case->value, CustomFieldType::cases()),
+        // file-upload is disabled product-wide (config/custom-fields.php) and its writes ship in #699.
+        [CustomFieldType::FILE_UPLOAD->value],
+    ));
+
+    expect($exercised)->toEqualCanonicalizing($creatable);
 });

@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
 use App\Filament\Pages\Import\ImportPage;
+use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
+use App\Http\Requests\Api\V1\IndexCustomFieldsRequest;
+use App\Http\Requests\Api\V1\IndexRequest;
 use App\Livewire\BaseLivewireComponent;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
@@ -65,6 +68,7 @@ arch('avoid open for extension')
         BaseAttachTool::class,
         BaseDetachTool::class,
         BaseRelationshipTool::class,
+        BaseCrmEntityRequest::class,
         ImportPage::class,
         PersonalAccessToken::class,
     ]);
@@ -86,6 +90,7 @@ arch('ensure no extends')
         BaseAttachTool::class,
         BaseDetachTool::class,
         BaseRelationshipTool::class,
+        BaseCrmEntityRequest::class,
         ImportPage::class,
     ]);
 
@@ -246,6 +251,16 @@ arch('SystemAdmin module must not depend on main app namespace')
         'App\Models',
         'App\Enums',
         'App\Rules',
+    ]);
+
+arch('CRM API write requests share the custom field contract')
+    ->expect('App\Http\Requests\Api\V1')
+    ->classes()
+    ->toExtend(BaseCrmEntityRequest::class)
+    ->ignoring([
+        BaseCrmEntityRequest::class,
+        IndexCustomFieldsRequest::class,
+        IndexRequest::class,
     ]);
 
 arch('API controllers must not use Eloquent query methods directly')
