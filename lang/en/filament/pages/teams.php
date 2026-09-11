@@ -36,6 +36,7 @@ return [
             'workspace_name' => [
                 'label' => 'Workspace name',
                 'placeholder' => 'Acme Corp',
+                'default' => 'My workspace',
             ],
             'workspace_handle' => [
                 'label' => 'Workspace handle',

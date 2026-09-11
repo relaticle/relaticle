@@ -243,6 +243,22 @@ final class CreateTeam extends RegisterTenant
         return $slug === '' ? Str::lower(Str::random(8)) : $slug;
     }
 
+    // The default handle is the same for everyone; without a suffix the unique
+    // rule rejects a field the user never touched.
+    private function uniqueHandleFor(string $handle): string
+    {
+        if (! Team::query()->where('slug', $handle)->exists()) {
+            return $handle;
+        }
+
+        $highest = (int) Team::query()
+            ->where('slug', 'like', "{$handle}-%")
+            ->selectRaw('max(substring(slug from ?)::int) as highest', ['^'.$handle.'-(\d{1,9})$'])
+            ->value('highest');
+
+        return "{$handle}-".max($highest + 1, 2);
+    }
+
     private function stepHeading(string $title, string ...$paragraphs): HtmlString
     {
         $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
@@ -280,13 +296,14 @@ final class CreateTeam extends RegisterTenant
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/teams.create_team.form.workspace_name.placeholder'))
+                ->default(fn (): string => __('filament/pages/teams.create_team.form.workspace_name.default'))
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
                         return;
                     }
 
-                    $set('slug', $this->generateHandleFrom($state));
+                    $set('slug', $this->uniqueHandleFor($this->generateHandleFrom($state)));
                     $set('slug_auto_generated', true);
                 }),
 
@@ -300,6 +317,9 @@ final class CreateTeam extends RegisterTenant
                     column: 'slug',
                     ignorable: fn (): ?Team => $this->tenant instanceof Team ? $this->tenant : null,
                 )
+                ->default(fn (): string => $this->uniqueHandleFor(
+                    $this->generateHandleFrom(__('filament/pages/teams.create_team.form.workspace_name.default')),
+                ))
                 ->prefix(WorkspaceUrlPrefix::get())
                 ->helperText(__('filament/pages/teams.create_team.form.workspace_handle.helper_text'))
                 ->live(onBlur: true)

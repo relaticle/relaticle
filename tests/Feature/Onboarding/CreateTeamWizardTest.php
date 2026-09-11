@@ -131,6 +131,79 @@ it('prefills the workspace step with the current user name', function (): void {
         ->assertFormSet(['user_name' => 'Ada Lovelace']);
 });
 
+it('prefills a workspace name and a handle that is not already taken', function (): void {
+    $other = User::factory()->create();
+    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertFormSet([
+            'name' => 'My workspace',
+            'slug' => 'my-workspace-2',
+        ]);
+});
+
+it('picks the next free suffix from the highest one in use, not the next in scan order', function (): void {
+    $other = User::factory()->create();
+    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'my-workspace-2', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'my-workspace-10', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertFormSet(['slug' => 'my-workspace-11']);
+});
+
+it('suffixes a typed name that slugs to a handle already in use', function (): void {
+    $other = User::factory()->create();
+    Team::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp-2']);
+});
+
+it('ignores a taken handle whose suffix is too long to be a number', function (): void {
+    $other = User::factory()->create();
+    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'my-workspace-99999999999', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->assertFormSet(['slug' => 'my-workspace-2']);
+});
+
+it('creates a workspace from the defaults with only the use case chosen', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    expect($team->name)->toBe('My workspace')
+        ->and($team->slug)->toBe('my-workspace');
+});
+
 it('renders wizard for users who already have a team', function (): void {
     $user = User::factory()->withPersonalTeam()->create();
 
