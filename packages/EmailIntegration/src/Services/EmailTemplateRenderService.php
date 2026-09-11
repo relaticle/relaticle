@@ -11,6 +11,7 @@ use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
@@ -97,6 +98,8 @@ final readonly class EmailTemplateRenderService
     {
         $html = RichContentRenderer::make($bodyHtml)
             ->customBlocks([SignatureBlock::class])
+            ->fileAttachmentsDisk(EmailAttachment::DISK)
+            ->fileAttachmentsVisibility('private')
             ->toHtml();
 
         return $this->renderContent($html, $record);
