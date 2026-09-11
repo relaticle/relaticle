@@ -224,10 +224,15 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // A second `composer:open` while a draft is already in progress (e.g. the `c`
         // shortcut firing after a click landed on a button, not an input) must not
         // wipe what the user has typed. Just bring the composer back into view.
-        if ($this->isOpen) {
+        // Bulk mass send is different: it is a deliberate new session and must apply.
+        if ($this->isOpen && ! ($payload['massSend'] ?? false)) {
             $this->isMinimized = false;
 
             return;
+        }
+
+        if ($this->isOpen) {
+            $this->isMinimized = false;
         }
 
         $account = $this->sendableAccount() ?? $this->activeAccounts()->first();

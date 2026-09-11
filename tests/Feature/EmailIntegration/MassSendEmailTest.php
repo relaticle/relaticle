@@ -548,6 +548,32 @@ it('uses the email address when a person name looks like an empty json array', f
         ->assertSet('massRecipients.0.name', 'broken-name@example.com');
 });
 
+it('replaces an open compose session when bulk mass send opens the composer again', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'alice@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'In progress')
+        ->set('to', ['alice@example.com'])
+        ->call('minimize')
+        ->assertSet('isMinimized', true)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => massRecipientPayload($person, 'alice@example.com'),
+        ])
+        ->assertSet('isMinimized', false)
+        ->assertSet('isMassSend', true)
+        ->assertSet('massRecipients', massRecipientPayload($person, 'alice@example.com'))
+        ->assertSet('to', [])
+        ->assertSet('subject', '');
+});
+
 it('expands signatures and resolves merge tags per recipient on mass send', function (): void {
     $signature = EmailSignature::withoutEvents(fn () => EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,

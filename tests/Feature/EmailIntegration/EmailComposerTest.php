@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -443,16 +444,31 @@ it('rejects a recipient that is not on a record or in suggestions and sends noth
 });
 
 it('includes CRM addresses outside the autocomplete cap in the allowed recipient list', function (): void {
+    $seedEmail = function (People $person, string $email): void {
+        $emailsField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $person->team_id)
+            ->where('entity_type', 'people')
+            ->where('code', PeopleField::EMAILS->value)
+            ->firstOrFail();
+
+        $person->saveCustomFieldValue($emailsField, [$email], $person->team);
+    };
+
     foreach (range(1, 300) as $i) {
         $person = People::factory()->for($this->user->currentTeam)->create([
             'name' => sprintf('Person %03d', $i),
             'creator_id' => $this->user->getKey(),
         ]);
 
-        AllowedComposerRecipient::seed($this->user, "cap{$i}@example.com");
+        $seedEmail($person, "cap{$i}@example.com");
     }
 
-    AllowedComposerRecipient::seed($this->user, 'overflow@example.com');
+    $overflow = People::factory()->for($this->user->currentTeam)->create([
+        'name' => 'Z Overflow Contact',
+        'creator_id' => $this->user->getKey(),
+    ]);
+    $seedEmail($overflow, 'overflow@example.com');
 
     $component = Livewire::test(EmailComposer::class)->dispatch('composer:open');
 
