@@ -60,7 +60,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
@@ -165,7 +164,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->when(CustomFieldInput::class)
             ->needs(MarkdownRenderer::class)
             ->give(fn (): MarkdownRenderer => new MarkdownRenderer(
-                commonmarkOptions: Arr::except((array) config('markdown.commonmark_options'), 'heading_permalink'),
+                commonmarkOptions: (array) config('markdown.commonmark_options'),
                 highlightCode: false,
                 cacheStoreName: false,
                 renderAnchors: false,
