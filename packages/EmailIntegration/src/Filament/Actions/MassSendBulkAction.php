@@ -18,6 +18,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
@@ -62,12 +63,7 @@ final class MassSendBulkAction extends BulkAction
                 Select::make('template_id')
                     ->label(__('filament/actions/mass-send.fields.template.label'))
                     ->placeholder(__('filament/actions/mass-send.fields.template.placeholder'))
-                    ->options(fn (): array => EmailTemplate::query()
-                        ->where('team_id', filament()->getTenant()?->getKey())
-                        ->where(fn (Builder $q) => $q
-                            ->where('created_by', auth()->id())
-                            ->orWhere('is_shared', true)
-                        )
+                    ->options(fn (): array => self::authorizedTemplates()
                         ->pluck('name', 'id')
                         ->all()
                     )
@@ -78,9 +74,7 @@ final class MassSendBulkAction extends BulkAction
                             return;
                         }
 
-                        $template = EmailTemplate::query()
-                            ->where('team_id', filament()->getTenant()?->getKey())
-                            ->find($state);
+                        $template = self::authorizedTemplates()->find($state);
 
                         if ($template === null) {
                             return;
@@ -171,6 +165,19 @@ final class MassSendBulkAction extends BulkAction
                     ->success()
                     ->send();
             });
+    }
+
+    /**
+     * @return EloquentBuilder<EmailTemplate>
+     */
+    private static function authorizedTemplates(): EloquentBuilder
+    {
+        return EmailTemplate::query()
+            ->where('team_id', filament()->getTenant()?->getKey())
+            ->where(fn (Builder $query): Builder => $query
+                ->where('created_by', auth()->id())
+                ->orWhere('is_shared', true)
+            );
     }
 
     /**

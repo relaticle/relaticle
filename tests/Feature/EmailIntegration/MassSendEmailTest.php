@@ -342,6 +342,15 @@ it('scopes the template dropdown to the current team', function (): void {
         'is_shared' => true,
     ]);
 
+    $teammatePrivate = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => User::factory()->create()->id,
+        'name' => 'Teammate private template',
+        'subject' => 'Private',
+        'body_html' => '<p>Private</p>',
+        'is_shared' => false,
+    ]);
+
     // A shared template owned by a different team must never appear here.
     $foreignUser = User::factory()->withTeam()->create();
     $foreignShared = EmailTemplate::create([
@@ -364,6 +373,7 @@ it('scopes the template dropdown to the current team', function (): void {
     expect(array_keys($options))
         ->toContain($ownPrivate->id)
         ->toContain($teammateShared->id)
+        ->not->toContain($teammatePrivate->id)
         ->not->toContain($foreignShared->id);
 });
 
@@ -402,4 +412,65 @@ it('rejects a cross-team template id submitted on send', function (): void {
         ->assertHasTableActionErrors(['template_id']);
 
     expect(EmailBatch::where('team_id', $this->team->id)->exists())->toBeFalse();
+});
+
+it('fills subject and body when an authorized template is selected', function (bool $own, bool $shared): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Recipient',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $template = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => $own ? $this->user->id : User::factory()->create()->id,
+        'name' => 'Authorized template',
+        'subject' => 'Authorized subject',
+        'body_html' => '<p>Authorized body</p>',
+        'is_shared' => $shared,
+    ]);
+
+    livewire(ListPeople::class)
+        ->mountTableBulkAction('massSend', records: [$person])
+        ->fillForm([
+            'template_id' => $template->id,
+        ])
+        ->assertSchemaStateSet([
+            'subject' => 'Authorized subject',
+            'body_html' => '<p>Authorized body</p>',
+        ]);
+})->with([
+    'own private' => [true, false],
+    'teammate shared' => [false, true],
+]);
+
+it('does not copy a teammate\'s private template into the editor', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Recipient',
+        'creator_id' => $this->user->id,
+    ]);
+
+    $teammatePrivate = EmailTemplate::create([
+        'team_id' => $this->team->id,
+        'created_by' => User::factory()->create()->id,
+        'name' => 'Teammate private template',
+        'subject' => 'SECRET SUBJECT',
+        'body_html' => '<p>SECRET BODY</p>',
+        'is_shared' => false,
+    ]);
+
+    livewire(ListPeople::class)
+        ->mountTableBulkAction('massSend', records: [$person])
+        ->fillForm([
+            'subject' => 'Original subject',
+            'body_html' => '<p>Original body</p>',
+        ])
+        ->fillForm([
+            'template_id' => $teammatePrivate->id,
+        ])
+        ->assertSchemaStateSet([
+            'subject' => 'Original subject',
+            'body_html' => '<p>Original body</p>',
+        ]);
 });
