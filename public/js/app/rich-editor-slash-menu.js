@@ -54,7 +54,7 @@ const CANVAS_TOLERANCE = 2
 
 class CanvasFitView {
     constructor(view) {
-        this.content = view.dom.closest('.fi-fo-rich-editor-content')
+        this.content = view.dom.closest('.fi-fo-rich-editor-seamless .fi-fo-rich-editor-content')
         this.fit = this.fit.bind(this)
 
         if (! this.content) {

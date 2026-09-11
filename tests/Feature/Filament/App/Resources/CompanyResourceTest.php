@@ -10,6 +10,8 @@ use App\Models\CustomField;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
+use Filament\Schemas\Components\Component;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
@@ -239,4 +241,30 @@ it('adds a newly typed tags-input value to the option list when editing a compan
     $optionNames = $cf->refresh()->options->pluck('name')->all();
     expect($optionNames)->toContain('Existing')
         ->toContain('TypedDuringEdit');
+});
+
+it('keeps the slash menu but not the document canvas on a rich-editor field added to companies', function (): void {
+    CustomField::forceCreate([
+        'tenant_id' => $this->team->id,
+        'code' => 'account_plan',
+        'name' => 'Account plan',
+        'type' => 'rich-editor',
+        'entity_type' => 'company',
+        'sort_order' => 50,
+        'active' => true,
+        'system_defined' => false,
+        'validation_rules' => [],
+        'settings' => new CustomFieldSettingsData,
+    ]);
+
+    $page = livewire(ListCompanies::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    expect($editor->getToolbarButtons())->toBe([])
+        ->and($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
+        ->and($editor->getExtraAttributes())->not->toHaveKey('class');
 });

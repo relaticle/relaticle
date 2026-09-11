@@ -10,6 +10,8 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
+use Filament\Schemas\Components\Component;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
@@ -359,4 +361,16 @@ it('renders a custom-field datetime in the same format as the table default', fu
     livewire(ManageTasks::class)
         ->assertOk()
         ->assertSee(Date::parse('2026-08-19 08:30:00', 'Asia/Tokyo')->translatedFormat($format));
+});
+
+it('gives the task description the borderless document canvas', function (): void {
+    $page = livewire(ManageTasks::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    expect($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
+        ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
 });
