@@ -1,6 +1,7 @@
 @props([
     'options' => [],
     'suggestions' => [],
+    'allowedAddresses' => [],
     'autofocus' => false,
 ])
 
@@ -29,6 +30,7 @@
         activeIndex: 0,
         popoverStyle: {},
         options: @js([...$options, ...$manualOptions]),
+        allowedAddresses: @js($allowedAddresses),
         removeLabel: @js($removeLabel),
         companyTeamLabel: @js($companyTeamLabel),
 
@@ -63,7 +65,23 @@
             };
         },
 
+        allowedEmail(raw = null) {
+            const value = (raw ?? this.newValue).trim().replace(/,$/, '');
+
+            if (! value) {
+                return null;
+            }
+
+            const normalized = value.toLowerCase();
+
+            return this.allowedAddresses.find((email) => email.toLowerCase() === normalized) ?? null;
+        },
+
         resolveEmail(raw = null) {
+            return this.resolveEmailFromOptions(raw) ?? this.allowedEmail(raw);
+        },
+
+        resolveEmailFromOptions(raw = null) {
             const value = (raw ?? this.newValue).trim().replace(/,$/, '');
 
             if (! value) {

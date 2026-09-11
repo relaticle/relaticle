@@ -442,6 +442,41 @@ it('rejects a recipient that is not on a record or in suggestions and sends noth
     expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeFalse();
 });
 
+it('includes CRM addresses outside the autocomplete cap in the allowed recipient list', function (): void {
+    foreach (range(1, 300) as $i) {
+        $person = People::factory()->for($this->user->currentTeam)->create([
+            'name' => sprintf('Person %03d', $i),
+            'creator_id' => $this->user->getKey(),
+        ]);
+
+        AllowedComposerRecipient::seed($this->user, "cap{$i}@example.com");
+    }
+
+    AllowedComposerRecipient::seed($this->user, 'overflow@example.com');
+
+    $component = Livewire::test(EmailComposer::class)->dispatch('composer:open');
+
+    expect($component->instance()->allowedRecipientAddresses())
+        ->toContain('overflow@example.com');
+
+    $optionEmails = collect($component->instance()->recipientOptions())
+        ->pluck('email')
+        ->filter()
+        ->all();
+
+    expect($optionEmails)->not->toContain('overflow@example.com');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['overflow@example.com'])
+        ->set('subject', 'Overflow recipient')
+        ->set('bodyHtml', '<p>Body</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    expect(Email::query()->where('subject', 'Overflow recipient')->exists())->toBeTrue();
+});
+
 it('rejects an empty body with no signature block and sends nothing', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')

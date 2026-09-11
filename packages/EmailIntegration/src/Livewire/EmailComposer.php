@@ -1088,6 +1088,21 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
+     * Every address the composer may commit or send to. Wider than {@see recipientOptions},
+     * which caps autocomplete rows for performance.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function allowedRecipientAddresses(): array
+    {
+        return resolve(AllowedRecipientService::class)->addressesFor(
+            $this->authUser(),
+            $this->threadRecipientAllowlist(),
+        );
+    }
+
+    /**
      * @return list<array{
      *     type: 'person'|'company_team',
      *     id: string,
