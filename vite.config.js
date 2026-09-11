@@ -24,11 +24,7 @@ export default defineConfig({
                 'packages/Documentation/resources/css/documentation.css',
                 'packages/Documentation/resources/js/documentation.js',
             ],
-            refresh: [
-                'resources/views/**',
-                'routes/**',
-                'packages/*/resources/views/**',
-            ],
+            refresh: true,
         }),
         tailwindcss(),
     ],

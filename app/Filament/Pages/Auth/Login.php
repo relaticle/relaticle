@@ -12,6 +12,7 @@ use App\Features\SocialAuth;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Rules\RegistrableEmail;
+use App\Rules\TurnstileChallenge;
 use App\Support\EmailAddress;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
@@ -21,6 +22,7 @@ use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
@@ -191,13 +193,21 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $this->protectAgainstSpam();
 
-        $data = $this->form->getState();
+        try {
+            $data = $this->form->getState();
+        } catch (ValidationException $exception) {
+            $this->resetTurnstileChallenge();
+
+            throw $exception;
+        }
 
         $email = EmailAddress::canonicalize((string) $data['email']);
 
         try {
             $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
         } catch (UniqueConstraintViolationException) {
+            $this->resetTurnstileChallenge();
+
             throw ValidationException::withMessages([
                 'data.email' => __('validation.unique', ['attribute' => __('filament-panels::auth/pages/login.form.email.label')]),
             ]);
@@ -433,5 +443,51 @@ final class Login extends \Filament\Auth\Pages\Login
     {
         return Hidden::make('remember')
             ->default(true);
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        $schema = parent::form($schema);
+
+        return $schema->components([
+            ...$schema->getComponents(withHidden: true),
+            Hidden::make('cf_turnstile_expanded')
+                ->default(false)
+                ->dehydrated(false),
+            $this->getTurnstileFormComponent(),
+        ]);
+    }
+
+    protected function getTurnstileFormComponent(): ViewField
+    {
+        return ViewField::make('cf_turnstile_response')
+            ->hiddenLabel()
+            ->view('filament.forms.components.turnstile')
+            ->viewData(fn (ViewField $component): array => [
+                'expandedStatePath' => $component->getContainer()->getStatePath().'.cf_turnstile_expanded',
+            ])
+            ->visibleJs('$get(\'cf_turnstile_expanded\') === true')
+            ->dehydrated(false)
+            ->rules(TurnstileChallenge::rules(), condition: fn (): bool => $this->authMethod === 'signup')
+            ->validationMessages(['required' => __('auth.turnstile.required')])
+            ->visible(fn (): bool => $this->authMethod === 'signup' && TurnstileChallenge::isEnabled());
+    }
+
+    /**
+     * Turnstile tokens are single use and every field validates on every
+     * submit, so a token is already spent when any other field fails.
+     */
+    private function resetTurnstileChallenge(): void
+    {
+        if (! is_array($this->data)) {
+            return;
+        }
+
+        if (! array_key_exists('cf_turnstile_response', $this->data)) {
+            return;
+        }
+
+        $this->data['cf_turnstile_response'] = null;
+        $this->data['cf_turnstile_expanded'] = true;
     }
 }

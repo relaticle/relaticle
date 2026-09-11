@@ -53,6 +53,11 @@ return [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
 
+    'turnstile' => [
+        'key' => env('TURNSTILE_SITE_KEY'),
+        'secret' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'discord' => [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
@@ -62,7 +67,6 @@ return [
         'model' => env('EMAIL_SUMMARY_MODEL', 'gpt-4o-mini'),
     ],
 
-    // Email config
     'gmail' => [
         'client_id' => env('GMAIL_CLIENT_ID'),
         'client_secret' => env('GMAIL_CLIENT_SECRET'),
@@ -76,6 +80,7 @@ return [
         'tenant' => env('AZURE_TENANT_ID'),
         'proxy' => env('PROXY'),
     ],
+
     'stripe' => [
         'managed_payments' => (bool) env('STRIPE_MANAGED_PAYMENTS', true),
         'prices' => [

@@ -9,6 +9,7 @@
 
 @source not '../../../../vendor/laravel/horizon';
 
+
 @source '../../../../app/Filament';
 @source '../../../../resources/views';
 
@@ -936,3 +937,6 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
         color: #9ca3af;
     }
 }
+
+/* Chat record chips moved to resources/css/theme.css: the marketing hero
+   mock renders the same chips and only loads that shared bundle. */
