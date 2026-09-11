@@ -7,7 +7,7 @@ namespace Relaticle\EmailIntegration\Support;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 
-final class PublicDomainList
+final readonly class PublicDomainList
 {
     public function __construct(
         private CompanyDomainMatcher $domainMatcher,
