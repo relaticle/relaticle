@@ -21,7 +21,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Tests\Helpers\ChatDocument;
 
-mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
+mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class, ConversationTitler::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -130,6 +130,7 @@ it('replaces the provisional title and broadcasts the new one', function (): voi
         provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
         message: 'Create a follow-up task for Sarah at Acme next Tuesday',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('Follow Up With Acme');
@@ -156,6 +157,7 @@ it('never overwrites a title the user renamed while the model was thinking', fun
         provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
         message: 'Create a follow-up task for Sarah at Acme next Tuesday',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('My own name for this');
@@ -174,6 +176,7 @@ it('keeps the provisional title when the model call fails', function (): void {
         provisionalTitle: 'Create a follow-up task for Sarah',
         message: 'Create a follow-up task for Sarah',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('Create a follow-up task for Sarah');
@@ -194,6 +197,7 @@ it('leaves the title alone when generation is switched off', function (): void {
         provisionalTitle: 'Create a follow-up task for Sarah',
         message: 'Create a follow-up task for Sarah',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('Create a follow-up task for Sarah');
@@ -251,6 +255,7 @@ it('keeps the provisional title when the opener carries no topic to name', funct
         provisionalTitle: 'hey',
         message: 'hey',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(AgentConversation::query()->find($conversationId)->title)->toBe('hey');
@@ -323,6 +328,7 @@ it('names a record-less message from the record the user was viewing', function 
         provisionalTitle: 'add a note here',
         message: 'add a note here',
         provider: 'anthropic',
+        languageName: 'English',
         pageContext: ['type' => 'company', 'id' => '1', 'label' => 'Acme Corp'],
     ))->handle();
 
@@ -345,6 +351,7 @@ it('never pays for a title it could no longer apply', function (): void {
         provisionalTitle: 'Create a follow-up task for Sarah at Acme',
         message: 'Create a follow-up task for Sarah at Acme',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     ConversationTitler::assertNeverPrompted();
@@ -355,6 +362,7 @@ it('never pays for a title it could no longer apply', function (): void {
 it('titles from the assistant reply when the opening message named nothing', function (): void {
     Queue::fake();
     CrmAssistant::fake(['Globex has three open opportunities worth $45,000.']);
+    $this->user->forceFill(['locale' => 'da'])->save();
 
     $conversationId = seedTitlingConversation('hey');
 
@@ -370,7 +378,8 @@ it('titles from the assistant reply when the opening message named nothing', fun
         GenerateConversationTitle::class,
         fn (GenerateConversationTitle $job): bool => $job->conversationId === $conversationId
             && $job->provisionalTitle === 'hey'
-            && $job->reply === 'Globex has three open opportunities worth $45,000.',
+            && $job->reply === 'Globex has three open opportunities worth $45,000.'
+            && $job->languageName === 'Danish',
     );
 });
 
@@ -432,5 +441,41 @@ it('titles at turn end from what the user typed, not from the rows the system wr
         GenerateConversationTitle::class,
         fn (GenerateConversationTitle $job): bool => $job->provisionalTitle === 'hey'
             && $job->message === 'how is globex doing',
+    );
+});
+
+it('tells the titler which language breaks a tie', function (): void {
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Tilbud sendt i august']]);
+    $conversationId = seedTitlingConversation('Hvor mange tilbud har vi sendt i august');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Hvor mange tilbud har vi sendt i august',
+        message: 'Hvor mange tilbud har vi sendt i august',
+        provider: 'anthropic',
+        languageName: 'Danish',
+    ))->handle();
+
+    ConversationTitler::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains(
+        (string) $prompt->agent->instructions(),
+        'If the message is too short to tell, write in Danish.',
+    ));
+});
+
+it('dispatches title generation with the sender\'s language', function (): void {
+    Queue::fake();
+    test()->user->forceFill(['locale' => 'da'])->save();
+
+    $conversationId = $this->postJson(route('chat.conversations.create'), [
+        'document' => ChatDocument::fromText('Hvor mange tilbud har vi sendt i august'),
+    ])->assertOk()->json('conversation_id');
+
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ChatDocument::fromText('Hvor mange tilbud har vi sendt i august'),
+    ])->assertOk();
+
+    Queue::assertPushed(
+        GenerateConversationTitle::class,
+        fn (GenerateConversationTitle $job): bool => $job->languageName === 'Danish',
     );
 });

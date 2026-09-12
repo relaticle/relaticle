@@ -55,6 +55,7 @@ final class GenerateConversationTitle implements ShouldQueue
         public readonly string $provisionalTitle,
         public readonly string $message,
         private readonly ?string $provider,
+        public readonly string $languageName,
         public readonly ?array $pageContext = null,
         public readonly ?string $reply = null,
     ) {
@@ -123,7 +124,7 @@ final class GenerateConversationTitle implements ShouldQueue
     private function generate(): ?string
     {
         try {
-            $response = (new ConversationTitler)->prompt(
+            $response = new ConversationTitler($this->languageName)->prompt(
                 $this->buildPrompt(),
                 provider: $this->provider,
             );

@@ -98,7 +98,7 @@ it('routes export requests to the export destinations', function (): void {
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
     $instructions = (new CrmAssistant)
-        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner'])
+        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner', 'language' => 'English'])
         ->instructions();
 
     expect($instructions)
@@ -328,4 +328,25 @@ it('bans the em dash in assistant prose', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)->toContain('Never use an em dash');
+});
+
+it('names the user\'s language as the tie-breaker in the dynamic block', function (): void {
+    $instructions = resolve(CrmAssistant::class)
+        ->withCurrentUser(['name' => 'Casper', 'id' => '01USER', 'role' => 'member', 'language' => 'Danish'])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('## Language')
+        ->toContain('Reply in the language the user writes in.')
+        ->toContain('or the turn was started by the system rather than a typed message, continue in the language of the user\'s last typed message.')
+        ->toContain('If there is no typed message yet, use Danish.')
+        ->toContain('that request wins for the rest of the conversation.');
+});
+
+it('keeps the language block out of the cached static prefix', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())->not->toContain('## Language');
+});
+
+it('omits the language block when no user is bound', function (): void {
+    expect(resolve(CrmAssistant::class)->instructions())->not->toContain('## Language');
 });

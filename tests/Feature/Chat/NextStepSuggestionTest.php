@@ -22,7 +22,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 
-mutates(SuggestNextSteps::class, NextSteps::class);
+mutates(SuggestNextSteps::class, NextSteps::class, NextStepSuggester::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -102,6 +102,7 @@ it('persists the drafted steps on the assistant message and broadcasts them', fu
         message: 'What can you help me with?',
         reply: 'Your workspace is empty.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([
@@ -128,6 +129,7 @@ it('sends the reply, the message and the tools it used to the suggester', functi
         message: 'how is acme doing',
         reply: 'Acme Corp has two open deals.',
         provider: 'anthropic',
+        languageName: 'English',
         toolNames: ['GetCompanyTool', 'ListOpportunitiesTool', 'GetCompanyTool'],
     ))->handle();
 
@@ -149,6 +151,7 @@ it('omits the message block for a turn the user never typed', function (): void 
         message: '',
         reply: 'Done, I created the task.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     NextStepSuggester::assertPrompted(
@@ -175,6 +178,7 @@ it('caps the strip at three steps and drops blank or duplicate ones', function (
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(array_column(persistedNextSteps($messageId), 'label'))
@@ -195,6 +199,7 @@ it('truncates a label or prompt the model wrote too long for the strip', functio
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     $steps = persistedNextSteps($messageId);
@@ -215,6 +220,7 @@ it('writes nothing when the model offers no steps', function (): void {
         message: 'tell me about acme',
         reply: 'Which Acme did you mean?',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([]);
@@ -233,6 +239,7 @@ it('leaves the message untouched when the model call fails', function (): void {
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     expect(persistedNextSteps($messageId))->toBe([]);
@@ -250,6 +257,7 @@ it('keeps the other meta the turn already wrote', function (): void {
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     $meta = json_decode(
@@ -274,6 +282,7 @@ it('drops the steps when the message they belong to is gone', function (): void 
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     Event::assertNotDispatched(NextStepsSuggested::class);
@@ -292,6 +301,7 @@ it('never calls the model when suggestions are switched off', function (): void 
         message: 'anything',
         reply: 'Here you go.',
         provider: 'anthropic',
+        languageName: 'English',
     ))->handle();
 
     NextStepSuggester::assertNeverPrompted();
@@ -301,6 +311,7 @@ it('never calls the model when suggestions are switched off', function (): void 
 it('dispatches the suggester at the end of a turn with what the turn produced', function (): void {
     Queue::fake();
     CrmAssistant::fake(['Acme Corp has two open deals worth $30,000.']);
+    $this->user->forceFill(['locale' => 'da'])->save();
 
     (new ProcessChatMessage(
         user: $this->user,
@@ -314,7 +325,8 @@ it('dispatches the suggester at the end of a turn with what the turn produced', 
         SuggestNextSteps::class,
         fn (SuggestNextSteps $job): bool => $job->conversationId === $this->conversationId
             && $job->message === 'how is acme doing'
-            && $job->reply === 'Acme Corp has two open deals worth $30,000.',
+            && $job->reply === 'Acme Corp has two open deals worth $30,000.'
+            && $job->languageName === 'Danish',
     );
 });
 
@@ -378,4 +390,24 @@ it('reads no steps off a message that predates the feature', function (): void {
     $messageId = seedSuggestibleMessage('assistant', 'An older reply.');
 
     expect(persistedNextSteps($messageId))->toBe([]);
+});
+
+it('tells the suggester which language breaks a tie', function (): void {
+    NextStepSuggester::fake([['suggestions' => []]]);
+
+    $messageId = seedSuggestibleMessage('assistant', 'Din arbejdsplads er tom.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'Hvad kan du?',
+        reply: 'Din arbejdsplads er tom.',
+        provider: 'anthropic',
+        languageName: 'Danish',
+    ))->handle();
+
+    NextStepSuggester::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains(
+        (string) $prompt->agent->instructions(),
+        'if that is unclear too, write in Danish.',
+    ));
 });

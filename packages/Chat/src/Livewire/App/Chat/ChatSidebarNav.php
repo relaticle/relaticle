@@ -10,9 +10,12 @@ use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
+use Relaticle\Chat\Livewire\Concerns\RendersInChatLocale;
 
 final class ChatSidebarNav extends BaseLivewireComponent
 {
+    use RendersInChatLocale;
+
     /**
      * Deliberately listens to nothing.
      *

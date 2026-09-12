@@ -135,7 +135,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * Who is typing: without it "assign to me" and "my tasks" cost a
      * clarification round-trip (observed live).
      *
-     * @var array{name: string, id: string, role: string}|null
+     * @var array{name: string, id: string, role: string, language: string}|null
      */
     public ?array $currentUser = null;
 
@@ -174,7 +174,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     }
 
     /**
-     * @param  array{name: string, id: string, role: string}|null  $user
+     * @param  array{name: string, id: string, role: string, language: string}|null  $user
      */
     public function withCurrentUser(?array $user): self
     {
@@ -324,7 +324,7 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->currentUserBlock().$this->workspaceStateBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
+        return $this->dateBlock().$this->currentUserBlock().$this->languageBlock().$this->workspaceStateBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock();
     }
 
     /**
@@ -354,6 +354,23 @@ PROMPT;
         return "\n\n## Current user\n"
             ."{$name} (user id: {$this->currentUser['id']}, {$role}). "
             .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.';
+    }
+
+    /**
+     * Read off the user's locale, not the message, so a turn the system starts
+     * (the resume after a proposal decision) keeps the language the user typed in.
+     */
+    private function languageBlock(): string
+    {
+        if ($this->currentUser === null) {
+            return '';
+        }
+
+        $language = $this->currentUser['language'];
+
+        return "\n\n## Language\n"
+            .'Reply in the language the user writes in. When a message is too short to tell (a greeting, a name, a bare "yes"), or the turn was started by the system rather than a typed message, continue in the language of the user\'s last typed message. '
+            ."If there is no typed message yet, use {$language}. When the user asks for a specific language, that request wins for the rest of the conversation.";
     }
 
     /**

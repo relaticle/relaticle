@@ -17,6 +17,7 @@ use App\Listeners\Email\TeamCreatedTagListener;
 use App\Listeners\Email\TeamMemberAddedListener;
 use App\Listeners\Mcp\CopyTeamIdToAccessToken;
 use App\Listeners\SeedTeamCreditBalanceListener;
+use App\Listeners\SeedUserLocaleListener;
 use App\Livewire\FilamentNotifications;
 use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
@@ -190,6 +191,7 @@ final class AppServiceProvider extends ServiceProvider
         FilamentColor::register(['primary' => BrandColors::primary()]);
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
+        Event::listen(Login::class, SeedUserLocaleListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
         Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
         Event::listen(TeamCreated::class, TeamCreatedTagListener::class);

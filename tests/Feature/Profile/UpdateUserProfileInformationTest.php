@@ -11,6 +11,7 @@ use App\Models\UserSocialAccount;
 use App\Notifications\Auth\NoticeOfEmailChangeRequest;
 use App\Notifications\Auth\VerifyEmailChange;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\ChatLocales;
 use App\Support\SameOriginUrl;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
@@ -752,5 +753,148 @@ describe('the raw profile-information route', function () {
         expect($user->fresh())
             ->name->toBe('Renamed Over Http')
             ->email->toBe('owner@example.com');
+    });
+});
+
+describe('locale', function () {
+    test('form is prefilled with the stored locale', function () {
+        $user = User::factory()->withTeam()->create(['locale' => 'da']);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['locale' => 'da']);
+    });
+
+    test('a user with no stored locale is shown and saves English', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-default@example.com',
+            'locale' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['locale' => 'en'])
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'locale-default@example.com',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->locale)->toBe('en');
+    });
+
+    test('offers every supported locale named in its own language', function () {
+        $user = User::factory()->withTeam()->create();
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormFieldExists('locale', function ($field): bool {
+                $options = $field->getOptions();
+
+                return array_keys($options) === ChatLocales::CODES
+                    && $options['da'] === 'dansk'
+                    && $options['en'] === 'English';
+            });
+    });
+
+    test('can set a locale through the component', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale@example.com',
+            'locale' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'locale@example.com',
+                'locale' => 'da',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->locale)->toBe('da');
+    });
+
+    test('rejects a locale outside the supported list', function () {
+        $user = User::factory()->withTeam()->create(['email' => 'locale-bad@example.com']);
+        $this->actingAs($user);
+
+        expect(fn () => $this->action->update($user, [
+            'name' => $user->name,
+            'email' => 'locale-bad@example.com',
+            'locale' => 'xx',
+        ]))->toThrow(ValidationException::class);
+
+        expect($user->fresh()->locale)->toBeNull();
+    });
+
+    test('rejects an explicitly empty locale', function (?string $submitted) {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-empty@example.com',
+            'locale' => 'da',
+        ]);
+        $this->actingAs($user);
+
+        expect(fn () => $this->action->update($user, [
+            'name' => $user->name,
+            'email' => 'locale-empty@example.com',
+            'locale' => $submitted,
+        ]))->toThrow(ValidationException::class);
+
+        expect($user->fresh()->locale)->toBe('da');
+    })->with([null, '']);
+
+    test('an absent locale key leaves the stored value alone', function () {
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-keep@example.com',
+            'locale' => 'fr',
+        ]);
+
+        $this->action->update($user, [
+            'name' => 'Renamed',
+            'email' => 'locale-keep@example.com',
+        ]);
+
+        expect($user->fresh())
+            ->name->toBe('Renamed')
+            ->locale->toBe('fr');
+    });
+
+    test('locale survives a deferred email change', function () {
+        Notification::fake();
+
+        $user = User::factory()->withTeam()->create([
+            'email' => 'locale-email@example.com',
+            'email_verified_at' => now(),
+            'locale' => null,
+        ]);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => $user->name,
+                'email' => 'locale-email-changed@example.com',
+                'locale' => 'da',
+            ])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh())
+            ->locale->toBe('da')
+            ->email->toBe('locale-email@example.com');
+    });
+
+    test('chatLocale falls back to English for a language without translations', function () {
+        expect(User::factory()->make(['locale' => 'da'])->chatLocale())->toBe('da')
+            ->and(User::factory()->make(['locale' => 'ne'])->chatLocale())->toBe('en')
+            ->and(User::factory()->make(['locale' => null])->chatLocale())->toBe('en');
+    });
+
+    test('chatLanguageName names the stored language even without translations', function () {
+        expect(User::factory()->make(['locale' => 'da'])->chatLanguageName())->toBe('Danish')
+            ->and(User::factory()->make(['locale' => 'ne'])->chatLanguageName())->toBe('Nepali')
+            ->and(User::factory()->make(['locale' => null])->chatLanguageName())->toBe('English');
     });
 });

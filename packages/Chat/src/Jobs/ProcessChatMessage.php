@@ -44,6 +44,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
+use Relaticle\Chat\Support\ChatLocale;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
@@ -126,6 +127,11 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
+        ChatLocale::within($this->user->chatLocale(), fn () => $this->runTurn($creditService));
+    }
+
+    private function runTurn(CreditService $creditService): void
+    {
         $startedAt = microtime(true);
 
         $this->team->refresh();
@@ -207,6 +213,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
                 'role' => $this->user->ownsTeam($this->team) ? 'owner' : 'member',
+                'language' => $this->user->chatLanguageName(),
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
@@ -511,6 +518,16 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     public function failed(?Throwable $exception): void
+    {
+        ChatLocale::within($this->user->chatLocale(), fn () => $this->runFailed($exception));
+    }
+
+    /**
+     * The queue rebuilds this instance from the dispatch payload before calling
+     * failed(), after handle()'s ChatLocale scope already restored English, so
+     * failed() re-opens its own scope for every __() call this reaches.
+     */
+    private function runFailed(?Throwable $exception): void
     {
         // Unconditional, because this instance can never answer the question the
         // charge depends on: the queue rebuilds the command from the original
@@ -897,6 +914,7 @@ final class ProcessChatMessage implements ShouldQueue
             provisionalTitle: $attempt['provisional'],
             message: $attempt['latest'],
             provider: $this->resolved['provider'],
+            languageName: $this->user->chatLanguageName(),
             pageContext: $this->pageContext,
             reply: $reply,
         ));
@@ -939,6 +957,7 @@ final class ProcessChatMessage implements ShouldQueue
             message: $this->isContinuation ? '' : $this->message,
             reply: $reply,
             provider: $this->resolved['provider'],
+            languageName: $this->user->chatLanguageName(),
             toolNames: array_values(array_unique(
                 $streamedResponse->toolCalls
                     ->map(static fn (ToolCallData $toolCall): string => $toolCall->name)

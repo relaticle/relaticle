@@ -13,6 +13,7 @@ use App\Models\Concerns\HasProfilePhoto;
 use App\Notifications\Auth\ResetPassword;
 use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
+use App\Support\ChatLocales;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Exception;
@@ -51,6 +52,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $name
  * @property string $email
  * @property string|null $timezone
+ * @property string|null $locale
  * @property string|null $password
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
@@ -75,6 +77,7 @@ use Laravel\Sanctum\HasApiTokens;
     'name',
     'email',
     'timezone',
+    'locale',
     'password',
     'ai_preferences',
     'notification_preferences',
@@ -157,6 +160,24 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function effectiveTimezone(): string
     {
         return $this->timezone ?? (string) config('app.timezone');
+    }
+
+    /**
+     * The locale the chat surface renders in. Only the languages that ship
+     * chat translations qualify; anything else renders English chrome.
+     */
+    public function chatLocale(): string
+    {
+        return ChatLocales::isSupported($this->locale) ? (string) $this->locale : ChatLocales::DEFAULT;
+    }
+
+    /**
+     * The English name of the stored language, translations or not, because
+     * the prompt can name any language the model speaks.
+     */
+    public function chatLanguageName(): string
+    {
+        return ChatLocales::languageName($this->locale);
     }
 
     /**

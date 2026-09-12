@@ -6,6 +6,7 @@ use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
@@ -201,6 +202,42 @@ it('shows timeout-specific copy when the turn times out', function (): void {
         ->value('content');
 
     expect($note)->toContain('respond within the time limit');
+});
+
+it('persists the failure note in the user\'s locale and restores the worker locale after', function (): void {
+    $directory = sys_get_temp_dir().'/chat-locale-test-'.Str::random(8);
+    mkdir($directory);
+    file_put_contents($directory.'/da.json', json_encode([
+        'The assistant encountered an error. Please try again.' => 'Assistenten stoedte paa en fejl. Proev igen.',
+    ], JSON_THROW_ON_ERROR));
+    resolve(Translator::class)->addJsonPath($directory);
+
+    $user = User::factory()->withPersonalTeam()->create(['locale' => 'da']);
+    $team = $user->currentTeam;
+
+    AiCreditBalance::query()->where('team_id', $team->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'team_id' => $team->getKey(),
+        'title' => 'BR locale failure',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    makeFailedTurnJob($user, $conversationId)->failed(new RuntimeException('boom'));
+
+    $note = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->value('content');
+
+    expect($note)->toBe('Assistenten stoedte paa en fejl. Proev igen.')
+        ->and(app()->getLocale())->toBe('en');
 });
 
 it('orders the backfilled failed turn before a later retried turn when sorted by id', function (): void {
