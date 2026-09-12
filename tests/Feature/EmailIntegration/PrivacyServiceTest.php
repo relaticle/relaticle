@@ -204,6 +204,22 @@ it('effectiveTier uses per-email share tier when a share exists for the viewer',
     expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
+it('effectiveTier returns null when a per-viewer share tier is private', function (): void {
+    $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
+
+    $email = makePrivacyEmail(['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::PRIVATE)->create([
+        'email_id' => $email->getKey(),
+        'shared_by' => $this->owner->id,
+        'shared_with' => $viewer->id,
+    ]);
+
+    $tier = $this->service->effectiveTier($email, $viewer);
+
+    expect($tier)->toBeNull();
+});
+
 it('effectiveTier falls back to the email privacy_tier when no share exists', function (): void {
     $viewer = User::factory()->create(['current_team_id' => $this->team->id]);
 
