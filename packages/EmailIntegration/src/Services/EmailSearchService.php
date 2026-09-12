@@ -51,6 +51,15 @@ final readonly class EmailSearchService
      * @param  Builder<Email>  $query
      * @return Builder<Email>
      */
+    public function whereSubjectVisibleTo(Builder $query, User $viewer): Builder
+    {
+        return $this->whereViewerCanSeeSubject($query, $viewer->getKey());
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
     private function whereViewerCanSeeSubject(Builder $query, string $viewerId): Builder
     {
         return $this->whereViewerHasAccessAtTiers($query, $viewerId, [

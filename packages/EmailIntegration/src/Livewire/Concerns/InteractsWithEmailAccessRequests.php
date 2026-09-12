@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Livewire\Concerns;
 
 use App\Models\User;
+use App\Support\LikePattern;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -19,7 +20,9 @@ use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 
 trait InteractsWithEmailAccessRequests
 {
@@ -49,7 +52,8 @@ trait InteractsWithEmailAccessRequests
                 TextColumn::make('email.subject')
                     ->label(__('filament/pages/email-access-requests.columns.email'))
                     ->placeholder(__('filament/pages/email-access-requests.request.no_subject'))
-                    ->searchable()
+                    ->searchable(query: $this->searchVisibleEmailSubject(...))
+                    ->getStateUsing($this->visibleEmailSubject(...))
                     ->limit(60),
                 TextColumn::make('tier_requested')
                     ->label(__('filament/pages/email-access-requests.columns.access'))
@@ -90,13 +94,43 @@ trait InteractsWithEmailAccessRequests
         $user = $this->authUser();
 
         return EmailAccessRequest::query()
-            ->with(['email', 'requester', 'owner'])
+            ->with(['email.shares', 'requester', 'owner'])
             ->whereHas('email', fn (Builder $query): Builder => $query->where('team_id', $user->current_team_id))
             ->when(
                 $this->tab === 'incoming',
                 fn (Builder $query): Builder => $query->where('owner_id', $user->getKey()),
                 fn (Builder $query): Builder => $query->where('requester_id', $user->getKey()),
             );
+    }
+
+    private function visibleEmailSubject(EmailAccessRequest $request): ?string
+    {
+        $email = $request->email;
+
+        if (! $email instanceof Email) {
+            return null;
+        }
+
+        if (! $this->authUser()->can('viewSubject', $email)) {
+            return __('filament/pages/email-access-requests.request.subject_hidden');
+        }
+
+        return $email->subject;
+    }
+
+    /**
+     * @param  Builder<EmailAccessRequest>  $query
+     * @return Builder<EmailAccessRequest>
+     */
+    private function searchVisibleEmailSubject(Builder $query, string $search): Builder
+    {
+        $viewer = $this->authUser();
+        $term = '%'.LikePattern::escape($search).'%';
+
+        return $query->whereHas('email', function (Builder $emailQuery) use ($term, $viewer): void {
+            $emailQuery->where('subject', 'ilike', $term);
+            resolve(EmailSearchService::class)->whereSubjectVisibleTo($emailQuery, $viewer);
+        });
     }
 
     private function openEmailAction(): Action

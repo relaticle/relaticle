@@ -5,14 +5,18 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
+use Relaticle\EmailIntegration\Livewire\Concerns\InteractsWithEmailAccessRequests;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 
-mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class);
+mutates(AccessRequestsTable::class, EmailAccessRequestsPage::class, InteractsWithEmailAccessRequests::class, EmailSearchService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -342,5 +346,199 @@ describe('getNavigationBadge', function (): void {
         ]);
 
         expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();
+    });
+});
+
+describe('subject privacy', function (): void {
+    it('hides the email subject on outgoing requests when the viewer cannot see it', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Confidential Thread XYZ',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertCanSeeTableRecords([$request])
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-access-requests.request.subject_hidden'), $request)
+            ->assertDontSee('Confidential Thread XYZ');
+    });
+
+    it('hides the email subject on outgoing requests after access is denied', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Denied Thread Secret',
+        ]);
+
+        $request = EmailAccessRequest::factory()->denied()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertCanSeeTableRecords([$request])
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-access-requests.request.subject_hidden'), $request)
+            ->assertDontSee('Denied Thread Secret');
+    });
+
+    it('shows the email subject on outgoing requests after access is approved', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Approved Thread Subject',
+        ]);
+
+        $request = EmailAccessRequest::factory()->approved()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+            'email_id' => $email->getKey(),
+            'team_id' => $this->team->id,
+            'shared_by' => $owner->id,
+            'shared_with' => $this->user->id,
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertTableColumnStateSet('email.subject', 'Approved Thread Subject', $request);
+    });
+
+    it('shows the email subject on outgoing requests when the viewer already has subject access', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+            'subject' => 'Visible Subject Line',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->assertTableColumnStateSet('email.subject', 'Visible Subject Line', $request);
+    });
+
+    it('shows the email subject on incoming requests for the owner', function (): void {
+        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Owner Visible Subject',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->assertTableColumnStateSet('email.subject', 'Owner Visible Subject', $request);
+    });
+
+    it('does not match a hidden subject when searching outgoing requests', function (): void {
+        $owner = User::factory()->create(['current_team_id' => $this->team->id, 'name' => 'Pat Owner']);
+
+        $ownerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+        ]));
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $owner->id,
+            'connected_account_id' => $ownerAccount->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Quarterly forecast secret',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $owner->id,
+            'requester_id' => $this->user->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->call('setTab', 'outgoing')
+            ->searchTable('Quarterly forecast secret')
+            ->assertCanNotSeeTableRecords([$request])
+            ->searchTable('Pat Owner')
+            ->assertCanSeeTableRecords([$request]);
+    });
+
+    it('matches the subject when searching incoming requests as the owner', function (): void {
+        $requester = User::factory()->create(['current_team_id' => $this->team->id]);
+
+        $email = Email::factory()->create([
+            'team_id' => $this->team->id,
+            'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            'subject' => 'Owner search subject',
+        ]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->searchTable('Owner search subject')
+            ->assertCanSeeTableRecords([$request]);
     });
 });
