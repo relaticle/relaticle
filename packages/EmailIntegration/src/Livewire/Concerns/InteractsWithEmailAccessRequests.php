@@ -128,6 +128,7 @@ trait InteractsWithEmailAccessRequests
         $term = '%'.LikePattern::escape($search).'%';
 
         return $query->whereHas('email', function (Builder $emailQuery) use ($term, $viewer): void {
+            /** @var Builder<Email> $emailQuery */
             $emailQuery->where('subject', 'ilike', $term);
             resolve(EmailSearchService::class)->whereSubjectVisibleTo($emailQuery, $viewer);
         });
