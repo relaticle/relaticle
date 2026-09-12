@@ -143,6 +143,8 @@ arch('avoid mutation')
         // extension point; PHP forbids a readonly class extending a
         // non-readonly one.
         'App\Support\Media\UploadPathGenerator',
+        // Same for DefaultUrlGenerator.
+        'App\Support\Media\MediaUrlGenerator',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -189,6 +191,8 @@ arch('avoid inheritance')
         // Overrides medialibrary's DefaultPathGenerator, the package's
         // documented extension point.
         'App\Support\Media\UploadPathGenerator',
+        // Same for DefaultUrlGenerator.
+        'App\Support\Media\MediaUrlGenerator',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

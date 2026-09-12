@@ -13,6 +13,7 @@ use App\Services\Favicon\SsrfGuard;
 use App\Support\Media\TemporaryUploads;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class StoreAgentUpload
@@ -28,7 +29,7 @@ final readonly class StoreAgentUpload
     {
         abort_unless($user->belongsToTeam($team), 403);
 
-        $temp = (string) tempnam(sys_get_temp_dir(), 'agent-upload');
+        $temp = sys_get_temp_dir().'/agent-upload-'.Str::ulid();
 
         try {
             [$name, $source] = $this->materialise($input, $temp);
