@@ -38,7 +38,9 @@ final readonly class CreateWorkspace implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', new ValidWorkspaceSlug, 'unique:workspaces,slug'],
+            // Null hands the handle to Workspace's HasSlug pass, which settles it inside
+            // the insert instead of between a check and a write.
+            'slug' => ['nullable', 'string', 'max:255', new ValidWorkspaceSlug, 'unique:workspaces,slug'],
             'onboarding_use_case' => ['required', 'string', Rule::enum(OnboardingUseCase::class)],
             'onboarding_context' => ['nullable', 'array'],
             'onboarding_context.*' => ['string'],
@@ -88,7 +90,7 @@ final readonly class CreateWorkspace implements CreatesTeams
 
         $workspace = new Workspace([
             'name' => $input['name'],
-            'slug' => $input['slug'],
+            'slug' => $input['slug'] ?? null,
             'personal_workspace' => $isFirstWorkspace,
             'onboarding_use_case' => $useCase,
             'onboarding_context' => $useCase->getSubOptions() === []

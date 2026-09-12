@@ -31,7 +31,8 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Override;
 
 final class CreateWorkspace extends RegisterTenant
@@ -253,38 +254,6 @@ final class CreateWorkspace extends RegisterTenant
             ]);
     }
 
-    /**
-     * Mirrors the fallback in Workspace::getSlugOptions(). Names that transliterate to
-     * nothing (CJK, Hebrew, Thai, emoji) otherwise leave the handle blank, and the
-     * user is blocked by a bare "required" error on a field they never touched.
-     */
-    private function generateHandleFrom(?string $name): string
-    {
-        if (blank($name)) {
-            return '';
-        }
-
-        $slug = Str::slug($name);
-
-        return $slug === '' ? Str::lower(Str::random(8)) : $slug;
-    }
-
-    // The default handle is the same for everyone; without a suffix the unique
-    // rule rejects a field the user never touched.
-    private function uniqueHandleFor(string $handle): string
-    {
-        if (! Workspace::query()->where('slug', $handle)->exists()) {
-            return $handle;
-        }
-
-        $highest = (int) Workspace::query()
-            ->where('slug', 'like', "{$handle}-%")
-            ->selectRaw('max(substring(slug from ?)::int) as highest', ['^'.$handle.'-(\d{1,9})$'])
-            ->value('highest');
-
-        return "{$handle}-".max($highest + 1, 2);
-    }
-
     private function stepHeading(string $title, string ...$paragraphs): HtmlString
     {
         $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
@@ -303,7 +272,7 @@ final class CreateWorkspace extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
-        return ! Filament::getUserDefaultTenant($user) instanceof Team;
+        return ! Filament::getUserDefaultTenant($user) instanceof Workspace;
     }
 
     /**
@@ -338,7 +307,7 @@ final class CreateWorkspace extends RegisterTenant
                         return;
                     }
 
-                    $set('slug', $this->uniqueHandleFor($this->generateHandleFrom($state)));
+                    $set('slug', Workspace::availableSlugFor($state));
                     $set('slug_auto_generated', true);
                 }),
 
@@ -347,13 +316,12 @@ final class CreateWorkspace extends RegisterTenant
                 ->required()
                 ->maxLength(255)
                 ->rules([new ValidWorkspaceSlug])
-                ->unique(
-                    table: Workspace::class,
-                    column: 'slug',
-                    ignorable: fn (): ?Workspace => $this->tenant instanceof Workspace ? $this->tenant : null,
+                ->rules(
+                    [fn (): Unique => Rule::unique(Workspace::class, 'slug')],
+                    condition: fn (Get $get): bool => $get('slug_auto_generated') !== true,
                 )
-                ->default(fn (): string => $this->uniqueHandleFor(
-                    $this->generateHandleFrom(__('filament/pages/workspaces.create_workspace.form.workspace_name.default')),
+                ->default(fn (): string => Workspace::availableSlugFor(
+                    __('filament/pages/workspaces.create_workspace.form.workspace_name.default'),
                 ))
                 ->prefix(WorkspaceUrlPrefix::get())
                 ->helperText(__('filament/pages/workspaces.create_workspace.form.workspace_handle.helper_text'))
@@ -409,6 +377,10 @@ final class CreateWorkspace extends RegisterTenant
         $user = auth('web')->user();
 
         $this->updateUserNameIfChanged($user, $data);
+
+        if (($this->data['slug_auto_generated'] ?? null) === true && Workspace::query()->where('slug', $data['slug'])->exists()) {
+            $data['slug'] = null;
+        }
 
         return resolve(CreateWorkspaceAction::class)->create($user, $data);
     }
