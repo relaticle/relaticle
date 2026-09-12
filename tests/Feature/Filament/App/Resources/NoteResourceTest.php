@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\RichEditor\SlashMenuPlugin;
 use App\Models\Note;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
+use Filament\Schemas\Components\Component;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Model;
 
 mutates(NoteResource::class);
@@ -199,3 +204,84 @@ it('accepts deeply nested rich-editor JSON in custom field action data', functio
     livewire(ManageNotes::class)
         ->set($deepPath, [['type' => 'text', 'text' => 'hello']]);
 })->throwsNoExceptions();
+
+it('drives note body formatting from the slash menu rather than a toolbar', function (): void {
+    $page = livewire(ManageNotes::class)
+        ->mountAction('create')
+        ->instance();
+
+    $schema = $page->getSchema($page->getMountedActionSchemaName());
+
+    $editor = collect($schema->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    $paragraphToolbar = $editor->getFloatingToolbars()['paragraph'];
+    $headingToolbar = $editor->getFloatingToolbars()['heading'];
+
+    expect($editor)->not->toBeNull()
+        ->and($editor->getToolbarButtons())->toBe([])
+        ->and(array_keys($editor->getFloatingToolbars()))->toBe(['paragraph', 'heading', 'table'])
+        ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
+
+    foreach ([$paragraphToolbar, $headingToolbar] as $toolbar) {
+        expect($toolbar[0])->toBeInstanceOf(ToolbarButtonGroup::class)
+            ->and($toolbar[0]->getName())->toBe('Text style')
+            ->and($toolbar[0]->getButtons())->toBe(['paragraph', 'h1', 'h2', 'h3'])
+            ->and($toolbar[0]->hasTextualButtons())->toBeTrue()
+            ->and(collect($toolbar[0]->getResolvedButtons())->map->getLabel()->all())
+            ->toBe(['Body', 'Heading 1', 'Heading 2', 'Heading 3'])
+            ->and(array_slice($toolbar, 1))
+            ->toBe(['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link']);
+    }
+
+    expect($paragraphToolbar[0])->not->toBe($headingToolbar[0]);
+
+    foreach (['attachFiles', 'link'] as $name) {
+        expect($editor->getActions()[$name]->shouldOverlayParentActions())->toBeTrue();
+    }
+
+    $menu = json_decode(
+        base64_decode(SlashMenuPlugin::attributes($editor)['data-slash-menu']),
+        associative: true,
+    );
+
+    $items = $menu['items'];
+
+    expect($menu['noResults'])->toContain('"')
+        ->and($menu['placeholder'])->toContain(':key')
+        ->and(collect($items)->pluck('label')->all())
+        ->toBe(['Heading 1', 'Heading 2', 'Heading 3', 'Body', 'Quote', 'Bulleted list', 'Numbered list', 'Code', 'Table', 'Toggle', 'Divider', 'Image'])
+        ->and(collect($items)->pluck('group')->unique()->values()->all())
+        ->toBe(['Text', 'Lists', 'Insert']);
+
+    expect(collect($items)->pluck('shortcut', 'id')->filter()->all())
+        ->toBe([
+            'h1' => '#',
+            'h2' => '##',
+            'h3' => '###',
+            'blockquote' => '>',
+            'bulletList' => '-',
+            'orderedList' => '1.',
+            'horizontalRule' => '---',
+        ]);
+
+    expect(collect($items)->pluck('action')->filter()->all())->toHaveSameSize($items)
+        ->and(collect($items)->pluck('icon')->filter()->all())->toHaveSameSize($items);
+});
+
+it('versions the slash menu script by its published file so an edit changes the url', function (): void {
+    $published = filemtime(public_path('js/app/rich-editor-slash-menu.js'));
+
+    expect(FilamentAsset::getScriptSrc('rich-editor-slash-menu'))->toEndWith("?v={$published}");
+});
+
+it('keeps file attachments enabled on a toolbarless note body', function (): void {
+    $page = livewire(ManageNotes::class)
+        ->mountAction('create')
+        ->instance();
+
+    $editor = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof RichEditor);
+
+    expect($editor->hasFileAttachments())->toBeTrue();
+});

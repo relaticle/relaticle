@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Enums\Plan;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
+use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -49,6 +50,8 @@ use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
+use Filament\Support\Assets\Js;
+use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Auth\Events\Login;
@@ -515,6 +518,7 @@ final class AppServiceProvider extends ServiceProvider
         CustomFieldsType::register([
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
+            'rich-editor' => RichEditorFieldType::class,
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
@@ -601,6 +605,18 @@ final class AppServiceProvider extends ServiceProvider
 
             return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
+
+        // The browser loads the published copy: run `php artisan filament:assets` after editing it.
+        FilamentAsset::register([
+            Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
+                ->loadedOnRequest(),
+            Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
+        ]);
+
+        FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
+
+        // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
+        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
     }
 
     /**

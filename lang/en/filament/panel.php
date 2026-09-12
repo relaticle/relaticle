@@ -20,6 +20,8 @@ return [
         'tasks' => 'Tasks',
     ],
 
+    'payload_too_large' => 'That change is too large to save. Shorten the content and try again.',
+
     'selects' => [
         'member_self' => ':name (You)',
     ],

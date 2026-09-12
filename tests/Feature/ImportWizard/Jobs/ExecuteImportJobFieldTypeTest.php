@@ -148,24 +148,6 @@ it('imports rich-editor custom field value as text', function (): void {
         ->and($cfv->text_value)->toBe('<p>Bold statement</p>');
 });
 
-it('imports markdown-editor custom field value as text', function (): void {
-    $cf = ImportExecutionFixture::customField($this, 'readme', 'markdown-editor');
-
-    ImportExecutionFixture::readyStore($this, ['Name', 'Readme'], [
-        ImportExecutionFixture::row(2, ['Name' => 'John', 'Readme' => '# Heading\n\nSome **bold** text'], ['match_action' => RowMatchAction::Create->value]),
-    ], [
-        ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'Readme', target: "custom_fields_{$cf->code}"),
-    ]);
-
-    ImportExecutionFixture::run($this);
-
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
-    $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
-    expect($cfv)->not->toBeNull()
-        ->and($cfv->text_value)->toBe('# Heading\n\nSome **bold** text');
-});
-
 it('imports checkbox-list custom field with option names resolved to IDs', function (): void {
     $cf = ImportExecutionFixture::customField($this, 'interests', 'checkbox-list', 'people', ['Sports', 'Music', 'Tech']);
     $sportsOption = $cf->options->firstWhere('name', 'Sports');

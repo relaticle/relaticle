@@ -102,7 +102,6 @@ trait ResolvesEntitySchema
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST => ['format' => 'array of option labels or IDs (see options)', 'example' => ['Enterprise', 'EU']],
             CustomFieldType::TAGS_INPUT => ['format' => 'array of arbitrary string values', 'example' => ['priority', 'customer']],
             CustomFieldType::RICH_EDITOR => ['format' => 'markdown, or HTML when the value starts with <; stored and returned as HTML', 'example' => "## Notes\n- first call done"],
-            CustomFieldType::MARKDOWN_EDITOR => ['format' => 'markdown', 'example' => '**Follow up** Friday'],
             CustomFieldType::COLOR_PICKER => ['format' => 'hex color string', 'example' => '#0A80EA'],
             CustomFieldType::DATE => ['format' => 'ISO 8601 date', 'example' => '2026-09-10'],
             CustomFieldType::DATE_TIME => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],

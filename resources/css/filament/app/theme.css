@@ -959,3 +959,97 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
         @apply md:sticky md:top-8 md:self-start;
     }
 }
+
+[data-slash-menu] {
+    .fi-fo-rich-editor-floating-toolbar {
+        @apply gap-x-1;
+    }
+
+    @media (width < 40rem) {
+        .fi-fo-rich-editor-floating-toolbar {
+            inset-inline: 0 !important;
+            width: auto !important;
+        }
+    }
+
+    .fi-fo-rich-editor-content:has(.ProseMirror[data-selection-empty='true'])
+        > [x-ref='floatingToolbar::heading'] {
+        pointer-events: none;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+
+/* The slash menu is appended to <body> to escape the modal's overflow clipping,
+   so z-40 has to clear the modal window at 30. */
+.fi-slash-menu {
+    @apply absolute z-40 max-h-[28rem] w-screen overflow-y-auto p-1;
+}
+
+.fi-slash-menu-empty {
+    @apply px-2.5 py-3 text-center text-xs text-gray-500 dark:text-gray-400;
+}
+
+.fi-slash-menu-group {
+    @apply px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500;
+
+    &:first-child {
+        @apply pt-1;
+    }
+}
+
+.fi-slash-menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-start;
+
+    &[aria-selected='true'] {
+        @apply bg-gray-100 dark:bg-white/10;
+    }
+}
+
+.fi-slash-menu-item-icon {
+    @apply flex size-6 shrink-0 items-center justify-center rounded bg-gray-50 text-gray-500 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10;
+
+    svg {
+        @apply size-3.5;
+    }
+}
+
+.fi-slash-menu-item-label {
+    @apply flex-1 truncate text-[0.8125rem] text-gray-950 dark:text-white;
+}
+
+.fi-slash-menu-item-shortcut {
+    @apply shrink-0 rounded border border-gray-200 bg-gray-50 px-1 font-sans text-[0.6875rem] text-gray-400 dark:border-white/10 dark:bg-white/5 dark:text-gray-500;
+}
+
+/* A page rather than an input: the fill marks the writing area without a border or
+   ring, which a form of bordered fields would otherwise swallow. */
+.fi-fo-rich-editor-seamless {
+    @apply rounded-xl bg-[var(--surface-input-bg)] shadow-none ring-0;
+
+    &:not(.fi-disabled):not(:has(.fi-ac-action:focus)) {
+        @apply focus-within:ring-0;
+    }
+
+    /* A floor only: slash-menu.js measures the real height. No max-height, which
+       would nest a second scrollbar inside the modal's. */
+    .fi-fo-rich-editor-content {
+        @apply flex min-h-40 flex-col px-4 py-3.5 text-[0.9375rem]/[1.65];
+
+        /* The editable element fills the fill, so a click anywhere in the page,
+           including the empty space under the last block, lands in the document. */
+        .ProseMirror {
+            @apply flex-1;
+        }
+    }
+}
+
+/* The editor draws its own placeholder so the trigger can be a key cap, which
+   Filament's `content: attr(data-placeholder)` cannot style. */
+.fi-slash-placeholder {
+    @apply pointer-events-none absolute inline-flex select-none items-center gap-1 text-gray-400 dark:text-gray-500;
+
+    kbd {
+        @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 px-1 font-sans text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
+    }
+}

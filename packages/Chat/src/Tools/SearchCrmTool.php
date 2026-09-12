@@ -32,7 +32,6 @@ final class SearchCrmTool implements Tool
         'checkbox-list',
         'tags-input',
         'rich-editor',
-        'markdown-editor',
     ];
 
     public function description(): string
