@@ -31,6 +31,8 @@ it('redirects to Google using the Gmail OAuth client and the email-account callb
         ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.readonly')
         ->and($query['access_type'] ?? null)->toBe('offline')
         ->and($query['prompt'] ?? null)->toBe('consent');
+
+    expect(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($user->currentTeam->getKey());
 });
 
 it('includes calendar.readonly even when the leftover capability query is sent', function (): void {
@@ -44,4 +46,15 @@ it('includes calendar.readonly even when the leftover capability query is sent',
     expect(urldecode((string) ($query['scope'] ?? '')))
         ->toContain('https://www.googleapis.com/auth/calendar.events')
         ->toContain('https://www.googleapis.com/auth/calendar.readonly');
+});
+
+it('does not start Google consent when the user has no workspace', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $this->get(route('email-accounts.redirect', ['provider' => 'gmail']))
+        ->assertRedirect('/')
+        ->assertSessionHas('error', 'Select a team before connecting an account.');
+
+    expect(session()->has(RedirectController::WORKSPACE_SESSION_KEY))->toBeFalse();
 });

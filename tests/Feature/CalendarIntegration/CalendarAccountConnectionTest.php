@@ -34,6 +34,7 @@ it('flips calendar capability and dispatches InitialCalendarSyncJob on calendar 
     ];
 
     Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect();
@@ -63,6 +64,7 @@ it('enables calendar when Google grants calendar.events without calendar.readonl
     ];
 
     Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect();
@@ -92,6 +94,7 @@ it('connects mail without calendar when the user leaves both calendar scopes unc
     ];
 
     Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect();
@@ -121,6 +124,7 @@ it('records send as missing when Google does not grant gmail.send', function ():
     ];
 
     Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect();
@@ -150,6 +154,7 @@ it('turns send back on after reconnecting with gmail.send', function (): void {
         $social->approvedScopes = $scopes;
 
         Socialite::fake('gmail', $social);
+        bindMailboxOAuthWorkspace($user);
 
         $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
 

@@ -21,6 +21,7 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -94,6 +95,15 @@ function userChannelAuth(User $user, string $id): bool
     }
 
     return (bool) $callback($user, $id);
+}
+
+function bindMailboxOAuthWorkspace(User $user): void
+{
+    $teamId = $user->current_team_id;
+
+    throw_unless(is_string($teamId) && $teamId !== '', RuntimeException::class, 'bindMailboxOAuthWorkspace requires a current workspace.');
+
+    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $teamId);
 }
 
 /**
