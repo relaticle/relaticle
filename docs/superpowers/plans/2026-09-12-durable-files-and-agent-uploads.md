@@ -1220,13 +1220,13 @@ git commit -m "feat(custom-fields): back the file-upload type with media rows"
 
 ### Task 4: Rich editor attachments through the provider
 
-Prerequisite: #695 merged and `origin/main` merged into this branch. `app/Filament/CustomFields/RichEditorFieldType.php` must exist.
+Prerequisite: #695 merged and `origin/main` merged into this branch. `app/Filament/CustomFields/RichEditorFieldType.php` must exist. Runs after Task 7, whose `FormatsCustomFields` file-read branch and `StoredUploadPath` rule it extends.
 
 **Files:**
 - Create: `app/Support/Media/RichContentAttachments.php`, `app/Filament/CustomFields/RichContentEntry.php`
 - Create: `app/Console/Commands/BackfillRichEditorAttachmentsCommand.php`
-- Modify: `app/Filament/CustomFields/RichEditorFieldType.php` (the `formComponent` closure and the infolist entry)
-- Test: `tests/Feature/Filament/App/Resources/RichEditorAttachmentTest.php`, `tests/Feature/Media/BackfillRichEditorAttachmentsCommandTest.php`
+- Modify: `app/Filament/CustomFields/RichEditorFieldType.php` (the `formComponent` closure and the infolist entry), `app/Support/CustomFields/CustomFieldInput.php` (`richText()`), `app/Http/Resources/V1/Concerns/FormatsCustomFields.php` (rich-editor read)
+- Test: `tests/Feature/Filament/App/Resources/RichEditorAttachmentTest.php`, `tests/Feature/Media/BackfillRichEditorAttachmentsCommandTest.php`, `tests/Feature/Mcp/CustomFieldWritesTest.php` (two rich-editor cases)
 
 **Interfaces:**
 - Consumes: `StorePendingUpload::execute()`, `MediaPaths::findByUuid()`, `UploadClaims` (via the observer)
@@ -1742,6 +1742,54 @@ final class BackfillRichEditorAttachmentsCommand extends Command
     }
 }
 ```
+
+- [ ] **Step 5a: Tag agent-written images on the way in and rewrite `src` on the way out**
+
+An agent that embeds an `upload-file` result writes markdown, which becomes `<img src="...">` with no `data-id`, and `UploadClaims` only reads `data-id`. Tag it at the one normalizer REST and MCP share. In `app/Support/CustomFields/CustomFieldInput.php`, change the `RICH_EDITOR` match arm to `CustomFieldType::RICH_EDITOR => $this->richText($field, $value),` and make `richText()` take the field, produce the HTML as it does today (markdown through the renderer unless the value already starts with `<`), and return `RichContentAttachments::forTeam((string) $field->tenant_id)->tagOwnedImages($html)`. Add `use App\Support\Media\RichContentAttachments;`.
+
+In `app/Http/Resources/V1/Concerns/FormatsCustomFields.php::resolveFieldValue()`, after the `FILE_UPLOAD` branch Task 7 added:
+
+```php
+        if ($customField->type === CustomFieldType::RICH_EDITOR->value && is_string($rawValue)) {
+            return RichContentAttachments::forTeam((string) $fieldValue->tenant_id)->rewriteImageSources($rawValue);
+        }
+```
+
+Append to the `describe('file-upload values', ...)` block in `tests/Feature/Mcp/CustomFieldWritesTest.php` (its `beforeEach` needs `$this->body` resolved the same way the file's top-level `beforeEach` resolves `$this->status`, with `entity_type` `note` and `code` `body`):
+
+```php
+    it('claims an image an agent embedded by markdown from an upload-file url', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(onePixelPng()), 'filename' => 'shot.png'])
+            ->assertOk();
+        $media = Media::query()->latest('id')->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Md image', 'custom_fields' => ['body' => "Look:\n\n![shot]({$media->getUrl()})"]])
+            ->assertOk();
+
+        $note = Note::query()->where('title', 'Md image')->firstOrFail();
+
+        expect($media->refresh()->model_id)->toBe($note->getKey())
+            ->and($media->collection_name)->toBe(MediaCollection::forCustomField('body'))
+            ->and((string) $note->getCustomFieldValue($this->body))->toContain("data-id=\"{$media->uuid}\"");
+    });
+
+    it('rewrites rich editor image sources on read', function (): void {
+        $media = $this->team->addMediaFromString(onePixelPng())->usingFileName('a.png')
+            ->withCustomProperties(['team_id' => $this->team->getKey()])
+            ->toMediaCollection(MediaCollection::PendingUploads->value);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Img', 'custom_fields' => ['body' => "<p><img src=\"stale\" data-id=\"{$media->uuid}\"></p>"]])
+            ->assertOk()
+            ->assertSee($media->uuid)
+            ->assertDontSee('stale');
+    });
+```
+
+Run: `php artisan test --compact --filter='CustomFieldWritesTest|CustomFieldWritesApiTest'`
+Expected: PASS.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
@@ -2725,11 +2773,11 @@ git commit -m "feat(mcp): add create-upload-url and upload-file tools"
 
 **Files:**
 - Create: `app/Rules/StoredUploadPath.php`
-- Modify: `app/Rules/ValidCustomFields.php:56-64`, `app/Http/Resources/V1/Concerns/FormatsCustomFields.php:32-50`, `app/Support/CustomFields/CustomFieldInput.php:62,151-162`, `app/Mcp/Resources/Concerns/ResolvesEntitySchema.php:109`, `lang/en/validation.php:30-38`
+- Modify: `app/Rules/ValidCustomFields.php`, `app/Http/Resources/V1/Concerns/FormatsCustomFields.php`, `app/Mcp/Resources/Concerns/ResolvesEntitySchema.php:109`, `lang/en/validation.php:30-38`
 - Test: `tests/Feature/Mcp/CustomFieldWritesTest.php` (extend), `tests/Feature/Api/V1/CustomFieldWritesApiTest.php` (extend)
 
 **Interfaces:**
-- Consumes: `MediaPaths::find()`, `MediaCollection::*`, `RichContentAttachments::rewriteImageSources()`, `RichContentAttachments::tagOwnedImages()`
+- Consumes: `MediaPaths::find()`, `MediaCollection::*`
 - Produces: `StoredUploadPath::__construct(string $teamId, CustomField $field, string|int|null $entityId = null)`
 
 - [ ] **Step 1: Extend the MCP write tests**
@@ -2749,11 +2797,6 @@ function uploadedPath(User $user, string $filename = 'brief.pdf'): string
 describe('file-upload values', function (): void {
     beforeEach(function (): void {
         Storage::fake('public');
-        $this->body = CustomField::query()
-            ->where('tenant_id', $this->team->getKey())
-            ->where('entity_type', 'note')
-            ->where('code', 'body')
-            ->firstOrFail();
         $this->contract = CustomField::factory()->create([
             'tenant_id' => $this->team->getKey(),
             'entity_type' => 'note',
@@ -2831,34 +2874,6 @@ describe('file-upload values', function (): void {
             ->assertSee('"url"');
     });
 
-    it('claims an image an agent embedded by markdown from an upload-file url', function (): void {
-        RelaticleServer::actingAs($this->user)
-            ->tool(UploadFileTool::class, ['base64' => base64_encode(onePixelPng()), 'filename' => 'shot.png'])
-            ->assertOk();
-        $media = Media::query()->latest('id')->firstOrFail();
-
-        RelaticleServer::actingAs($this->user)
-            ->tool(CreateNoteTool::class, ['title' => 'Md image', 'custom_fields' => ['body' => "Look:\n\n![shot]({$media->getUrl()})"]])
-            ->assertOk();
-
-        $note = Note::query()->where('title', 'Md image')->firstOrFail();
-
-        expect($media->refresh()->model_id)->toBe($note->getKey())
-            ->and($media->collection_name)->toBe(MediaCollection::forCustomField('body'))
-            ->and((string) $note->getCustomFieldValue($this->body))->toContain("data-id=\"{$media->uuid}\"");
-    });
-
-    it('rewrites rich editor image sources on read', function (): void {
-        $media = $this->team->addMediaFromString(onePixelPng())->usingFileName('a.png')
-            ->withCustomProperties(['team_id' => $this->team->getKey()])
-            ->toMediaCollection(MediaCollection::PendingUploads->value);
-
-        RelaticleServer::actingAs($this->user)
-            ->tool(CreateNoteTool::class, ['title' => 'Img', 'custom_fields' => ['body' => "<p><img src=\"stale\" data-id=\"{$media->uuid}\"></p>"]])
-            ->assertOk()
-            ->assertSee($media->uuid)
-            ->assertDontSee('stale');
-    });
 });
 ```
 
@@ -2991,34 +3006,15 @@ In `app/Rules/ValidCustomFields.php::toRules()`, after the `RECORD` block inside
                 }
 ```
 
-- [ ] **Step 5: Tag agent-written images on the way in and shape the reads**
+- [ ] **Step 5: Shape the file reads**
 
-An agent that embeds an `upload-file` result writes markdown, which becomes `<img src="...">` with no `data-id`, and `UploadClaims` only reads `data-id`. Tag it at the one normalizer REST and MCP share. In `app/Support/CustomFields/CustomFieldInput.php`, change line 62 to `CustomFieldType::RICH_EDITOR => $this->richText($field, $value),` and replace `richText()`:
-
-```php
-    private function richText(CustomField $field, mixed $value): mixed
-    {
-        if (! is_string($value)) {
-            return $value;
-        }
-
-        $html = str_starts_with(ltrim($value), '<') ? $value : $this->markdown->toHtml($value);
-
-        return RichContentAttachments::forTeam((string) $field->tenant_id)->tagOwnedImages($html);
-    }
-```
-
-with `use App\Support\Media\RichContentAttachments;`.
+The rich-editor half of the read path (tagging agent-written images on the way in, rewriting `src` on the way out) needs `RichContentAttachments` from Task 4 and lives there as Task 4 Step 5a.
 
 In `app/Http/Resources/V1/Concerns/FormatsCustomFields.php::resolveFieldValue()`, before the `RECORD` check:
 
 ```php
         if ($customField->type === CustomFieldType::FILE_UPLOAD->value) {
             return $this->resolveFileValue($fieldValue, $rawValue);
-        }
-
-        if ($customField->type === CustomFieldType::RICH_EDITOR->value && is_string($rawValue)) {
-            return RichContentAttachments::forTeam((string) $fieldValue->tenant_id)->rewriteImageSources($rawValue);
         }
 ```
 
@@ -3040,7 +3036,7 @@ and add:
     }
 ```
 
-with imports `App\Support\Media\MediaPaths` and `App\Support\Media\RichContentAttachments`.
+with the import `App\Support\Media\MediaPaths`.
 
 In `app/Mcp/Resources/Concerns/ResolvesEntitySchema.php:109`, change the `FILE_UPLOAD` example to `'uploads/8f2c1d4e-2b6a-4f0e-9d3c-1a2b3c4d5e6f/01ARZ3NDEKTSV4RRFFQ69G5FAV.pdf'` and the format to `'path returned by the upload-file tool; read back as {path, url}'`. Grep `app/Mcp/Resources` for a `usage` string that lists tools and add `upload-file` to it if one exists.
 
