@@ -60,7 +60,11 @@ final class EmailVisibilityService
     {
         $email->loadMissing('participants');
 
-        $addresses = $email->participants->pluck('email_address')->all();
+        $addresses = array_values($email->participants
+            ->pluck('email_address')
+            ->filter(fn (?string $address): bool => filled($address))
+            ->map(fn (string $address): string => $address)
+            ->all());
 
         if ($email->connected_account_id === null) {
             if (resolve(ForwardingBlocklistMatcher::class)->isBlocked(

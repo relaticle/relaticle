@@ -38,6 +38,7 @@ final readonly class PostmarkInboundParser
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return list<string>
      */
     public function recipientAddresses(array $payload): array
     {

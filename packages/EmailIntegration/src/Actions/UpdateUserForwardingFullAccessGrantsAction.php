@@ -15,7 +15,10 @@ final readonly class UpdateUserForwardingFullAccessGrantsAction
      */
     public function execute(User $user, Team $team, array $grantedUserIds): void
     {
-        $memberIds = $team->allUsers()->modelKeys();
+        $memberIds = $team->allUsers()
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all();
         $validIds = array_values(array_intersect($grantedUserIds, $memberIds));
         $validIds = array_values(array_filter(
             $validIds,
