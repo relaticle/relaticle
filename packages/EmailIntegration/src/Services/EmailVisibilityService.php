@@ -60,10 +60,22 @@ final class EmailVisibilityService
     {
         $email->loadMissing('participants');
 
+        $addresses = $email->participants->pluck('email_address')->all();
+
+        if ($email->connected_account_id === null) {
+            if (resolve(ForwardingBlocklistMatcher::class)->isBlocked(
+                (string) $email->user_id,
+                (string) $email->team_id,
+                $addresses,
+            )) {
+                return true;
+            }
+        }
+
         return $this->isHiddenFromOwnerFor(
             (string) $email->team_id,
             $email->connected_account_id,
-            $email->participants->pluck('email_address')->all(),
+            $addresses,
         );
     }
 

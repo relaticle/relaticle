@@ -41,7 +41,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property string $id
  * @property string $team_id
  * @property string $user_id
- * @property string $connected_account_id
+ * @property string|null $connected_account_id
  * @property string|null $rfc_message_id
  * @property string|null $provider_message_id
  * @property string|null $thread_id

@@ -74,5 +74,34 @@
         </div>
     </x-filament::section>
 
+    <x-filament::section
+        class="mt-8"
+        :heading="__('filament/pages/email-accounts.sections.forwarding.heading')"
+        :description="__('filament/pages/email-accounts.sections.forwarding.description')"
+    >
+        <div class="flex flex-col gap-3 rounded-lg border border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+                <x-brand.logomark size="sm" class="shrink-0 text-gray-950 dark:text-white" />
+
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-gray-950 dark:text-white">
+                        {{ $this->forwardingAddress->fullAddress() }}
+                    </p>
+                    <p class="truncate text-xs text-gray-500 dark:text-gray-400">
+                        {{ __('filament/pages/forwarding-address.sublabel') }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-3">
+                <x-filament::badge color="success" icon="heroicon-m-bolt">
+                    {{ __('filament/pages/email-accounts.in_sync') }}
+                </x-filament::badge>
+
+                {{ $this->forwardingActions() }}
+            </div>
+        </div>
+    </x-filament::section>
+
     <x-filament-actions::modals />
 </x-filament-panels::page>
