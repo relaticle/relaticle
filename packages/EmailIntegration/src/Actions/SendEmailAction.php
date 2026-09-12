@@ -77,6 +77,7 @@ final readonly class SendEmailAction
         $scheduledFor = $this->resolveScheduledFor($data, $priority);
 
         $embedded = $this->inlineImageEmbedder->embed(
+            $user,
             (string) $data['body_html'],
             array_values($data['attachments'] ?? []),
             $data['attachment_file_names'] ?? [],

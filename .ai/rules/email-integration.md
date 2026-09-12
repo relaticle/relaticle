@@ -71,3 +71,11 @@ that calendar date. Do not convert them through the viewer's timezone: a
 Los Angeles day window starts at 07:00 UTC, so a September 10 all-day event
 would otherwise appear on the 9th. Timed meetings still use local-day UTC
 bounds.
+
+## Authorize composer inline images
+
+`EmailInlineImageEmbedder` copies files named in composer HTML (`data-id` or
+`src`). Those attributes are client-controlled. Only embed files on
+`EmailAttachment::DISK` under `email-attachments/{current_team_id}/` with an
+`image/` MIME type, plus `data:image/` URIs. Do not treat `/storage/...` URLs
+as arbitrary disk paths.

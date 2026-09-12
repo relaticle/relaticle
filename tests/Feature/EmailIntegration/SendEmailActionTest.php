@@ -17,6 +17,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
@@ -25,7 +26,7 @@ use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class);
+mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class, EmailAttachment::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withTeam()->create();
@@ -534,7 +535,7 @@ it('embeds rich editor inline images from data-id paths when queuing send', func
     Storage::fake('local');
     Storage::fake('public');
 
-    $editorPath = 'email-attachments/editor-image.png';
+    $editorPath = EmailAttachment::composeImagesDirectory((string) $this->user->current_team_id).'/editor-image.png';
     Storage::disk('local')->put($editorPath, 'png-bytes');
 
     $email = app(SendEmailAction::class)->execute([
@@ -563,4 +564,99 @@ it('embeds rich editor inline images from data-id paths when queuing send', func
     expect($sanitized)
         ->toContain(route('email-attachments.inline', ['attachment' => $attachment->getKey()]))
         ->not->toContain('cid:'.$attachment->content_id);
+});
+
+it('does not attach a storage file referenced by a composer image url', function (): void {
+    Storage::fake('local');
+    Storage::fake('public');
+    Storage::disk('public')->put('private.csv', 'secret,tenant,data');
+    Storage::disk('local')->put('private.csv', 'secret,tenant,data');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Inline image',
+        'body_html' => '<p>See below</p><img src="/storage/private.csv">',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    expect($email->attachments)->toHaveCount(0)
+        ->and($email->body?->body_html)->toContain('/storage/private.csv')
+        ->and($email->body?->body_html)->not->toContain('cid:');
+});
+
+it('does not attach another tenant image named in composer html', function (): void {
+    Storage::fake('local');
+
+    $otherUser = User::factory()->withTeam()->create();
+    $foreignPath = EmailAttachment::composeImagesDirectory((string) $otherUser->current_team_id).'/secret.png';
+    Storage::disk('local')->put($foreignPath, 'png-bytes-from-other-tenant');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Inline image',
+        'body_html' => '<p>See below</p><img data-id="'.$foreignPath.'" src="">',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    expect($email->attachments)->toHaveCount(0)
+        ->and($email->body?->body_html)->toContain($foreignPath)
+        ->and(Storage::disk('local')->get($foreignPath))->toBe('png-bytes-from-other-tenant');
+});
+
+it('does not attach a non-image file from the tenant compose directory', function (): void {
+    Storage::fake('local');
+
+    $path = EmailAttachment::composeImagesDirectory((string) $this->user->current_team_id).'/notes.csv';
+    Storage::disk('local')->put($path, 'secret,csv,contents');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Inline image',
+        'body_html' => '<p>See below</p><img data-id="'.$path.'" src="">',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    expect($email->attachments)->toHaveCount(0)
+        ->and($email->body?->body_html)->toContain($path);
+});
+
+it('does not follow path traversal in composer image data-id', function (): void {
+    Storage::fake('local');
+    Storage::disk('local')->put('private.csv', 'secret,tenant,data');
+
+    $path = EmailAttachment::composeImagesDirectory((string) $this->user->current_team_id).'/../../private.csv';
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Inline image',
+        'body_html' => '<p>See below</p><img data-id="'.$path.'" src="">',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ]);
+
+    expect($email->attachments)->toHaveCount(0)
+        ->and(Storage::disk('local')->get('private.csv'))->toBe('secret,tenant,data');
 });

@@ -322,6 +322,28 @@ it('persists rich editor inline images when sending from the composer', function
         ->and($email->body?->body_html)->not->toContain($uploadId);
 });
 
+it('does not attach a storage file referenced by a composer image url', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::fake('public');
+    Storage::disk('public')->put('private.csv', 'secret,tenant,data');
+    Storage::disk(EmailAttachment::DISK)->put('private.csv', 'secret,tenant,data');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Composer image leak')
+        ->set('bodyHtml', '<p><img src="/storage/private.csv"></p><p>Hello</p>')
+        ->call('send')
+        ->assertHasNoErrors()
+        ->assertSet('isOpen', false);
+
+    $email = Email::query()->where('subject', 'Composer image leak')->sole();
+
+    expect($email->attachments)->toHaveCount(0)
+        ->and($email->body?->body_html)->not->toContain('cid:')
+        ->and(Storage::disk('public')->get('private.csv'))->toBe('secret,tenant,data');
+});
+
 it('links a queued send to the record the composer was opened from', function (): void {
     $person = People::factory()->recycle([$this->user, $this->user->currentTeam])->create();
 

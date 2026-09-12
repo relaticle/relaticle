@@ -1106,7 +1106,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->hiddenLabel()
                 ->resizableImages()
                 ->fileAttachmentsDisk(EmailAttachment::DISK)
-                ->fileAttachmentsDirectory('email-attachments')
+                ->fileAttachmentsDirectory(fn (): string => EmailAttachment::composeImagesDirectory((string) $this->authUser()->current_team_id))
                 ->fileAttachmentsVisibility('private')
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
