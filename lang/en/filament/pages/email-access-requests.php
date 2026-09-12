@@ -31,6 +31,7 @@ return [
         'requested_outgoing' => 'you requested access',
         'unknown_user' => 'Unknown user',
         'no_subject' => '(No subject)',
+        'subject_hidden' => '(Subject hidden)',
         'email_unavailable' => 'The associated email is no longer available.',
     ],
     'empty' => [
