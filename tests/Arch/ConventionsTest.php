@@ -273,3 +273,39 @@ it('keeps published copy and source free of em-dashes', function (): void {
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });
+
+it('keeps new file uploads on medialibrary', function (): void {
+    $root = dirname(__DIR__, 2);
+    $allowed = [
+        'app/Filament/CustomFields/FileUploadComponent.php',
+        'app/Livewire/App/Profile/UpdateProfileInformation.php',
+    ];
+    $offenders = [];
+
+    foreach ([$root.'/app', $root.'/packages'] as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relative = str_replace($root.'/', '', $file->getPathname());
+
+            if (in_array($relative, $allowed, true)) {
+                continue;
+            }
+
+            $source = (string) file_get_contents($file->getPathname());
+
+            if (preg_match('/\bFileUpload::make\(|->fileAttachmentsDisk\(|->fileAttachmentsDirectory\(/', $source) === 1) {
+                $offenders[] = $relative;
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Durable uploads go through medialibrary (.ai/rules/file-uploads.md). Offending files: '.implode(', ', $offenders),
+    );
+});
