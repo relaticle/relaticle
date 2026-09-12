@@ -1,6 +1,5 @@
 @props([
     'search',
-    'folder',
     'canCompose' => false,
 ])
 
@@ -14,7 +13,7 @@
         />
     @else
         <x-filament::empty-state
-            :heading="__('filament/pages/email-inbox.list_empty.'.$folder->value)"
+            :heading="__('filament/pages/record-emails.empty.heading')"
             :description="__('filament/pages/record-emails.empty.description')"
             icon="heroicon-o-envelope"
             icon-color="gray"
