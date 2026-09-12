@@ -60,7 +60,10 @@ final readonly class StoreAgentUpload
         }
 
         if (filled($input['upload_id'] ?? null)) {
-            return [$this->takeTemporary((string) $input['upload_id'], $temp), UploadSource::SignedPut];
+            $upload = $this->takeTemporary((string) $input['upload_id'], $temp);
+            $name = filled($input['filename'] ?? null) ? (string) $input['filename'] : $upload;
+
+            return [$name, UploadSource::SignedPut];
         }
 
         throw UploadException::noSource();

@@ -18,9 +18,11 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 
+#[Name('create-upload-url')]
 #[Title('Create Upload URL')]
 #[Description('Get a short-lived signed URL to PUT a file body to (max 10 MB, pdf/doc/docx/jpeg/png/gif/webp). Then call upload-file with the returned upload_id to finish. Use upload-file directly with source_url or base64 when you can.')]
 final class CreateUploadUrlTool extends Tool

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Testing\Fluent\AssertableJson;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 mutates(StoreAgentUpload::class, TemporaryUploads::class, CreateUploadUrlTool::class, UploadFileTool::class);
@@ -204,15 +205,18 @@ describe('upload-file', function (): void {
     });
 
     it('accepts a completed signed put by upload id', function (): void {
-        $name = TemporaryUploads::newName('deck.pdf');
-        TemporaryUploads::disk()->put(TemporaryUploads::path($name), pdfBytes());
+        $upload = TemporaryUploads::newName('deck.pdf');
+        TemporaryUploads::disk()->put(TemporaryUploads::path($upload), pdfBytes());
 
         RelaticleServer::actingAs($this->user)
-            ->tool(UploadFileTool::class, ['upload_id' => $name])
+            ->tool(UploadFileTool::class, ['upload_id' => $upload, 'filename' => 'deck.pdf'])
             ->assertOk()
-            ->assertSee('"mime_type"');
+            ->assertSee('"mime_type"')
+            ->assertSee('[deck.pdf](');
 
-        expect(Media::query()->latest('id')->firstOrFail()->mime_type)->toBe('application/pdf');
+        $media = Media::query()->latest('id')->firstOrFail();
+        expect($media->mime_type)->toBe('application/pdf')
+            ->and($media->getCustomProperty('original_name'))->toBe('deck.pdf');
     });
 
     it('requires exactly one source', function (): void {
@@ -229,6 +233,18 @@ describe('upload-file', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(UploadFileTool::class, ['base64' => base64_encode('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'filename' => 'a.svg'])
             ->assertHasErrors([__('uploads.errors.mime_not_allowed', ['mime' => 'image/svg+xml'])]);
+    });
+
+    it('escapes markdown-breaking characters in the suggested label', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(UploadFileTool::class, [
+                'base64' => base64_encode(pdfBytes()),
+                'filename' => 'a](https://evil.test) x.pdf',
+            ])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->where('suggested_markdown', fn (string $markdown): bool => substr_count($markdown, '](') === 1)
+                ->etc());
     });
 
     it('limits a workspace to 60 uploads per hour across both tools', function (): void {

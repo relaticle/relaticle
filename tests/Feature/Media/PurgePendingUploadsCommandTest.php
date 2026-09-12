@@ -6,6 +6,8 @@ use App\Console\Commands\PurgePendingUploadsCommand;
 use App\Enums\MediaCollection;
 use App\Models\User;
 use App\Support\Media\TemporaryUploads;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -43,9 +45,15 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     TemporaryUploads::disk()->assertExists(TemporaryUploads::path($freshTemp));
 });
 
-it('is scheduled hourly', function (): void {
-    $this->artisan('schedule:list')
-        ->expectsOutputToContain('app:purge-pending-uploads')
-        ->expectsOutputToContain('0 * * * *')
-        ->assertSuccessful();
+it('is scheduled hourly without overlap on a single server', function (): void {
+    $this->artisan('schedule:list')->assertSuccessful();
+
+    $schedule = resolve(Schedule::class);
+    $event = collect($schedule->events())
+        ->first(fn (Event $event): bool => str_contains((string) $event->command, 'app:purge-pending-uploads'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('0 * * * *')
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->onOneServer)->toBeTrue();
 });
