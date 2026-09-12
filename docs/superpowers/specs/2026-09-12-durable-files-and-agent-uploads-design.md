@@ -96,9 +96,9 @@ Render surfaces:
 
 ## One switch to a private disk
 
-`config/filesystems.php` gains a `media` disk whose driver, root, and visibility come from env. `config/media-library.php` `disk_name` reads `MEDIA_DISK`, default `public`; `.env.example` documents it.
+`config/filesystems.php` gains a `media` disk whose driver and root come from env. It is private by definition: a public `media` disk would need its own `url` and symlink, and `public` already covers that case. The switch is forward-only. A Media row keeps the disk it was uploaded to, so `MEDIA_DISK=media` is set before the first upload on an install; no move command exists because production holds no uploads yet. Conversions and responsive images are not served through the signed route; nothing on this branch registers one, and the first conversion added needs a `conversion` parameter on the route. `config/media-library.php` `disk_name` reads `MEDIA_DISK`, default `public`; `.env.example` documents it.
 
-An app URL generator returns the plain disk URL when the disk is public and a 30-minute signed link to `GET /media/{uuid}` when it is private. That route streams through medialibrary on any driver: images inline, every other type with `Content-Disposition: attachment`.
+An app URL generator returns the plain disk URL when the disk is public and a 30-minute signed link to `GET /media/{uuid}` when it is private. That route streams through the disk on any driver: images inline, every other type with `Content-Disposition: attachment`, the download named after the upload's `original_name`, `Cache-Control: no-store, private`, and a 60-per-minute throttle. The `upload-file` tool's `suggested_markdown` carries this expiring URL; `CustomFieldInput::richText()` tags such a `/media/{uuid}` image with `data-id` on write, and reads rewrite `src` from the Media row, so the stored link never has to outlive its signature.
 
 The `logo` collections on `Company` and `Team` stay on the public disk through `useDisk('public')` in `registerMediaCollections()`. They feed every avatar in pickers, lists and search, and plain cacheable URLs matter more there than the private-disk option. Every collection this PR creates follows `MEDIA_DISK`. Decided 2026-09-12.
 
