@@ -139,7 +139,7 @@ Route::middleware(['signed', 'throttle:30,1,mail-unsubscribe', 'no-referrer'])->
 });
 
 Route::get('/media/{media:uuid}', ShowMediaController::class)
-    ->middleware('signed')
+    ->middleware(['signed', 'throttle:60,1'])
     ->name('media.show');
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {

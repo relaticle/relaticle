@@ -58,7 +58,8 @@ it('serves a signed route on a private disk and downloads non-images', function 
 
     $this->get($media->getUrl())
         ->assertOk()
-        ->assertHeader('Content-Disposition', 'attachment; filename="'.$media->file_name.'"');
+        ->assertHeader('Content-Disposition', 'attachment; filename=brief.pdf')
+        ->assertHeader('Cache-Control', 'no-store, private');
 });
 
 it('renders images inline on a private disk', function (): void {
@@ -70,7 +71,20 @@ it('renders images inline on a private disk', function (): void {
 
     $this->get($media->getUrl())
         ->assertOk()
-        ->assertHeader('Content-Disposition', 'inline; filename="'.$media->file_name.'"');
+        ->assertHeader('Content-Disposition', 'inline; filename=pixel.png');
+});
+
+it('falls back to the stored file name when original_name is absent', function (): void {
+    usePrivateMediaDisk();
+
+    $media = $this->team->addMediaFromString(pdfBytes())
+        ->usingFileName('brief.pdf')
+        ->withCustomProperties(['team_id' => $this->team->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+
+    $this->get($media->getUrl())
+        ->assertOk()
+        ->assertHeader('Content-Disposition', 'attachment; filename='.$media->file_name);
 });
 
 it('refuses an unsigned or expired private url', function (): void {
