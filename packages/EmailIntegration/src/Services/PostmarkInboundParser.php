@@ -41,12 +41,7 @@ final readonly class PostmarkInboundParser
      */
     public function recipientAddresses(array $payload): array
     {
-        $addresses = [];
-
-        foreach ($this->addressList($payload, 'ToFull') as $entry) {
-            $addresses[] = $entry;
-        }
-
+        $addresses = $this->addressList($payload, 'ToFull');
         foreach ($this->addressList($payload, 'CcFull') as $entry) {
             $addresses[] = $entry;
         }
@@ -63,7 +58,7 @@ final readonly class PostmarkInboundParser
             }
         }
 
-        return array_values(array_unique(array_map('strtolower', $addresses)));
+        return array_values(array_unique(array_map(strtolower(...), $addresses)));
     }
 
     /**
@@ -89,7 +84,7 @@ final readonly class PostmarkInboundParser
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function sentAt(array $payload): ?CarbonImmutable
+    private function sentAt(array $payload): CarbonImmutable
     {
         $date = $this->string($payload, 'Date');
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use App\Models\Team;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Relaticle\EmailIntegration\Actions\ResolveForwardingSenderAction;
@@ -54,7 +55,7 @@ final class ProcessInboundEmailJob implements ShouldQueue
 
         $sender = $resolveSender->execute($team, $fromAddress);
 
-        if ($sender === null) {
+        if (! $sender instanceof User) {
             return;
         }
 
