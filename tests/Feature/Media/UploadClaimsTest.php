@@ -6,12 +6,14 @@ use App\Actions\Upload\StorePendingUpload;
 use App\Enums\MediaCollection;
 use App\Enums\UploadSource;
 use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\User;
 use App\Observers\CustomFieldValueObserver;
 use App\Support\Media\UploadClaims;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -111,10 +113,28 @@ it('never claims another team\'s pending upload', function (): void {
     $foreign = pendingUpload($stranger, pdfBytes(), 'a.pdf');
     $note = Note::factory()->create(['team_id' => $this->team->getKey()]);
 
-    $note->saveCustomFieldValue($this->contract, $foreign->getPathRelativeToRoot());
+    expect(fn (): mixed => DB::transaction(fn () => $note->saveCustomFieldValue($this->contract, $foreign->getPathRelativeToRoot())))
+        ->toThrow(ValidationException::class);
 
     expect($foreign->refresh()->collection_name)->toBe(MediaCollection::PendingUploads->value)
         ->and($foreign->model_id)->toBe($stranger->personalTeam()->getKey());
+});
+
+it('refuses to store a file value whose upload another record owns', function (): void {
+    $media = pendingUpload($this->user, pdfBytes(), 'a.pdf');
+    $path = $media->getPathRelativeToRoot();
+    $noteA = Note::factory()->create(['team_id' => $this->team->getKey()]);
+    $noteB = Note::factory()->create(['team_id' => $this->team->getKey()]);
+    $noteA->saveCustomFieldValue($this->contract, $path);
+
+    expect(fn (): mixed => DB::transaction(fn () => $noteB->saveCustomFieldValue($this->contract, $path)))
+        ->toThrow(ValidationException::class);
+
+    expect(CustomFieldValue::query()
+        ->where('entity_type', $noteB->getMorphClass())
+        ->where('entity_id', $noteB->getKey())
+        ->where('custom_field_id', $this->contract->getKey())
+        ->exists())->toBeFalse();
 });
 
 it('claims every image a rich editor body references and releases the ones it drops', function (): void {

@@ -9,6 +9,8 @@ use App\Enums\MediaCollection;
 use App\Models\CustomFieldValue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Models\CustomField;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -55,6 +57,10 @@ final readonly class UploadClaims
                 $media->save();
             });
 
+        if ($field->type === CustomFieldType::FILE_UPLOAD->value) {
+            $this->assertClaimedByEntity($referenced, $teamId, $entity, $collection, $field);
+        }
+
         DB::afterCommit(function () use ($entity, $collection, $referenced): void {
             $entity->media()
                 ->where('collection_name', $collection)
@@ -62,6 +68,31 @@ final readonly class UploadClaims
                 ->get()
                 ->each(fn (Model $media): ?bool => $media->delete());
         });
+    }
+
+    /** @param list<string> $referenced */
+    private function assertClaimedByEntity(array $referenced, string $teamId, Model&HasMedia $entity, string $collection, CustomField $field): void
+    {
+        $uuid = $referenced[0] ?? null;
+
+        if ($uuid === null) {
+            return;
+        }
+
+        $media = $this->paths->findByUuid($teamId, $uuid);
+
+        $ownedByEntity = $media instanceof Media
+            && $media->model_type === $entity->getMorphClass()
+            && (string) $media->model_id === (string) $entity->getKey()
+            && $media->collection_name === $collection;
+
+        if ($ownedByEntity) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            "custom_fields.{$field->code}" => __('validation.custom_field.upload_path', ['field' => $field->name]),
+        ]);
     }
 
     /** @return list<string> */

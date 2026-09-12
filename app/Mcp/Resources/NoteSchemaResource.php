@@ -81,7 +81,7 @@ final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
                 'peopleCount' => 'Count of related people',
                 'opportunitiesCount' => 'Count of related opportunities',
             ],
-            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys.',
+            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. For file-upload fields, pass the path returned by the upload-file tool.',
         ];
     }
 }

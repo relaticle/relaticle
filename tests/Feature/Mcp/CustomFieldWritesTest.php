@@ -27,6 +27,7 @@ use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\Media\MediaPaths;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -632,6 +633,41 @@ describe('file-upload values', function (): void {
             ->assertOk()
             ->assertSee($media->uuid)
             ->assertSee('"url"');
+    });
+
+    it('rejects a path another record already claimed', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'First', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Second', 'custom_fields' => ['contract' => $path]])
+            ->assertHasErrors()
+            ->assertSee('Contract: pass a path returned by the upload-file tool');
+
+        expect(Note::query()->where('title', 'Second')->exists())->toBeFalse();
+    });
+
+    it('refuses one upload for two fields in the same payload', function (): void {
+        CustomField::factory()->create([
+            'tenant_id' => $this->team->getKey(),
+            'entity_type' => 'note',
+            'code' => 'annex',
+            'name' => 'Annex',
+            'type' => 'file-upload',
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+        $path = uploadedPath($this->user);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Twice', 'custom_fields' => ['contract' => $path, 'annex' => $path]])
+            ->assertHasErrors();
+
+        expect(Note::query()->where('title', 'Twice')->exists())->toBeFalse()
+            ->and(resolve(MediaPaths::class)->find($this->team->getKey(), $path)?->collection_name)->toBe(MediaCollection::PendingUploads->value);
     });
 
 });
