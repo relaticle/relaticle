@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
-use App\Support\Media\UploadAllowlist;
 use RuntimeException;
 
 final class UploadException extends RuntimeException
 {
-    public static function tooLarge(): self
+    public static function tooLarge(int $maxBytes): self
     {
-        return new self(__('uploads.errors.too_large', ['max' => (int) round(UploadAllowlist::maxBytes() / 1048576)]));
+        return new self(__('uploads.errors.too_large', ['max' => (int) round($maxBytes / 1048576)]));
     }
 
     public static function mimeNotAllowed(string $mime): self
@@ -42,5 +41,10 @@ final class UploadException extends RuntimeException
     public static function invalidBase64(): self
     {
         return new self(__('uploads.errors.invalid_base64'));
+    }
+
+    public static function noSource(): self
+    {
+        return new self(__('uploads.errors.no_source'));
     }
 }

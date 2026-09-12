@@ -24,7 +24,7 @@ final readonly class StorePendingUpload
 
         $size = (int) filesize($path);
 
-        throw_if($size > UploadAllowlist::maxBytes(), UploadException::tooLarge());
+        throw_if($size > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
 
         $mime = (string) new finfo(FILEINFO_MIME_TYPE)->file($path);
         $extension = UploadAllowlist::extensionFor($mime);

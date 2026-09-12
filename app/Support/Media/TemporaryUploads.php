@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 final readonly class TemporaryUploads
 {
-    public const string NAME_PATTERN = '/^[0-9A-HJKMNP-TV-Z]{26}\.[a-z0-9]{2,5}$/';
+    public const string NAME_PATTERN = '/^[0-9A-HJKMNP-TV-Z]{26}\.[a-z0-9]{2,5}\z/';
 
     public const string DIRECTORY = 'tmp';
 

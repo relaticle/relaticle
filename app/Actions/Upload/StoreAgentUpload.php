@@ -26,6 +26,8 @@ final readonly class StoreAgentUpload
      */
     public function execute(User $user, Team $team, array $input): Media
     {
+        abort_unless($user->belongsToTeam($team), 403);
+
         $temp = (string) tempnam(sys_get_temp_dir(), 'agent-upload');
 
         try {
@@ -57,7 +59,11 @@ final readonly class StoreAgentUpload
             return [$this->decode((string) $input['base64'], (string) ($input['filename'] ?? 'upload'), $temp), UploadSource::Base64];
         }
 
-        return [$this->takeTemporary((string) ($input['upload_id'] ?? ''), $temp), UploadSource::SignedPut];
+        if (filled($input['upload_id'] ?? null)) {
+            return [$this->takeTemporary((string) $input['upload_id'], $temp), UploadSource::SignedPut];
+        }
+
+        throw UploadException::noSource();
     }
 
     private function fetch(string $url, string $temp): string
@@ -74,7 +80,7 @@ final readonly class StoreAgentUpload
 
         $body = $response->body();
 
-        throw_if(strlen($body) > UploadAllowlist::maxBytes(), UploadException::tooLarge());
+        throw_if(strlen($body) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
 
         file_put_contents($temp, $body);
 
@@ -88,7 +94,7 @@ final readonly class StoreAgentUpload
         $bytes = base64_decode($base64, strict: true);
 
         throw_if($bytes === false, UploadException::invalidBase64());
-        throw_if(strlen($bytes) > self::MAX_BASE64_BYTES, UploadException::tooLarge());
+        throw_if(strlen($bytes) > self::MAX_BASE64_BYTES, UploadException::tooLarge(self::MAX_BASE64_BYTES));
 
         file_put_contents($temp, $bytes);
 
@@ -103,6 +109,8 @@ final readonly class StoreAgentUpload
         $path = TemporaryUploads::path($upload);
 
         throw_unless($disk->exists($path), UploadException::notFound());
+
+        throw_if((int) $disk->size($path) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
 
         $stream = $disk->readStream($path);
 

@@ -6,6 +6,7 @@ use App\Actions\Upload\StoreAgentUpload;
 use App\Enums\MediaCollection;
 use App\Exceptions\UploadException;
 use App\Models\User;
+use App\Services\Favicon\HostResolver;
 use App\Support\Media\TemporaryUploads;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -22,9 +23,12 @@ beforeEach(function (): void {
 
 describe('StoreAgentUpload', function (): void {
     it('fetches a public https url into pending uploads', function (): void {
-        Http::fake(['https://1.1.1.1/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
+        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
+            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
+            ->getMock());
+        Http::fake(['https://cdn.example.com/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
 
-        $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://1.1.1.1/brief.pdf']);
+        $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/brief.pdf']);
 
         expect($media->collection_name)->toBe(MediaCollection::PendingUploads->value)
             ->and($media->mime_type)->toBe('application/pdf')
@@ -33,9 +37,12 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('reports an unreachable url', function (): void {
-        Http::fake(['https://1.1.1.1/*' => Http::response('', 404)]);
+        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
+            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
+            ->getMock());
+        Http::fake(['https://cdn.example.com/*' => Http::response('', 404)]);
 
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://1.1.1.1/missing.pdf']))
+        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/missing.pdf']))
             ->toThrow(UploadException::class, __('uploads.errors.unreachable'));
     });
 
@@ -45,9 +52,12 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('rejects a fetched body over 10 MB', function (): void {
-        Http::fake(['https://1.1.1.1/*' => Http::response(str_repeat('a', 10 * 1024 * 1024 + 1), 200)]);
+        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
+            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
+            ->getMock());
+        Http::fake(['https://cdn.example.com/*' => Http::response(str_repeat('a', 10 * 1024 * 1024 + 1), 200)]);
 
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://1.1.1.1/huge.bin']))
+        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/huge.bin']))
             ->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 10]));
     });
 
@@ -66,12 +76,17 @@ describe('StoreAgentUpload', function (): void {
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, [
             'base64' => base64_encode(str_repeat('a', 5 * 1024 * 1024 + 1)),
             'filename' => 'big.pdf',
-        ]))->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 10]));
+        ]))->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 5]));
     });
 
     it('rejects malformed base64', function (): void {
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['base64' => '***', 'filename' => 'x.pdf']))
             ->toThrow(UploadException::class, __('uploads.errors.invalid_base64'));
+    });
+
+    it('reports no source when none of source_url, base64, or upload_id is given', function (): void {
+        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['base64' => '', 'filename' => 'x.pdf']))
+            ->toThrow(UploadException::class, __('uploads.errors.no_source'));
     });
 
     it('moves a signed-put temp file into pending uploads', function (): void {
@@ -83,6 +98,14 @@ describe('StoreAgentUpload', function (): void {
         expect($media->getCustomProperty('source'))->toBe('signed_put')
             ->and($media->mime_type)->toBe('application/pdf');
         TemporaryUploads::disk()->assertMissing(TemporaryUploads::path($name));
+    });
+
+    it('rejects a temp file over the 10 MB ceiling', function (): void {
+        $name = TemporaryUploads::newName('report.pdf');
+        TemporaryUploads::disk()->put(TemporaryUploads::path($name), str_repeat('a', 10 * 1024 * 1024 + 1));
+
+        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => $name]))
+            ->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 10]));
     });
 
     it('reports a missing or malformed upload id', function (): void {
