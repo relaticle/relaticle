@@ -17,7 +17,10 @@ final readonly class UploadAllowlist
         'image/webp' => 'webp',
     ];
 
-    public const int MAX_BYTES = 10 * 1024 * 1024;
+    public static function maxBytes(): int
+    {
+        return (int) config('media-library.max_file_size');
+    }
 
     public static function extensionFor(string $mime): ?string
     {

@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\User;
 use App\Support\Media\UploadPathGenerator;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -94,7 +95,17 @@ it('rejects a file over the 10 MB ceiling', function (): void {
     fclose($handle);
 
     expect(fn (): Media => resolve(StorePendingUpload::class)->execute($this->user, $this->team, $path, 'big.pdf', UploadSource::Panel))
-        ->toThrow(UploadException::class, __('uploads.errors.too_large'));
+        ->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 10]));
+});
+
+it('reports a missing source file as not found', function (): void {
+    expect(fn (): Media => resolve(StorePendingUpload::class)->execute(
+        $this->user,
+        $this->team,
+        sys_get_temp_dir().'/does-not-exist-'.Str::random(8),
+        'a.pdf',
+        UploadSource::Panel,
+    ))->toThrow(UploadException::class, __('uploads.errors.not_found'));
 });
 
 it('refuses to store for a team the user is not on', function (): void {

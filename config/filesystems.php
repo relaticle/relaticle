@@ -48,7 +48,7 @@ return [
 
         'media' => [
             'driver' => env('MEDIA_DRIVER', 'local'),
-            'root' => storage_path('app/media'),
+            'root' => env('MEDIA_DRIVER', 'local') === 's3' ? env('MEDIA_ROOT', '') : storage_path('app/media'),
             'visibility' => env('MEDIA_VISIBILITY', 'private'),
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),

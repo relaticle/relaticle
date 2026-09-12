@@ -20,9 +20,11 @@ final readonly class StorePendingUpload
     {
         abort_unless($user->belongsToTeam($team), 403);
 
-        $size = filesize($path);
+        throw_unless(is_file($path), UploadException::notFound());
 
-        throw_if($size === false || $size > UploadAllowlist::MAX_BYTES, UploadException::tooLarge());
+        $size = (int) filesize($path);
+
+        throw_if($size > UploadAllowlist::maxBytes(), UploadException::tooLarge());
 
         $mime = (string) new finfo(FILEINFO_MIME_TYPE)->file($path);
         $extension = UploadAllowlist::extensionFor($mime);

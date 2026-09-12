@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'errors' => [
-        'too_large' => 'The file is larger than 10 MB.',
+        'too_large' => 'The file is larger than :max MB.',
         'mime_not_allowed' => 'Files of type :mime are not accepted. Allowed: pdf, doc, docx, jpeg, png, gif, webp.',
         'unreachable' => 'The URL could not be fetched.',
         'url_not_allowed' => 'Only public https URLs on port 443 can be fetched.',
