@@ -106,7 +106,7 @@ trait ResolvesEntitySchema
             CustomFieldType::COLOR_PICKER => ['format' => 'hex color string', 'example' => '#0A80EA'],
             CustomFieldType::DATE => ['format' => 'ISO 8601 date', 'example' => '2026-09-10'],
             CustomFieldType::DATE_TIME => ['format' => 'ISO 8601 datetime string', 'example' => '2025-01-15T10:30:00Z'],
-            CustomFieldType::FILE_UPLOAD => ['format' => 'path returned by the upload-file tool', 'example' => 'uploads/custom-fields/01J.../report.pdf'],
+            CustomFieldType::FILE_UPLOAD => ['format' => 'path returned by the upload-file tool; read back as {path, url}', 'example' => 'uploads/8f2c1d4e-2b6a-4f0e-9d3c-1a2b3c4d5e6f/01ARZ3NDEKTSV4RRFFQ69G5FAV.pdf'],
             CustomFieldType::RECORD => ['format' => 'array of record IDs of the lookup entity; records must belong to this workspace', 'example' => ['01J...']],
         };
     }

@@ -2,17 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Enums\MediaCollection;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
+use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
+use App\Rules\StoredUploadPath;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
-mutates(BaseCrmEntityRequest::class);
+mutates(BaseCrmEntityRequest::class, StoredUploadPath::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -180,4 +184,47 @@ it('resolves record names with a constant number of lookups, not one per row', f
 
     expect($names)->toHaveCount(12)
         ->and($large)->toBe($small);
+});
+
+describe('file-upload values over rest', function (): void {
+    beforeEach(function (): void {
+        Storage::fake('public');
+        $this->contract = CustomField::factory()->create([
+            'tenant_id' => $this->team->getKey(),
+            'entity_type' => 'note',
+            'code' => 'contract',
+            'name' => 'Contract',
+            'type' => 'file-upload',
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+        $this->pending = $this->team->addMediaFromString(pdfBytes())->usingFileName('01ARZ3NDEKTSV4RRFFQ69G5FAV.pdf')
+            ->withCustomProperties(['team_id' => $this->team->getKey()])
+            ->toMediaCollection(MediaCollection::PendingUploads->value);
+    });
+
+    it('stores an owned pending path and returns path and url', function (): void {
+        $path = $this->pending->getPathRelativeToRoot();
+
+        $this->postJson('/api/v1/notes', ['title' => 'Rest file', 'custom_fields' => ['contract' => $path]])
+            ->assertCreated()
+            ->assertJsonPath('data.attributes.custom_fields.contract.path', $path)
+            ->assertJsonPath('data.attributes.custom_fields.contract.url', $this->pending->refresh()->getUrl());
+    });
+
+    it('returns 422 for a path this workspace does not own', function (): void {
+        $this->postJson('/api/v1/notes', ['title' => 'Rest bad', 'custom_fields' => ['contract' => 'uploads/00000000-0000-0000-0000-000000000000/x.pdf']])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['custom_fields.contract']);
+    });
+
+    it('returns null for an empty file field', function (): void {
+        $note = Note::factory()->create(['team_id' => $this->team->getKey()]);
+        $note->saveCustomFieldValue($this->contract, null);
+
+        $this->getJson("/api/v1/notes/{$note->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('data.attributes.custom_fields.contract', null);
+    });
 });
