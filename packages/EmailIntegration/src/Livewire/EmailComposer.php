@@ -632,6 +632,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ],
         );
 
+        if ($this->draftId !== null) {
+            resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
+        }
+
         Notification::make()
             ->success()
             ->title(__('filament/emails/composer.notifications.mass_queued.title'))
@@ -641,6 +645,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->send();
 
         $this->closeComposer();
+        $this->dispatch('drafts:changed');
         $this->dispatch('outbox:changed');
     }
 

@@ -14,6 +14,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -30,6 +31,7 @@ use Relaticle\EmailIntegration\Services\OpenMassSendComposer;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
 
 mutates(MassSendBulkAction::class);
+mutates(DeleteEmailDraftAction::class);
 mutates(SendEmailBatchAction::class);
 mutates(MassSendRecipientResolver::class);
 mutates(OpenMassSendComposer::class);
@@ -766,4 +768,36 @@ it('saves a mass send draft when the composer is closed', function (): void {
         ->assertSet('subject', 'Mass draft')
         ->assertCount('massRecipients', 1)
         ->assertSet('massRecipients.0.email', 'alice@example.com');
+});
+
+it('deletes a reopened mass send draft after a successful send', function (): void {
+    $person = People::create([
+        'team_id' => $this->team->id,
+        'name' => 'Alice',
+        'creator_id' => $this->user->id,
+    ]);
+
+    setPersonEmail($person, 'alice@example.com');
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('isMassSend', true)
+        ->call('addMassRecipient', (string) $person->getKey())
+        ->set('subject', 'Mass draft')
+        ->set('bodyHtml', '<p>Hi</p>')
+        ->call('close');
+
+    $draft = Email::query()
+        ->where('status', EmailStatus::DRAFT)
+        ->where('subject', 'Mass draft')
+        ->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->call('send')
+        ->assertDispatched('drafts:changed')
+        ->assertDispatched('outbox:changed');
+
+    expect(Email::query()->withTrashed()->whereKey($draft->id)->exists())->toBeFalse()
+        ->and(EmailBatch::where('team_id', $this->team->id)->count())->toBe(1);
 });
