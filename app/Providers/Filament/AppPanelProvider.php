@@ -361,13 +361,8 @@ final class AppPanelProvider extends PanelProvider
                 PanelsRenderHook::TENANT_MENU_AFTER,
                 fn (): View|Factory => view('filament.app.sidebar-toggle')
             )
-            /**
-             * Appearance is a device preference held in localStorage, so the accent
-             * ramps ship as CSS and the browser picks one. STYLES_AFTER renders past
-             *
-             * @filamentStyles, which is what makes the `html[data-accent]` block win
-             * over the `:root` defaults it emits.
-             */
+            // STYLES_AFTER renders past the panel stylesheet, which is what lets the
+            // `html[data-accent]` ramps outrank the `:root` defaults it emits.
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): View|Factory => view('filament.app.accent-palettes', [

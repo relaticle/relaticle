@@ -926,7 +926,7 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 /* Account settings shell: personal settings render without the panel's
    workspace chrome, so the frame is defined here rather than by fi-layout. */
 .fi-settings-layout {
-    @apply flex h-screen flex-col bg-white dark:bg-gray-900;
+    @apply flex h-full flex-col bg-white dark:bg-gray-900;
 }
 
 .fi-settings-topbar {
@@ -935,27 +935,24 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 
 /* The topbar and the page share one container so the back link, the page
    heading and the content below all sit on the same left edge. */
+.fi-settings-container,
+.fi-settings-main .fi-page {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+}
+
 .fi-settings-container {
-    @apply mx-auto flex w-full max-w-6xl items-center gap-x-3 px-4 sm:px-6 lg:px-8;
+    @apply flex items-center gap-x-3;
 }
 
 .fi-settings-back-link {
     @apply inline-flex items-center gap-x-1.5 rounded-lg px-2 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white;
 }
 
-.fi-settings-topbar-heading {
-    @apply text-sm font-semibold text-gray-950 dark:text-white;
-}
-
 .fi-settings-main {
     @apply flex-1 overflow-y-auto;
 
     .fi-page {
-        @apply mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8;
-    }
-
-    .fi-settings-back-link {
-        @apply -ml-2;
+        @apply py-8;
     }
 
     .fi-page-sub-navigation-sidebar-ctn {

@@ -34,3 +34,10 @@ it('ships a primary ramp for every accent', function (): void {
         ->assertSee('html[data-accent="'.AccentColor::Blue->name.'"]', false)
         ->assertSee('--primary-500', false);
 });
+
+it('restores the stored accent on every page load', function (): void {
+    $this->get(Appearance::getUrl())
+        ->assertSuccessful()
+        ->assertSee('const loadAccent', false)
+        ->assertSee("document.addEventListener('livewire:navigated', loadAccent)", false);
+});

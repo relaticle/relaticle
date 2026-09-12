@@ -15,14 +15,8 @@
 
             selectTheme(theme) {
                 this.theme = theme
-                localStorage.setItem('theme', theme)
 
-                document.documentElement.classList.toggle(
-                    'dark',
-                    theme === 'dark' ||
-                        (theme === 'system' &&
-                            window.matchMedia('(prefers-color-scheme: dark)').matches),
-                )
+                this.$dispatch('theme-changed', theme)
             },
 
             selectAccent(accent) {

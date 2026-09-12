@@ -59,6 +59,34 @@ it('keeps only the latest logo when a new one replaces it', function (): void {
     expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(1);
 });
 
+it('clears the logo when the upload is emptied', function (): void {
+    $component = Livewire::test(UpdateTeamLogo::class, ['team' => $this->team])
+        ->fillForm(['logo' => UploadedFile::fake()->image('logo.png', 200, 200)])
+        ->call('updateLogo');
+
+    expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(1);
+
+    $component
+        ->fillForm(['logo' => []])
+        ->call('updateLogo')
+        ->assertHasNoFormErrors();
+
+    $team = $this->team->fresh();
+
+    expect($team->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(0)
+        ->and($team->getFilamentAvatarUrl())->toContain('data:image/svg+xml');
+});
+
+it('holds a single logo even when media is added outside the form', function (): void {
+    $this->team->addMedia(UploadedFile::fake()->image('first.png', 120, 120))
+        ->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);
+
+    $this->team->addMedia(UploadedFile::fake()->image('second.png', 120, 120))
+        ->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);
+
+    expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(1);
+});
+
 it('replaces the workspace initials avatar with the logo url', function (): void {
     $this->team
         ->addMedia(UploadedFile::fake()->image('logo.png', 200, 200))

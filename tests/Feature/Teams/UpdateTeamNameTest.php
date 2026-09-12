@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\App\Teams\UpdateTeamName;
 use App\Models\Team;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Livewire\Livewire;
 
 mutates(UpdateTeamName::class);
@@ -104,4 +105,15 @@ test('same slug does not trigger redirect', function () {
         ->assertHasNoFormErrors()
         ->assertNotified()
         ->assertNoRedirect();
+});
+
+test('the slug field is prefixed with the workspace address', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    $panel = Filament::getPanel('app');
+    $host = parse_url((string) config('app.url'), PHP_URL_HOST);
+
+    Livewire::test(UpdateTeamName::class, ['team' => $user->currentTeam])
+        ->assertSuccessful()
+        ->assertSee($host.'/'.$panel->getPath().'/');
 });
