@@ -15,6 +15,7 @@ declare(strict_types=1);
  */
 
 use App\Models\User;
+use App\Services\Favicon\HostResolver;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
@@ -117,4 +118,16 @@ function pdfBytes(): string
 function onePixelPng(): string
 {
     return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true);
+}
+
+/** @param list<string> $addresses */
+function resolveHostsTo(array $addresses, int &$calls = 0): void
+{
+    $calls = 0;
+
+    app()->instance(HostResolver::class, new HostResolver(function (string $host) use ($addresses, &$calls): array {
+        $calls++;
+
+        return $addresses;
+    }));
 }

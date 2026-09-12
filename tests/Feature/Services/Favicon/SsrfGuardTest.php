@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Exceptions\SsrfGuardException;
-use App\Services\Favicon\HostResolver;
 use App\Services\Favicon\SsrfGuard;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -99,29 +98,25 @@ test('pinned client never follows redirects and pins the resolved address', func
 });
 
 test('pinned client resolves a hostname once and pins the validated address', function (): void {
-    app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-        ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
-        ->getMock());
+    $calls = 0;
+    resolveHostsTo(['93.184.216.34'], $calls);
 
     $client = SsrfGuard::pinnedClient('https://cdn.example.com/brief.pdf');
     $options = (fn (): array => $this->options)->call($client);
 
-    expect($options['curl'][CURLOPT_RESOLVE])->toBe(['cdn.example.com:443:93.184.216.34']);
+    expect($options['curl'][CURLOPT_RESOLVE])->toBe(['cdn.example.com:443:93.184.216.34'])
+        ->and($calls)->toBe(1);
 });
 
 test('pinned client refuses a hostname that resolves to a private address', function (): void {
-    app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-        ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['169.254.169.254'])
-        ->getMock());
+    resolveHostsTo(['169.254.169.254']);
 
     expect(fn (): PendingRequest => SsrfGuard::pinnedClient('https://cdn.example.com/brief.pdf'))
         ->toThrow(SsrfGuardException::class);
 });
 
 test('pinned client refuses a hostname that fails to resolve', function (): void {
-    app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-        ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn([])
-        ->getMock());
+    resolveHostsTo([]);
 
     expect(fn (): PendingRequest => SsrfGuard::pinnedClient('https://cdn.example.com/brief.pdf'))
         ->toThrow(SsrfGuardException::class);

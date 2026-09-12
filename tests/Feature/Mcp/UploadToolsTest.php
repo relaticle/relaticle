@@ -6,7 +6,6 @@ use App\Actions\Upload\StoreAgentUpload;
 use App\Enums\MediaCollection;
 use App\Exceptions\UploadException;
 use App\Models\User;
-use App\Services\Favicon\HostResolver;
 use App\Support\Media\TemporaryUploads;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -23,9 +22,7 @@ beforeEach(function (): void {
 
 describe('StoreAgentUpload', function (): void {
     it('fetches a public https url into pending uploads', function (): void {
-        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
-            ->getMock());
+        resolveHostsTo(['93.184.216.34']);
         Http::fake(['https://cdn.example.com/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
 
         $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/brief.pdf']);
@@ -37,9 +34,7 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('reports an unreachable url', function (): void {
-        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
-            ->getMock());
+        resolveHostsTo(['93.184.216.34']);
         Http::fake(['https://cdn.example.com/*' => Http::response('', 404)]);
 
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/missing.pdf']))
@@ -52,9 +47,7 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('rejects a fetched body over 10 MB', function (): void {
-        app()->instance(HostResolver::class, Mockery::mock(new HostResolver)
-            ->shouldReceive('addresses')->once()->with('cdn.example.com')->andReturn(['93.184.216.34'])
-            ->getMock());
+        resolveHostsTo(['93.184.216.34']);
         Http::fake(['https://cdn.example.com/*' => Http::response(str_repeat('a', 10 * 1024 * 1024 + 1), 200)]);
 
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['source_url' => 'https://cdn.example.com/huge.bin']))
