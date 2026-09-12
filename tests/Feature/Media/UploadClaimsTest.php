@@ -10,9 +10,11 @@ use App\Models\Note;
 use App\Models\User;
 use App\Observers\CustomFieldValueObserver;
 use App\Support\Media\UploadClaims;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
 use Relaticle\CustomFields\Services\TenantContextService;
+use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 mutates(UploadClaims::class, CustomFieldValueObserver::class);
@@ -78,6 +80,22 @@ it('releases the previous file when a file value is replaced', function (): void
     expect(Media::query()->find($first->getKey()))->toBeNull()
         ->and($second->refresh()->model_id)->toBe($note->getKey());
     Storage::disk('public')->assertMissing($first->getPathRelativeToRoot());
+});
+
+it('keeps the released file when the surrounding transaction rolls back', function (): void {
+    $first = pendingUpload($this->user, pdfBytes(), 'a.pdf');
+    $second = pendingUpload($this->user, pdfBytes(), 'b.pdf');
+    $note = Note::factory()->create(['team_id' => $this->team->getKey()]);
+    $note->saveCustomFieldValue($this->contract, $first->getPathRelativeToRoot());
+
+    expect(fn (): mixed => DB::transaction(function () use ($note, $second): void {
+        $note->saveCustomFieldValue($this->contract, $second->getPathRelativeToRoot());
+
+        throw new RuntimeException('boom');
+    }))->toThrow(RuntimeException::class);
+
+    expect(Media::query()->find($first->getKey()))->not->toBeNull();
+    Storage::disk('public')->assertExists($first->getPathRelativeToRoot());
 });
 
 it('releases the file when a file value is cleared', function (): void {

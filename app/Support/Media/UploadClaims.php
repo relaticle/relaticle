@@ -8,6 +8,7 @@ use App\Enums\CustomFieldType;
 use App\Enums\MediaCollection;
 use App\Models\CustomFieldValue;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -54,11 +55,13 @@ final readonly class UploadClaims
                 $media->save();
             });
 
-        $entity->media()
-            ->where('collection_name', $collection)
-            ->whereNotIn('uuid', $referenced)
-            ->get()
-            ->each(fn (Model $media): ?bool => $media->delete());
+        DB::afterCommit(function () use ($entity, $collection, $referenced): void {
+            $entity->media()
+                ->where('collection_name', $collection)
+                ->whereNotIn('uuid', $referenced)
+                ->get()
+                ->each(fn (Model $media): ?bool => $media->delete());
+        });
     }
 
     /** @return list<string> */
