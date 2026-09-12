@@ -8,27 +8,33 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\ResolveForwardingSenderAction;
 use Relaticle\EmailIntegration\Actions\StoreInboundEmailAction;
 use Relaticle\EmailIntegration\Models\TeamForwardingAddress;
+use Relaticle\EmailIntegration\Services\PostmarkInboundAuthenticationValidator;
 use Relaticle\EmailIntegration\Services\PostmarkInboundParser;
+use Throwable;
 
 final class ProcessInboundEmailJob implements ShouldQueue
 {
     use Queueable;
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    public function __construct(private readonly array $payload) {}
+    public function __construct(private readonly string $payloadPath) {}
 
     public function handle(
         PostmarkInboundParser $parser,
+        PostmarkInboundAuthenticationValidator $authenticator,
         ResolveForwardingSenderAction $resolveSender,
         StoreInboundEmailAction $store,
     ): void {
-        /** @var list<string> $recipientAddresses */
-        $recipientAddresses = array_values($parser->recipientAddresses($this->payload));
+        $payload = $this->payload();
+
+        if ($payload === null) {
+            return;
+        }
+
+        $recipientAddresses = $parser->recipientAddresses($payload);
 
         if ($recipientAddresses === []) {
             return;
@@ -46,10 +52,14 @@ final class ProcessInboundEmailJob implements ShouldQueue
             return;
         }
 
-        $data = $parser->parse($this->payload);
+        $data = $parser->parse($payload);
         $fromAddress = collect($data->participants)->firstWhere('role', 'from')['email_address'] ?? null;
 
         if (! is_string($fromAddress) || $fromAddress === '') {
+            return;
+        }
+
+        if (! $authenticator->passes($payload, $fromAddress)) {
             return;
         }
 
@@ -60,6 +70,34 @@ final class ProcessInboundEmailJob implements ShouldQueue
         }
 
         $store->execute($sender, $team, $data);
+
+        Storage::disk('local')->delete($this->payloadPath);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        Storage::disk('local')->delete($this->payloadPath);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function payload(): ?array
+    {
+        if (! Storage::disk('local')->exists($this->payloadPath)) {
+            return null;
+        }
+
+        $contents = Storage::disk('local')->get($this->payloadPath);
+
+        if (! is_string($contents) || $contents === '') {
+            return null;
+        }
+
+        /** @var array<string, mixed>|null $payload */
+        $payload = json_decode($contents, true);
+
+        return is_array($payload) ? $payload : null;
     }
 
     /**

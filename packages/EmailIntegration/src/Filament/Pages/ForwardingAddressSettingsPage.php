@@ -23,6 +23,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Relaticle\EmailIntegration\Actions\DeleteUserForwardingBlocklistEntryAction;
 use Relaticle\EmailIntegration\Actions\EnsureTeamForwardingAddressAction;
 use Relaticle\EmailIntegration\Actions\UpdateUserForwardingBlocklistAction;
 use Relaticle\EmailIntegration\Actions\UpdateUserForwardingFullAccessGrantsAction;
@@ -211,13 +212,12 @@ final class ForwardingAddressSettingsPage extends Page implements HasSchemas
             ->size(Size::Small)
             ->iconButton()
             ->requiresConfirmation()
-            ->action(function (array $arguments): void {
-                UserForwardingBlocklist::query()
-                    ->where('user_id', $this->authUser()->getKey())
-                    ->where('team_id', $this->team()->getKey())
-                    ->whereKey((string) $arguments['entry_id'])
-                    ->firstOrFail()
-                    ->delete();
+            ->action(function (array $arguments, DeleteUserForwardingBlocklistEntryAction $deleteEntry): void {
+                $deleteEntry->execute(
+                    $this->authUser(),
+                    $this->team(),
+                    (string) $arguments['entry_id'],
+                );
 
                 unset($this->blocklistEntries);
 

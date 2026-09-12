@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -128,6 +129,10 @@ final readonly class StoreInboundEmailAction
 
                 return $email;
             });
+        } catch (UniqueConstraintViolationException) {
+            Storage::disk(EmailAttachment::DISK)->delete($storedPaths);
+
+            return null;
         } catch (Throwable $exception) {
             Storage::disk(EmailAttachment::DISK)->delete($storedPaths);
 

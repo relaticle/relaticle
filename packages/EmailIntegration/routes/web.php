@@ -14,7 +14,7 @@ Route::middleware(['web'])->group(function (): void {
         ->whereIn('provider', ['gmail', 'azure'])
         ->middleware('throttle:120,1');
 
-    Route::post('webhooks/inbound/postmark', InboundEmailWebhookController::class)
+    Route::post('webhooks/inbound/postmark/{token}', InboundEmailWebhookController::class)
         ->name('inbound-email.webhook')
         ->middleware('throttle:120,1');
 });
