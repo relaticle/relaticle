@@ -77,6 +77,15 @@ it('clears the logo when the upload is emptied', function (): void {
         ->and($team->getFilamentAvatarUrl())->toContain('data:image/svg+xml');
 });
 
+it('rejects an image type outside the logo allowlist', function (): void {
+    Livewire::test(UpdateTeamLogo::class, ['team' => $this->team])
+        ->fillForm(['logo' => UploadedFile::fake()->image('logo.gif', 120, 120)])
+        ->call('updateLogo')
+        ->assertHasFormErrors(['logo']);
+
+    expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(0);
+});
+
 it('holds a single logo even when media is added outside the form', function (): void {
     $this->team->addMedia(UploadedFile::fake()->image('first.png', 120, 120))
         ->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);

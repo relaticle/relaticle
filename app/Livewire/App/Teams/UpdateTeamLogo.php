@@ -42,10 +42,11 @@ final class UpdateTeamLogo extends BaseLivewireComponent
                         SpatieMediaLibraryFileUpload::make('logo')
                             ->label(__('teams.form.team_logo.label'))
                             ->collection(Team::LOGO_MEDIA_COLLECTION)
-                            ->image()
-                            ->acceptedFileTypes(Team::LOGO_MIME_TYPES)
                             ->imageEditor()
-                            ->avatar(),
+                            ->avatar()
+                            // Last in the chain on purpose: avatar() calls image(),
+                            // which resets the allowlist back to `image/*`.
+                            ->acceptedFileTypes(Team::LOGO_MIME_TYPES),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
