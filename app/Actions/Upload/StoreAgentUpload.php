@@ -30,6 +30,8 @@ final readonly class StoreAgentUpload
         abort_unless($user->belongsToTeam($team), 403);
 
         $temp = sys_get_temp_dir().'/agent-upload-'.Str::ulid();
+        touch($temp);
+        chmod($temp, 0600);
 
         try {
             [$name, $source] = $this->materialise($input, $temp);

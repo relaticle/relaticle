@@ -4,6 +4,11 @@ paths:
   - 'app/Livewire/**'
   - 'app/Support/Media/**'
   - 'app/Actions/Upload/**'
+  - 'app/Mcp/Tools/**'
+  - 'app/Http/Controllers/Media/**'
+  - 'app/Rules/StoredUploadPath.php'
+  - 'app/Observers/**'
+  - 'app/Console/Commands/**'
 ---
 
 # File uploads
@@ -12,10 +17,12 @@ Durable user files go through medialibrary with a named collection on the owning
 model (`App\Enums\MediaCollection`). Two exemptions: import CSVs under
 `storage/app/imports` (transient) and Jetstream profile photos (framework-owned).
 
-- Every upload lands in the team's `pending-uploads` collection first
-  (`App\Actions\Upload\StorePendingUpload`). `App\Support\Media\UploadClaims`
-  claims it onto the record when a saved custom-field value references it. A
-  file another record or field already owns fails validation at that save.
+- Every custom-field upload lands in the team's `pending-uploads` collection
+  first (`App\Actions\Upload\StorePendingUpload`); `logo` collections are
+  written directly. `App\Support\Media\UploadClaims` claims a pending row onto
+  the record when a saved custom-field value references it. For `file-upload`
+  values a file another record or field already owns fails validation at that
+  save; a rich-editor image another record owns is left where it is.
 - Never call `Media::move()`. It copies and deletes, changing `uuid` and path.
   Ownership changes are attribute writes on the existing row.
 - `logo` collections stay on the public disk. Everything else follows

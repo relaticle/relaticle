@@ -12,4 +12,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Jobs/Email/**, app/Support/Email/** | .ai/rules/email.md |
 | app/Models/**, app/Casts/** | .ai/rules/models.md |
 | resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/** | .ai/rules/panel-links.md |
-| app/Filament/**, app/Livewire/**, app/Support/Media/**, app/Actions/Upload/** | .ai/rules/file-uploads.md |
+| app/Filament/**, app/Livewire/**, app/Support/Media/**, app/Actions/Upload/**, app/Mcp/Tools/**, app/Http/Controllers/Media/**, app/Rules/StoredUploadPath.php, app/Observers/**, app/Console/Commands/** | .ai/rules/file-uploads.md |
