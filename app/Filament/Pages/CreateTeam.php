@@ -299,7 +299,6 @@ final class CreateTeam extends RegisterTenant
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/teams.create_team.form.workspace_name.placeholder'))
-                ->default(fn (): string => __('filament/pages/teams.create_team.form.workspace_name.default'))
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
@@ -322,9 +321,6 @@ final class CreateTeam extends RegisterTenant
                     [fn (): Unique => Rule::unique(Team::class, 'slug')],
                     condition: fn (Get $get): bool => $get('slug_auto_generated') !== true,
                 )
-                ->default(fn (): string => Team::availableSlugFor(
-                    __('filament/pages/teams.create_team.form.workspace_name.default'),
-                ))
                 ->prefix(WorkspaceUrlPrefix::get())
                 ->helperText(__('filament/pages/teams.create_team.form.workspace_handle.helper_text'))
                 ->live(onBlur: true)
