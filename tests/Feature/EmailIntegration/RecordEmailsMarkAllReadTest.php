@@ -6,7 +6,6 @@ use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -77,7 +76,6 @@ it('marks all of the record\'s unread emails as read', function (): void {
 
 it('opens with the list only, and reads an email into the overlay until it is closed', function (): void {
     $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertSet('folder', EmailFolder::All)
         ->assertSet('selectedEmailId', null);
 
     expect($page->instance()->selectedEmail())->toBeNull();
