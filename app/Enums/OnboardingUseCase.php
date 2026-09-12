@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Enums\CustomFields\OpportunityField;
 use Filament\Support\Contracts\HasLabel;
 
 enum OnboardingUseCase: string implements HasLabel
@@ -43,9 +42,12 @@ enum OnboardingUseCase: string implements HasLabel
     }
 
     /**
-     * @return array<string, string>
+     * Pipeline stages this use case wants, mapped to their colour. Null keeps
+     * the opportunity field's own defaults.
+     *
+     * @return array<string, string>|null
      */
-    public function stagePreset(): array
+    public function stagePreset(): ?array
     {
         return match ($this) {
             self::CustomerSuccess => [
@@ -74,7 +76,7 @@ enum OnboardingUseCase: string implements HasLabel
                 'Closed' => '#059669',
                 'Passed' => '#6b7280',
             ],
-            self::Sales, self::Marketing, self::Other => OpportunityField::STAGE->getOptionColors() ?? [],
+            self::Sales, self::Marketing, self::Other => null,
         };
     }
 
