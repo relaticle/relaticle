@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Models\CustomFieldValue;
+use App\Support\Media\UploadClaims;
 use Carbon\CarbonInterface;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -17,10 +18,15 @@ final readonly class CustomFieldValueObserver
 {
     public function __construct(
         private EnsureTagOptionsExist $ensureTagOptionsExist,
+        private UploadClaims $uploadClaims,
     ) {}
 
     public function saved(CustomFieldValue $value): void
     {
+        if ($value->wasRecentlyCreated || $value->wasChanged(['string_value', 'text_value'])) {
+            $this->uploadClaims->sync($value);
+        }
+
         // Only multi-value fields (tags-input et al.) store an array in json_value;
         // scalar-typed fields leave it blank. Short-circuit before loading the
         // customField relation so ordinary custom-field saves incur no extra query.
