@@ -42,6 +42,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
+        ->type('[id="form.name"]', 'Hiring Desk')
         ->press('Continue')
         ->waitForText('How did you hear about us?')
         ->press('Continue')
@@ -50,7 +51,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->waitForText('Pick what applies to you.')
         ->click('[for$="onboarding_context-sourcing"]')
         ->press('Get started')
-        ->assertPathContains('/my-workspace');
+        ->assertPathContains('/hiring-desk');
 
     $user->refresh();
 
@@ -58,5 +59,5 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
 
     expect($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
         ->and($workspace->onboarding_context)->toBe(['sourcing'])
-        ->and($workspace->name)->toBe('My workspace');
+        ->and($workspace->name)->toBe('Hiring Desk');
 });
