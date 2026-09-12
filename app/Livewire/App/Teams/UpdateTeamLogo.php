@@ -28,6 +28,9 @@ final class UpdateTeamLogo extends BaseLivewireComponent
         $this->team = $team;
 
         $this->form->fill();
+
+        // fill() hydrates defaults only; the media collection needs its own load.
+        $this->form->loadStateFromRelationships(shouldHydrate: true);
     }
 
     public function form(Schema $schema): Schema

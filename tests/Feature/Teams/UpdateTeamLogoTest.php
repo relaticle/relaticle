@@ -86,6 +86,17 @@ it('rejects an image type outside the logo allowlist', function (): void {
     expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(0);
 });
 
+it('keeps the existing logo when the form is saved untouched', function (): void {
+    $this->team->addMedia(UploadedFile::fake()->image('existing.png', 120, 120))
+        ->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);
+
+    Livewire::test(UpdateTeamLogo::class, ['team' => $this->team])
+        ->call('updateLogo')
+        ->assertHasNoFormErrors();
+
+    expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(1);
+});
+
 it('holds a single logo even when media is added outside the form', function (): void {
     $this->team->addMedia(UploadedFile::fake()->image('first.png', 120, 120))
         ->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);
