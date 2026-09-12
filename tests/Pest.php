@@ -108,3 +108,13 @@ function loginViaBrowser(User $user): AwaitableWebpage
         ->type('[id="form.password"]', 'password')
         ->click('button[type="submit"]');
 }
+
+function pdfBytes(): string
+{
+    return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+}
+
+function onePixelPng(): string
+{
+    return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true);
+}

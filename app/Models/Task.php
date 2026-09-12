@@ -27,6 +27,8 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property int $id
@@ -39,7 +41,7 @@ use Spatie\EloquentSortable\SortableTrait;
     'title',
     'creation_source',
 ])]
-final class Task extends Model implements HasCustomFields, HasTimeline
+final class Task extends Model implements HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasCreator;
@@ -49,6 +51,7 @@ final class Task extends Model implements HasCustomFields, HasTimeline
 
     use HasTeam;
     use HasUlids;
+    use InteractsWithMedia;
     use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;

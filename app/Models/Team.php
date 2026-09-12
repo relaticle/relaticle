@@ -368,7 +368,8 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
     {
         $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
             ->acceptsMimeTypes(self::LOGO_MIME_TYPES)
-            ->singleFile();
+            ->singleFile()
+            ->useDisk('public');
     }
 
     /**

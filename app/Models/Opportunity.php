@@ -28,6 +28,8 @@ use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\EloquentSortable\SortableTrait;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property CarbonImmutable|null $deleted_at
@@ -37,7 +39,7 @@ use Spatie\EloquentSortable\SortableTrait;
 #[Fillable([
     'creation_source',
 ])]
-final class Opportunity extends Model implements HasCustomFields, HasTimeline
+final class Opportunity extends Model implements HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasCreator;
@@ -48,6 +50,7 @@ final class Opportunity extends Model implements HasCustomFields, HasTimeline
     use HasNotes;
     use HasTeam;
     use HasUlids;
+    use InteractsWithMedia;
     use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;

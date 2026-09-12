@@ -29,6 +29,8 @@ use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property CarbonImmutable|null $deleted_at
@@ -39,7 +41,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'name',
     'creation_source',
 ])]
-final class People extends Model implements HasAvatar, HasCustomFields, HasTimeline
+final class People extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToTeamCreator;
     use HasCreator;
@@ -50,6 +52,7 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasTimel
     use HasNotes;
     use HasTeam;
     use HasUlids;
+    use InteractsWithMedia;
     use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
