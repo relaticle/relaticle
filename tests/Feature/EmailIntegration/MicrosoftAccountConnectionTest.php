@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Bus;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
+use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Controllers\CallbackController;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -22,6 +23,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 mutates(AppServiceProvider::class);
 mutates(CallbackController::class);
 mutates(ConnectAccountAction::class);
+mutates(DisconnectConnectedAccountAction::class);
 mutates(RedirectController::class);
 
 it('resolves the azure socialite driver', function (): void {
@@ -350,6 +352,52 @@ it('stores a separate connected account when the same mailbox is connected in a 
             $firstTeam->getKey(),
             $secondTeam->getKey(),
         ]);
+});
+
+it('reconnects a previously default mailbox without violating the live default constraint', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withTeam()->create();
+    $this->actingAs($user);
+    $team = $user->currentTeam;
+
+    $default = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->default()->create([
+        'user_id' => $user->getKey(),
+        'team_id' => $team->getKey(),
+        'email_address' => 'default@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-default-reconnect',
+    ]));
+
+    $successor = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'team_id' => $team->getKey(),
+    ]));
+
+    app(DisconnectConnectedAccountAction::class)->execute($default);
+
+    expect($successor->fresh()->is_default)->toBeTrue();
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-default-reconnect';
+    $social->email = 'default@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    expect($default->refresh()->trashed())->toBeFalse()
+        ->and($default->is_default)->toBeFalse()
+        ->and($successor->fresh()->is_default)->toBeTrue();
 });
 
 it('makes the first connected account the default and leaves later connections non-default', function (): void {
