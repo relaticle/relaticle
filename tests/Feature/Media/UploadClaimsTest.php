@@ -12,7 +12,6 @@ use App\Observers\CustomFieldValueObserver;
 use App\Support\Media\UploadClaims;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Relaticle\CustomFields\FieldTypeSystem\FieldTypeConfigurator;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -20,7 +19,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 mutates(UploadClaims::class, CustomFieldValueObserver::class);
 
 beforeEach(function (): void {
-    config()->set('custom-fields.field_type_configuration', FieldTypeConfigurator::configure()->disabled([]));
     Storage::fake('public');
     $this->user = User::factory()->withPersonalTeam()->create();
     $this->team = $this->user->personalTeam();

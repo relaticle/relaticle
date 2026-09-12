@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Enums\Plan;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
+use App\Filament\CustomFields\FileUploadFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -515,6 +516,7 @@ final class AppServiceProvider extends ServiceProvider
         CustomFieldsType::register([
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
+            'file-upload' => FileUploadFieldType::class,
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
