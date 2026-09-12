@@ -31,7 +31,8 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Override;
 
 final class CreateTeam extends RegisterTenant
@@ -185,7 +186,6 @@ final class CreateTeam extends RegisterTenant
     private function getUseCaseStep(): Step
     {
         return Step::make(__('filament/pages/teams.create_team.steps.use_case'))
-            ->key('onboarding-use-case')
             ->schema([
                 Placeholder::make('use_case_heading')
                     ->label(__('filament/pages/teams.create_team.headings.use_case'))
@@ -253,38 +253,6 @@ final class CreateTeam extends RegisterTenant
             ]);
     }
 
-    /**
-     * Mirrors the fallback in Team::getSlugOptions(). Names that transliterate to
-     * nothing (CJK, Hebrew, Thai, emoji) otherwise leave the handle blank, and the
-     * user is blocked by a bare "required" error on a field they never touched.
-     */
-    private function generateHandleFrom(?string $name): string
-    {
-        if (blank($name)) {
-            return '';
-        }
-
-        $slug = Str::slug($name);
-
-        return $slug === '' ? Str::lower(Str::random(8)) : $slug;
-    }
-
-    // The default handle is the same for everyone; without a suffix the unique
-    // rule rejects a field the user never touched.
-    private function uniqueHandleFor(string $handle): string
-    {
-        if (! Team::query()->where('slug', $handle)->exists()) {
-            return $handle;
-        }
-
-        $highest = (int) Team::query()
-            ->where('slug', 'like', "{$handle}-%")
-            ->selectRaw('max(substring(slug from ?)::int) as highest', ['^'.$handle.'-(\d{1,9})$'])
-            ->value('highest');
-
-        return "{$handle}-".max($highest + 1, 2);
-    }
-
     private function stepHeading(string $title, string ...$paragraphs): HtmlString
     {
         $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
@@ -338,7 +306,7 @@ final class CreateTeam extends RegisterTenant
                         return;
                     }
 
-                    $set('slug', $this->uniqueHandleFor($this->generateHandleFrom($state)));
+                    $set('slug', Team::availableSlugFor($state));
                     $set('slug_auto_generated', true);
                 }),
 
@@ -347,13 +315,15 @@ final class CreateTeam extends RegisterTenant
                 ->required()
                 ->maxLength(255)
                 ->rules([new ValidTeamSlug])
-                ->unique(
-                    table: Team::class,
-                    column: 'slug',
-                    ignorable: fn (): ?Team => $this->tenant instanceof Team ? $this->tenant : null,
+                // A handle the user never typed belongs to the model: HasSlug settles
+                // it inside the insert, where a concurrent signup cannot slip between
+                // the check and the write.
+                ->rules(
+                    [fn (): Unique => Rule::unique(Team::class, 'slug')],
+                    condition: fn (Get $get): bool => $get('slug_auto_generated') !== true,
                 )
-                ->default(fn (): string => $this->uniqueHandleFor(
-                    $this->generateHandleFrom(__('filament/pages/teams.create_team.form.workspace_name.default')),
+                ->default(fn (): string => Team::availableSlugFor(
+                    __('filament/pages/teams.create_team.form.workspace_name.default'),
                 ))
                 ->prefix(WorkspaceUrlPrefix::get())
                 ->helperText(__('filament/pages/teams.create_team.form.workspace_handle.helper_text'))
@@ -409,6 +379,15 @@ final class CreateTeam extends RegisterTenant
         $user = auth('web')->user();
 
         $this->updateUserNameIfChanged($user, $data);
+
+        // Only hand a handle the user never typed back to the model, and only when
+        // it has been taken since it was previewed: HasSlug then settles it in the
+        // same save. Keeping the previewed value otherwise is what stops a name
+        // that transliterates to nothing from being shown one random handle and
+        // saved under another.
+        if (($this->data['slug_auto_generated'] ?? null) === true && Team::query()->where('slug', $data['slug'])->exists()) {
+            $data['slug'] = null;
+        }
 
         return resolve(CreateTeamAction::class)->create($user, $data);
     }

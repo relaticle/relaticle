@@ -38,7 +38,9 @@ final readonly class CreateTeam implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
+            // Null hands the handle to Team's HasSlug pass, which settles it inside
+            // the insert instead of between a check and a write.
+            'slug' => ['nullable', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
             'onboarding_use_case' => ['required', 'string', Rule::enum(OnboardingUseCase::class)],
             'onboarding_context' => ['nullable', 'array'],
             'onboarding_context.*' => ['string'],
@@ -88,7 +90,7 @@ final readonly class CreateTeam implements CreatesTeams
 
         $team = new Team([
             'name' => $input['name'],
-            'slug' => $input['slug'],
+            'slug' => $input['slug'] ?? null,
             'personal_team' => $isFirstTeam,
             'onboarding_use_case' => $useCase,
             'onboarding_context' => $useCase->getSubOptions() === []

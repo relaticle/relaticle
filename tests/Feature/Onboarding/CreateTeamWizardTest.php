@@ -177,7 +177,7 @@ it('prefills a workspace name and a handle that is not already taken', function 
         ]);
 });
 
-it('picks the next free suffix from the highest one in use, not the next in scan order', function (): void {
+it('picks the lowest free suffix, skipping the ones already in use', function (): void {
     $other = User::factory()->create();
     Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
     Team::factory()->create(['slug' => 'my-workspace-2', 'user_id' => $other->id]);
@@ -188,7 +188,92 @@ it('picks the next free suffix from the highest one in use, not the next in scan
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
-        ->assertFormSet(['slug' => 'my-workspace-11']);
+        ->assertFormSet(['slug' => 'my-workspace-3']);
+});
+
+it('creates both workspaces when two signups overlap on the default handle', function (): void {
+    $first = User::factory()->create();
+    $second = User::factory()->create();
+
+    $this->actingAs($first);
+    $firstWizard = livewire(CreateTeam::class)->assertFormSet(['slug' => 'my-workspace']);
+
+    $this->actingAs($second);
+    $secondWizard = livewire(CreateTeam::class)->assertFormSet(['slug' => 'my-workspace']);
+
+    $this->actingAs($first);
+    $firstWizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $this->actingAs($second);
+    $secondWizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Team::query()->whereIn('user_id', [$first->id, $second->id])->pluck('slug')->sort()->values()->all())
+        ->toBe(['my-workspace', 'my-workspace-2']);
+});
+
+it('stores no context for a use case that offers no sub-options', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'name' => 'Blank Canvas',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Team::query()->where('name', 'Blank Canvas')->sole()->onboarding_context)->toBeNull();
+});
+
+it('saves the handle it previewed for a name that transliterates to nothing', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $wizard = livewire(CreateTeam::class)->fillForm(['name' => '株式会社テスト']);
+    $previewed = $wizard->get('data')['slug'];
+
+    $wizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->personalTeam()->slug)->toBe($previewed);
+});
+
+it('previews a handle that clears the reserved route segments, the way the save does', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Billing'])
+        ->assertFormSet(['slug' => 'billing-2']);
+});
+
+it('still rejects a handle the user typed themselves when it is taken', function (): void {
+    $other = User::factory()->create();
+    Team::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'slug' => 'acme-corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['slug']);
 });
 
 it('suffixes a typed name that slugs to a handle already in use', function (): void {
@@ -536,11 +621,11 @@ it('shows the free text only for the Other use case', function (): void {
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
         ])
-        ->assertFormFieldHidden('onboarding-use-case.onboarding_other_use_case')
+        ->assertFormFieldHidden('onboarding_other_use_case')
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Other->value,
         ])
-        ->assertFormFieldVisible('onboarding-use-case.onboarding_other_use_case');
+        ->assertFormFieldVisible('onboarding_other_use_case');
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {

@@ -273,18 +273,41 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-            ->generateSlugsFrom(function (): string {
-                $slug = Str::slug($this->name);
-
-                if ($slug === '') {
-                    return Str::lower(Str::random(8));
-                }
-
-                return $slug;
-            })
+            ->generateSlugsFrom(fn (): string => $this->slugSourceFor($this->name))
             ->saveSlugsTo('slug')
+            // "acme-corp" then "acme-corp-2" reads as the second Acme Corp, and it is
+            // the convention the 2026_02_11 backfill already wrote into every row.
+            ->startSlugSuffixFrom(2)
             ->preventOverwrite()
             ->doNotGenerateSlugsOnUpdate();
+    }
+
+    /**
+     * The handle a workspace of this name would be saved with. Runs the save's
+     * own pass, so what the signup form previews is what it stores.
+     */
+    public static function availableSlugFor(?string $name): string
+    {
+        if (blank($name)) {
+            return '';
+        }
+
+        $team = new self(['name' => $name]);
+        $team->generateSlug();
+
+        return (string) $team->slug;
+    }
+
+    /**
+     * Names that transliterate to nothing (CJK, Hebrew, Thai, emoji) would
+     * otherwise leave the handle blank and fail a "required" rule on a field
+     * the user never touched.
+     */
+    private function slugSourceFor(?string $name): string
+    {
+        $slug = Str::slug((string) $name);
+
+        return $slug === '' ? Str::lower(Str::random(8)) : $slug;
     }
 
     protected function generateSlugAction(): ReservedSlugAwareGenerateSlugAction
