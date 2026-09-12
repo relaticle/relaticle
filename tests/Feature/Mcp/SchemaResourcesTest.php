@@ -409,7 +409,7 @@ function customFieldHintRows(): array
         ['date', 'ISO 8601 date"'],
         ['date-time', 'ISO 8601 datetime string'],
         ['record', 'array of record IDs of the lookup entity'],
-        ['file-upload', 'upload-file tool'],
+        ['file-upload', 'read back as {path, url}'],
     ];
 }
 
