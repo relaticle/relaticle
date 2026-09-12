@@ -5,6 +5,14 @@ paths:
 
 # Email integration
 
+## Bind mailbox OAuth to the initiating workspace
+
+`RedirectController` stores the current team id in the session before sending
+the user to Google or Microsoft. `CallbackController` connects the mailbox to
+that stored team, not `$user->currentTeam`. Switching workspaces in another tab
+during consent must not import history under the other workspace's sharing
+defaults. A missing or non-member binding fails closed: no account is created.
+
 ## Vanished provider messages must not fail the mailbox
 
 A listed Gmail or Graph id can be permanently deleted before `StoreEmailJob`

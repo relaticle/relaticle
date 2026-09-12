@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Controllers;
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,11 +65,6 @@ final readonly class CallbackController
         /** @var User $user */
         $user = auth()->user();
 
-        // Without an active team we cannot scope or redirect; bail to the dashboard.
-        if ($user->currentTeam === null) {
-            return redirect('/')->with('error', 'Select a team before connecting an account.');
-        }
-
         if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
             return $this->redirectWithError($user, 'That email provider is not supported.');
         }
@@ -82,14 +78,20 @@ final readonly class CallbackController
         } catch (InvalidStateException) {
             Log::warning('OAuth callback state mismatch.', ['provider' => $provider, 'user_id' => $user->getKey()]);
 
-            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.');
+            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.', $this->boundWorkspace($request, $user));
         } catch (Throwable $e) {
             Log::error('OAuth callback failed.', ['provider' => $provider, 'user_id' => $user->getKey(), 'exception' => $e]);
 
-            return $this->redirectWithError($user, 'We could not connect that account. Please try again.');
+            return $this->redirectWithError($user, 'We could not connect that account. Please try again.', $this->boundWorkspace($request, $user));
         }
 
         throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
+
+        $team = $this->consumeBoundWorkspace($request, $user);
+
+        if (! $team instanceof Team) {
+            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.');
+        }
 
         /** @var array<int, string> $grantedScopes */
         $grantedScopes = $socialUser->approvedScopes;
@@ -98,7 +100,7 @@ final readonly class CallbackController
 
         resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
             userId: $user->getKey(),
-            teamId: $user->currentTeam->getKey(),
+            teamId: $team->getKey(),
             provider: $provider,
             emailAddress: $socialUser->getEmail(),
             displayName: $socialUser->getName(),
@@ -111,14 +113,41 @@ final readonly class CallbackController
         ));
 
         return redirect(EmailAccountsPage::getUrl([
-            'tenant' => $user->currentTeam->slug,
+            'tenant' => $team->slug,
         ]))->with('success', 'Account connected successfully.');
     }
 
-    private function redirectWithError(User $user, string $message): RedirectResponse
+    private function boundWorkspace(Request $request, User $user): ?Team
     {
+        return $this->workspaceIfMember($user, $request->session()->get(RedirectController::WORKSPACE_SESSION_KEY));
+    }
+
+    private function consumeBoundWorkspace(Request $request, User $user): ?Team
+    {
+        return $this->workspaceIfMember($user, $request->session()->pull(RedirectController::WORKSPACE_SESSION_KEY));
+    }
+
+    private function workspaceIfMember(User $user, mixed $teamId): ?Team
+    {
+        if (! is_string($teamId) || $teamId === '' || ! $user->belongsToTeamId($teamId)) {
+            return null;
+        }
+
+        $team = Team::query()->find($teamId);
+
+        return $team instanceof Team ? $team : null;
+    }
+
+    private function redirectWithError(User $user, string $message, ?Team $team = null): RedirectResponse
+    {
+        $team ??= $user->currentTeam;
+
+        if ($team === null) {
+            return redirect('/')->with('error', $message);
+        }
+
         return redirect(EmailAccountsPage::getUrl([
-            'tenant' => $user->currentTeam->slug,
+            'tenant' => $team->slug,
         ]))->with('error', $message);
     }
 

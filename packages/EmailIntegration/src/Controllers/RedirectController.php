@@ -4,28 +4,55 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Controllers;
 
+use App\Models\Team;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Laravel\Socialite\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use RuntimeException;
 
 final readonly class RedirectController
 {
-    public function __invoke(string $provider): RedirectResponse
-    {
-        return match ($provider) {
-            'gmail' => $this->driver('gmail')
-                ->scopes($this->gmailScopes())
-                ->with(['access_type' => 'offline', 'prompt' => 'consent'])
-                ->redirect(),
+    public const string WORKSPACE_SESSION_KEY = 'email_integration.oauth.team_id';
 
-            'azure' => $this->driver('azure')
-                ->setScopes($this->azureScopes())
-                ->with(['prompt' => 'consent'])
-                ->redirect(),
+    public function __invoke(Request $request, string $provider): RedirectResponse
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        return match ($provider) {
+            'gmail' => $this->startOAuth(
+                $request,
+                $user,
+                $this->driver('gmail')
+                    ->scopes($this->gmailScopes())
+                    ->with(['access_type' => 'offline', 'prompt' => 'consent']),
+            ),
+
+            'azure' => $this->startOAuth(
+                $request,
+                $user,
+                $this->driver('azure')
+                    ->setScopes($this->azureScopes())
+                    ->with(['prompt' => 'consent']),
+            ),
 
             default => back(),
         };
+    }
+
+    private function startOAuth(Request $request, User $user, AbstractProvider $driver): RedirectResponse
+    {
+        $team = $user->currentTeam;
+
+        if (! $team instanceof Team) {
+            return redirect('/')->with('error', 'Select a team before connecting an account.');
+        }
+
+        $request->session()->put(self::WORKSPACE_SESSION_KEY, $team->getKey());
+
+        return $driver->redirect();
     }
 
     /** @return array<int, string> */
