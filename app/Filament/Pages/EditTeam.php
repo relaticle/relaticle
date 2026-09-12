@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Livewire\App\Teams\DeleteTeam;
+use App\Livewire\App\Teams\UpdateTeamLogo;
 use App\Livewire\App\Teams\UpdateTeamName;
 use App\Models\Team;
 use Filament\Pages\Tenancy\EditTenantProfile;
@@ -29,6 +30,8 @@ final class EditTeam extends EditTenantProfile
 
         return $schema->components([
             Livewire::make(UpdateTeamName::class)
+                ->data(['team' => $tenant]),
+            Livewire::make(UpdateTeamLogo::class)
                 ->data(['team' => $tenant]),
             Livewire::make(DeleteTeam::class)
                 ->visible(fn (): bool => $tenant->isPersonalTeam() === false)

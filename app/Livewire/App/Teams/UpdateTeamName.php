@@ -9,6 +9,7 @@ use App\Filament\Pages\EditTeam;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Rules\ValidTeamSlug;
+use App\Support\WorkspaceUrlPrefix;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
@@ -60,6 +61,7 @@ final class UpdateTeamName extends BaseLivewireComponent
                             }),
                         TextInput::make('slug')
                             ->label(__('teams.form.team_slug.label'))
+                            ->prefix(WorkspaceUrlPrefix::get())
                             ->helperText(__('teams.form.team_slug.helper_text'))
                             ->string()
                             ->maxLength(255)

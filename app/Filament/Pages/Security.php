@@ -18,6 +18,8 @@ final class Security extends Page
 {
     protected string $view = 'filament.pages.security';
 
+    protected static string $layout = 'filament.layouts.settings';
+
     protected static ?string $slug = 'security';
 
     protected static ?int $navigationSort = 2;

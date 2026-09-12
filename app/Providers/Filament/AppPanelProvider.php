@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
@@ -359,6 +360,18 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::TENANT_MENU_AFTER,
                 fn (): View|Factory => view('filament.app.sidebar-toggle')
+            )
+            // STYLES_AFTER renders past the panel stylesheet, which is what lets the
+            // `html[data-accent]` ramps outrank the `:root` defaults it emits.
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): View|Factory => view('filament.app.accent-palettes', [
+                    'accents' => AccentColor::cases(),
+                ])
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_START,
+                fn (): View|Factory => view('filament.app.appearance-preference')
             )
             /**
              * The activation checklist lives here rather than on the dashboard

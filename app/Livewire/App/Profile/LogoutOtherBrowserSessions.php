@@ -28,7 +28,6 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
             ->schema([
                 Section::make(__('profile.sections.browser_sessions.title'))
                     ->description(__('profile.sections.browser_sessions.description'))
-                    ->aside()
                     ->schema([
                         ViewField::make('browserSessions')
                             ->hiddenLabel()

@@ -1,5 +1,5 @@
 <div class="space-y-4">
-    <div class="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+    <div class="flex items-start justify-between gap-4">
         <div class="space-y-1">
             <div class="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
                 <x-filament::icon

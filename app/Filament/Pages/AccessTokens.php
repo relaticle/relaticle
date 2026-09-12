@@ -19,6 +19,8 @@ final class AccessTokens extends Page
 {
     protected string $view = 'filament.pages.access-tokens';
 
+    protected static string $layout = 'filament.layouts.settings';
+
     protected static ?string $slug = 'access-tokens';
 
     protected static ?int $navigationSort = 4;

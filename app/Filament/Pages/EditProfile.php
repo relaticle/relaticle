@@ -18,6 +18,8 @@ final class EditProfile extends Page
 {
     protected string $view = 'filament.pages.edit-profile';
 
+    protected static string $layout = 'filament.layouts.settings';
+
     protected static ?string $slug = 'profile';
 
     protected static ?int $navigationSort = 1;

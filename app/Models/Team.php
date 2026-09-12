@@ -34,6 +34,8 @@ use Laravel\Jetstream\Team as JetstreamTeam;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\ImportWizard\Models\Import;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Onboard\Concerns\GetsOnboarded;
 use Spatie\Onboard\Concerns\Onboardable;
 use Spatie\Sluggable\HasSlug;
@@ -71,7 +73,7 @@ use Spatie\Sluggable\SlugOptions;
 #[Hidden([
     'invite_link_token',
 ])]
-final class Team extends JetstreamTeam implements HasAvatar, Onboardable
+final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardable
 {
     use Billable;
     use GetsOnboarded;
@@ -81,6 +83,16 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 
     use HasSlug;
     use HasUlids;
+    use InteractsWithMedia;
+
+    public const string LOGO_MEDIA_COLLECTION = 'logo';
+
+    // SVG is excluded on purpose: it carries script, and a workspace logo is the
+    // one image members upload to the public disk on our own origin.
+    /** @var list<string> */
+    public const array LOGO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    public const int LOGO_MAX_KILOBYTES = 2048;
 
     public const string SLUG_REGEX = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
@@ -343,7 +355,20 @@ final class Team extends JetstreamTeam implements HasAvatar, Onboardable
 
     public function getFilamentAvatarUrl(): string
     {
+        $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
+
+        if ($logo !== '') {
+            return $logo;
+        }
+
         return resolve(AvatarService::class)->generate(name: $this->name, bgColor: '#000000', textColor: '#ffffff');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
+            ->acceptsMimeTypes(self::LOGO_MIME_TYPES)
+            ->singleFile();
     }
 
     /**

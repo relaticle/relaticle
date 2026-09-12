@@ -12,6 +12,10 @@ return [
         'settings' => 'Settings',
     ],
 
+    'settings_layout' => [
+        'back_to_app' => 'Back to app',
+    ],
+
     'navigation_groups' => [
         'tasks' => 'Tasks',
     ],

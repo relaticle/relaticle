@@ -13,6 +13,7 @@ use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\ValidTeamSlug;
+use App\Support\WorkspaceUrlPrefix;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
@@ -438,8 +439,6 @@ final class CreateTeam extends RegisterTenant
      */
     private function getWorkspaceFormComponents(): array
     {
-        $appHost = parse_url(url()->getAppUrl(), PHP_URL_HOST);
-
         return [
             TextInput::make('user_name')
                 ->label(__('filament/pages/teams.create_team.form.your_name.label'))
@@ -479,7 +478,7 @@ final class CreateTeam extends RegisterTenant
                     column: 'slug',
                     ignorable: fn (): ?Team => $this->tenant instanceof Team ? $this->tenant : null,
                 )
-                ->prefix("{$appHost}/")
+                ->prefix(WorkspaceUrlPrefix::get())
                 ->helperText(__('filament/pages/teams.create_team.form.workspace_handle.helper_text'))
                 ->live(onBlur: true)
                 ->afterStateUpdated(function (Set $set): void {

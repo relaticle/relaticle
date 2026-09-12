@@ -12,6 +12,8 @@ final class NotificationPreferences extends Page
 {
     protected string $view = 'filament.pages.notification-preferences';
 
+    protected static string $layout = 'filament.layouts.settings';
+
     protected static ?string $slug = 'notifications';
 
     protected static ?int $navigationSort = 3;

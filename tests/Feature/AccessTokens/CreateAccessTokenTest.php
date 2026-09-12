@@ -10,6 +10,24 @@ use Laravel\Jetstream\Features;
 
 mutates(User::class);
 
+test('the expiration field defaults to 180 days', function () {
+    $this->actingAs($user = User::factory()->withTeam()->create());
+
+    livewire(CreateAccessToken::class)
+        ->assertFormSet(['expiration' => '180'])
+        ->fillForm([
+            'name' => 'Default Expiry Token',
+            'team_id' => $user->currentTeam->id,
+            'permissions' => ['read'],
+        ])
+        ->call('createToken')
+        ->assertHasNoFormErrors();
+
+    $token = $user->fresh()->tokens->first();
+
+    expect($token->expires_at->startOfDay()->equalTo(now()->addDays(180)->startOfDay()))->toBeTrue();
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
 test('api tokens can be created with team and expiration', function () {
     $this->actingAs($user = User::factory()->withTeam()->create());
 
