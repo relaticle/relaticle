@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Favicon;
 
 use App\Exceptions\SsrfGuardException;
+use App\Exceptions\UploadException;
+use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
@@ -69,6 +71,36 @@ final readonly class SsrfGuard
                 },
             ],
         ];
+    }
+
+    /**
+     * A client for one-shot downloads that never follows a redirect and connects
+     * to the address resolved here, so a DNS answer cannot change between the
+     * check and the fetch (TOCTOU). https on 443 only.
+     */
+    public static function pinnedClient(string $url): PendingRequest
+    {
+        $parts = parse_url($url);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? null) : null;
+        $port = is_array($parts) ? ($parts['port'] ?? 443) : null;
+
+        throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
+
+        self::assertPublicHost($url);
+
+        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+        $address = self::resolveAddresses($host)[0];
+        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
+
+        return Http::withOptions([
+            'allow_redirects' => false,
+            'connect_timeout' => 10,
+            'timeout' => 30,
+            'curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$pinned}"]],
+            'progress' => static function (int $downloadTotal, int $downloaded): void {
+                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge());
+            },
+        ]);
     }
 
     public static function assertPublicHost(string $url): void
