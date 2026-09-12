@@ -398,7 +398,14 @@ export default Extension.create({
             // ProseMirror sets role="textbox" but not this, so a screen reader
             // announces a single-line field and reads Enter as submit.
             new Plugin({
-                props: { attributes: { 'aria-multiline': 'true' } },
+                props: {
+                    attributes(state) {
+                        return {
+                            'aria-multiline': 'true',
+                            'data-selection-empty': state.selection.empty ? 'true' : 'false',
+                        }
+                    },
+                },
             }),
 
             new Plugin({

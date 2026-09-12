@@ -10,6 +10,7 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Filament\Schemas\Components\Component;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Model;
@@ -214,12 +215,26 @@ it('drives note body formatting from the slash menu rather than a toolbar', func
     $editor = collect($schema->getFlatComponents(withHidden: true))
         ->first(fn (Component $component): bool => $component instanceof RichEditor);
 
+    $paragraphToolbar = $editor->getFloatingToolbars()['paragraph'];
+    $headingToolbar = $editor->getFloatingToolbars()['heading'];
+
     expect($editor)->not->toBeNull()
         ->and($editor->getToolbarButtons())->toBe([])
-        ->and(array_keys($editor->getFloatingToolbars()))->toBe(['paragraph', 'table'])
-        ->and($editor->getFloatingToolbars()['paragraph'])
-        ->toBe(['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link'])
+        ->and(array_keys($editor->getFloatingToolbars()))->toBe(['paragraph', 'heading', 'table'])
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
+
+    foreach ([$paragraphToolbar, $headingToolbar] as $toolbar) {
+        expect($toolbar[0])->toBeInstanceOf(ToolbarButtonGroup::class)
+            ->and($toolbar[0]->getName())->toBe('Text style')
+            ->and($toolbar[0]->getButtons())->toBe(['paragraph', 'h1', 'h2', 'h3'])
+            ->and($toolbar[0]->hasTextualButtons())->toBeTrue()
+            ->and(collect($toolbar[0]->getResolvedButtons())->map->getLabel()->all())
+            ->toBe(['Body', 'Heading 1', 'Heading 2', 'Heading 3'])
+            ->and(array_slice($toolbar, 1))
+            ->toBe(['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link']);
+    }
+
+    expect($paragraphToolbar[0])->not->toBe($headingToolbar[0]);
 
     foreach (['attachFiles', 'link'] as $name) {
         expect($editor->getActions()[$name]->shouldOverlayParentActions())->toBeTrue();

@@ -8,6 +8,10 @@ return [
 
     'limit_reached' => 'This field is full. Delete some content to keep writing.',
 
+    'selection_toolbar' => [
+        'text_style' => 'Text style',
+    ],
+
     'slash_menu' => [
         'no_results' => 'No blocks match ":query"',
 

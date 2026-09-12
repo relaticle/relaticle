@@ -960,6 +960,26 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     }
 }
 
+[data-slash-menu] {
+    .fi-fo-rich-editor-floating-toolbar {
+        @apply gap-x-1;
+    }
+
+    @media (width < 40rem) {
+        .fi-fo-rich-editor-floating-toolbar {
+            inset-inline: 0 !important;
+            width: auto !important;
+        }
+    }
+
+    .fi-fo-rich-editor-content:has(.ProseMirror[data-selection-empty='true'])
+        > [x-ref='floatingToolbar::heading'] {
+        pointer-events: none;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+
 /* The slash menu is appended to <body> to escape the modal's overflow clipping,
    so z-40 has to clear the modal window at 30. */
 .fi-slash-menu {

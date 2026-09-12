@@ -9,6 +9,7 @@ use App\Enums\CustomFields\NoteField;
 use App\Enums\CustomFields\TaskField;
 use App\Filament\RichEditor\SlashMenuPlugin;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\Definitions\RichEditorFieldType as PackageRichEditorFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\FieldSchema;
@@ -16,8 +17,6 @@ use Relaticle\CustomFields\Models\CustomField;
 
 final class RichEditorFieldType extends BaseFieldType
 {
-    // Never add `heading`: Filament shows a node's floating toolbar whenever the caret
-    // sits in it, which would park a toolbar under every heading being typed.
     /** @var list<string> */
     private const array FLOATING_TOOLBAR = ['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link'];
 
@@ -39,14 +38,35 @@ final class RichEditorFieldType extends BaseFieldType
                 // and there is no toolbar: without this, an uploaded image saves as null.
                 ->fileAttachments(true)
                 // The defaults carry the table controls, unreachable otherwise without a toolbar.
-                ->floatingToolbars(fn (RichEditor $component): array => [
-                    'paragraph' => self::FLOATING_TOOLBAR,
-                    ...$component->getDefaultFloatingToolbars(),
-                ])
+                ->floatingToolbars(function (RichEditor $component): array {
+                    $tools = $component->getTools();
+                    $tools['paragraph']->label(__('filament/rich-editor.slash_menu.items.paragraph.label'));
+                    $tools['h1']->label(__('filament/rich-editor.slash_menu.items.h1.label'));
+                    $tools['h2']->label(__('filament/rich-editor.slash_menu.items.h2.label'));
+                    $tools['h3']->label(__('filament/rich-editor.slash_menu.items.h3.label'));
+
+                    return [
+                        'paragraph' => $this->selectionToolbar(),
+                        'heading' => $this->selectionToolbar(),
+                        ...$component->getDefaultFloatingToolbars(),
+                    ];
+                })
                 ->extraAttributes(fn (RichEditor $component): array => [
                     ...SlashMenuPlugin::attributes($component),
                     ...($this->isDocument($customField) ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
                 ]));
+    }
+
+    /** @return list<string | ToolbarButtonGroup> */
+    private function selectionToolbar(): array
+    {
+        return [
+            ToolbarButtonGroup::make(
+                __('filament/rich-editor.selection_toolbar.text_style'),
+                ['paragraph', 'h1', 'h2', 'h3'],
+            )->textualButtons(),
+            ...self::FLOATING_TOOLBAR,
+        ];
     }
 
     private function isDocument(CustomField $customField): bool
