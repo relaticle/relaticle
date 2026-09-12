@@ -2,30 +2,40 @@
 
 declare(strict_types=1);
 
+use App\Enums\MediaCollection;
 use App\Http\Resources\V1\Concerns\FormatsCustomFields;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Note\CreateNoteTool;
+use App\Mcp\Tools\Note\GetNoteTool;
+use App\Mcp\Tools\Note\UpdateNoteTool;
 use App\Mcp\Tools\Task\CreateTaskTool;
 use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
+use App\Mcp\Tools\UploadFileTool;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use App\Rules\OwnedLookupRecords;
+use App\Rules\StoredUploadPath;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\Media\MediaPaths;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, StoredUploadPath::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -535,3 +545,166 @@ it('sets then clears a value for every writable custom field type', function (st
     'checkbox-list' => ['checkbox-list', null, 'OPTION_ID_LIST'],
     'record' => ['record', null, null],
 ]);
+
+function uploadedPath(User $user, string $filename = 'brief.pdf'): string
+{
+    RelaticleServer::actingAs($user)
+        ->tool(UploadFileTool::class, ['base64' => base64_encode(pdfBytes()), 'filename' => $filename])
+        ->assertOk();
+
+    return Media::query()->latest('id')->firstOrFail()->getPathRelativeToRoot();
+}
+
+describe('file-upload values', function (): void {
+    beforeEach(function (): void {
+        Storage::fake('public');
+        $this->contract = CustomField::factory()->create([
+            'tenant_id' => $this->team->getKey(),
+            'entity_type' => 'note',
+            'code' => 'contract',
+            'name' => 'Contract',
+            'type' => 'file-upload',
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+    });
+
+    it('sets a file field from an upload-file path and claims the media', function (): void {
+        $path = uploadedPath($this->user);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Signed', 'custom_fields' => ['contract' => $path]])
+            ->assertOk()
+            ->assertSee('"path"')
+            ->assertSee('"url"');
+
+        $note = Note::query()->where('title', 'Signed')->with('customFieldValues.customField.options')->firstOrFail();
+        $media = Media::query()->where('collection_name', MediaCollection::forCustomField('contract'))->firstOrFail();
+
+        expect($media->model_id)->toBe($note->getKey())
+            ->and($note->getCustomFieldValue($this->contract))->toBe($path);
+    });
+
+    it('accepts the record\'s current value on update', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Keep', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+        $note = Note::query()->where('title', 'Keep')->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdateNoteTool::class, ['id' => $note->getKey(), 'title' => 'Kept', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+
+        expect(Media::query()->where('collection_name', MediaCollection::forCustomField('contract'))->count())->toBe(1);
+    });
+
+    it('rejects another file owned by the record when it is not the current field value', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Exact current value', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+        $note = Note::query()->where('title', 'Exact current value')->with('customFieldValues.customField.options')->firstOrFail();
+        $other = $note->addMediaFromString(pdfBytes())
+            ->usingFileName('other.pdf')
+            ->withCustomProperties(['team_id' => $this->team->getKey()])
+            ->toMediaCollection(MediaCollection::forCustomField('contract'));
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdateNoteTool::class, ['id' => $note->getKey(), 'custom_fields' => ['contract' => $other->getPathRelativeToRoot()]])
+            ->assertHasErrors()
+            ->assertSee('Contract: pass a path returned by the upload-file tool');
+
+        expect($note->fresh('customFieldValues.customField.options')->getCustomFieldValue($this->contract))->toBe($path);
+    });
+
+    it('rejects another workspace\'s upload', function (): void {
+        $stranger = User::factory()->withPersonalTeam()->create();
+        $path = uploadedPath($stranger);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Nope', 'custom_fields' => ['contract' => $path]])
+            ->assertHasErrors()
+            ->assertSee('Contract: pass a path returned by the upload-file tool');
+    });
+
+    it('rejects a tmp path, a traversal path, and a missing file', function (): void {
+        foreach (['tmp/01ARZ3NDEKTSV4RRFFQ69G5FAV.pdf', '../.env', 'uploads/00000000-0000-0000-0000-000000000000/x.pdf'] as $bad) {
+            RelaticleServer::actingAs($this->user)
+                ->tool(CreateNoteTool::class, ['title' => 'Bad', 'custom_fields' => ['contract' => $bad]])
+                ->assertHasErrors();
+        }
+
+        expect(Note::query()->where('title', 'Bad')->exists())->toBeFalse();
+    });
+
+    it('reads a file field as path and url', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Read', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+        $note = Note::query()->where('title', 'Read')->firstOrFail();
+        $media = Media::query()->where('collection_name', MediaCollection::forCustomField('contract'))->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(GetNoteTool::class, ['id' => $note->getKey()])
+            ->assertOk()
+            ->assertSee($media->uuid)
+            ->assertSee('"url"');
+    });
+
+    it('rejects a path another record already claimed', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'First', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Second', 'custom_fields' => ['contract' => $path]])
+            ->assertHasErrors()
+            ->assertSee('Contract: pass a path returned by the upload-file tool');
+
+        expect(Note::query()->where('title', 'Second')->exists())->toBeFalse();
+    });
+
+    it('refuses one upload for two fields in the same payload', function (): void {
+        CustomField::factory()->create([
+            'tenant_id' => $this->team->getKey(),
+            'entity_type' => 'note',
+            'code' => 'annex',
+            'name' => 'Annex',
+            'type' => 'file-upload',
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+        $path = uploadedPath($this->user);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Twice', 'custom_fields' => ['contract' => $path, 'annex' => $path]])
+            ->assertHasErrors();
+
+        expect(Note::query()->where('title', 'Twice')->exists())->toBeFalse()
+            ->and(resolve(MediaPaths::class)->find($this->team->getKey(), $path)?->collection_name)->toBe(MediaCollection::PendingUploads->value);
+    });
+
+    it('leaves a rich-editor image owned by another workspace untouched', function (): void {
+        $stranger = User::factory()->withPersonalTeam()->create();
+        RelaticleServer::actingAs($stranger)
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(onePixelPng()), 'filename' => 'foreign.png'])
+            ->assertOk();
+        $foreign = Media::query()->latest('id')->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, [
+                'title' => 'Foreign rich image',
+                'custom_fields' => ['body' => "<p><img data-id=\"{$foreign->uuid}\" src=\"x\"></p>"],
+            ])
+            ->assertOk();
+
+        expect(Note::query()->where('title', 'Foreign rich image')->exists())->toBeTrue()
+            ->and($foreign->refresh()->collection_name)->toBe(MediaCollection::PendingUploads->value);
+    });
+
+});

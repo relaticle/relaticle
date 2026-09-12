@@ -66,7 +66,7 @@ final class PeopleSchemaResource extends Resource implements ProvidesEntitySchem
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators.',
+            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators. For file-upload fields, pass the path returned by the upload-file tool.',
         ];
     }
 }

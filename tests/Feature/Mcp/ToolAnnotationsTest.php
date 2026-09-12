@@ -17,6 +17,7 @@ use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -47,6 +48,7 @@ use App\Mcp\Tools\Task\DetachTaskFromEntitiesTool;
 use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
+use App\Mcp\Tools\UploadFileTool;
 use App\Mcp\Tools\WhoAmiTool;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
@@ -88,6 +90,8 @@ $toolContracts = [
     AggregateOpportunitiesTool::class => ['title' => 'Aggregate Opportunities', 'name' => 'aggregate-opportunities-tool', 'annotations' => $readAnnotations],
     ListActivityTool::class => ['title' => 'List CRM Activity', 'name' => 'list-activity-tool', 'annotations' => $readAnnotations],
     ListCustomFieldsTool::class => ['title' => 'List Custom Fields', 'name' => 'list-custom-fields-tool', 'annotations' => $readAnnotations],
+    CreateUploadUrlTool::class => ['title' => 'Create Upload URL', 'name' => 'create-upload-url', 'annotations' => $createAnnotations],
+    UploadFileTool::class => ['title' => 'Upload File', 'name' => 'upload-file', 'annotations' => $createTaskAnnotations],
     ListCompaniesTool::class => ['title' => 'List Companies', 'name' => 'list-companies-tool', 'annotations' => $readAnnotations],
     GetCompanyTool::class => ['title' => 'Get Company', 'name' => 'get-company-tool', 'annotations' => $readAnnotations],
     CreateCompanyTool::class => ['title' => 'Create Company', 'name' => 'create-company-tool', 'annotations' => $createAnnotations],
@@ -140,7 +144,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(37);
+    expect($registeredTools)->toBeArray()->toHaveCount(39);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -159,7 +163,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(37);
+    expect($tools)->toBeArray()->toHaveCount(39);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();

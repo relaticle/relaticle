@@ -17,6 +17,7 @@ use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -47,6 +48,7 @@ use App\Mcp\Tools\Task\DetachTaskFromEntitiesTool;
 use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
+use App\Mcp\Tools\UploadFileTool;
 use App\Mcp\Tools\WhoAmiTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
@@ -72,6 +74,8 @@ final class RelaticleServer extends Server
         AggregateOpportunitiesTool::class,
         ListActivityTool::class,
         ListCustomFieldsTool::class,
+        CreateUploadUrlTool::class,
+        UploadFileTool::class,
         ListCompaniesTool::class,
         GetCompanyTool::class,
         CreateCompanyTool::class,

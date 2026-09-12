@@ -409,17 +409,14 @@ function customFieldHintRows(): array
         ['date', 'ISO 8601 date"'],
         ['date-time', 'ISO 8601 datetime string'],
         ['record', 'array of record IDs of the lookup entity'],
+        ['file-upload', 'read back as {path, url}'],
     ];
 }
 
 it('exercises the hint of every custom field type a tenant can create', function (): void {
     $exercised = array_column(customFieldHintRows(), 0);
 
-    $creatable = array_values(array_diff(
-        array_map(fn (CustomFieldType $case): string => $case->value, CustomFieldType::cases()),
-        // file-upload is disabled product-wide (config/custom-fields.php) and its writes ship in #699.
-        [CustomFieldType::FILE_UPLOAD->value],
-    ));
+    $creatable = array_map(fn (CustomFieldType $case): string => $case->value, CustomFieldType::cases());
 
     expect($exercised)->toEqualCanonicalizing($creatable);
 });

@@ -7,6 +7,9 @@ use App\Actions\Note\UpdateNote;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\People\UpdatePeople;
 use App\Actions\Task\UpdateTask;
+use App\Actions\Upload\StorePendingUpload;
+use App\Enums\MediaCollection;
+use App\Enums\UploadSource;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -15,9 +18,11 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Media\UploadClaims;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
@@ -29,6 +34,8 @@ use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
+
+mutates(StorePendingUpload::class, UploadClaims::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -102,6 +109,36 @@ it('updates the note body via custom_fields and persists as text_value', functio
     resolve(UpdateNote::class)->execute($this->user, $note, latestPendingForCustomFieldsTest()->action_data);
 
     expect(rawValueForCustomFieldsTest($note, 'body', 'text_value'))->toContain('Body text');
+});
+
+it('sets and clears a note file upload through chat approval', function (): void {
+    Storage::fake('public');
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => 'note',
+        'code' => 'contract',
+        'name' => 'Contract',
+        'type' => 'file-upload',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $source = tempnam(sys_get_temp_dir(), 'chat-upload');
+    file_put_contents($source, pdfBytes());
+    $media = resolve(StorePendingUpload::class)->execute($this->user, $this->team, $source, 'contract.pdf', UploadSource::Panel);
+    $note = Note::factory()->for($this->team)->create(['title' => 'N']);
+
+    runUpdateToolForCustomFieldsTest(UpdateNoteTool::class, $note, ['contract' => $media->getPathRelativeToRoot()]);
+    resolve(UpdateNote::class)->execute($this->user, $note, latestPendingForCustomFieldsTest()->action_data);
+
+    expect($media->refresh()->collection_name)->toBe(MediaCollection::forCustomField('contract'))
+        ->and(rawValueForCustomFieldsTest($note, 'contract', 'string_value'))->toBe($media->getPathRelativeToRoot());
+
+    runUpdateToolForCustomFieldsTest(UpdateNoteTool::class, $note, ['contract' => null]);
+    resolve(UpdateNote::class)->execute($this->user, $note, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($note, 'contract', 'string_value'))->toBeNull()
+        ->and($media->fresh())->toBeNull();
 });
 
 it('updates the opportunity stage by option label and persists the option id', function (): void {

@@ -99,6 +99,11 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->logo;
     }
 
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)->useDisk('public');
+    }
+
     /**
      * Team member responsible for managing the company account
      *

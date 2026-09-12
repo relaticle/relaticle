@@ -6,6 +6,7 @@ namespace App\Http\Resources\V1\Concerns;
 
 use App\Enums\CustomFieldType;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\Media\MediaPaths;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,7 +18,10 @@ trait FormatsCustomFields
 {
     public static function collection(mixed $resource): AnonymousResourceCollection
     {
-        resolve(RecordNameResolver::class)->prime($resource instanceof Paginator ? $resource->items() : $resource);
+        $records = $resource instanceof Paginator ? $resource->items() : $resource;
+
+        resolve(RecordNameResolver::class)->prime($records);
+        resolve(MediaPaths::class)->prime($records);
 
         return parent::collection($resource);
     }
@@ -46,6 +50,10 @@ trait FormatsCustomFields
 
         if ($customField->type === CustomFieldType::RECORD->value) {
             return $this->resolveRecordValue($customField, $rawValue);
+        }
+
+        if ($customField->type === CustomFieldType::FILE_UPLOAD->value) {
+            return $this->resolveFileValue($fieldValue, $rawValue);
         }
 
         if (! $customField->typeData->dataType->isChoiceField()) {
@@ -108,5 +116,19 @@ trait FormatsCustomFields
         }
 
         return resolve(RecordNameResolver::class)->resolve((string) $customField->lookup_type, $rawValue);
+    }
+
+    /**
+     * @return array{path: string, url: ?string}|null
+     */
+    private function resolveFileValue(CustomFieldValue $fieldValue, mixed $rawValue): ?array
+    {
+        if (! is_string($rawValue) || $rawValue === '') {
+            return null;
+        }
+
+        $media = resolve(MediaPaths::class)->find((string) $fieldValue->getAttribute('tenant_id'), $rawValue);
+
+        return ['path' => $rawValue, 'url' => $media?->getUrl()];
     }
 }

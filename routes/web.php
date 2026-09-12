@@ -24,6 +24,7 @@ use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\JoinTeamViaLinkController;
 use App\Http\Controllers\Mail\UnsubscribeController;
+use App\Http\Controllers\Media\ShowMediaController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
@@ -136,6 +137,10 @@ Route::middleware(['signed', 'throttle:30,1,mail-unsubscribe', 'no-referrer'])->
         ->whereIn('type', [NotificationType::TaskDigest->value])
         ->name('mail.unsubscribe.store');
 });
+
+Route::get('/media/{media:uuid}', ShowMediaController::class)
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('media.show');
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
     Route::get('/', HomeController::class);

@@ -9,6 +9,7 @@ use App\Enums\CrmEntity;
 use App\Enums\Plan;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
+use App\Filament\CustomFields\FileUploadFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
@@ -41,6 +42,7 @@ use App\Support\BrandColors;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
+use App\Support\Media\MediaPaths;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
@@ -132,6 +134,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->scoped(WorkspaceActivationFacts::class);
 
         $this->app->scoped(RecordNameResolver::class);
+        $this->app->scoped(MediaPaths::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every team share one OnboardingStep instance. Its complete()
@@ -515,6 +518,7 @@ final class AppServiceProvider extends ServiceProvider
         CustomFieldsType::register([
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
+            'file-upload' => FileUploadFieldType::class,
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();

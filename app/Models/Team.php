@@ -130,7 +130,7 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
         'discord', 'llms.txt',
 
         // API & developer
-        'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
+        'api', 'graphql', 'mcp', 'media', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
 
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
@@ -368,7 +368,8 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
     {
         $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
             ->acceptsMimeTypes(self::LOGO_MIME_TYPES)
-            ->singleFile();
+            ->singleFile()
+            ->useDisk('public');
     }
 
     /**

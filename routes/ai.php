@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
+use App\Http\Controllers\Mcp\ReceiveUploadController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\SetApiTeamContext;
 use App\Http\Middleware\ValidateMcpOrigin;
@@ -43,12 +44,21 @@ if (is_string($challengeHost) && $challengeHost !== '') {
         ->name('mcp.openai-apps-challenge');
 }
 
+$uploadPath = rtrim($mcpPath, '/').'/uploads/{upload}';
+$registerUploadRoute = static fn (): Illuminate\Routing\Route => Route::put($uploadPath, ReceiveUploadController::class)
+    ->middleware(['signed', 'throttle:60,1'])
+    ->name('mcp.uploads.receive');
+
 if ($mcpDomain) {
-    Route::domain($mcpDomain)->group(static function () use ($mcpPath, $mcpMiddleware): void {
+    Route::domain($mcpDomain)->group(static function () use ($mcpPath, $mcpMiddleware, $registerUploadRoute): void {
         Mcp::web($mcpPath, RelaticleServer::class)
             ->middleware($mcpMiddleware);
+
+        $registerUploadRoute();
     });
 } else {
     Mcp::web($mcpPath, RelaticleServer::class)
         ->middleware($mcpMiddleware);
+
+    $registerUploadRoute();
 }

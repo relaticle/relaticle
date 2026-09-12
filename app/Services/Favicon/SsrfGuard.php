@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Favicon;
 
 use App\Exceptions\SsrfGuardException;
+use App\Exceptions\UploadException;
+use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
@@ -71,6 +73,42 @@ final readonly class SsrfGuard
         ];
     }
 
+    /**
+     * A client for one-shot downloads that never follows a redirect and connects
+     * to the address resolved here, so a DNS answer cannot change between the
+     * check and the fetch (TOCTOU). https on 443 only.
+     */
+    public static function pinnedClient(string $url): PendingRequest
+    {
+        $parts = parse_url($url);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? null) : null;
+        $port = is_array($parts) ? ($parts['port'] ?? 443) : null;
+
+        throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
+
+        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+        $addresses = self::resolveAddresses($host);
+
+        throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
+
+        foreach ($addresses as $address) {
+            throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
+        }
+
+        $address = $addresses[0];
+        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
+
+        return Http::withOptions([
+            'allow_redirects' => false,
+            'connect_timeout' => 10,
+            'timeout' => 30,
+            'curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$pinned}"]],
+            'progress' => static function (int $downloadTotal, int $downloaded): void {
+                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
+            },
+        ]);
+    }
+
     public static function assertPublicHost(string $url): void
     {
         $host = parse_url($url, PHP_URL_HOST);
@@ -93,27 +131,7 @@ final readonly class SsrfGuard
      */
     private static function resolveAddresses(string $host): array
     {
-        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
-            return [$host];
-        }
-
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA);
-
-        if ($records === false) {
-            return [];
-        }
-
-        $addresses = [];
-        foreach ($records as $record) {
-            if (isset($record['ip'])) {
-                $addresses[] = (string) $record['ip'];
-            }
-            if (isset($record['ipv6'])) {
-                $addresses[] = (string) $record['ipv6'];
-            }
-        }
-
-        return $addresses;
+        return resolve(HostResolver::class)->addresses($host);
     }
 
     private static function isPublicAddress(string $address): bool

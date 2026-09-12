@@ -139,6 +139,12 @@ arch('avoid mutation')
         // Same shape: laravel-markdown-response resolves its detector through an
         // is_a() check against its own class, so extending it is mandatory.
         'App\Support\DetectsPublicMarkdownRequest',
+        // Overrides medialibrary's DefaultPathGenerator, its documented
+        // extension point; PHP forbids a readonly class extending a
+        // non-readonly one.
+        'App\Support\Media\UploadPathGenerator',
+        // Same for DefaultUrlGenerator.
+        'App\Support\Media\MediaUrlGenerator',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -182,6 +188,11 @@ arch('avoid inheritance')
         // laravel-markdown-response validates the configured detector with
         // is_a($class, DetectsMarkdownRequest::class), so it must extend it.
         'App\Support\DetectsPublicMarkdownRequest',
+        // Overrides medialibrary's DefaultPathGenerator, the package's
+        // documented extension point.
+        'App\Support\Media\UploadPathGenerator',
+        // Same for DefaultUrlGenerator.
+        'App\Support\Media\MediaUrlGenerator',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

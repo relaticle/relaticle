@@ -96,7 +96,7 @@ it('links to the complete MCP tool offering', function (): void {
     $crawler = new Crawler((string) $response->getContent());
     $toolLink = $crawler->filter('main a[href="'.route('ai').'"]')->text();
 
-    expect($toolLink)->toContain('37 MCP tools');
+    expect($toolLink)->toContain('39 MCP tools');
 });
 
 it('emits product json-ld on the pricing page', function (): void {
