@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use App\Models\User;
 use DOMDocument;
 use DOMElement;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,9 @@ final readonly class EmailInlineImageEmbedder
      * serve through {@see EmailHtmlSanitizer}. Composer images are stored on disk
      * with a `data-id` path while the HTML still references a transient URL.
      *
+     * Image `src` and `data-id` are client-controlled, so disk files are copied
+     * only when they live in the sender's tenant compose directory and are images.
+     *
      * @param  array<int, string>  $attachmentPaths
      * @param  array<string, string>  $attachmentFileNames
      * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attachmentAttributes
@@ -29,6 +33,7 @@ final readonly class EmailInlineImageEmbedder
      * }
      */
     public function embed(
+        User $user,
         string $bodyHtml,
         array $attachmentPaths = [],
         array $attachmentFileNames = [],
@@ -78,7 +83,7 @@ final readonly class EmailInlineImageEmbedder
             }
 
             if (! isset($contentIdsBySourcePath[$sourcePath])) {
-                $embedded = $this->copyToEmailAttachmentDisk($sourcePath);
+                $embedded = $this->copyToEmailAttachmentDisk($user, $sourcePath);
 
                 if ($embedded === null) {
                     continue;
@@ -154,71 +159,111 @@ final readonly class EmailInlineImageEmbedder
             return $src;
         }
 
-        $path = parse_url($src, PHP_URL_PATH);
-
-        if (! is_string($path) || $path === '') {
-            return null;
-        }
-
-        if (str_starts_with($path, '/storage/')) {
-            return ltrim(mb_substr($path, mb_strlen('/storage/')), '/');
-        }
-
-        return ltrim($path, '/');
+        return null;
     }
 
     /**
      * @return array{path: string, filename: string, content_id: string}|null
      */
-    private function copyToEmailAttachmentDisk(string $sourcePath): ?array
+    private function copyToEmailAttachmentDisk(User $user, string $sourcePath): ?array
     {
         if (str_starts_with(mb_strtolower($sourcePath), 'data:image/')) {
             return $this->copyDataUri($sourcePath);
         }
 
-        foreach ($this->candidateDisks() as $diskName) {
-            $disk = Storage::disk($diskName);
+        $path = $this->authorizedStoragePath($user, $sourcePath);
 
-            foreach ($this->candidateStoragePaths($sourcePath) as $path) {
-                if (! $disk->exists($path)) {
-                    continue;
-                }
-
-                $mimeType = $disk->mimeType($path) ?: 'application/octet-stream';
-                $extension = $this->extensionFromMimeType($mimeType);
-                $destination = 'email-attachments/'.Str::ulid().'.'.$extension;
-
-                Storage::disk(EmailAttachment::DISK)->put($destination, $disk->get($path) ?? '');
-
-                if (! Storage::disk(EmailAttachment::DISK)->exists($destination)) {
-                    continue;
-                }
-
-                return [
-                    'path' => $destination,
-                    'filename' => basename($path) !== '' && basename($path) !== '.'
-                        ? basename($path)
-                        : "inline.{$extension}",
-                    'content_id' => $this->makeContentId(),
-                ];
-            }
+        if ($path === null) {
+            return null;
         }
 
-        return null;
+        $disk = Storage::disk(EmailAttachment::DISK);
+
+        if (! $disk->exists($path)) {
+            return null;
+        }
+
+        $mimeType = $disk->mimeType($path);
+
+        if (! is_string($mimeType) || ! str_starts_with(mb_strtolower($mimeType), 'image/')) {
+            return null;
+        }
+
+        $extension = $this->extensionFromMimeType($mimeType);
+        $destination = 'email-attachments/'.Str::ulid().'.'.$extension;
+
+        Storage::disk(EmailAttachment::DISK)->put($destination, $disk->get($path) ?? '');
+
+        if (! Storage::disk(EmailAttachment::DISK)->exists($destination)) {
+            return null;
+        }
+
+        return [
+            'path' => $destination,
+            'filename' => basename($path) !== '' && basename($path) !== '.'
+                ? basename($path)
+                : "inline.{$extension}",
+            'content_id' => $this->makeContentId(),
+        ];
     }
 
-    /**
-     * @return list<string>
-     */
-    private function candidateStoragePaths(string $sourcePath): array
+    private function authorizedStoragePath(User $user, string $sourcePath): ?string
     {
-        $paths = [$sourcePath];
+        $path = $this->normalizeStoragePath($sourcePath);
 
-        if (! str_contains($sourcePath, '/')) {
-            $paths[] = 'email-attachments/'.$sourcePath;
+        if ($path === null) {
+            return null;
         }
 
-        return array_values(array_unique($paths));
+        $teamId = $user->current_team_id;
+
+        if (blank($teamId)) {
+            return null;
+        }
+
+        $directory = EmailAttachment::composeImagesDirectory((string) $teamId).'/';
+
+        if (! str_starts_with($path, $directory)) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    private function normalizeStoragePath(string $sourcePath): ?string
+    {
+        $path = str_replace('\\', '/', $sourcePath);
+        $path = ltrim($path, '/');
+
+        if ($path === '' || str_contains($path, "\0")) {
+            return null;
+        }
+
+        $segments = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                if ($segments === []) {
+                    return null;
+                }
+
+                array_pop($segments);
+
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        if ($segments === []) {
+            return null;
+        }
+
+        return implode('/', $segments);
     }
 
     /**
@@ -247,21 +292,6 @@ final readonly class EmailInlineImageEmbedder
             'filename' => "inline.{$extension}",
             'content_id' => $this->makeContentId(),
         ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function candidateDisks(): array
-    {
-        $defaultDisk = (string) config('filament.default_filesystem_disk', 'local');
-
-        return array_values(array_unique([
-            EmailAttachment::DISK,
-            'public',
-            $defaultDisk,
-            $defaultDisk === 'local' ? 'public' : 'local',
-        ]));
     }
 
     private function makeContentId(): string

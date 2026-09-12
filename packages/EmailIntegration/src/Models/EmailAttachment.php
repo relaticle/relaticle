@@ -30,6 +30,15 @@ final class EmailAttachment extends Model
      */
     use HasFactory, HasUlids;
 
+    /**
+     * Directory on {@see DISK} for RichEditor inline images. Tenant-scoped so
+     * composer HTML cannot name another workspace's files.
+     */
+    public static function composeImagesDirectory(string $teamId): string
+    {
+        return 'email-attachments/'.$teamId;
+    }
+
     protected static function newFactory(): EmailAttachmentFactory
     {
         return EmailAttachmentFactory::new();
