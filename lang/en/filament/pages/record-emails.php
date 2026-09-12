@@ -45,6 +45,7 @@ return [
         ],
     ],
     'empty' => [
+        'heading' => 'No emails',
         'description' => 'This record doesn\'t have any emails, or they may be hidden due to permissions.',
         'compose' => 'Compose email',
     ],

@@ -42,8 +42,6 @@ abstract class BaseRecordEmailsPage extends Page
 
     protected string $view = 'filament.pages.record-emails';
 
-    public EmailFolder $folder = EmailFolder::All;
-
     public ?string $selectedEmailId = null;
 
     public string $search = '';
@@ -53,13 +51,8 @@ abstract class BaseRecordEmailsPage extends Page
         $this->record = $this->resolveRecord($record);
     }
 
-    /**
-     * A send from this record belongs on All, not Inbox. Inbox is inbound only
-     * and would hide the just-queued outbound copy.
-     */
     public function showQueuedSendOnRecord(?string $emailId = null): void
     {
-        $this->folder = EmailFolder::All;
         $this->search = '';
 
         if (filled($emailId)) {
@@ -136,12 +129,6 @@ abstract class BaseRecordEmailsPage extends Page
                     ->where('status', EmailAccessRequestStatus::PENDING),
             ])
             ->withGlobalScope('visible', new VisibleEmailScope($user));
-
-        if ($this->folder === EmailFolder::Sent) {
-            $query->sent();
-        } elseif ($this->folder === EmailFolder::Inbox) {
-            $query->inbox();
-        }
 
         if (filled($this->search)) {
             resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
@@ -254,16 +241,6 @@ abstract class BaseRecordEmailsPage extends Page
         unset($this->inboxUnreadCount);
     }
 
-    public function setFolder(string $folder): void
-    {
-        $this->folder = EmailFolder::from($folder);
-        $this->search = '';
-        $this->selectedEmailId = null;
-        $this->resetPage();
-        unset($this->emails);
-        $this->dispatch('composer:dismiss-inline');
-    }
-
     public function deselectEmail(): void
     {
         $this->selectedEmailId = null;
@@ -324,7 +301,7 @@ abstract class BaseRecordEmailsPage extends Page
         /** @var Company|Opportunity|People $record */
         $record = $this->getRecord();
 
-        $count = resolve(MarkAllEmailsAsReadAction::class)->execute($this->authUser(), $this->folder, $record);
+        $count = resolve(MarkAllEmailsAsReadAction::class)->execute($this->authUser(), EmailFolder::All, $record);
 
         unset($this->inboxUnreadCount, $this->emails);
 
