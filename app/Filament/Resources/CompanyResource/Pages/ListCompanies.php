@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
+use App\Filament\Concerns\PersistsTableColumnState;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
 use Asmit\ResizedColumn\HasResizableColumn;
@@ -22,6 +23,7 @@ final class ListCompanies extends ListRecords
 {
     use HasResizableColumn;
     use InteractsWithCustomFields;
+    use PersistsTableColumnState;
 
     /** @var class-string<CompanyResource> */
     protected static string $resource = CompanyResource::class;
