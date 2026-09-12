@@ -38,10 +38,13 @@ final readonly class CreateTeam implements CreatesTeams
 
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
+            // Null hands the handle to Team's HasSlug pass, which settles it inside
+            // the insert instead of between a check and a write.
+            'slug' => ['nullable', 'string', 'max:255', new ValidTeamSlug, 'unique:teams,slug'],
             'onboarding_use_case' => ['required', 'string', Rule::enum(OnboardingUseCase::class)],
             'onboarding_context' => ['nullable', 'array'],
             'onboarding_context.*' => ['string'],
+            'onboarding_other_use_case' => ['nullable', 'string', 'max:120'],
             'onboarding_referral_source' => ['nullable', 'string', Rule::enum(OnboardingReferralSource::class)],
         ])
             ->after(function (ValidatorInstance $validator) use ($input): void {
@@ -62,19 +65,17 @@ final readonly class CreateTeam implements CreatesTeams
                 if (! is_array($context) || $context === []) {
                     $validator->errors()->add(
                         'onboarding_context',
-                        'The onboarding context field is required for the selected use case.',
+                        __('filament/pages/teams.create_team.validation.context_required'),
                     );
 
                     return;
                 }
 
-                $allowedKeys = array_keys($subOptions);
-
                 foreach ($context as $value) {
-                    if (! is_string($value) || ! in_array($value, $allowedKeys, true)) {
+                    if (! is_string($value) || ! array_key_exists($value, $subOptions)) {
                         $validator->errors()->add(
                             'onboarding_context',
-                            'The selected onboarding context is invalid for the chosen use case.',
+                            __('filament/pages/teams.create_team.validation.context_invalid'),
                         );
 
                         return;
@@ -83,14 +84,21 @@ final readonly class CreateTeam implements CreatesTeams
             })
             ->validateWithBag('createTeam');
 
+        $useCase = OnboardingUseCase::from((string) $input['onboarding_use_case']);
+
         event(new AddingTeam($user));
 
         $team = new Team([
             'name' => $input['name'],
-            'slug' => $input['slug'],
+            'slug' => $input['slug'] ?? null,
             'personal_team' => $isFirstTeam,
-            'onboarding_use_case' => $input['onboarding_use_case'] ?? null,
-            'onboarding_context' => $input['onboarding_context'] ?? null,
+            'onboarding_use_case' => $useCase,
+            'onboarding_context' => $useCase->getSubOptions() === []
+                ? null
+                : array_values($input['onboarding_context']),
+            'onboarding_other_use_case' => $useCase === OnboardingUseCase::Other
+                ? ($input['onboarding_other_use_case'] ?? null)
+                : null,
             'onboarding_referral_source' => $input['onboarding_referral_source'] ?? null,
         ]);
         $team->plan = Plan::default();

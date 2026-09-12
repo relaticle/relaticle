@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\BillingStatus;
+use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\TeamScope;
@@ -355,4 +356,37 @@ it('prefers a live subscription over a trial that has not run out yet', function
     Subscription::factory()->active()->create(['team_id' => $team->getKey()]);
 
     expect($team->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+});
+
+it('shows what a workspace said it tracks, and its use case details by label', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->ownedTeams()->first();
+    $team->forceFill([
+        'onboarding_use_case' => OnboardingUseCase::Sales,
+        'onboarding_context' => ['outbound', 'partner_led'],
+        'onboarding_other_use_case' => 'Wholesale buyers and distributors',
+    ])->save();
+
+    livewire(ViewTeam::class, ['record' => $team->getKey()])
+        ->assertSuccessful()
+        ->assertSee('Wholesale buyers and distributors')
+        ->assertSee('Outbound')
+        ->assertSee('Partner-led')
+        ->assertDontSee('partner_led');
+});
+
+it('finds a workspace by the free text it gave for its use case', function (): void {
+    $owner = User::factory()->withPersonalTeam()->create();
+    $team = $owner->ownedTeams()->first();
+    $team->forceFill([
+        'onboarding_use_case' => OnboardingUseCase::Other,
+        'onboarding_other_use_case' => 'Grant applications',
+    ])->save();
+
+    $other = User::factory()->withPersonalTeam()->create();
+
+    livewire(ListTeams::class)
+        ->searchTable('Grant applications')
+        ->assertCanSeeTableRecords([$team])
+        ->assertCanNotSeeTableRecords([$other->ownedTeams()->first()]);
 });

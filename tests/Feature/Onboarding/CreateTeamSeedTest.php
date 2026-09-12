@@ -19,7 +19,7 @@ use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
-mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class);
+mutates(CreateTeam::class, CreateTeamAction::class, OnboardSeedManager::class, CreateTeamCustomFields::class, OnboardingUseCase::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.
@@ -35,7 +35,7 @@ it('seeds sales demo data for sales use case', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Sales Team',
         ])
         ->call('register')
@@ -148,7 +148,7 @@ it('creates all custom fields for the first team', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Custom Fields Team',
         ])
         ->call('register')
@@ -176,7 +176,7 @@ it('seeds people linked to their correct companies for sales', function (): void
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Link Test Team',
         ])
         ->call('register');
@@ -206,7 +206,7 @@ it('seeds tasks and opportunities with board positions', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Board Test Team',
         ])
         ->call('register');
@@ -234,7 +234,7 @@ it('seeds custom field values correctly for sales', function (): void {
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Values Test Team',
         ])
         ->call('register');
@@ -272,19 +272,24 @@ it('subsequent teams still require use case selection', function (): void {
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
-it('provides sub-options for each use case', function (): void {
-    expect(OnboardingUseCase::Sales->getSubOptions())->toHaveCount(7)
-        ->and(OnboardingUseCase::CustomerSuccess->getSubOptions())->toHaveCount(5)
-        ->and(OnboardingUseCase::Recruiting->getSubOptions())->toHaveCount(2)
-        ->and(OnboardingUseCase::Marketing->getSubOptions())->toHaveCount(4)
-        ->and(OnboardingUseCase::Fundraising->getSubOptions())->toHaveCount(3)
-        ->and(OnboardingUseCase::Investing->getSubOptions())->toHaveCount(3)
+it('provides one axis of sub-options for each use case', function (): void {
+    expect(OnboardingUseCase::Sales->getSubOptions())->toBe([
+        'outbound' => 'Outbound',
+        'inbound' => 'Inbound',
+        'product_led' => 'Product-led',
+        'partner_led' => 'Partner-led',
+    ])
+        ->and(OnboardingUseCase::CustomerSuccess->getSubOptions())->toHaveKeys(['high_touch', 'low_touch'])
+        ->and(OnboardingUseCase::Recruiting->getSubOptions())->toHaveKeys(['applications', 'sourcing'])
+        ->and(OnboardingUseCase::Marketing->getSubOptions())->toHaveKeys(['content', 'demand_gen', 'events', 'partnerships'])
+        ->and(OnboardingUseCase::Fundraising->getSubOptions())->toHaveKeys(['early_stage', 'growth_stage', 'late_stage'])
+        ->and(OnboardingUseCase::Investing->getSubOptions())->toHaveKeys(['early_stage', 'growth_stage', 'late_stage'])
         ->and(OnboardingUseCase::Other->getSubOptions())->toBe([]);
 });
 
 it('maps use case to correct fixture set', function (): void {
     expect(OnboardingUseCase::Sales->getFixtureSet())->toBe('sales')
-        ->and(OnboardingUseCase::CustomerSuccess->getFixtureSet())->toBe('sales')
+        ->and(OnboardingUseCase::CustomerSuccess->getFixtureSet())->toBe('customer_success')
         ->and(OnboardingUseCase::Recruiting->getFixtureSet())->toBe('recruiting')
         ->and(OnboardingUseCase::Marketing->getFixtureSet())->toBe('marketing')
         ->and(OnboardingUseCase::Fundraising->getFixtureSet())->toBe('fundraising')
@@ -292,7 +297,7 @@ it('maps use case to correct fixture set', function (): void {
         ->and(OnboardingUseCase::Other->getFixtureSet())->toBe('general');
 });
 
-it('seeds all entity types for each fixture set', function (OnboardingUseCase $useCase, ?array $context): void {
+it('seeds all entity types for each fixture set', function (OnboardingUseCase $useCase): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -302,8 +307,10 @@ it('seeds all entity types for each fixture set', function (OnboardingUseCase $u
         'name' => "Team {$useCase->value}",
     ];
 
+    $context = array_key_first($useCase->getSubOptions());
+
     if ($context !== null) {
-        $formData['onboarding_context'] = $context;
+        $formData['onboarding_context'] = [$context];
     }
 
     livewire(CreateTeam::class)
@@ -319,13 +326,13 @@ it('seeds all entity types for each fixture set', function (OnboardingUseCase $u
         ->and(Task::where('team_id', $team->id)->count())->toBe(4)
         ->and(Note::where('team_id', $team->id)->count())->toBe(5);
 })->with([
-    'sales' => [OnboardingUseCase::Sales, ['product_led']],
-    'recruiting' => [OnboardingUseCase::Recruiting, ['applications']],
-    'marketing' => [OnboardingUseCase::Marketing, ['content']],
-    'customer_success' => [OnboardingUseCase::CustomerSuccess, ['low_touch']],
-    'fundraising' => [OnboardingUseCase::Fundraising, ['early_stage']],
-    'investing' => [OnboardingUseCase::Investing, ['early_stage']],
-    'other' => [OnboardingUseCase::Other, null],
+    'sales' => OnboardingUseCase::Sales,
+    'recruiting' => OnboardingUseCase::Recruiting,
+    'marketing' => OnboardingUseCase::Marketing,
+    'customer_success' => OnboardingUseCase::CustomerSuccess,
+    'fundraising' => OnboardingUseCase::Fundraising,
+    'investing' => OnboardingUseCase::Investing,
+    'other' => OnboardingUseCase::Other,
 ]);
 
 it('generates a fallback handle for names that transliterate to nothing', function (): void {
@@ -350,7 +357,7 @@ it('assigns seeded demo tasks to the workspace owner so the dashboard is not emp
     livewire(CreateTeam::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Assigned Tasks Team',
         ])
         ->call('register')
@@ -366,3 +373,141 @@ it('assigns seeded demo tasks to the workspace owner so the dashboard is not emp
         expect($task->assignees()->whereKey($user->getKey())->exists())->toBeTrue();
     });
 });
+
+it('creates the stage preset for the chosen use case', function (OnboardingUseCase $useCase, array $expectedStages): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $formData = [
+        'onboarding_use_case' => $useCase->value,
+        'name' => "Preset {$useCase->value}",
+    ];
+
+    $context = array_key_first($useCase->getSubOptions());
+
+    if ($context !== null) {
+        $formData['onboarding_context'] = [$context];
+    }
+
+    livewire(CreateTeam::class)
+        ->fillForm($formData)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $stages = $stageField->options()->withoutGlobalScopes()->orderBy('id')->pluck('name')->all();
+
+    expect($stages)->toBe($expectedStages);
+})->with([
+    'sales keeps the default list' => [OnboardingUseCase::Sales, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'marketing shares the sales list' => [OnboardingUseCase::Marketing, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'other shares the sales list' => [OnboardingUseCase::Other, ['Prospecting', 'Qualification', 'Needs Analysis', 'Value Proposition', 'Id. Decision Makers', 'Perception Analysis', 'Proposal/Price Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost']],
+    'customer success' => [OnboardingUseCase::CustomerSuccess, ['Onboarding', 'Active', 'Renewal due', 'At risk', 'Renewed', 'Churned']],
+    'recruiting' => [OnboardingUseCase::Recruiting, ['Sourced', 'Applied', 'Screen', 'Interview', 'Offer', 'Hired', 'Declined']],
+    'fundraising' => [OnboardingUseCase::Fundraising, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
+    'investing shares the fundraising list' => [OnboardingUseCase::Investing, ['Target', 'Intro', 'First meeting', 'Partner meeting', 'Term sheet', 'Closed', 'Passed']],
+]);
+
+it('colours the preset stages', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+            'onboarding_context' => ['sourcing'],
+            'name' => 'Coloured Hiring',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $hired = $stageField->options()->withoutGlobalScopes()->where('name', 'Hired')->sole();
+
+    expect($hired->settings->color)->toBe('#059669');
+});
+
+it('seeds customer success demo data for the customer success use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::CustomerSuccess->value,
+            'onboarding_context' => ['high_touch'],
+            'name' => 'Success Team',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $companies = Company::where('team_id', $team->id)->pluck('name')->sort()->values();
+
+    expect($companies)->toHaveCount(4)
+        ->and($companies->all())->toBe(['Calendly', 'Intercom', 'Loom', 'Zapier']);
+});
+
+it('seeds every demo opportunity at a stage that exists in the preset', function (OnboardingUseCase $useCase): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $formData = [
+        'onboarding_use_case' => $useCase->value,
+        'name' => "Stages {$useCase->value}",
+    ];
+
+    $context = array_key_first($useCase->getSubOptions());
+
+    if ($context !== null) {
+        $formData['onboarding_context'] = [$context];
+    }
+
+    livewire(CreateTeam::class)
+        ->fillForm($formData)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $team = $user->fresh()->personalTeam();
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $team->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    $optionIds = $stageField->options()->withoutGlobalScopes()->pluck('id');
+
+    $stageValues = CustomFieldValue::withoutGlobalScopes()
+        ->where('custom_field_id', $stageField->id)
+        ->pluck($stageField->getValueColumn());
+
+    expect($stageValues)->toHaveCount(4)
+        ->and($stageValues->every(fn (mixed $value): bool => $optionIds->contains($value)))->toBeTrue();
+})->with([
+    'sales' => OnboardingUseCase::Sales,
+    'recruiting' => OnboardingUseCase::Recruiting,
+    'marketing' => OnboardingUseCase::Marketing,
+    'customer_success' => OnboardingUseCase::CustomerSuccess,
+    'fundraising' => OnboardingUseCase::Fundraising,
+    'investing' => OnboardingUseCase::Investing,
+    'other' => OnboardingUseCase::Other,
+]);

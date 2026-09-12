@@ -85,9 +85,6 @@ parameters:
         # PHPStan fails on unmatched ignores, so stale entries can't linger.
         -
             identifier: app.architecture.eloquentWriteOutsideAction
-            path: app/Filament/Pages/CreateTeam.php
-        -
-            identifier: app.architecture.eloquentWriteOutsideAction
             path: app/Filament/Resources/OpportunityResource/Pages/OpportunitiesBoard.php
         -
             identifier: app.architecture.eloquentWriteOutsideAction

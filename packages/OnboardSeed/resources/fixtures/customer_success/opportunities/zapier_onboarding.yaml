@@ -1,0 +1,6 @@
+name: Zapier rollout
+company: zapier
+custom_fields:
+  amount: 18000
+  close_date: '{{ +2w }}'
+  stage: Onboarding

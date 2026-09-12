@@ -1,0 +1,8 @@
+title: Quote Calendly the extra seats
+assigned_people:
+  - marcus
+custom_fields:
+  description: Twenty seats across two new support pods, starting next quarter.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium
