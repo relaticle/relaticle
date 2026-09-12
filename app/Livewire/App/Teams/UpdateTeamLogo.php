@@ -49,7 +49,8 @@ final class UpdateTeamLogo extends BaseLivewireComponent
                             ->avatar()
                             // Last in the chain on purpose: avatar() calls image(),
                             // which resets the allowlist back to `image/*`.
-                            ->acceptedFileTypes(Team::LOGO_MIME_TYPES),
+                            ->acceptedFileTypes(Team::LOGO_MIME_TYPES)
+                            ->maxSize(Team::LOGO_MAX_KILOBYTES),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))

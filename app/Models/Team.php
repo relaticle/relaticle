@@ -95,6 +95,8 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
      */
     public const array LOGO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+    public const int LOGO_MAX_KILOBYTES = 2048;
+
     public const string SLUG_REGEX = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
     /**
