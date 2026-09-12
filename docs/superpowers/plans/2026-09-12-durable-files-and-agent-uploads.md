@@ -74,7 +74,7 @@
 
 **Interfaces:**
 - Produces: `MediaCollection::Logo`, `MediaCollection::PendingUploads`, `MediaCollection::forCustomField(string $code): string`
-- Produces: `UploadAllowlist::MIME_TYPES`, `UploadAllowlist::MAX_BYTES`, `UploadAllowlist::extensionFor(string $mime): ?string`, `UploadAllowlist::isImage(string $mime): bool`, `UploadAllowlist::extensions(): array`
+- Produces: `UploadAllowlist::MIME_TYPES`, `UploadAllowlist::maxBytes(): int`, `UploadAllowlist::extensionFor(string $mime): ?string`, `UploadAllowlist::isImage(string $mime): bool`, `UploadAllowlist::extensions(): array`
 - Produces: `StorePendingUpload::execute(User $user, Team $team, string $path, string $originalName, UploadSource $source): Media`
 - Produces: `MediaPaths::uuidFromPath(string $path): ?string`, `MediaPaths::find(string $teamId, string $path): ?Media`, `MediaPaths::findByUuid(string $teamId, string $uuid): ?Media`
 - Produces: `UploadException::tooLarge()`, `::mimeNotAllowed(string $mime)`, `::unreachable()`, `::urlNotAllowed()`, `::notFound()`, `::rateLimited()`, `::invalidBase64()`
@@ -474,7 +474,7 @@ final readonly class StorePendingUpload
 
         $size = filesize($path);
 
-        throw_if($size === false || $size > UploadAllowlist::MAX_BYTES, UploadException::tooLarge());
+        throw_if($size === false || $size > UploadAllowlist::maxBytes(), UploadException::tooLarge());
 
         $mime = (string) new finfo(FILEINFO_MIME_TYPE)->file($path);
         $extension = UploadAllowlist::extensionFor($mime);
@@ -1018,7 +1018,7 @@ final readonly class FileUploadComponent extends AbstractFormComponent
         return FileUpload::make($customField->getFieldName())
             ->disk(config('media-library.disk_name'))
             ->acceptedFileTypes(array_keys(UploadAllowlist::MIME_TYPES))
-            ->maxSize((int) (UploadAllowlist::MAX_BYTES / 1024))
+            ->maxSize((int) (UploadAllowlist::maxBytes() / 1024))
             ->downloadable()
             ->openable()
             ->previewable()
@@ -1946,7 +1946,7 @@ In `app/Services/Favicon/SsrfGuard.php` add after `redirectGuardOptions()`:
             'timeout' => 30,
             'curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$pinned}"]],
             'progress' => static function (int $downloadTotal, int $downloaded): void {
-                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::MAX_BYTES, UploadException::tooLarge());
+                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge());
             },
         ]);
     }
@@ -2084,7 +2084,7 @@ final readonly class StoreAgentUpload
 
         $body = $response->body();
 
-        throw_if(strlen($body) > UploadAllowlist::MAX_BYTES, UploadException::tooLarge());
+        throw_if(strlen($body) > UploadAllowlist::maxBytes(), UploadException::tooLarge());
 
         file_put_contents($temp, $body);
 
@@ -2611,7 +2611,7 @@ final class ReceiveUploadController
         $length = $request->header('Content-Length');
 
         abort_if(! is_numeric($length) || (int) $length < 1, Response::HTTP_LENGTH_REQUIRED);
-        abort_if((int) $length > UploadAllowlist::MAX_BYTES, Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
+        abort_if((int) $length > UploadAllowlist::maxBytes(), Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
 
         $disk = TemporaryUploads::disk();
         $path = TemporaryUploads::path($upload);
@@ -2619,7 +2619,7 @@ final class ReceiveUploadController
 
         $disk->writeStream($path, $body);
 
-        if ((int) $disk->size($path) > UploadAllowlist::MAX_BYTES) {
+        if ((int) $disk->size($path) > UploadAllowlist::maxBytes()) {
             $disk->delete($path);
 
             abort(Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
