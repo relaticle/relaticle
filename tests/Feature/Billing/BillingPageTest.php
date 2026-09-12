@@ -81,11 +81,11 @@ it('offers the trial to a hosted workspace that never received one', function ()
         ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
 });
 
-it('advertises all 37 MCP tools on the authenticated billing page', function (): void {
+it('advertises all 39 MCP tools on the authenticated billing page', function (): void {
     billingPageOwner();
 
     livewire(Billing::class)
-        ->assertSee('REST API and 37-tool MCP server')
+        ->assertSee('REST API and 39-tool MCP server')
         ->assertDontSee('REST API and 32-tool MCP server');
 });
 

@@ -48,12 +48,12 @@ return [
 
         'media' => [
             'driver' => env('MEDIA_DRIVER', 'local'),
-            'root' => env('MEDIA_DRIVER', 'local') === 's3' ? env('MEDIA_ROOT', '') : storage_path('app/media'),
+            'root' => env('MEDIA_ROOT') ?: (env('MEDIA_DRIVER', 'local') === 's3' ? '' : storage_path('app/media')),
             'visibility' => 'private',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
-            'bucket' => env('MEDIA_BUCKET', env('AWS_BUCKET')),
+            'bucket' => env('MEDIA_BUCKET') ?: env('AWS_BUCKET'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,

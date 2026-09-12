@@ -74,7 +74,7 @@ final class CreateUploadUrlTool extends Tool
         }
 
         try {
-            $uploadId = TemporaryUploads::newName((string) $validated['filename']);
+            $uploadId = TemporaryUploads::newName((string) $validated['filename'], (string) $team->getKey());
         } catch (UploadException $exception) {
             return Response::error($exception->getMessage());
         }

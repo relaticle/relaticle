@@ -31,6 +31,8 @@ final readonly class StorePendingUpload
 
         throw_if($extension === null, UploadException::mimeNotAllowed($mime));
 
+        $originalName = $this->safeOriginalName($originalName, $extension);
+
         return $team->addMedia($path)
             ->usingFileName(Str::ulid().'.'.$extension)
             ->usingName(pathinfo($originalName, PATHINFO_FILENAME))
@@ -41,5 +43,17 @@ final readonly class StorePendingUpload
                 'original_name' => $originalName,
             ])
             ->toMediaCollection(MediaCollection::PendingUploads->value);
+    }
+
+    private function safeOriginalName(string $originalName, string $extension): string
+    {
+        $name = Str::of($originalName)
+            ->replace('\\', '/')
+            ->afterLast('/')
+            ->replaceMatches('/[\x00-\x1F\x7F]/u', '')
+            ->trim()
+            ->toString();
+
+        return $name === '' ? "upload.{$extension}" : $name;
     }
 }

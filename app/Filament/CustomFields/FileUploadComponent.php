@@ -17,8 +17,10 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Relaticle\CustomFields\Filament\Integration\Base\AbstractFormComponent;
+use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\CustomFields\Models\CustomField;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -33,7 +35,10 @@ final readonly class FileUploadComponent extends AbstractFormComponent
             ->downloadable()
             ->openable()
             ->previewable()
-            ->preventFilePathTampering(allowFilePathUsing: fn (string $file, FileUpload $component): bool => $this->isAllowedPath($file, $component, $customField->code))
+            ->preventFilePathTampering(allowFilePathUsing: fn (string $file, FileUpload $component): bool => $this->isAllowedPath($file, $component, $customField))
+            ->afterStateUpdated(function (FileUpload $component, Component $livewire): void {
+                $livewire->resetValidation($component->getStatePath().'.*');
+            })
             ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file, FileUpload $component): string => $this->store($file, $component))
             ->getUploadedFileUsing(fn (string $file): ?array => $this->describe($file))
             ->deleteUploadedFileUsing(fn (string $file): null => $this->discardPending($file));
@@ -84,9 +89,7 @@ final readonly class FileUploadComponent extends AbstractFormComponent
         return null;
     }
 
-    // A custom-field value is not a native model attribute, so Filament's
-    // getOriginalFilePaths() is always empty; every string path is authorized here.
-    private function isAllowedPath(string $file, FileUpload $component, string $code): bool
+    private function isAllowedPath(string $file, FileUpload $component, CustomField $customField): bool
     {
         $team = Filament::getTenant();
 
@@ -107,8 +110,11 @@ final readonly class FileUploadComponent extends AbstractFormComponent
         $record = $component->getRecord();
 
         return $record instanceof Model
+            && $record instanceof HasCustomFields
+            && $media->model_type === $record->getMorphClass()
             && (string) $media->model_id === (string) $record->getKey()
-            && $media->collection_name === MediaCollection::forCustomField($code);
+            && $media->collection_name === MediaCollection::forCustomField($customField->code)
+            && $record->getCustomFieldValue($customField) === $file;
     }
 
     private function find(string $file): ?Media

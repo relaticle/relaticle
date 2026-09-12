@@ -6,7 +6,7 @@ it('renders the press page with facts and unique metadata', function (): void {
     $this->get('/press')
         ->assertOk()
         ->assertSee('AGPL-3.0')
-        ->assertSee('37 MCP tools')
+        ->assertSee('39 MCP tools')
         ->assertSee('<title>'.e(__('Press kit: License, stack and pricing')).' - Relaticle</title>', false);
 });
 

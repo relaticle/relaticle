@@ -130,7 +130,7 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
         'discord', 'llms.txt',
 
         // API & developer
-        'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
+        'api', 'graphql', 'mcp', 'media', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
 
         // Marketing & public
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',

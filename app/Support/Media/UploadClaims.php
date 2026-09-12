@@ -20,10 +20,9 @@ final readonly class UploadClaims
 
     public function sync(CustomFieldValue $value): void
     {
-        $field = $value->customField;
+        $field = $value->getRelationValue('customField');
 
-        // @phpstan-ignore identical.alwaysFalse (the customField relation can resolve to null for an orphaned value row)
-        if ($field === null) {
+        if (! $field instanceof CustomField) {
             return;
         }
 
@@ -50,12 +49,11 @@ final readonly class UploadClaims
             ->where('custom_properties->team_id', $teamId)
             ->where('collection_name', MediaCollection::PendingUploads->value)
             ->whereIn('uuid', $referenced)
-            ->get()
-            ->each(function (Media $media) use ($entity, $collection): void {
-                $media->model()->associate($entity);
-                $media->collection_name = $collection;
-                $media->save();
-            });
+            ->update([
+                'model_type' => $entity->getMorphClass(),
+                'model_id' => $entity->getKey(),
+                'collection_name' => $collection,
+            ]);
 
         if ($field->type === CustomFieldType::FILE_UPLOAD->value) {
             $this->assertClaimedByEntity($referenced, $teamId, $entity, $collection, $field);
@@ -73,18 +71,17 @@ final readonly class UploadClaims
     /** @param list<string> $referenced */
     private function assertClaimedByEntity(array $referenced, string $teamId, Model&HasMedia $entity, string $collection, CustomField $field): void
     {
-        $uuid = $referenced[0] ?? null;
-
-        if ($uuid === null) {
+        if ($referenced === []) {
             return;
         }
 
-        $media = $this->paths->findByUuid($teamId, $uuid);
-
-        $ownedByEntity = $media instanceof Media
-            && $media->model_type === $entity->getMorphClass()
-            && (string) $media->model_id === (string) $entity->getKey()
-            && $media->collection_name === $collection;
+        $ownedByEntity = Media::query()
+            ->where('custom_properties->team_id', $teamId)
+            ->whereIn('uuid', $referenced)
+            ->where('model_type', $entity->getMorphClass())
+            ->where('model_id', $entity->getKey())
+            ->where('collection_name', $collection)
+            ->count() === count($referenced);
 
         if ($ownedByEntity) {
             return;

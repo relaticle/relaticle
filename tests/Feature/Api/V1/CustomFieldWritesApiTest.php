@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Enums\MediaCollection;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Models\Company;
@@ -12,11 +13,12 @@ use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use App\Rules\StoredUploadPath;
+use App\Support\Media\MediaPaths;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
-mutates(BaseCrmEntityRequest::class, StoredUploadPath::class);
+mutates(BaseCrmEntityRequest::class, StoredUploadPath::class, MediaPaths::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalTeam()->create();
@@ -186,6 +188,43 @@ it('resolves record names with a constant number of lookups, not one per row', f
         ->and($large)->toBe($small);
 });
 
+it('claims file uploads for every CRM entity over rest', function (CrmEntity $entity, string $endpoint, string $titleKey): void {
+    Storage::fake('public');
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->team->getKey(),
+        'entity_type' => $entity->value,
+        'code' => 'contract',
+        'name' => 'Contract',
+        'type' => 'file-upload',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $pending = $this->team->addMediaFromString(pdfBytes())
+        ->usingFileName("{$entity->value}.pdf")
+        ->withCustomProperties(['team_id' => $this->team->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+    $path = $pending->getPathRelativeToRoot();
+
+    $response = $this->postJson("/api/v1/{$endpoint}", [
+        $titleKey => "File {$entity->value}",
+        'custom_fields' => [$field->code => $path],
+    ])->assertCreated();
+
+    $modelClass = $entity->model();
+    $record = $modelClass::query()->findOrFail($response->json('data.id'));
+
+    expect($pending->refresh()->model_type)->toBe($record->getMorphClass())
+        ->and($pending->model_id)->toBe($record->getKey())
+        ->and($pending->collection_name)->toBe(MediaCollection::forCustomField($field->code));
+})->with([
+    'company' => [CrmEntity::Company, 'companies', 'name'],
+    'people' => [CrmEntity::People, 'people', 'name'],
+    'opportunity' => [CrmEntity::Opportunity, 'opportunities', 'name'],
+    'task' => [CrmEntity::Task, 'tasks', 'title'],
+    'note' => [CrmEntity::Note, 'notes', 'title'],
+]);
+
 describe('file-upload values over rest', function (): void {
     beforeEach(function (): void {
         Storage::fake('public');
@@ -226,5 +265,39 @@ describe('file-upload values over rest', function (): void {
         $this->getJson("/api/v1/notes/{$note->getKey()}")
             ->assertOk()
             ->assertJsonPath('data.attributes.custom_fields.contract', null);
+    });
+
+    it('resolves file urls with a constant number of media lookups', function (): void {
+        $attach = function (int $count): void {
+            Note::factory()->count($count)->create(['team_id' => $this->team->getKey()])
+                ->each(function (Note $note): void {
+                    $media = $this->team->addMediaFromString(pdfBytes())
+                        ->usingFileName("{$note->getKey()}.pdf")
+                        ->withCustomProperties(['team_id' => $this->team->getKey()])
+                        ->toMediaCollection(MediaCollection::PendingUploads->value);
+                    $note->saveCustomFieldValue($this->contract, $media->getPathRelativeToRoot());
+                });
+        };
+
+        $lookupCount = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->getJson('/api/v1/notes?per_page=50')->assertOk();
+            $count = collect(DB::getQueryLog())->filter(
+                fn (array $query): bool => str_contains($query['query'], 'from "media"'),
+            )->count();
+            DB::disableQueryLog();
+
+            return $count;
+        };
+
+        $attach(3);
+        $small = $lookupCount();
+
+        $attach(9);
+        $large = $lookupCount();
+
+        expect($small)->toBeGreaterThan(0)
+            ->and($large)->toBe($small);
     });
 });

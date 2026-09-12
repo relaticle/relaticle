@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 final readonly class TemporaryUploads
 {
-    public const string NAME_PATTERN = '/^[0-9A-HJKMNP-TV-Z]{26}\.[a-z0-9]{2,5}\z/';
+    public const string NAME_PATTERN = '/^[0-9A-HJKMNP-TV-Z]{26}\.[0-9A-HJKMNP-TV-Z]{26}\.[a-z0-9]{2,5}\z/i';
 
     public const string DIRECTORY = 'tmp';
 
@@ -23,13 +23,13 @@ final readonly class TemporaryUploads
         return $disk;
     }
 
-    public static function newName(string $filename): string
+    public static function newName(string $filename, string $teamId): string
     {
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
 
         throw_unless(in_array($extension, UploadAllowlist::extensions(), true), UploadException::mimeNotAllowed($extension));
 
-        return Str::ulid().'.'.$extension;
+        return strtoupper($teamId).'.'.Str::ulid().'.'.$extension;
     }
 
     public static function path(string $upload): string
@@ -40,5 +40,14 @@ final readonly class TemporaryUploads
     public static function isValidName(string $upload): bool
     {
         return preg_match(self::NAME_PATTERN, $upload) === 1;
+    }
+
+    public static function belongsToTeam(string $upload, string $teamId): bool
+    {
+        if (! self::isValidName($upload)) {
+            return false;
+        }
+
+        return hash_equals(strtoupper($teamId), explode('.', $upload, 2)[0]);
     }
 }

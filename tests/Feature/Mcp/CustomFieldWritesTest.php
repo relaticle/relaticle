@@ -600,6 +600,25 @@ describe('file-upload values', function (): void {
         expect(Media::query()->where('collection_name', MediaCollection::forCustomField('contract'))->count())->toBe(1);
     });
 
+    it('rejects another file owned by the record when it is not the current field value', function (): void {
+        $path = uploadedPath($this->user);
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, ['title' => 'Exact current value', 'custom_fields' => ['contract' => $path]])
+            ->assertOk();
+        $note = Note::query()->where('title', 'Exact current value')->with('customFieldValues.customField.options')->firstOrFail();
+        $other = $note->addMediaFromString(pdfBytes())
+            ->usingFileName('other.pdf')
+            ->withCustomProperties(['team_id' => $this->team->getKey()])
+            ->toMediaCollection(MediaCollection::forCustomField('contract'));
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdateNoteTool::class, ['id' => $note->getKey(), 'custom_fields' => ['contract' => $other->getPathRelativeToRoot()]])
+            ->assertHasErrors()
+            ->assertSee('Contract: pass a path returned by the upload-file tool');
+
+        expect($note->fresh('customFieldValues.customField.options')->getCustomFieldValue($this->contract))->toBe($path);
+    });
+
     it('rejects another workspace\'s upload', function (): void {
         $stranger = User::factory()->withPersonalTeam()->create();
         $path = uploadedPath($stranger);
@@ -668,6 +687,24 @@ describe('file-upload values', function (): void {
 
         expect(Note::query()->where('title', 'Twice')->exists())->toBeFalse()
             ->and(resolve(MediaPaths::class)->find($this->team->getKey(), $path)?->collection_name)->toBe(MediaCollection::PendingUploads->value);
+    });
+
+    it('leaves a rich-editor image owned by another workspace untouched', function (): void {
+        $stranger = User::factory()->withPersonalTeam()->create();
+        RelaticleServer::actingAs($stranger)
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(onePixelPng()), 'filename' => 'foreign.png'])
+            ->assertOk();
+        $foreign = Media::query()->latest('id')->firstOrFail();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(CreateNoteTool::class, [
+                'title' => 'Foreign rich image',
+                'custom_fields' => ['body' => "<p><img data-id=\"{$foreign->uuid}\" src=\"x\"></p>"],
+            ])
+            ->assertOk();
+
+        expect(Note::query()->where('title', 'Foreign rich image')->exists())->toBeTrue()
+            ->and($foreign->refresh()->collection_name)->toBe(MediaCollection::PendingUploads->value);
     });
 
 });

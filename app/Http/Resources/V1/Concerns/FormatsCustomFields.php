@@ -18,7 +18,10 @@ trait FormatsCustomFields
 {
     public static function collection(mixed $resource): AnonymousResourceCollection
     {
-        resolve(RecordNameResolver::class)->prime($resource instanceof Paginator ? $resource->items() : $resource);
+        $records = $resource instanceof Paginator ? $resource->items() : $resource;
+
+        resolve(RecordNameResolver::class)->prime($records);
+        resolve(MediaPaths::class)->prime($records);
 
         return parent::collection($resource);
     }

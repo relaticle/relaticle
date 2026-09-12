@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Upload\PurgeExpiredUploads;
 use App\Console\Commands\PurgePendingUploadsCommand;
 use App\Enums\MediaCollection;
 use App\Models\User;
@@ -11,7 +12,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(PurgePendingUploadsCommand::class);
+mutates(PurgeExpiredUploads::class, PurgePendingUploadsCommand::class);
 
 beforeEach(function (): void {
     Storage::fake('public');
@@ -24,7 +25,7 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     $old = $this->team->addMediaFromString(pdfBytes())->usingFileName('old.pdf')
         ->withCustomProperties(['team_id' => $this->team->getKey()])
         ->toMediaCollection(MediaCollection::PendingUploads->value);
-    $oldTemp = TemporaryUploads::newName('old.pdf');
+    $oldTemp = TemporaryUploads::newName('old.pdf', (string) $this->team->getKey());
     TemporaryUploads::disk()->put(TemporaryUploads::path($oldTemp), pdfBytes());
     touch(TemporaryUploads::disk()->path(TemporaryUploads::path($oldTemp)), now()->getTimestamp());
 
@@ -32,7 +33,7 @@ it('removes pending media and temp files older than a day, keeps the rest', func
     $fresh = $this->team->addMediaFromString(pdfBytes())->usingFileName('fresh.pdf')
         ->withCustomProperties(['team_id' => $this->team->getKey()])
         ->toMediaCollection(MediaCollection::PendingUploads->value);
-    $freshTemp = TemporaryUploads::newName('fresh.pdf');
+    $freshTemp = TemporaryUploads::newName('fresh.pdf', (string) $this->team->getKey());
     TemporaryUploads::disk()->put(TemporaryUploads::path($freshTemp), pdfBytes());
 
     $this->artisan('app:purge-pending-uploads')
@@ -57,3 +58,15 @@ it('is scheduled hourly without overlap on a single server', function (): void {
         ->and($event->withoutOverlapping)->toBeTrue()
         ->and($event->onOneServer)->toBeTrue();
 });
+
+it('rejects a non-positive retention window without deleting uploads', function (string $hours): void {
+    $pending = $this->team->addMediaFromString(pdfBytes())->usingFileName('pending.pdf')
+        ->withCustomProperties(['team_id' => $this->team->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+
+    $this->artisan('app:purge-pending-uploads', ['--hours' => $hours])
+        ->expectsOutputToContain('The retention window must be at least one hour.')
+        ->assertFailed();
+
+    expect(Media::query()->find($pending->getKey()))->not->toBeNull();
+})->with(['zero' => '0', 'negative' => '-1', 'not numeric' => 'tomorrow']);

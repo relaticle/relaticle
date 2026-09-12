@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Upload\StoreAgentUpload;
 use App\Enums\MediaCollection;
 use App\Exceptions\UploadException;
+use App\Http\Controllers\Mcp\ReceiveUploadController;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\UploadFileTool;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(StoreAgentUpload::class, TemporaryUploads::class, CreateUploadUrlTool::class, UploadFileTool::class);
+mutates(StoreAgentUpload::class, ReceiveUploadController::class, TemporaryUploads::class, CreateUploadUrlTool::class, UploadFileTool::class);
 
 beforeEach(function (): void {
     Storage::fake('public');
@@ -89,7 +90,7 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('moves a signed-put temp file into pending uploads', function (): void {
-        $name = TemporaryUploads::newName('report.pdf');
+        $name = TemporaryUploads::newName('report.pdf', (string) $this->team->getKey());
         TemporaryUploads::disk()->put(TemporaryUploads::path($name), pdfBytes());
 
         $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => $name]);
@@ -100,7 +101,7 @@ describe('StoreAgentUpload', function (): void {
     });
 
     it('rejects a temp file over the 10 MB ceiling', function (): void {
-        $name = TemporaryUploads::newName('report.pdf');
+        $name = TemporaryUploads::newName('report.pdf', (string) $this->team->getKey());
         TemporaryUploads::disk()->put(TemporaryUploads::path($name), str_repeat('a', 10 * 1024 * 1024 + 1));
 
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => $name]))
@@ -111,12 +112,12 @@ describe('StoreAgentUpload', function (): void {
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => '../etc/passwd']))
             ->toThrow(UploadException::class, __('uploads.errors.not_found'));
 
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => TemporaryUploads::newName('gone.pdf')]))
+        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->team, ['upload_id' => TemporaryUploads::newName('gone.pdf', (string) $this->team->getKey())]))
             ->toThrow(UploadException::class, __('uploads.errors.not_found'));
     });
 
     it('rejects a temp name whose extension is outside the allowlist', function (): void {
-        expect(fn (): string => TemporaryUploads::newName('page.html'))
+        expect(fn (): string => TemporaryUploads::newName('page.html', (string) $this->team->getKey()))
             ->toThrow(UploadException::class, __('uploads.errors.mime_not_allowed', ['mime' => 'html']));
     });
 });
@@ -152,7 +153,7 @@ describe('create-upload-url', function (): void {
 
 describe('signed put receiver', function (): void {
     it('stores the body under tmp on the local disk and answers 204', function (): void {
-        $name = TemporaryUploads::newName('deck.pdf');
+        $name = TemporaryUploads::newName('deck.pdf', (string) $this->team->getKey());
         $url = URL::temporarySignedRoute('mcp.uploads.receive', now()->addMinutes(5), ['upload' => $name]);
 
         $this->call('PUT', $url, [], [], [], ['CONTENT_LENGTH' => strlen(pdfBytes()), 'CONTENT_TYPE' => 'application/pdf'], pdfBytes())
@@ -162,12 +163,12 @@ describe('signed put receiver', function (): void {
     });
 
     it('rejects an unsigned request', function (): void {
-        $this->put(route('mcp.uploads.receive', ['upload' => TemporaryUploads::newName('deck.pdf')]), [], ['Content-Length' => '10'])
+        $this->put(route('mcp.uploads.receive', ['upload' => TemporaryUploads::newName('deck.pdf', (string) $this->team->getKey())]), [], ['Content-Length' => '10'])
             ->assertForbidden();
     });
 
     it('rejects a missing or oversized content length before reading', function (): void {
-        $name = TemporaryUploads::newName('deck.pdf');
+        $name = TemporaryUploads::newName('deck.pdf', (string) $this->team->getKey());
         $url = URL::temporarySignedRoute('mcp.uploads.receive', now()->addMinutes(5), ['upload' => $name]);
 
         $this->call('PUT', $url, [], [], [], ['CONTENT_LENGTH' => (string) (10 * 1024 * 1024 + 1)], 'x')
@@ -205,7 +206,7 @@ describe('upload-file', function (): void {
     });
 
     it('accepts a completed signed put by upload id', function (): void {
-        $upload = TemporaryUploads::newName('deck.pdf');
+        $upload = TemporaryUploads::newName('deck.pdf', (string) $this->team->getKey());
         TemporaryUploads::disk()->put(TemporaryUploads::path($upload), pdfBytes());
 
         RelaticleServer::actingAs($this->user)
@@ -219,13 +220,29 @@ describe('upload-file', function (): void {
             ->and($media->getCustomProperty('original_name'))->toBe('deck.pdf');
     });
 
+    it('prevents another workspace from finalizing a signed put', function (): void {
+        $upload = TemporaryUploads::newName('deck.pdf', (string) $this->team->getKey());
+        TemporaryUploads::disk()->put(TemporaryUploads::path($upload), pdfBytes());
+        $otherUser = User::factory()->withPersonalTeam()->create();
+
+        RelaticleServer::actingAs($otherUser)
+            ->tool(UploadFileTool::class, ['upload_id' => $upload, 'filename' => 'deck.pdf'])
+            ->assertHasErrors([__('uploads.errors.not_found')]);
+
+        TemporaryUploads::disk()->assertExists(TemporaryUploads::path($upload));
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UploadFileTool::class, ['upload_id' => $upload, 'filename' => 'deck.pdf'])
+            ->assertOk();
+    });
+
     it('requires exactly one source', function (): void {
         RelaticleServer::actingAs($this->user)
             ->tool(UploadFileTool::class, [])
             ->assertHasErrors();
 
         RelaticleServer::actingAs($this->user)
-            ->tool(UploadFileTool::class, ['base64' => base64_encode(pdfBytes()), 'filename' => 'a.pdf', 'upload_id' => TemporaryUploads::newName('b.pdf')])
+            ->tool(UploadFileTool::class, ['base64' => base64_encode(pdfBytes()), 'filename' => 'a.pdf', 'upload_id' => TemporaryUploads::newName('b.pdf', (string) $this->team->getKey())])
             ->assertHasErrors();
     });
 

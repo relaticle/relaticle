@@ -80,6 +80,22 @@ it('rejects an svg through the accepted file types', function (): void {
     expect(Note::query()->where('title', 'With svg')->exists())->toBeFalse();
 });
 
+it('clears a failed upload error after a successful retry', function (): void {
+    $test = livewire(ManageNotes::class)->mountAction('create');
+    $schemaName = $test->instance()->getMountedActionSchemaName();
+    $schema = $test->instance()->{$schemaName};
+    $component = $schema->getComponent(fn (Component|Action|ActionGroup $component): bool => $component instanceof FileUpload
+        && $component->getName() === $this->contract->getFieldName());
+    $statePath = $component->getStatePath();
+    $livewire = $test->instance();
+    $failedUploadPath = "{$statePath}.upload-key";
+    $livewire->addError($failedUploadPath, "The {$failedUploadPath} failed to upload.");
+
+    $component->callAfterStateUpdated();
+
+    expect($livewire->getErrorBag()->has($failedUploadPath))->toBeFalse();
+});
+
 it('shows the original file name, not the storage name, as a link on the record', function (): void {
     $note = Note::factory()->recycle([$this->user, $this->team])->create();
     $media = $this->team->addMediaFromString(pdfBytes())

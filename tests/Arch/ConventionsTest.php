@@ -278,6 +278,7 @@ it('keeps new file uploads on medialibrary', function (): void {
     $root = dirname(__DIR__, 2);
     $allowed = [
         'app/Filament/CustomFields/FileUploadComponent.php',
+        'app/Filament/CustomFields/RichEditorFieldType.php',
         'app/Livewire/App/Profile/UpdateProfileInformation.php',
     ];
     $offenders = [];
@@ -298,7 +299,7 @@ it('keeps new file uploads on medialibrary', function (): void {
 
             $source = (string) file_get_contents($file->getPathname());
 
-            if (preg_match('/\bFileUpload::make\(|->fileAttachmentsDisk\(|->fileAttachmentsDirectory\(/', $source) === 1) {
+            if (preg_match('/\bFileUpload::make\(|->attachFiles\(|->fileAttachmentsDisk\(|->fileAttachmentsDirectory\(/', $source) === 1) {
                 $offenders[] = $relative;
             }
         }

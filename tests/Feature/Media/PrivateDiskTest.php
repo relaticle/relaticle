@@ -7,12 +7,13 @@ use App\Http\Controllers\Media\ShowMediaController;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\UploadFileTool;
 use App\Models\Company;
+use App\Models\Team;
 use App\Models\User;
 use App\Support\Media\MediaUrlGenerator;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(MediaUrlGenerator::class, ShowMediaController::class);
+mutates(MediaUrlGenerator::class, ShowMediaController::class, Team::class);
 
 beforeEach(function (): void {
     Storage::fake('public');
@@ -87,6 +88,24 @@ it('falls back to the stored file name when original_name is absent', function (
         ->assertHeader('Content-Disposition', 'attachment; filename='.$media->file_name);
 });
 
+it('serves agent files with a safe original download name', function (): void {
+    usePrivateMediaDisk();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UploadFileTool::class, [
+            'base64' => base64_encode(pdfBytes()),
+            'filename' => "../folder\\brief\n.pdf",
+        ])
+        ->assertOk();
+    $media = Media::query()->latest('id')->firstOrFail();
+
+    $this->get($media->getUrl())
+        ->assertOk()
+        ->assertHeader('Content-Disposition', 'attachment; filename=brief.pdf');
+
+    expect($media->getCustomProperty('original_name'))->toBe('brief.pdf');
+});
+
 it('refuses an unsigned or expired private url', function (): void {
     usePrivateMediaDisk();
     $media = uploadPdf($this->user);
@@ -103,6 +122,15 @@ it('keeps company logos on the public disk regardless of the switch', function (
     $company = Company::factory()->create(['team_id' => $this->team->getKey()]);
 
     $logo = $company->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(MediaCollection::Logo->value);
+
+    expect($logo->disk)->toBe('public')
+        ->and($logo->getUrl())->not->toContain('signature=');
+});
+
+it('keeps workspace logos on the public disk regardless of the switch', function (): void {
+    usePrivateMediaDisk();
+
+    $logo = $this->team->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Team::LOGO_MEDIA_COLLECTION);
 
     expect($logo->disk)->toBe('public')
         ->and($logo->getUrl())->not->toContain('signature=');

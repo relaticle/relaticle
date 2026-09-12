@@ -4,45 +4,30 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Enums\MediaCollection;
-use App\Support\Media\TemporaryUploads;
+use App\Actions\Upload\PurgeExpiredUploads;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 #[Description('Delete pending uploads and signed-put temp files nobody claimed within a day')]
 #[Signature('app:purge-pending-uploads {--hours=24 : Age after which an unclaimed upload is deleted}')]
 final class PurgePendingUploadsCommand extends Command
 {
-    public function handle(): int
+    public function handle(PurgeExpiredUploads $purge): int
     {
-        $cutoff = now()->subHours((int) $this->option('hours'));
+        $hours = filter_var($this->option('hours'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
-        $media = Media::query()
-            ->where('collection_name', MediaCollection::PendingUploads->value)
-            ->where('created_at', '<', $cutoff)
-            ->get();
+        if ($hours === false) {
+            $this->error(__('uploads.errors.invalid_retention'));
 
-        foreach ($media as $item) {
-            $this->info("Deleting pending upload {$item->uuid}");
-            $item->delete();
+            return self::FAILURE;
         }
 
-        $disk = TemporaryUploads::disk();
-        $temps = 0;
+        $cutoff = now()->subHours($hours);
 
-        foreach ($disk->files(TemporaryUploads::DIRECTORY) as $file) {
-            if ($disk->lastModified($file) >= $cutoff->getTimestamp()) {
-                continue;
-            }
+        $deleted = $purge->execute($cutoff);
 
-            $this->info("Deleting temp file {$file}");
-            $disk->delete($file);
-            $temps++;
-        }
-
-        $this->comment("Purged {$media->count()} pending upload(s) and {$temps} temp file(s).");
+        $this->comment("Purged {$deleted['media']} pending upload(s) and {$deleted['temporary']} temp file(s).");
 
         return self::SUCCESS;
     }

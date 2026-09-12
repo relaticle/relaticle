@@ -34,7 +34,7 @@ final readonly class StoreAgentUpload
         chmod($temp, 0600);
 
         try {
-            [$name, $source] = $this->materialise($input, $temp);
+            [$name, $source] = $this->materialise($input, (string) $team->getKey(), $temp);
 
             $media = $this->store->execute($user, $team, $temp, $name, $source);
 
@@ -52,7 +52,7 @@ final readonly class StoreAgentUpload
      * @param  array{source_url?: ?string, base64?: ?string, filename?: ?string, upload_id?: ?string}  $input
      * @return array{0: string, 1: UploadSource}
      */
-    private function materialise(array $input, string $temp): array
+    private function materialise(array $input, string $teamId, string $temp): array
     {
         if (filled($input['source_url'] ?? null)) {
             return [$this->fetch((string) $input['source_url'], $temp), UploadSource::Url];
@@ -63,7 +63,7 @@ final readonly class StoreAgentUpload
         }
 
         if (filled($input['upload_id'] ?? null)) {
-            $upload = $this->takeTemporary((string) $input['upload_id'], $temp);
+            $upload = $this->takeTemporary((string) $input['upload_id'], $teamId, $temp);
             $name = filled($input['filename'] ?? null) ? (string) $input['filename'] : $upload;
 
             return [$name, UploadSource::SignedPut];
@@ -75,7 +75,7 @@ final readonly class StoreAgentUpload
     private function fetch(string $url, string $temp): string
     {
         try {
-            $response = SsrfGuard::pinnedClient($url)->get($url);
+            $response = SsrfGuard::pinnedClient($url)->sink($temp)->get($url);
         } catch (SsrfGuardException) {
             throw UploadException::urlNotAllowed();
         } catch (ConnectionException) {
@@ -84,11 +84,7 @@ final readonly class StoreAgentUpload
 
         throw_unless($response->successful(), UploadException::unreachable());
 
-        $body = $response->body();
-
-        throw_if(strlen($body) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
-
-        file_put_contents($temp, $body);
+        throw_if((int) filesize($temp) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
 
         $name = basename((string) parse_url($url, PHP_URL_PATH));
 
@@ -107,9 +103,9 @@ final readonly class StoreAgentUpload
         return $filename;
     }
 
-    private function takeTemporary(string $upload, string $temp): string
+    private function takeTemporary(string $upload, string $teamId, string $temp): string
     {
-        throw_unless(TemporaryUploads::isValidName($upload), UploadException::notFound());
+        throw_unless(TemporaryUploads::belongsToTeam($upload, $teamId), UploadException::notFound());
 
         $disk = TemporaryUploads::disk();
         $path = TemporaryUploads::path($upload);
