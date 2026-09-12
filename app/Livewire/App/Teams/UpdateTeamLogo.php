@@ -12,6 +12,7 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 
 final class UpdateTeamLogo extends BaseLivewireComponent
@@ -57,6 +58,8 @@ final class UpdateTeamLogo extends BaseLivewireComponent
 
     public function updateLogo(): void
     {
+        Gate::authorize('update', $this->team);
+
         try {
             $this->rateLimit(5);
         } catch (TooManyRequestsException $exception) {

@@ -99,6 +99,20 @@ it('falls back to the generated initials avatar without a logo', function (): vo
     expect($this->team->getFilamentAvatarUrl())->toContain('data:image/svg+xml');
 });
 
+it('refuses a logo change from a member who does not own the workspace', function (): void {
+    $member = User::factory()->create();
+    $this->team->users()->attach($member, ['role' => 'editor']);
+
+    $this->actingAs($member);
+
+    Livewire::test(UpdateTeamLogo::class, ['team' => $this->team])
+        ->fillForm(['logo' => UploadedFile::fake()->image('sneaky.png', 120, 120)])
+        ->call('updateLogo')
+        ->assertForbidden();
+
+    expect($this->team->fresh()->getMedia(Team::LOGO_MEDIA_COLLECTION))->toHaveCount(0);
+});
+
 it('offers the logo section on a personal workspace', function (): void {
     $this->team->forceFill(['personal_team' => true])->save();
 
