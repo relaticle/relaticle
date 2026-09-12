@@ -28,6 +28,14 @@ it('renders every theme mode and accent swatch', function (): void {
     }
 });
 
+it('renders accent labels through the translation layer', function (): void {
+    app('translator')->addLines(['appearance.accent_colors.Blue' => 'Azure'], 'en');
+
+    Livewire::test(Appearance::class)
+        ->assertSuccessful()
+        ->assertSee('Azure');
+});
+
 it('ships a primary ramp for every accent', function (): void {
     $this->get(Appearance::getUrl())
         ->assertSuccessful()

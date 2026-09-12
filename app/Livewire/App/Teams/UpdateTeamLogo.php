@@ -74,7 +74,6 @@ final class UpdateTeamLogo extends BaseLivewireComponent
         }
 
         $this->form->getState();
-        $this->form->saveRelationships();
 
         $this->sendNotification();
     }

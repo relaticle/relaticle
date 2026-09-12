@@ -87,12 +87,9 @@ final class Team extends JetstreamTeam implements HasAvatar, HasMedia, Onboardab
 
     public const string LOGO_MEDIA_COLLECTION = 'logo';
 
-    /**
-     * SVG is excluded on purpose: it carries script, and a workspace logo is the
-     * one image members upload to the public disk on our own origin.
-     *
-     * @var list<string>
-     */
+    // SVG is excluded on purpose: it carries script, and a workspace logo is the
+    // one image members upload to the public disk on our own origin.
+    /** @var list<string> */
     public const array LOGO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
     public const int LOGO_MAX_KILOBYTES = 2048;

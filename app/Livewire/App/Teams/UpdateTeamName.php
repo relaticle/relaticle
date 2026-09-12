@@ -9,9 +9,9 @@ use App\Filament\Pages\EditTeam;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Team;
 use App\Rules\ValidTeamSlug;
+use App\Support\WorkspaceUrlPrefix;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
@@ -38,24 +38,6 @@ final class UpdateTeamName extends BaseLivewireComponent
         $this->form->fill($team->only(['name', 'slug']));
     }
 
-    /**
-     * The part of the workspace address that precedes the slug, so the field
-     * reads as the URL members will actually visit.
-     */
-    private function slugPrefix(): string
-    {
-        $panel = Filament::getPanel('app');
-        $domains = $panel->getDomains();
-
-        if ($domains !== []) {
-            return reset($domains).'/';
-        }
-
-        $host = parse_url((string) config('app.url'), PHP_URL_HOST);
-
-        return (is_string($host) ? $host : '').'/'.$panel->getPath().'/';
-    }
-
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -79,7 +61,7 @@ final class UpdateTeamName extends BaseLivewireComponent
                             }),
                         TextInput::make('slug')
                             ->label(__('teams.form.team_slug.label'))
-                            ->prefix($this->slugPrefix())
+                            ->prefix(WorkspaceUrlPrefix::get())
                             ->helperText(__('teams.form.team_slug.helper_text'))
                             ->string()
                             ->maxLength(255)
