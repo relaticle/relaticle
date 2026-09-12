@@ -162,44 +162,56 @@ it('shows your name for a first-run user', function (): void {
         ->assertFormFieldVisible('user_name');
 });
 
-it('prefills a workspace name and a handle that is not already taken', function (): void {
-    $other = User::factory()->create();
-    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
-
+it('starts the workspace step empty for the user to name it themselves', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
         ->assertFormSet([
-            'name' => 'My workspace',
-            'slug' => 'my-workspace-2',
+            'name' => null,
+            'slug' => null,
         ]);
+});
+
+it('derives the handle from the name as it is typed', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
 });
 
 it('picks the lowest free suffix, skipping the ones already in use', function (): void {
     $other = User::factory()->create();
-    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
-    Team::factory()->create(['slug' => 'my-workspace-2', 'user_id' => $other->id]);
-    Team::factory()->create(['slug' => 'my-workspace-10', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'acme-corp-2', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'acme-corp-10', 'user_id' => $other->id]);
 
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
-        ->assertFormSet(['slug' => 'my-workspace-3']);
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp-3']);
 });
 
-it('creates both workspaces when two signups overlap on the default handle', function (): void {
+it('creates both workspaces when two signups type the same name at once', function (): void {
     $first = User::factory()->create();
     $second = User::factory()->create();
 
     $this->actingAs($first);
-    $firstWizard = livewire(CreateTeam::class)->assertFormSet(['slug' => 'my-workspace']);
+    $firstWizard = livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
 
     $this->actingAs($second);
-    $secondWizard = livewire(CreateTeam::class)->assertFormSet(['slug' => 'my-workspace']);
+    $secondWizard = livewire(CreateTeam::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
 
     $this->actingAs($first);
     $firstWizard
@@ -214,7 +226,7 @@ it('creates both workspaces when two signups overlap on the default handle', fun
         ->assertHasNoFormErrors();
 
     expect(Team::query()->whereIn('user_id', [$first->id, $second->id])->pluck('slug')->sort()->values()->all())
-        ->toBe(['my-workspace', 'my-workspace-2']);
+        ->toBe(['acme-corp', 'acme-corp-2']);
 });
 
 it('stores no context for a use case that offers no sub-options', function (): void {
@@ -291,18 +303,19 @@ it('suffixes a typed name that slugs to a handle already in use', function (): v
 
 it('ignores a taken handle whose suffix is too long to be a number', function (): void {
     $other = User::factory()->create();
-    Team::factory()->create(['slug' => 'my-workspace', 'user_id' => $other->id]);
-    Team::factory()->create(['slug' => 'my-workspace-99999999999', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'globex', 'user_id' => $other->id]);
+    Team::factory()->create(['slug' => 'globex-99999999999', 'user_id' => $other->id]);
 
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateTeam::class)
-        ->assertFormSet(['slug' => 'my-workspace-2']);
+        ->fillForm(['name' => 'Globex'])
+        ->assertFormSet(['slug' => 'globex-2']);
 });
 
-it('creates a workspace from the defaults with only the use case chosen', function (): void {
+it('requires both a workspace name and a handle when the user fills neither', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -312,12 +325,9 @@ it('creates a workspace from the defaults with only the use case chosen', functi
             'onboarding_use_case' => OnboardingUseCase::Other->value,
         ])
         ->call('register')
-        ->assertHasNoFormErrors();
+        ->assertHasFormErrors(['name' => 'required', 'slug' => 'required']);
 
-    $team = $user->fresh()->personalTeam();
-
-    expect($team->name)->toBe('My workspace')
-        ->and($team->slug)->toBe('my-workspace');
+    expect($user->fresh()->personalTeam())->toBeNull();
 });
 
 it('renders wizard for users who already have a team', function (): void {
