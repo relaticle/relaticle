@@ -28,7 +28,7 @@
 
 1. Tasks 1 to 3 need nothing beyond `main` as of `94e442c59`.
 2. Task 4 edits `app/Filament/CustomFields/RichEditorFieldType.php`, created by #695. Before Task 4: confirm #695 is merged, then `git fetch origin && git merge origin/main` and verify the file exists.
-3. #606 reworks its team logo into a `logo` collection on `Team` and adds `Team implements HasMedia`. Task 1 adds `HasMedia` to `Team` only if it is not there yet, so either merge order works. After #606 merges, merge `origin/main` again and drop the duplicate if both branches added it.
+3. #606 was closed on 2026-09-12 and replaced by #734 (`feat/appearance-and-workspace-logo`), which already stores the team logo in a `logo` collection on `Team` through `SpatieMediaLibraryFileUpload` and adds `Team implements HasMedia` with `LOGO_MEDIA_COLLECTION` and `registerMediaCollections()`. Task 1 added the same on this branch. When #734 lands, merge `origin/main`, keep #734's `Team` version, and re-apply only the `useDisk('public')` on its `logo` registration if #734 does not carry it.
 4. #699 targets `feat/custom-fields-agent-friendly-writes` (merged as #698). Retargeting to `main` needs the founder's say-so; it is not part of any task.
 
 ## File map
@@ -3324,7 +3324,7 @@ it('keeps new file uploads on medialibrary', function (): void {
 
             $source = (string) file_get_contents($file->getPathname());
 
-            if (preg_match('/FileUpload::make\(|->fileAttachmentsDisk\(|->fileAttachmentsDirectory\(/', $source) === 1) {
+            if (preg_match('/\bFileUpload::make\(|->fileAttachmentsDisk\(|->fileAttachmentsDirectory\(/', $source) === 1) {
                 $offenders[] = $relative;
             }
         }
@@ -3340,7 +3340,7 @@ it('keeps new file uploads on medialibrary', function (): void {
 - [ ] **Step 3: Run the arch test**
 
 Run: `php artisan test --compact --filter='keeps new file uploads on medialibrary'`
-Expected: PASS. If #606 has merged with a `FileUpload::make('logo_path')`, the test fails and names the file; that is the signal #606's rework has not landed, not a reason to widen `$allowed`.
+Expected: PASS. The `\b` keeps `SpatieMediaLibraryFileUpload::make(` (used by #734 for the team logo, medialibrary-backed) out of the match; a bare `FileUpload::make(` anywhere new fails the test and names the file.
 
 - [ ] **Step 4: Commit**
 
