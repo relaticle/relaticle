@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailShare;
 
 mutates(EmailPolicy::class);
 
@@ -46,6 +47,23 @@ it('denies every email ability to a user from another workspace', function (): v
         ->and($outsider->can('viewBody', $this->email))->toBeFalse()
         ->and($outsider->can('share', $this->email))->toBeFalse()
         ->and($outsider->can('requestAccess', $this->email))->toBeFalse();
+});
+
+it('denies every view ability to a teammate with a private share override', function (): void {
+    $teammate = User::factory()->create();
+    $teammate->teams()->attach($this->team);
+    $teammate->forceFill(['current_team_id' => $this->team->id])->save();
+
+    EmailShare::factory()->tier(EmailPrivacyTier::PRIVATE)->create([
+        'email_id' => $this->email->getKey(),
+        'shared_by' => $this->owner->id,
+        'shared_with' => $teammate->id,
+    ]);
+
+    expect($teammate->can('view', $this->email))->toBeFalse()
+        ->and($teammate->can('viewSubject', $this->email))->toBeFalse()
+        ->and($teammate->can('viewBody', $this->email))->toBeFalse()
+        ->and($teammate->can('requestAccess', $this->email))->toBeFalse();
 });
 
 it('still allows a teammate to view a shared-tier email in the same workspace', function (): void {

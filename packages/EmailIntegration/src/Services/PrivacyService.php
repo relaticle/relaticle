@@ -45,7 +45,13 @@ final readonly class PrivacyService
         $share = $this->shareForViewer($email, $viewer);
 
         if ($share instanceof EmailShare) {
-            return EmailPrivacyTier::from($share->tier);
+            $tier = EmailPrivacyTier::from($share->tier);
+
+            if ($tier === EmailPrivacyTier::PRIVATE) {
+                return null;
+            }
+
+            return $tier;
         }
 
         // Email's own tier
