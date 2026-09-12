@@ -144,6 +144,14 @@ final class WorkspaceResource extends Resource
                         ->label('Use Case')
                         ->badge()
                         ->placeholder('—'),
+                    TextEntry::make('onboarding_context')
+                        ->label('Use Case Details')
+                        ->badge()
+                        ->formatStateUsing(self::contextLabel(...))
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_other_use_case')
+                        ->label('What They Track')
+                        ->placeholder('—'),
                     TextEntry::make('onboarding_referral_source')
                         ->label('Referral Source')
                         ->badge()
@@ -158,6 +166,11 @@ final class WorkspaceResource extends Resource
                         ->dateTime(),
                 ])->columnSpanFull()->columns(),
             ]);
+    }
+
+    public static function contextLabel(Workspace $record, string $state): string
+    {
+        return $record->onboarding_use_case?->getSubOptions()[$state] ?? $state;
     }
 
     #[Override]
@@ -198,6 +211,18 @@ final class WorkspaceResource extends Resource
                     ->badge()
                     ->sortable()
                     ->toggleable()
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_context')
+                    ->label('Use Case Details')
+                    ->badge()
+                    ->formatStateUsing(self::contextLabel(...))
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_other_use_case')
+                    ->label('What They Track')
+                    ->searchable()
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 TextColumn::make('onboarding_referral_source')
                     ->label('Referral')
