@@ -54,12 +54,15 @@ y en GitHub Codespaces.
 - Todo lo que ejecuta el CI (Pint, Rector, type coverage, PHPStan, Pest):
   `composer test`
 - Migraciones: `php artisan migrate`
+- Aplicar nuestro pipeline y campos a un workspace:
+  `php artisan crm:configurar-pipeline {id-o-slug}` (idempotente)
 
 ## Reglas de oro para el agente
 1. **Campos nuevos = Custom Fields, no migraciones.** Para añadir atributos a
-   Empresas / Contactos / Oportunidades, usa el sistema de Custom Fields del
-   panel. Crea migraciones solo para entidades realmente nuevas. Esto mantiene
-   el fork limpio para poder actualizar desde upstream.
+   Empresas / Contactos / Oportunidades, usa el sistema de Custom Fields: desde
+   el panel o, para que sea repetible, añadiéndolos a `config/crm.php` y a
+   `crm:configurar-pipeline`. Crea migraciones solo para entidades realmente
+   nuevas. Esto mantiene el fork limpio para poder actualizar desde upstream.
 2. **No romper tests.** Ejecuta Pest antes y después de cada cambio; mantenlo en
    verde.
 3. **Cambios pequeños y commits atómicos.** Explica y pide confirmación antes de
@@ -73,7 +76,9 @@ y en GitHub Codespaces.
    ejemplo parcial en `lang/fr`). Sigue `docs/i18n.md`: `cp -r lang/en lang/es`,
    traducir, `php artisan lang:update`,
    `php artisan locale:diff es --update-snapshot` (commitear
-   `lang/.snapshots/es.json`) y `APP_LOCALE=es`.
+   `lang/.snapshots/es.json`) y `APP_LOCALE=es`. Los nombres de los campos
+   personalizados son datos, no traducciones: los pone en español
+   `crm:configurar-pipeline`.
 
 ## Mantener el fork actualizable
 - `origin` = nuestro fork, `https://github.com/Guillermoj9/relaticle`
@@ -93,15 +98,23 @@ y en GitHub Codespaces.
   raíz y apuntar `compose.yml` a ella.
 - En producción: `REQUIRE_EMAIL_VERIFICATION=true` y un SMTP real
   (`MAIL_MAILER=smtp`); en local el correo solo va al log.
+- `RELATICLE_FEATURE_ONBOARD_SEED=false`: si no, al crear la primera cuenta se
+  cargan datos de demo en el workspace.
+- Tras crear el workspace: `php artisan crm:configurar-pipeline {id-o-slug}`.
 
 ## Nuestro pipeline de ventas
-Etapas: **Nuevo → Cualificado → Propuesta enviada → Negociación → Ganado /
-Perdido**.
+Etapas (columnas del tablero): **Oportunidad → Contactado → En trámite →
+Contactar más tarde → Cerrada ganada / Cerrada fallida**.
 
-Campos que nos importan:
-- **Oportunidad:** valor (€), responsable, origen (web / referido / frío /
-  RRSS), fecha de cierre estimada, probabilidad %.
-- **Empresa:** CIF, sector, web.
+Todo se define en `config/crm.php` y lo aplica `crm:configurar-pipeline`:
+- **Oportunidad:** valor (€), responsable (desplegable con los nombres del
+  equipo), origen (web / referido / frío / RRSS), fecha de cierre estimada,
+  probabilidad %.
+- **Empresa:** CIF, sector (desplegable), web.
+
+Las etapas de upstream que coinciden (p. ej. *Prospecting*, *Closed Won*) se
+renombran y conservan sus oportunidades; el resto se borran solo si nadie las
+usa.
 
 ## Roadmap
 - **Fase 1:** instalar y arrancar, crear usuario admin, invitar al equipo,
