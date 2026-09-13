@@ -6,14 +6,15 @@
 > `.gitignore` ignore `.claude/*` (se añadió con `git add -f`).
 
 ## Qué es este proyecto
-CRM y pipeline de ventas **interno** del equipo, partiendo de un fork de
-[Relaticle](https://github.com/Relaticle/relaticle) (CRM open-source sobre
-Laravel + Filament). Objetivo: tener controlados todos los clientes y el
+**Crabdev CRM**: CRM y pipeline de ventas **interno** del equipo, partiendo de
+un fork de [Relaticle](https://github.com/Relaticle/relaticle) (CRM open-source
+sobre Laravel + Filament). Objetivo: tener controlados todos los clientes y el
 pipeline de ventas en un solo sitio.
 
 - **Equipo (2-3 personas):** dirección/desarrollo, socio dev y un comercial.
 - **Clientes:** pymes españolas (agencia CrabDev y demás líneas de negocio).
 - **Idioma de la interfaz:** español.
+- **Acceso:** solo por invitación; sin web pública.
 
 ## Stack (heredado de Relaticle)
 - Laravel 13, Filament 5, PHP 8.5, Livewire 4, Alpine.js, Tailwind
@@ -37,8 +38,9 @@ fijada en `packageManager` de `package.json`) · Redis (Horizon y caché).
 configurados. Funciona igual en VS Code (*Reopen in Container*, requiere Docker)
 y en GitHub Codespaces.
 
-- Al crearse, `post-create.sh` instala dependencias, crea `.env`, migra y
-  compila assets. Es idempotente: se puede relanzar.
+- Al crearse, `post-create.sh` instala dependencias, crea `.env` (marca Crabdev,
+  sin login social, documentación ni datos de demo), migra y compila assets.
+  Es idempotente: se puede relanzar.
 - `APP_URL` debe coincidir con la URL del navegador (`RedirectToPrimaryHost`
   redirige cualquier otro host). `post-create.sh` lo fija solo al crear `.env`:
   `http://localhost:8000` en local o la URL pública en Codespaces.
@@ -54,6 +56,7 @@ y en GitHub Codespaces.
 - Todo lo que ejecuta el CI (Pint, Rector, type coverage, PHPStan, Pest):
   `composer test`
 - Migraciones: `php artisan migrate`
+- Primer usuario (el registro está cerrado): `php artisan make:filament-user`
 - Aplicar nuestro pipeline y campos a un workspace:
   `php artisan crm:configurar-pipeline {id-o-slug}` (idempotente)
 
@@ -76,9 +79,28 @@ y en GitHub Codespaces.
    ejemplo parcial en `lang/fr`). Sigue `docs/i18n.md`: `cp -r lang/en lang/es`,
    traducir, `php artisan lang:update`,
    `php artisan locale:diff es --update-snapshot` (commitear
-   `lang/.snapshots/es.json`) y `APP_LOCALE=es`. Los nombres de los campos
-   personalizados son datos, no traducciones: los pone en español
-   `crm:configurar-pipeline`.
+   `lang/.snapshots/es.json`) y `APP_LOCALE=es`. Al traducir, cambia
+   «Relaticle» por «Crabdev CRM» (en `lang/en` aparece ~36 veces, p. ej.
+   `auth.login.welcome`). Los nombres de los campos personalizados son datos,
+   no traducciones: los pone en español `crm:configurar-pipeline`.
+
+## Personalización Crabdev (sin tocar el core)
+Todo vive en archivos propios y se controla con `config/crm.php`:
+
+- `app/Providers/CrmServiceProvider.php`: nombre, favicon, colores (dorado
+  `#d9a441`), cabecera de correos, registro solo por invitación y middleware de
+  la web pública. Registrado al final de `bootstrap/providers.php` (única línea
+  tocada de upstream).
+- `resources/views/crm/`: vistas que **sustituyen** a las de upstream con el
+  mismo nombre (logo, pie del login, crear workspace, cabecera de correo). Si
+  upstream cambia la vista original, revisar nuestra copia.
+- `app/Http/Middleware/RedirectPublicPagesToApp.php`: portada, precios,
+  documentación, legales… redirigen a la app (lista en
+  `crm.access.public_paths`).
+- `app/Support/Crm/SignupGate.php`: desde la web solo se crea cuenta con
+  invitación pendiente; por Artisan, siempre.
+- Flags (por defecto activos salvo en los tests de upstream, `APP_ENV=testing`):
+  `CRM_BRANDING`, `CRM_PUBLIC_PAGES`, `CRM_OPEN_SIGNUP`.
 
 ## Mantener el fork actualizable
 - `origin` = nuestro fork, `https://github.com/Guillermoj9/relaticle`
@@ -86,7 +108,8 @@ y en GitHub Codespaces.
 - Personalizar vía config, Custom Fields y archivos propios siempre que se
   pueda, evitando editar el core, para poder hacer `git pull upstream main`.
 - Tras cada `git pull upstream main`: `php artisan locale:diff es` para ver
-  textos nuevos o cambiados que traducir.
+  textos nuevos o cambiados que traducir, y revisar si cambiaron las vistas que
+  sustituimos en `resources/views/crm/` o aparecieron páginas públicas nuevas.
 - Contexto personal o no versionado → `CLAUDE.local.md` (no commitear).
 - `.env` no se versiona: hay que recrearlo en cada máquina.
 
@@ -96,11 +119,14 @@ y en GitHub Codespaces.
   (`ghcr.io/relaticle/relaticle:latest`), **no nuestro código**. Para
   desplegar el fork hay que construir nuestra imagen con el `Dockerfile` de la
   raíz y apuntar `compose.yml` a ella.
-- En producción: `REQUIRE_EMAIL_VERIFICATION=true` y un SMTP real
-  (`MAIL_MAILER=smtp`); en local el correo solo va al log.
-- `RELATICLE_FEATURE_ONBOARD_SEED=false`: si no, al crear la primera cuenta se
-  cargan datos de demo en el workspace.
-- Tras crear el workspace: `php artisan crm:configurar-pipeline {id-o-slug}`.
+- Variables: `APP_NAME="Crabdev CRM"`, `REQUIRE_EMAIL_VERIFICATION=true`, SMTP
+  real (`MAIL_MAILER=smtp`), `RELATICLE_FEATURE_SOCIAL_AUTH=false`,
+  `RELATICLE_FEATURE_DOCUMENTATION=false` y
+  `RELATICLE_FEATURE_ONBOARD_SEED=false` (si no, la primera cuenta recibe datos
+  de demo).
+- Arranque: `php artisan make:filament-user` (primer admin) → entrar y crear el
+  workspace → `php artisan crm:configurar-pipeline {id-o-slug}` → invitar al
+  equipo desde el CRM.
 
 ## Nuestro pipeline de ventas
 Etapas (columnas del tablero): **Oportunidad → Contactado → En trámite →

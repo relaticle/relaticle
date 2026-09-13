@@ -22,6 +22,15 @@ if [ ! -f .env ]; then
         app_url="http://localhost:8000"
     fi
     sed -i "s|^APP_URL=.*|APP_URL=${app_url}|" .env
+
+    # CRM interno de Crabdev: sin login social, documentación ni datos de demo.
+    sed -i 's|^APP_NAME=.*|APP_NAME="Crabdev CRM"|' .env
+    cat >> .env <<'ENV'
+
+RELATICLE_FEATURE_SOCIAL_AUTH=false
+RELATICLE_FEATURE_DOCUMENTATION=false
+RELATICLE_FEATURE_ONBOARD_SEED=false
+ENV
 fi
 
 composer install --no-interaction --prefer-dist

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 use App\Providers\AppServiceProvider;
+use App\Providers\CrmServiceProvider;
 use App\Providers\FaviconServiceProvider;
 use App\Providers\Filament\AppPanelProvider;
 use App\Providers\FortifyServiceProvider;
@@ -29,4 +30,6 @@ return [
     DocumentationServiceProvider::class,
     ImportWizardNewServiceProvider::class,
     SystemAdminPanelProvider::class,
+    // Last on purpose: Crabdev branding and access rules override the above.
+    CrmServiceProvider::class,
 ];

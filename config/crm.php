@@ -15,6 +15,59 @@ declare(strict_types=1);
 
 return [
 
+    /*
+    | Marca y acceso. Se aplican siempre salvo en los tests de upstream
+    | (APP_ENV=testing), que siguen probando el comportamiento original de
+    | Relaticle; los tests propios los activan explícitamente.
+    */
+
+    'brand' => [
+        'enabled' => (bool) env('CRM_BRANDING', env('APP_ENV') !== 'testing'),
+        'name' => 'Crabdev CRM',
+        'company' => 'Crabdev',
+        'color' => '#d9a441',
+    ],
+
+    'access' => [
+
+        // Web pública de Relaticle: portada, precios, documentación, legales…
+        'public_pages' => (bool) env('CRM_PUBLIC_PAGES', env('APP_ENV') === 'testing'),
+
+        // Registro abierto. Si está cerrado, desde la web solo puede crearse
+        // cuenta quien tenga una invitación pendiente; por Artisan, siempre.
+        'open_signup' => (bool) env('CRM_OPEN_SIGNUP', env('APP_ENV') === 'testing'),
+
+        // Rutas que se redirigen a la app cuando la web pública está apagada.
+        'public_paths' => [
+            '/',
+            'ai',
+            'ai-native-crm',
+            'alternatives/*',
+            'blog',
+            'blog/*',
+            'compare/*',
+            'contact',
+            'developers',
+            'developers/*',
+            'discord',
+            'docs',
+            'docs/*',
+            'documentation',
+            'documentation/*',
+            'help',
+            'help/*',
+            'llms.txt',
+            'press',
+            'pricing',
+            'privacy-policy',
+            'scalar',
+            'self-hosted',
+            'sitemap.xml',
+            'terms-of-service',
+        ],
+
+    ],
+
     'currency' => 'EUR',
 
     'opportunity' => [
