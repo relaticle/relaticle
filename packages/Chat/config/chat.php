@@ -57,6 +57,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Setup Conversation Proposal Expiry (minutes)
+    |--------------------------------------------------------------------------
+    |
+    | A proposal made in a workspace's setup conversation waits for the person
+    | who signed up and walked away. Seven days covers the day-2 nudge and a
+    | weekend before the card lapses.
+    */
+
+    'setup_pending_action_expiry_minutes' => 10080,
+
+    /*
+    |--------------------------------------------------------------------------
     | Conversation Context Window
     |--------------------------------------------------------------------------
     |
