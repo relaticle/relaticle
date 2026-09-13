@@ -13,7 +13,7 @@ pipeline de ventas en un solo sitio.
 
 - **Equipo (2-3 personas):** dirección/desarrollo, socio dev y un comercial.
 - **Clientes:** pymes españolas (agencia CrabDev y demás líneas de negocio).
-- **Idioma de la interfaz:** español.
+- **Idioma de la interfaz:** español (`APP_LOCALE=es`).
 - **Acceso:** solo por invitación; sin web pública.
 
 ## Stack (heredado de Relaticle)
@@ -39,8 +39,8 @@ configurados. Funciona igual en VS Code (*Reopen in Container*, requiere Docker)
 y en GitHub Codespaces.
 
 - Al crearse, `post-create.sh` instala dependencias, crea `.env` (marca Crabdev,
-  sin login social, documentación ni datos de demo), migra y compila assets.
-  Es idempotente: se puede relanzar.
+  español, sin login social, documentación ni datos de demo), migra y compila
+  assets. Es idempotente: se puede relanzar.
 - `APP_URL` debe coincidir con la URL del navegador (`RedirectToPrimaryHost`
   redirige cualquier otro host). `post-create.sh` lo fija solo al crear `.env`:
   `http://localhost:8000` en local o la URL pública en Codespaces.
@@ -56,7 +56,7 @@ y en GitHub Codespaces.
 - Todo lo que ejecuta el CI (Pint, Rector, type coverage, PHPStan, Pest):
   `composer test`
 - Migraciones: `php artisan migrate`
-- Primer usuario (el registro está cerrado): `php artisan make:filament-user`
+- Primer usuario (el registro está cerrado): `php artisan make:filament-user --panel=app`
 - Aplicar nuestro pipeline y campos a un workspace:
   `php artisan crm:configurar-pipeline {id-o-slug}` (idempotente)
 
@@ -73,16 +73,27 @@ y en GitHub Codespaces.
    borrado de datos).
 4. **No tocar la lógica multi-tenant / teams** salvo que se pida: somos un solo
    equipo, un solo workspace.
-5. **PSR-12** y las convenciones ya presentes en el repo (Pint + Rector).
-6. **UI en español:** usa la localización de Laravel/Filament (`lang/es`), no
-   textos hardcodeados. **Pendiente:** upstream solo trae `lang/en` (y un
-   ejemplo parcial en `lang/fr`). Sigue `docs/i18n.md`: `cp -r lang/en lang/es`,
-   traducir, `php artisan lang:update`,
-   `php artisan locale:diff es --update-snapshot` (commitear
-   `lang/.snapshots/es.json`) y `APP_LOCALE=es`. Al traducir, cambia
-   «Relaticle» por «Crabdev CRM» (en `lang/en` aparece ~36 veces, p. ej.
-   `auth.login.welcome`). Los nombres de los campos personalizados son datos,
-   no traducciones: los pone en español `crm:configurar-pipeline`.
+5. **PSR-12** y las convenciones ya presentes en el repo (Pint + Rector). Pint
+   también revisa `lang/`.
+6. **UI en español:** usa la localización de Laravel/Filament, no textos
+   hardcodeados. Todo texto nuevo va en `lang/en` **y** en `lang/es`. Nunca
+   escribas «Relaticle» en español: es «Crabdev CRM».
+
+## Español
+- `lang/es/`: traducción completa de `lang/en/` (glosario: Workspace →
+  espacio de trabajo, People → Contactos, Account Owner → Responsable de la
+  cuenta; «Rela», el asistente de IA, conserva su nombre).
+- `lang/es/{auth,pagination,passwords,validation}.php` y `lang/es.json` parten
+  de Laravel Lang (`php artisan lang:add es`) con las claves propias de
+  Relaticle añadidas.
+- `lang/vendor/custom-fields/es/` y `lang/vendor/activity-log/es/`: paquetes
+  de Relaticle que no traen español. Filament y Flowforge sí lo traen.
+- `tests/Feature/Crm/SpanishTranslationTest.php` **falla si falta en español
+  alguna clave** de `lang/en` o de esos paquetes (p. ej. tras un
+  `git pull upstream main` o un `composer update`): tradúcela y actualiza el
+  snapshot.
+- Sigue sin traducir (código de upstream con texto fijo): el aviso de
+  «exportación terminada» de los exportadores.
 
 ## Personalización Crabdev (sin tocar el core)
 Todo vive en archivos propios y se controla con `config/crm.php`:
@@ -98,7 +109,8 @@ Todo vive en archivos propios y se controla con `config/crm.php`:
   documentación, legales… redirigen a la app (lista en
   `crm.access.public_paths`).
 - `app/Support/Crm/SignupGate.php`: desde la web solo se crea cuenta con
-  invitación pendiente; por Artisan, siempre.
+  invitación pendiente **por correo** (el enlace de invitación no sirve para
+  gente sin cuenta); por Artisan, siempre.
 - Flags (por defecto activos salvo en los tests de upstream, `APP_ENV=testing`):
   `CRM_BRANDING`, `CRM_PUBLIC_PAGES`, `CRM_OPEN_SIGNUP`.
 
@@ -107,9 +119,16 @@ Todo vive en archivos propios y se controla con `config/crm.php`:
   (ahora público; **pasarlo a privado**). `upstream` = `Relaticle/relaticle`.
 - Personalizar vía config, Custom Fields y archivos propios siempre que se
   pueda, evitando editar el core, para poder hacer `git pull upstream main`.
-- Tras cada `git pull upstream main`: `php artisan locale:diff es` para ver
-  textos nuevos o cambiados que traducir, y revisar si cambiaron las vistas que
-  sustituimos en `resources/views/crm/` o aparecieron páginas públicas nuevas.
+- Tras cada `git pull upstream main`:
+  1. Pasar los tests: `SpanishTranslationTest` avisa de textos nuevos.
+  2. Ver qué textos de `lang/en` cambiaron (sin el ruido de `es.json`, que
+     siempre sale como «orphaned» porque upstream no tiene `en.json`):
+     `php artisan locale:diff es --format=json | php -r '$d=json_decode(stream_get_contents(STDIN),true); foreach(["missing","stale"] as $k) foreach($d[$k] as $i) echo "$k: {$i["key"]}\n";'`
+  3. Traducir y fijar la nueva referencia:
+     `php artisan locale:diff es --update-snapshot` (commitear
+     `lang/.snapshots/es.json`).
+  4. Revisar si cambiaron las vistas que sustituimos en `resources/views/crm/`
+     o aparecieron páginas públicas nuevas.
 - Contexto personal o no versionado → `CLAUDE.local.md` (no commitear).
 - `.env` no se versiona: hay que recrearlo en cada máquina.
 
@@ -119,14 +138,18 @@ Todo vive en archivos propios y se controla con `config/crm.php`:
   (`ghcr.io/relaticle/relaticle:latest`), **no nuestro código**. Para
   desplegar el fork hay que construir nuestra imagen con el `Dockerfile` de la
   raíz y apuntar `compose.yml` a ella.
-- Variables: `APP_NAME="Crabdev CRM"`, `REQUIRE_EMAIL_VERIFICATION=true`, SMTP
-  real (`MAIL_MAILER=smtp`), `RELATICLE_FEATURE_SOCIAL_AUTH=false`,
+- Variables: `APP_NAME="Crabdev CRM"`, `APP_LOCALE=es`,
+  `APP_FAKER_LOCALE=es_ES`, `REQUIRE_EMAIL_VERIFICATION=true`, SMTP real
+  (`MAIL_MAILER=smtp`), `RELATICLE_FEATURE_SOCIAL_AUTH=false`,
   `RELATICLE_FEATURE_DOCUMENTATION=false` y
   `RELATICLE_FEATURE_ONBOARD_SEED=false` (si no, la primera cuenta recibe datos
   de demo).
-- Arranque: `php artisan make:filament-user` (primer admin) → entrar y crear el
-  workspace → `php artisan crm:configurar-pipeline {id-o-slug}` → invitar al
-  equipo desde el CRM.
+- Arranque: `php artisan make:filament-user --panel=app` (primer admin) →
+  entrar y crear el workspace → `php artisan crm:configurar-pipeline
+  {id-o-slug}` → invitar al equipo **por correo** desde el CRM.
+- Ojo: `make:filament-user` deja el email **sin verificar** (visto en local), y
+  con `REQUIRE_EMAIL_VERIFICATION=true` el admin quedaría bloqueado. Verifícalo a
+  mano: `php artisan tinker --execute='App\Models\User::where("email", "tu@email")->firstOrFail()->forceFill(["email_verified_at" => now()])->save();'`
 
 ## Nuestro pipeline de ventas
 Etapas (columnas del tablero): **Oportunidad → Contactado → En trámite →
@@ -143,9 +166,9 @@ renombran y conservan sus oportunidades; el resto se borran solo si nadie las
 usa.
 
 ## Roadmap
-- **Fase 1:** instalar y arrancar, crear usuario admin, invitar al equipo,
-  localización en español, configurar etapas del pipeline y campos, cargar los
-  clientes actuales.
+- **Fase 1:** instalar y arrancar ✅, localización en español ✅, configurar
+  etapas del pipeline y campos ✅ (comando), crear usuario admin, invitar al
+  equipo, cargar los clientes actuales (pendientes, en el VPS).
 - **Fase 2:** dashboard (valor por etapa, tasa de conversión) y recordatorios de
   seguimiento.
 - **Fase 3:** integraciones (email / calendario) y aprovechar el MCP/API.

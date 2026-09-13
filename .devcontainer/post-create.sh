@@ -25,6 +25,8 @@ if [ ! -f .env ]; then
 
     # CRM interno de Crabdev: sin login social, documentación ni datos de demo.
     sed -i 's|^APP_NAME=.*|APP_NAME="Crabdev CRM"|' .env
+    sed -i 's|^APP_LOCALE=.*|APP_LOCALE=es|' .env
+    sed -i 's|^APP_FAKER_LOCALE=.*|APP_FAKER_LOCALE=es_ES|' .env
     cat >> .env <<'ENV'
 
 RELATICLE_FEATURE_SOCIAL_AUTH=false
