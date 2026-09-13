@@ -8,6 +8,10 @@ use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -141,6 +145,60 @@ it('still fails when the provider error is not a rate limit', function (): void 
 
     $job->handle($factory, resolve(StoreEmailAction::class));
 })->throws(GoogleServiceException::class, 'Backend Error');
+
+it('adopts a pending Microsoft sent row when the canonical Graph id arrives', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_inbox' => true,
+        'sync_sent' => true,
+    ]));
+
+    $sent = Email::factory()->outbound()->create([
+        'team_id' => $account->team_id,
+        'user_id' => $account->user_id,
+        'connected_account_id' => $account->getKey(),
+        'rfc_message_id' => '<local-id@example.com>',
+        'provider_message_id' => 'ms-pending-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'thread_id' => 'ms-pending-thread-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'status' => EmailStatus::SENT,
+        'subject' => 'Hi',
+    ]);
+
+    $fetched = new FetchedEmailData(
+        providerMessageId: 'AAA1',
+        rfcMessageId: '<provider-id@example.com>',
+        threadId: 'conversation-1',
+        inReplyTo: null,
+        subject: 'Hi from Graph',
+        snippet: 'Hi',
+        sentAt: now(),
+        direction: EmailDirection::OUTBOUND,
+        folder: EmailFolder::Sent,
+        hasAttachments: false,
+        isRead: true,
+        bodyText: 'Hi',
+        bodyHtml: '<p>Hi</p>',
+        participants: [
+            ['email_address' => 'owner@example.com', 'name' => 'Owner', 'role' => 'from'],
+        ],
+        attachments: [],
+        reconciliationMessageId: '<local-id@example.com>',
+    );
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchMessage')->once()->with('AAA1')->andReturn($fetched);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    $job = new StoreEmailJob($account, 'AAA1');
+    $job->handle($factory, resolve(StoreEmailAction::class));
+
+    expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(1)
+        ->and($sent->refresh()->provider_message_id)->toBe('AAA1')
+        ->and($sent->thread_id)->toBe('conversation-1')
+        ->and($sent->rfc_message_id)->toBe('<provider-id@example.com>')
+        ->and($sent->status)->toBe(EmailStatus::SENT);
+});
 
 it('releases using the Retry-After header from Microsoft Graph', function (): void {
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());

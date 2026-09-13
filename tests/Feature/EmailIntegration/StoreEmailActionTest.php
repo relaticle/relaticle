@@ -57,6 +57,7 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
         ],
         attachments: $overrides['attachments'] ?? [],
         providerCategory: $overrides['providerCategory'] ?? null,
+        reconciliationMessageId: $overrides['reconciliationMessageId'] ?? null,
     );
 }
 
@@ -632,4 +633,114 @@ it('does not bump mailbox import progress after the history cursor is written', 
     resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData());
 
     expect($this->account->fresh()?->initial_sync_imported)->toBe(0);
+});
+
+it('adopts a pending Microsoft sent row instead of creating a duplicate', function (): void {
+    $pendingThreadId = 'ms-pending-thread-01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
+    $sent = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => '<local-id@example.com>',
+        'provider_message_id' => 'ms-pending-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'thread_id' => $pendingThreadId,
+        'status' => EmailStatus::SENT,
+        'subject' => 'Hi',
+    ]);
+
+    EmailThread::factory()->create([
+        'team_id' => $this->team->id,
+        'connected_account_id' => $this->account->getKey(),
+        'thread_id' => $pendingThreadId,
+        'subject' => 'Hi',
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'AAA1',
+        'rfcMessageId' => '<provider-id@example.com>',
+        'reconciliationMessageId' => '<local-id@example.com>',
+        'threadId' => 'conversation-1',
+        'subject' => 'Hi from Graph',
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Sent,
+    ]));
+
+    expect($email->is($sent))->toBeTrue()
+        ->and(Email::query()->where('connected_account_id', $this->account->getKey())->count())->toBe(1);
+
+    expect($email->refresh())
+        ->provider_message_id->toBe('AAA1')
+        ->thread_id->toBe('conversation-1')
+        ->rfc_message_id->toBe('<provider-id@example.com>')
+        ->status->toBe(EmailStatus::SENT)
+        ->subject->toBe('Hi');
+
+    $this->assertDatabaseHas('email_threads', [
+        'connected_account_id' => $this->account->getKey(),
+        'thread_id' => 'conversation-1',
+    ]);
+
+    $this->assertDatabaseMissing('email_threads', [
+        'connected_account_id' => $this->account->getKey(),
+        'thread_id' => $pendingThreadId,
+    ]);
+});
+
+it('adopts a pending Microsoft sent row when Graph keeps the stamped message id', function (): void {
+    $sent = Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => '<local-id@example.com>',
+        'provider_message_id' => 'ms-pending-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'thread_id' => 'ms-pending-thread-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'status' => EmailStatus::SENT,
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'AAA1',
+        'rfcMessageId' => '<local-id@example.com>',
+        'threadId' => 'conversation-1',
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Sent,
+    ]));
+
+    expect($email->is($sent))->toBeTrue()
+        ->and($email->refresh()->provider_message_id)->toBe('AAA1')
+        ->and(Email::query()->where('connected_account_id', $this->account->getKey())->count())->toBe(1);
+});
+
+it('does not adopt a pending Microsoft send that belongs to another mailbox', function (): void {
+    $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    Email::factory()->outbound()->create([
+        'team_id' => $this->team->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $otherAccount->getKey(),
+        'rfc_message_id' => '<local-id@example.com>',
+        'provider_message_id' => 'ms-pending-OTHERMAILBOX',
+        'thread_id' => 'ms-pending-thread-OTHERMAILBOX',
+        'status' => EmailStatus::SENT,
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'AAA1',
+        'rfcMessageId' => '<provider-id@example.com>',
+        'reconciliationMessageId' => '<local-id@example.com>',
+        'threadId' => 'conversation-1',
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Sent,
+    ]));
+
+    expect(Email::query()->where('connected_account_id', $this->account->getKey())->count())->toBe(1)
+        ->and(Email::query()->where('connected_account_id', $otherAccount->getKey())->count())->toBe(1);
+
+    $this->assertDatabaseHas('emails', [
+        'connected_account_id' => $otherAccount->getKey(),
+        'provider_message_id' => 'ms-pending-OTHERMAILBOX',
+    ]);
 });

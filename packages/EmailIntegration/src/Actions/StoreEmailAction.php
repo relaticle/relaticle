@@ -9,14 +9,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
+use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+use Relaticle\EmailIntegration\Services\MicrosoftGraphMailService;
 use Symfony\Component\Mime\MimeTypes;
 use Throwable;
 
@@ -30,6 +33,14 @@ final readonly class StoreEmailAction
      */
     public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
+        $adopted = $this->adoptPendingSentEmail($connectedAccount, $data);
+
+        if ($adopted instanceof Email) {
+            $this->bumpInitialImportProgress($connectedAccount);
+
+            return $adopted;
+        }
+
         $storedInlinePaths = [];
 
         try {
@@ -187,6 +198,78 @@ final readonly class StoreEmailAction
         $storedInlinePaths[] = $path;
 
         return $path;
+    }
+
+    /**
+     * Graph /me/sendMail returns no id, so a successful send stores ms-pending-*
+     * placeholders. Import must attach the canonical Graph ids to that SENT row.
+     */
+    private function adoptPendingSentEmail(ConnectedAccount $connectedAccount, FetchedEmailData $data): ?Email
+    {
+        $messageIds = array_values(array_unique(array_filter(
+            [$data->reconciliationMessageId, $data->rfcMessageId],
+            fn (?string $id): bool => is_string($id) && $id !== '',
+        )));
+
+        if ($messageIds === []) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($connectedAccount, $data, $messageIds): ?Email {
+            $pending = Email::query()
+                ->where('connected_account_id', $connectedAccount->getKey())
+                ->whereIn('rfc_message_id', $messageIds)
+                ->get()
+                ->first(fn (Email $email): bool => str_starts_with((string) $email->provider_message_id, MicrosoftGraphMailService::PENDING_MESSAGE_ID_PREFIX));
+
+            if (! $pending instanceof Email) {
+                return null;
+            }
+
+            $previousThreadId = $pending->thread_id;
+            $threadId = $data->threadId !== '' ? $data->threadId : $pending->thread_id;
+
+            $pending->update([
+                'provider_message_id' => $data->providerMessageId,
+                'thread_id' => $threadId,
+                'rfc_message_id' => $data->rfcMessageId ?? $pending->rfc_message_id,
+                'status' => EmailStatus::SENT,
+                'folder' => $data->folder ?? $pending->folder,
+            ]);
+
+            if (is_string($threadId) && $threadId !== '') {
+                resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $threadId);
+            }
+
+            $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
+
+            return $pending->refresh();
+        });
+    }
+
+    private function forgetPendingThread(ConnectedAccount $connectedAccount, ?string $previousThreadId, ?string $canonicalThreadId): void
+    {
+        if (! is_string($previousThreadId) || $previousThreadId === $canonicalThreadId) {
+            return;
+        }
+
+        if (! str_starts_with($previousThreadId, MicrosoftGraphMailService::PENDING_THREAD_ID_PREFIX)) {
+            return;
+        }
+
+        $stillUsed = Email::query()
+            ->where('connected_account_id', $connectedAccount->getKey())
+            ->where('thread_id', $previousThreadId)
+            ->exists();
+
+        if ($stillUsed) {
+            return;
+        }
+
+        EmailThread::query()
+            ->where('connected_account_id', $connectedAccount->getKey())
+            ->where('thread_id', $previousThreadId)
+            ->delete();
     }
 
     private function bumpInitialImportProgress(ConnectedAccount $connectedAccount): void

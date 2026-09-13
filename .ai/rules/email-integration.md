@@ -99,6 +99,13 @@ as a JSON list, and replay all of them on incremental sync. Do not keep only
 the last future window. A raw Graph delta URL is expired so the account
 rebuilds full coverage.
 
+## Microsoft sent mail must be adopted on import
+
+Graph `/me/sendMail` returns 202 with no body. A successful send stores
+`ms-pending-*` placeholders. The next delta delivers a different Graph id
+and `internetMessageId`. Match the RelaticleMessageId extended property
+and update that SENT row. Creating a new synced row duplicates the send.
+
 ## Authorize composer inline images
 
 `EmailInlineImageEmbedder` copies files named in composer HTML (`data-id` or

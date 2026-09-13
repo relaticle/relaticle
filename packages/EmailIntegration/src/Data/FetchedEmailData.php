@@ -38,5 +38,6 @@ final readonly class FetchedEmailData
          * back to AI.
          */
         public ?EmailCategory $providerCategory = null,
+        public ?string $reconciliationMessageId = null,
     ) {}
 }
