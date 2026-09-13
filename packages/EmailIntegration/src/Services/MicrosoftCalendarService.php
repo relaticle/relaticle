@@ -8,6 +8,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Date;
 use InvalidArgumentException;
+use JsonException;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
@@ -34,14 +35,45 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
 
     public function initialSync(?string $pageToken = null): CalendarSyncResult
     {
-        $url = $pageToken ?? $this->calendarWindowUrl($this->historyStart());
+        if ($pageToken === null || $pageToken === '') {
+            return $this->drainOnePage(
+                url: $this->calendarWindowUrl($this->historyStart()),
+                isInitial: true,
+            );
+        }
 
-        return $this->drainOnePage($url, isInitial: true);
+        $page = $this->decodePageToken($pageToken);
+
+        return $this->drainOnePage(
+            url: $page['url'],
+            isInitial: true,
+            completedCursors: $page['cursors'],
+            windowEnd: $page['windowEnd'],
+            importBoundary: $page['importBoundary'],
+        );
     }
 
     public function fetchDelta(string $syncToken): CalendarSyncResult
     {
-        return $this->drainOnePage($syncToken, isInitial: false);
+        $events = [];
+        $updatedCursors = [];
+
+        foreach ($this->decodeSyncCursors($syncToken) as $cursor) {
+            $result = $this->drainOnePage($cursor, isInitial: false);
+
+            foreach ($result->events as $event) {
+                $events[] = $event;
+            }
+
+            $updatedCursors[] = is_string($result->nextSyncToken) && $result->nextSyncToken !== ''
+                ? $result->nextSyncToken
+                : $cursor;
+        }
+
+        return new CalendarSyncResult(
+            events: $events,
+            nextSyncToken: $this->encodeSyncCursors($updatedCursors),
+        );
     }
 
     public function respondToEvent(string $eventId, AttendeeResponseStatus $status): void
@@ -188,11 +220,18 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     }
 
     /**
-     * @param  bool  $isInitial  When true, stop after one HTTP page and chain remaining windows via nextPageToken
+     * @param  list<string>  $completedCursors
      */
-    private function drainOnePage(string $url, bool $isInitial): CalendarSyncResult
-    {
+    private function drainOnePage(
+        string $url,
+        bool $isInitial,
+        array $completedCursors = [],
+        ?CarbonInterface $windowEnd = null,
+        ?CarbonInterface $importBoundary = null,
+    ): CalendarSyncResult {
         $http = $this->clientFactory->make($this->account);
+        $windowEnd ??= $this->endDateTimeFromUrl($url);
+        $importBoundary ??= $this->importBoundaryFromUrl($url) ?? $this->importBoundary();
 
         try {
             $response = $http->get($url)->throw()->json();
@@ -246,24 +285,40 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         }
 
         if (is_string($nextLink) && $nextLink !== '') {
-            $importBoundary = $this->importBoundaryFromUrl($url) ?? $this->importBoundary();
-
             return new CalendarSyncResult(
                 events: $events,
                 nextSyncToken: null,
-                nextPageToken: $this->withImportBoundary($nextLink, $importBoundary),
+                nextPageToken: $this->encodePageToken(
+                    $this->withImportBoundary($nextLink, $importBoundary),
+                    $completedCursors,
+                    $windowEnd,
+                    $importBoundary,
+                ),
             );
         }
 
-        $nextWindow = $this->nextWindowUrl($url);
+        if (is_string($deltaLink) && $deltaLink !== '') {
+            $completedCursors[] = $deltaLink;
+        }
+
+        $nextWindow = $this->nextWindowUrlFromEnd($windowEnd, $importBoundary);
 
         if ($nextWindow !== null) {
-            return new CalendarSyncResult(events: $events, nextSyncToken: null, nextPageToken: $nextWindow);
+            return new CalendarSyncResult(
+                events: $events,
+                nextSyncToken: null,
+                nextPageToken: $this->encodePageToken(
+                    $nextWindow,
+                    $completedCursors,
+                    $this->endDateTimeFromUrl($nextWindow),
+                    $importBoundary,
+                ),
+            );
         }
 
         return new CalendarSyncResult(
             events: $events,
-            nextSyncToken: is_string($deltaLink) && $deltaLink !== '' ? $deltaLink : null,
+            nextSyncToken: $this->encodeSyncCursors($completedCursors),
         );
     }
 
@@ -292,21 +347,135 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             .'&'.self::IMPORT_BOUNDARY_PARAM.'='.rawurlencode($importBoundary->toIso8601String());
     }
 
-    private function nextWindowUrl(string $currentUrl): ?string
+    private function nextWindowUrlFromEnd(?CarbonInterface $end, CarbonInterface $importBoundary): ?string
     {
-        $end = $this->endDateTimeFromUrl($currentUrl);
-
-        if (! $end instanceof CarbonInterface) {
-            return null;
-        }
-
-        $importBoundary = $this->importBoundaryFromUrl($currentUrl) ?? $this->importBoundary();
-
-        if ($end->gte($importBoundary)) {
+        if (! $end instanceof CarbonInterface || $end->gte($importBoundary)) {
             return null;
         }
 
         return $this->calendarWindowUrl($end, $importBoundary);
+    }
+
+    /**
+     * Graph delta tokens stay bound to the window that created them.
+     *
+     * @param  list<string>  $cursors
+     */
+    private function encodePageToken(
+        string $url,
+        array $cursors,
+        ?CarbonInterface $windowEnd,
+        CarbonInterface $importBoundary,
+    ): string {
+        return json_encode([
+            'url' => $url,
+            'cursors' => $cursors,
+            'windowEnd' => $windowEnd?->toIso8601String(),
+            'importBoundary' => $importBoundary->toIso8601String(),
+        ], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array{url: string, cursors: list<string>, windowEnd: CarbonInterface|null, importBoundary: CarbonInterface|null}
+     */
+    private function decodePageToken(string $pageToken): array
+    {
+        if (! str_starts_with($pageToken, '{')) {
+            return [
+                'url' => $pageToken,
+                'cursors' => [],
+                'windowEnd' => $this->endDateTimeFromUrl($pageToken),
+                'importBoundary' => $this->importBoundaryFromUrl($pageToken),
+            ];
+        }
+
+        try {
+            $decoded = json_decode($pageToken, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new InvalidArgumentException('Invalid Microsoft calendar page token.');
+        }
+
+        throw_unless(is_array($decoded), InvalidArgumentException::class, 'Invalid Microsoft calendar page token.');
+
+        $url = $decoded['url'] ?? null;
+
+        throw_if(! is_string($url) || $url === '', InvalidArgumentException::class, 'Invalid Microsoft calendar page token.');
+
+        $rawCursors = $decoded['cursors'] ?? [];
+
+        throw_unless(is_array($rawCursors), InvalidArgumentException::class, 'Invalid Microsoft calendar page token.');
+
+        $cursors = [];
+
+        foreach ($rawCursors as $cursor) {
+            if (is_string($cursor) && $cursor !== '') {
+                $cursors[] = $cursor;
+            }
+        }
+
+        $windowEndValue = $decoded['windowEnd'] ?? null;
+        $windowEnd = is_string($windowEndValue) && $windowEndValue !== ''
+            ? Date::parse($windowEndValue)
+            : $this->endDateTimeFromUrl($url);
+
+        $importBoundaryValue = $decoded['importBoundary'] ?? null;
+        $importBoundary = is_string($importBoundaryValue) && $importBoundaryValue !== ''
+            ? Date::parse($importBoundaryValue)
+            : $this->importBoundaryFromUrl($url);
+
+        return [
+            'url' => $url,
+            'cursors' => $cursors,
+            'windowEnd' => $windowEnd,
+            'importBoundary' => $importBoundary,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $cursors
+     */
+    private function encodeSyncCursors(array $cursors): ?string
+    {
+        $cursors = array_values(array_filter(
+            $cursors,
+            static fn (string $cursor): bool => $cursor !== '',
+        ));
+
+        if ($cursors === []) {
+            return null;
+        }
+
+        return json_encode($cursors, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function decodeSyncCursors(string $syncToken): array
+    {
+        try {
+            $decoded = json_decode($syncToken, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw CalendarSyncTokenExpired::forAccount($this->account->getKey());
+        }
+
+        if (! is_array($decoded) || ! array_is_list($decoded)) {
+            throw CalendarSyncTokenExpired::forAccount($this->account->getKey());
+        }
+
+        $cursors = [];
+
+        foreach ($decoded as $cursor) {
+            if (is_string($cursor) && $cursor !== '') {
+                $cursors[] = $cursor;
+            }
+        }
+
+        if ($cursors === []) {
+            throw CalendarSyncTokenExpired::forAccount($this->account->getKey());
+        }
+
+        return $cursors;
     }
 
     private function importBoundaryFromUrl(string $url): ?CarbonInterface
