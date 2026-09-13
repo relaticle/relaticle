@@ -25,6 +25,10 @@ if [ ! -f .env ]; then
 fi
 
 composer install --no-interaction --prefer-dist
+
+# Sin esto pnpm crea .pnpm-store/ dentro del proyecto, porque /workspaces está
+# en otro sistema de ficheros que el home del contenedor.
+pnpm config set store-dir "$HOME/.local/share/pnpm/store"
 pnpm install --frozen-lockfile
 
 grep -q '^APP_KEY=base64:' .env || php artisan key:generate --ansi
