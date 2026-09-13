@@ -1,0 +1,35 @@
+# app y redis comparten la red de pgsql, así que todo responde en 127.0.0.1
+# y .env.example / .env.testing funcionan sin tocarlos.
+name: crm-devcontainer
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/crm:cached
+    network_mode: service:pgsql
+    depends_on:
+      - pgsql
+      - redis
+
+  pgsql:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: relaticle
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgsql-data:/var/lib/postgresql
+      - ./pgsql-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    network_mode: service:pgsql
+
+volumes:
+  pgsql-data:

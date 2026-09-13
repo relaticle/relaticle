@@ -1,0 +1,24 @@
+{
+    "name": "CRM (Relaticle)",
+    "dockerComposeFile": "compose.yml",
+    "service": "app",
+    "workspaceFolder": "/workspaces/crm",
+    "shutdownAction": "stopCompose",
+    "remoteUser": "vscode",
+    "updateRemoteUserUID": true,
+    "forwardPorts": [8000, 5173],
+    "portsAttributes": {
+        "8000": { "label": "App" },
+        "5173": { "label": "Vite" }
+    },
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "laravel.vscode-laravel",
+                "bradlc.vscode-tailwindcss"
+            ]
+        }
+    }
+}
